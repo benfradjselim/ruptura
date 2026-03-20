@@ -1,0 +1,75 @@
+# src/monitoring/grafana/dashboard.yaml
+
+dashboard:
+  title: System Monitoring Dashboard
+  time_range: 1h
+  rows:
+    - title: CPU Usage
+      panels:
+        - title: CPU Usage Percentage
+          type: graph
+          span: 12
+          datasource: Prometheus
+          targets:
+            - expr: '100 * (1 - rate(node_cpu_seconds_total{namespace="default"}[1m]))'
+              legend: '{{ pod_name }}'
+              refId: A
+          yaxes:
+            - format: percent
+              label: CPU Usage
+          xaxis:
+            - buckets: 10
+          gridPos:
+            - h: 8
+            - w: 12
+            - x: 0
+            - y: 0
+
+    - title: Memory Usage
+      panels:
+        - title: Memory Usage Percentage
+          type: graph
+          span: 12
+          datasource: Prometheus
+          targets:
+            - expr: '(node_memory_MemTotal_bytes{namespace="default"} - node_memory_MemFree_bytes{namespace="default"}) / node_memory_MemTotal_bytes{namespace="default"} * 100'
+              legend: '{{ pod_name }}'
+              refId: B
+          yaxes:
+            - format: percent
+              label: Memory Usage
+          xaxis:
+            - buckets: 10
+          gridPos:
+            - h: 8
+            - w: 12
+            - x: 0
+            - y: 8
+
+    - title: Network Traffic
+      panels:
+        - title: Network In/Out
+          type: stat
+          span: 12
+          datasource: Prometheus
+          targets:
+            - expr: 'rate(node_network_bytes_total{namespace="default"}[5m])'
+              legend: '{{ pod_name }}'
+              refId: C
+          yaxes:
+            - format: bytes
+              label: Network Traffic
+          xaxis:
+            - buckets: 10
+          gridPos:
+            - h: 8
+            - w: 12
+            - x: 0
+            - y: 16
+
+  refresh: 30s
+  description: A comprehensive dashboard for monitoring system resources
+  tags:
+    - system
+    - monitoring
+    - infrastructure

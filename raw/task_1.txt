@@ -1,0 +1,58 @@
+```python
+from fastapi import FastAPI, CORS, HTTPException
+from pydantic import BaseModel
+import uvicorn
+
+# Create FastAPI app
+app = FastAPI()
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Base response model
+class BaseResponse(BaseModel):
+    success: bool
+    data: dict | None
+    error: str | None
+
+# Item model
+class Item(BaseModel):
+    id: int
+    name: str
+    description: str
+    price: float
+    created_at: str
+
+# In-memory data storage
+items = [
+    {"id": 1, "name": "Item 1", "description": "First item", "price": 10.99, "created_at": "2023-01-01"},
+    {"id": 2, "name": "Item 2", "description": "Second item", "price": 9.99, "created_at": "2023-01-02"},
+]
+item_counter = 3
+
+# Root endpoint
+@app.get("/")
+async def root():
+    return {"message": "Welcome to FastAPI!"}
+
+# Get all items
+@app.get("/items")
+async def get_all_items():
+    return BaseResponse(success=True, data={"items": items}, error=None).dict()
+
+# Create new item
+@app.post("/items")
+async def create_item(item: Item):
+    global item_counter
+    new_item = {
+        "id": item_counter,
+        "name": item.name,
+        "description": item.description,
+        "price": item.price,
+        "

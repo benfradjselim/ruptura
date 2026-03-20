@@ -1,0 +1,22 @@
+# Configuration file for the application
+
+database:
+  host: localhost
+  port: 5432
+  name: mydatabase
+  user: myuser
+  password: mypassword
+
+server:
+  host: 0.0.0.0
+  port: 8000
+  debug: true
+
+application:
+  secret_key: your-secret-key-here
+  logging:
+    level: INFO
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  allowed_origins:
+    - http://localhost:3000
+    - http://127.0.0.1:3000

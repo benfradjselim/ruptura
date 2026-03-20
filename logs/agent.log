@@ -1,0 +1,210 @@
+[2026-03-20 08:44:01] 🚀 Démarrage de l'Agent 2 (Code Generator)
+[2026-03-20 08:44:01] ✅ OpenRouter: clé configurée
+[2026-03-20 08:44:01] ✅ Modèle: google/gemini-2.0-flash-exp:free
+[2026-03-20 08:44:01] 📦 Initialisation du dépôt GitHub...
+[2026-03-20 08:44:01] ✅ Dépôt GitHub initialisé
+[2026-03-20 08:44:01] 📡 API démarrée sur http://0.0.0.0:8001
+[2026-03-20 08:44:31] 🚀 Démarrage de l'Agent 2 (Code Generator)
+[2026-03-20 08:44:31] ✅ OpenRouter: clé configurée
+[2026-03-20 08:44:31] ✅ Modèle: google/gemini-2.0-flash-exp:free
+[2026-03-20 08:44:31] 📦 Initialisation du dépôt GitHub...
+[2026-03-20 08:44:31] ✅ Dépôt GitHub initialisé
+[2026-03-20 08:44:31] 📡 API démarrée sur http://0.0.0.0:8001
+[2026-03-20 08:48:21] 📝 Génération de code pour: Créer l'API FastAPI
+[2026-03-20 08:48:21] ❌ OpenRouter erreur 404: {"error":{"message":"No endpoints found for google/gemini-2.0-flash-exp:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 08:48:21] ⚠️ Aucun bloc de code trouvé, sauvegarde brute
+[2026-03-20 08:48:21]   ✅ Fichier créé: raw/task_1.txt
+[2026-03-20 08:48:31] 📝 Génération de code pour: Développer le modèle ML
+[2026-03-20 08:48:31] ❌ OpenRouter erreur 404: {"error":{"message":"No endpoints found for google/gemini-2.0-flash-exp:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 08:48:31] ⚠️ Aucun bloc de code trouvé, sauvegarde brute
+[2026-03-20 08:48:31]   ✅ Fichier créé: raw/task_2.txt
+[2026-03-20 08:48:41] 📝 Génération de code pour: Créer le dashboard
+[2026-03-20 08:48:41] ❌ OpenRouter erreur 404: {"error":{"message":"No endpoints found for google/gemini-2.0-flash-exp:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 08:48:41] ⚠️ Aucun bloc de code trouvé, sauvegarde brute
+[2026-03-20 08:48:41]   ✅ Fichier créé: raw/task_3.txt
+[2026-03-20 08:49:08] 📝 Génération de code pour: Créer l'API FastAPI
+[2026-03-20 08:49:08] ❌ OpenRouter erreur 404: {"error":{"message":"No endpoints found for google/gemini-2.0-flash-exp:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 08:49:08] ⚠️ Aucun bloc de code trouvé, sauvegarde brute
+[2026-03-20 08:49:08]   ✅ Fichier créé: raw/task_1.txt
+[2026-03-20 08:49:18] 📝 Génération de code pour: Développer le modèle ML
+[2026-03-20 08:49:18] ❌ OpenRouter erreur 404: {"error":{"message":"No endpoints found for google/gemini-2.0-flash-exp:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 08:49:18] ⚠️ Aucun bloc de code trouvé, sauvegarde brute
+[2026-03-20 08:49:18]   ✅ Fichier créé: raw/task_2.txt
+[2026-03-20 08:49:28] 📝 Génération de code pour: Créer le dashboard
+[2026-03-20 08:49:28] ❌ OpenRouter erreur 404: {"error":{"message":"No endpoints found for google/gemini-2.0-flash-exp:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 08:49:28] ⚠️ Aucun bloc de code trouvé, sauvegarde brute
+[2026-03-20 08:49:28]   ✅ Fichier créé: raw/task_3.txt
+[2026-03-20 10:09:24] 🚀 Démarrage de l'Agent 2 (Code Generator)
+[2026-03-20 10:09:24] ✅ OpenRouter: clé configurée
+[2026-03-20 10:09:24] ✅ Modèles disponibles: ['deepseek/deepseek-r1:free', 'deepseek/deepseek-v3:free', 'mistralai/mistral-7b-instruct:free', 'nousresearch/nous-hermes-2-mixtral-8x7b:free', 'openai/gpt-3.5-turbo:free']
+[2026-03-20 10:09:24] 📦 Initialisation du dépôt GitHub...
+[2026-03-20 10:09:24] ✅ Dépôt GitHub initialisé
+[2026-03-20 10:09:24] 📡 API démarrée sur http://0.0.0.0:8001
+[2026-03-20 10:13:42] 🚀 Démarrage de l'Agent 2 (Code Generator)
+[2026-03-20 10:13:42] ✅ OpenRouter: clé configurée
+[2026-03-20 10:13:42] ✅ Modèles disponibles: ['deepseek/deepseek-r1:free', 'deepseek/deepseek-v3:free', 'mistralai/mistral-7b-instruct:free', 'nousresearch/nous-hermes-2-mixtral-8x7b:free', 'openai/gpt-3.5-turbo:free']
+[2026-03-20 10:13:42] 📦 Initialisation du dépôt GitHub...
+[2026-03-20 10:13:42] ✅ Dépôt GitHub initialisé
+[2026-03-20 10:13:42] 📡 API démarrée sur http://0.0.0.0:8001
+[2026-03-20 10:15:24] 📝 Génération de code pour: Créer l'API FastAPI
+[2026-03-20 10:15:24] 🔄 Tentative avec modèle: deepseek/deepseek-r1:free
+[2026-03-20 10:15:24] ⚠️ deepseek/deepseek-r1:free échoué: Erreur 404: {"error":{"message":"No endpoints found for deepseek/deepseek-r1:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:25] 🔄 Tentative avec modèle: deepseek/deepseek-v3:free
+[2026-03-20 10:15:26] ⚠️ deepseek/deepseek-v3:free échoué: Erreur 400: {"error":{"message":"deepseek/deepseek-v3:free is not a valid model ID","code":400},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:27] 🔄 Tentative avec modèle: mistralai/mistral-7b-instruct:free
+[2026-03-20 10:15:27] ⚠️ mistralai/mistral-7b-instruct:free échoué: Erreur 404: {"error":{"message":"No endpoints found for mistralai/mistral-7b-instruct:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:28] 🔄 Tentative avec modèle: nousresearch/nous-hermes-2-mixtral-8x7b:free
+[2026-03-20 10:15:28] ⚠️ nousresearch/nous-hermes-2-mixtral-8x7b:free échoué: Erreur 400: {"error":{"message":"nousresearch/nous-hermes-2-mixtral-8x7b:free is not a valid model ID","code":400},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:29] 🔄 Tentative avec modèle: openai/gpt-3.5-turbo:free
+[2026-03-20 10:15:29] ⚠️ openai/gpt-3.5-turbo:free échoué: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:30] ❌ Tous les modèles ont échoué. Dernière erreur: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:30] ❌ ERREUR: Aucun modèle disponible. Dernière erreur: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:30]   ✅ Fichier créé: raw/error_1.txt
+[2026-03-20 10:15:40] 📝 Génération de code pour: Développer le modèle ML
+[2026-03-20 10:15:40] 🔄 Tentative avec modèle: deepseek/deepseek-r1:free
+[2026-03-20 10:15:40] ⚠️ deepseek/deepseek-r1:free échoué: Erreur 404: {"error":{"message":"No endpoints found for deepseek/deepseek-r1:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:41] 🔄 Tentative avec modèle: deepseek/deepseek-v3:free
+[2026-03-20 10:15:41] ⚠️ deepseek/deepseek-v3:free échoué: Erreur 400: {"error":{"message":"deepseek/deepseek-v3:free is not a valid model ID","code":400},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:42] 🔄 Tentative avec modèle: mistralai/mistral-7b-instruct:free
+[2026-03-20 10:15:42] ⚠️ mistralai/mistral-7b-instruct:free échoué: Erreur 404: {"error":{"message":"No endpoints found for mistralai/mistral-7b-instruct:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:43] 🔄 Tentative avec modèle: nousresearch/nous-hermes-2-mixtral-8x7b:free
+[2026-03-20 10:15:43] ⚠️ nousresearch/nous-hermes-2-mixtral-8x7b:free échoué: Erreur 400: {"error":{"message":"nousresearch/nous-hermes-2-mixtral-8x7b:free is not a valid model ID","code":400},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:44] 🔄 Tentative avec modèle: openai/gpt-3.5-turbo:free
+[2026-03-20 10:15:44] ⚠️ openai/gpt-3.5-turbo:free échoué: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:45] ❌ Tous les modèles ont échoué. Dernière erreur: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:45] ❌ ERREUR: Aucun modèle disponible. Dernière erreur: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:45]   ✅ Fichier créé: raw/error_2.txt
+[2026-03-20 10:15:55] 📝 Génération de code pour: Créer le dashboard
+[2026-03-20 10:15:55] 🔄 Tentative avec modèle: deepseek/deepseek-r1:free
+[2026-03-20 10:15:55] ⚠️ deepseek/deepseek-r1:free échoué: Erreur 404: {"error":{"message":"No endpoints found for deepseek/deepseek-r1:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:56] 🔄 Tentative avec modèle: deepseek/deepseek-v3:free
+[2026-03-20 10:15:56] ⚠️ deepseek/deepseek-v3:free échoué: Erreur 400: {"error":{"message":"deepseek/deepseek-v3:free is not a valid model ID","code":400},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:57] 🔄 Tentative avec modèle: mistralai/mistral-7b-instruct:free
+[2026-03-20 10:15:57] ⚠️ mistralai/mistral-7b-instruct:free échoué: Erreur 404: {"error":{"message":"No endpoints found for mistralai/mistral-7b-instruct:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:58] 🔄 Tentative avec modèle: nousresearch/nous-hermes-2-mixtral-8x7b:free
+[2026-03-20 10:15:58] ⚠️ nousresearch/nous-hermes-2-mixtral-8x7b:free échoué: Erreur 400: {"error":{"message":"nousresearch/nous-hermes-2-mixtral-8x7b:free is not a valid model ID","code":400},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:15:59] 🔄 Tentative avec modèle: openai/gpt-3.5-turbo:free
+[2026-03-20 10:15:59] ⚠️ openai/gpt-3.5-turbo:free échoué: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:16:00] ❌ Tous les modèles ont échoué. Dernière erreur: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:16:00] ❌ ERREUR: Aucun modèle disponible. Dernière erreur: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}
+[2026-03-20 10:16:00]   ✅ Fichier créé: raw/error_3.txt
+2026-03-20 10:21:21: 🚀 Agent 2 démarré
+2026-03-20 10:21:21: 📦 Initialisation GitHub...
+2026-03-20 10:21:21: ✅ GitHub OK
+2026-03-20 10:22:46: 📝 Tâche 1: Créer l'API FastAPI...
+2026-03-20 10:22:46: 🔄 Essai modèle: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:23:00: ✅ Modèle OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:23:00:   ✅ raw/task_1.txt
+2026-03-20 10:23:10: 📝 Tâche 2: Développer le modèle ML...
+2026-03-20 10:23:10: 🔄 Essai modèle: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:23:15: ✅ Modèle OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:23:15:   ✅ raw/task_2.txt
+2026-03-20 10:23:25: 📝 Tâche 3: Créer le dashboard...
+2026-03-20 10:23:25: 🔄 Essai modèle: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:23:38: ✅ Modèle OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:23:38:   ✅ raw/task_3.txt
+2026-03-20 10:34:31: 🚀 Agent 2 démarré
+2026-03-20 10:34:31: 📦 Init GitHub...
+2026-03-20 10:35:01: 📝 Tâche test: Génère src/api/main.py avec FastAPI et endpoint /health...
+2026-03-20 10:35:01: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:35:08: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:35:08: ✅ src/api/main.py
+2026-03-20 10:48:23: 📝 Tâche 1: Créer l'API FastAPI...
+2026-03-20 10:48:23: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:48:32: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:48:32: ✅ src/api/main.py
+2026-03-20 10:48:42: 📝 Tâche 2: Développer le modèle ML...
+2026-03-20 10:48:42: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:48:53: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:48:53: ✅ src/model/detector.py
+2026-03-20 10:49:03: 📝 Tâche 3: Créer le dashboard...
+2026-03-20 10:49:03: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:49:23: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:49:23: ✅ src/generated_1774003763.py
+2026-03-20 10:55:19: 📝 Tâche 1: 🎯 > PROJET: Solution MLOPS de prédiction d'anomalies en ligne pour Kubernetes...
+2026-03-20 10:55:19: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:55:37: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 10:55:37: ✅ Dockerfile
+2026-03-20 10:55:37: ✅ deploy/helm/templates/deployment.yaml
+2026-03-20 10:55:37: ✅ deploy/helm/templates/service.yaml
+2026-03-20 10:55:37: ✅ src/generated_1774004137.py
+2026-03-20 10:55:37: ✅ src/generated_1774004137.py
+2026-03-20 10:55:37: ✅ src/model/detector.py
+2026-03-20 10:55:37: ✅ scripts/install.sh
+2026-03-20 10:55:37: ✅ scripts/install.sh
+2026-03-20 10:55:37: ✅ scripts/install.sh
+2026-03-20 10:55:37: ✅ scripts/install.sh
+2026-03-20 11:05:57: 📝 Tâche 1: Créer src/collector/metrics.py...
+2026-03-20 11:05:57: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:06:02: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:06:02: ✅ src/collector/metrics.py
+2026-03-20 11:06:07: 📝 Tâche 2: Créer src/collector/processor.py...
+2026-03-20 11:06:07: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:06:11: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:06:11: ✅ src/collector/metrics.py
+2026-03-20 11:06:16: 📝 Tâche 3: Créer src/model/detector.py...
+2026-03-20 11:06:16: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:06:21: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:06:21: ✅ src/generated_1774004781.py
+2026-03-20 11:06:26: 📝 Tâche 4: Créer src/model/autoencoder.py...
+2026-03-20 11:06:26: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:06:39: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:06:39: ✅ src/generated_1774004799.py
+2026-03-20 11:06:44: 📝 Tâche 5: Créer src/training/train_model.py...
+2026-03-20 11:06:44: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:02: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:02: ✅ src/model/detector.py
+2026-03-20 11:07:07: 📝 Tâche 6: Créer src/api/main.py...
+2026-03-20 11:07:07: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:14: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:14: ✅ src/generated_1774004834.py
+2026-03-20 11:07:20: 📝 Tâche 7: Créer src/api/predictor.py...
+2026-03-20 11:07:20: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:31: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:31: ✅ src/generated_1774004851.py
+2026-03-20 11:07:36: 📝 Tâche 8: Créer src/deployment/docker/api/Dockerfile...
+2026-03-20 11:07:36: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:44: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:44: ✅ Dockerfile
+2026-03-20 11:07:49: 📝 Tâche 9: Créer src/deployment/docker/collector/Dockerfile...
+2026-03-20 11:07:49: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:56: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:07:56: ✅ Dockerfile
+2026-03-20 11:08:01: 📝 Tâche 10: Créer src/deployment/k8s/deployment.yaml...
+2026-03-20 11:08:01: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:08:04: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:08:04: ✅ deploy/helm/templates/deployment.yaml
+2026-03-20 11:08:09: 📝 Tâche 11: Créer src/deployment/k8s/service.yaml...
+2026-03-20 11:08:09: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:08:15: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:08:15: ✅ deploy/helm/templates/service.yaml
+2026-03-20 11:08:20: 📝 Tâche 12: Créer src/monitoring/prometheus/dashboard.yaml...
+2026-03-20 11:08:20: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:08:30: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:08:30: ✅ deploy/generated_1774004910.yaml
+2026-03-20 11:08:35: 📝 Tâche 13: Créer src/monitoring/grafana/dashboard.yaml...
+2026-03-20 11:08:35: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:08:49: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:08:49: ✅ deploy/generated_1774004929.yaml
+2026-03-20 11:08:54: 📝 Tâche 14: Créer src/logging/logging.py...
+2026-03-20 11:08:54: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:09:05: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:09:05: ✅ src/generated_1774004945.py
+2026-03-20 11:09:10: 📝 Tâche 15: Créer src/config/config.yaml...
+2026-03-20 11:09:10: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:09:12: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:09:12: ✅ deploy/generated_1774004952.yaml
+2026-03-20 11:22:33: 📝 Tâche 1: Créer src/collector/data_collector.py...
+2026-03-20 11:22:33: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:22:49: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:22:49: ✅ src/collector/metrics.py
+2026-03-20 11:24:58: 📝 Tâche 2: Créer src/collector/data_processor.py...
+2026-03-20 11:24:58: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:25:17: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:25:17: ✅ src/collector/metrics.py
+2026-03-20 11:27:31: 📝 Tâche 3: Créer src/collector/feature_engineering.py...
+2026-03-20 11:27:31: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:27:53: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:27:53: ✅ src/model/detector.py
+2026-03-20 11:28:33: 🚀 Agent 2 démarré
+2026-03-20 11:28:33: 📦 Init GitHub...
