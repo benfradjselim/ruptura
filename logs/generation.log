@@ -1,0 +1,157 @@
+2026-03-20 23:02:39: 🚀 Agent demarre
+2026-03-20 23:02:39: 
+📦 GENERATION
+2026-03-20 23:02:39: 
+--- src/collector/metrics.py ---
+2026-03-20 23:02:39: 📝 Generation: src/collector/metrics.py
+2026-03-20 23:02:39:    Role: Collecteur Prometheus
+2026-03-20 23:02:39: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:02:40: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:02:41: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:02:41: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:02:42: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:02:42: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:02:43: ❌ Echec src/collector/metrics.py
+2026-03-20 23:02:43: 
+--- src/collector/logs.py ---
+2026-03-20 23:02:43: 📝 Generation: src/collector/logs.py
+2026-03-20 23:02:43:    Role: Collecteur logs Kubernetes
+2026-03-20 23:02:43: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:02:43: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:02:44: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:02:44: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:02:45: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:02:45: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:02:46: ❌ Echec src/collector/logs.py
+2026-03-20 23:02:46: 
+--- src/model/online_detector.py ---
+2026-03-20 23:02:46: 📝 Generation: src/model/online_detector.py
+2026-03-20 23:02:46:    Role: Modele River HalfSpaceTrees
+2026-03-20 23:02:46: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:02:46: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:02:47: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:02:47: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:02:48: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:02:48: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:02:49: ❌ Echec src/model/online_detector.py
+2026-03-20 23:02:49: 
+--- src/api/main.py ---
+2026-03-20 23:02:49: 📝 Generation: src/api/main.py
+2026-03-20 23:02:49:    Role: API FastAPI
+2026-03-20 23:02:49: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:02:49: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:02:50: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:02:50: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:02:51: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:02:51: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:02:52: ❌ Echec src/api/main.py
+2026-03-20 23:02:52: 
+--- dashboard/app.py ---
+2026-03-20 23:02:52: 📝 Generation: dashboard/app.py
+2026-03-20 23:02:52:    Role: Dashboard Streamlit
+2026-03-20 23:02:52: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:02:53: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:02:54: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:02:54: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:02:55: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:02:55: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:02:56: ❌ Echec dashboard/app.py
+2026-03-20 23:02:56: 
+--- Dockerfile ---
+2026-03-20 23:02:56: 📝 Generation: Dockerfile
+2026-03-20 23:02:56:    Role: Conteneurisation
+2026-03-20 23:02:56: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:02:56: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:02:57: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:02:57: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:02:58: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:02:58: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:02:59: ❌ Echec Dockerfile
+2026-03-20 23:02:59: 
+--- requirements.txt ---
+2026-03-20 23:02:59: 📝 Generation: requirements.txt
+2026-03-20 23:02:59:    Role: Dependances
+2026-03-20 23:02:59: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:02:59: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:03:00: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:03:00: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:03:01: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:03:01: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:03:02: ❌ Echec requirements.txt
+2026-03-20 23:03:02: 
+--- deploy/helm/Chart.yaml ---
+2026-03-20 23:03:02: 📝 Generation: deploy/helm/Chart.yaml
+2026-03-20 23:03:02:    Role: Helm metadata
+2026-03-20 23:03:02: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:03:02: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:03:03: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:03:03: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:03:04: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:03:04: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:03:05: ❌ Echec deploy/helm/Chart.yaml
+2026-03-20 23:03:05: 
+--- deploy/helm/values.yaml ---
+2026-03-20 23:03:05: 📝 Generation: deploy/helm/values.yaml
+2026-03-20 23:03:05:    Role: Helm configuration
+2026-03-20 23:03:05: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:03:05: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:03:06: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:03:06: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:03:07: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:03:07: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:03:08: ❌ Echec deploy/helm/values.yaml
+2026-03-20 23:03:08: 
+--- deploy/helm/templates/deployment.yaml ---
+2026-03-20 23:03:08: 📝 Generation: deploy/helm/templates/deployment.yaml
+2026-03-20 23:03:08:    Role: K8s Deployment
+2026-03-20 23:03:08: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:03:08: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:03:09: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:03:09: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:03:10: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:03:11: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:03:12: ❌ Echec deploy/helm/templates/deployment.yaml
+2026-03-20 23:03:12: 
+--- deploy/helm/templates/service.yaml ---
+2026-03-20 23:03:12: 📝 Generation: deploy/helm/templates/service.yaml
+2026-03-20 23:03:12:    Role: K8s Service
+2026-03-20 23:03:12: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:03:12: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:03:13: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:03:13: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:03:14: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:03:14: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:03:15: ❌ Echec deploy/helm/templates/service.yaml
+2026-03-20 23:03:15: 
+--- scripts/install.sh ---
+2026-03-20 23:03:15: 📝 Generation: scripts/install.sh
+2026-03-20 23:03:15:    Role: Installation one-click
+2026-03-20 23:03:15: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:03:15: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:03:16: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:03:16: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:03:17: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:03:17: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:03:18: ❌ Echec scripts/install.sh
+2026-03-20 23:03:18: 
+--- README.md ---
+2026-03-20 23:03:18: 📝 Generation: README.md
+2026-03-20 23:03:18:    Role: Documentation
+2026-03-20 23:03:18: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:03:18: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:03:19: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:03:19: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:03:20: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:03:20: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:03:21: ❌ Echec README.md
+2026-03-20 23:03:21: 
+--- .gitignore ---
+2026-03-20 23:03:21: 📝 Generation: .gitignore
+2026-03-20 23:03:21:    Role: Git ignore
+2026-03-20 23:03:21: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 23:03:21: ⚠️ deepseek/deepseek-r1-distill-llama-70b echec: 402
+2026-03-20 23:03:22: 🔄 Essai: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-20 23:03:22: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-20 23:03:23: 🔄 Essai: mistralai/mistral-7b-instruct-v0.3
+2026-03-20 23:03:23: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-20 23:03:24: ❌ Echec .gitignore
