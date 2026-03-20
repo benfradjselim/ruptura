@@ -11,4 +11,4 @@ Cette solution MLOPS doit:
 7. S'installer en 1 clic sur Kubernetes via Helm
 
 
-Date: 2026-03-20 23:03:24.656243
+Date: 2026-03-20 23:06:28.392410
