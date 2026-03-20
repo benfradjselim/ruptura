@@ -212,3 +212,7 @@
 2026-03-20 11:28:38: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
 2026-03-20 11:28:58: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
 2026-03-20 11:28:58: ✅ src/generated_1774006138.py
+2026-03-20 11:29:00: 📝 Tâche 5: Créer src/model/data_loader.py...
+2026-03-20 11:29:00: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:29:22: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:29:22: ✅ src/generated_1774006162.py
