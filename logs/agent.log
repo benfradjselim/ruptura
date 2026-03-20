@@ -208,3 +208,7 @@
 2026-03-20 11:27:53: ✅ src/model/detector.py
 2026-03-20 11:28:33: 🚀 Agent 2 démarré
 2026-03-20 11:28:33: 📦 Init GitHub...
+2026-03-20 11:28:38: 📝 Tâche 4: Créer src/collector/data_validator.py...
+2026-03-20 11:28:38: 🔄 Essai: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:28:58: ✅ OK: deepseek/deepseek-r1-distill-llama-70b
+2026-03-20 11:28:58: ✅ src/generated_1774006138.py
