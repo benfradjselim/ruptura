@@ -1,125 +1,87 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# src/model/model_evaluator.py
 
-"""
-This module contains functionality for feature engineering.
-It provides methods to process and transform raw data into engineered features.
-"""
-
-import pandas as pd
+import os
 import numpy as np
-import logging
+import pandas as pd
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report,
+    roc_auc_score
+)
 
-class FeatureEngineer:
-    """
-    A class used to perform feature engineering operations.
-    
-    Attributes:
-    ----------
-    logger : logging.Logger
-        Logger instance for logging operations.
-    config : dict
-        Configuration dictionary for feature engineering parameters.
-    """
-    
-    def __init__(self, config_path=None):
-        """
-        Initializes the FeatureEngineer with configuration.
+class ModelEvaluator:
+    def __init__(self, model, X_test, y_test, output_path):
+        self.model = model
+        self.X_test = X_test
+        self.y_test = y_test
+        self.output_path = output_path
+        self.predictions = None
+        self.proba_predictions = None
         
-        Parameters:
-        ----------
-        config_path : str, optional
-            Path to the configuration file (default is None).
-        """
-        self.logger = logging.getLogger(__name__)
-        self.config = self._load_config(config_path)
+    def run_evaluation(self):
+        """Run the evaluation process and save results"""
+        self._make_predictions()
+        self._calculate_metrics()
+        self._save_results()
         
-    def _load_config(self, config_path):
-        """
-        Loads configuration from a JSON file.
+    def _make_predictions(self):
+        """Make predictions on test set"""
+        self.predictions = self.model.predict(self.X_test)
+        self.proba_predictions = self.model.predict_proba(self.X_test)
         
-        Parameters:
-        ----------
-        config_path : str
-            Path to the configuration file.
+    def _calculate_metrics(self):
+        """Calculate various evaluation metrics"""
+        # Classification metrics
+        self.accuracy = accuracy_score(self.y_test, self.predictions)
+        self.precision = precision_score(self.y_test, self.predictions, average='weighted')
+        self.recall = recall_score(self.y_test, self.predictions, average='weighted')
+        self.f1 = f1_score(self.y_test, self.predictions, average='weighted')
+        
+        # Additional metrics
+        self.confusion_matrix = confusion_matrix(self.y_test, self.predictions)
+        self.classification_report = classification_report(self.y_test, self.predictions)
+        
+        # For probabilistic models
+        if len(self.proba_predictions.shape) > 1:
+            self.roc_auc = roc_auc_score(self.y_test, self.proba_predictions[:, 1])
             
-        Returns:
-        -------
-        dict
-            Configuration dictionary.
-        """
-        if config_path:
-            try:
-                with open(config_path, 'r') as f:
-                    return pd.read_json(f)
-            except Exception as e:
-                self.logger.error(f"Failed to load config: {e}")
-                return {}
-        return {}
-    
-    def engineer_features(self, df):
-        """
-        Performs feature engineering on the input DataFrame.
+    def _save_results(self):
+        """Save evaluation results to output path"""
+        results = {
+            'metric': ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
+            'value': [self.accuracy, self.precision, self.recall, self.f1]
+        }
         
-        Parameters:
-        ----------
-        df : pandas.DataFrame
-            Input DataFrame containing raw data.
-            
-        Returns:
-        -------
-        pandas.DataFrame
-            DataFrame with engineered features.
-        """
-        # TODO: Implement your feature engineering logic here
-        # Example steps:
-        # 1. Handle missing values
-        # 2. Encode categorical variables
-        # 3. Scale/normalize data
-        # 4. Create new features
+        results_df = pd.DataFrame(results)
+        output_file = os.path.join(self.output_path, 'evaluation_metrics.csv')
+        results_df.to_csv(output_file, index=False)
         
-        # Example implementation:
-        if df is None:
-            raise ValueError("Input DataFrame is None")
-            
-        # Create copy of original DataFrame
-        df_engineered = df.copy()
+        # Save confusion matrix
+        cm_df = pd.DataFrame(self.confusion_matrix, columns=['Predicted 0', 'Predicted 1'])
+        cm_df.index = ['Actual 0', 'Actual 1']
+        cm_output = os.path.join(self.output_path, 'confusion_matrix.csv')
+        cm_df.to_csv(cm_output)
         
-        # Example feature engineering steps
-        # 1. Handle missing values
-        df_engineered.fillna(df_engineered.mean(), inplace=True)
-        
-        # 2. Encode categorical variables
-        categorical_cols = df.select_dtypes(include=['object']).columns
-        df_engineered = pd.get_dummies(df_engineered, columns=categorical_cols)
-        
-        # 3. Scale/normalize data
-        from sklearn.preprocessing import StandardScaler
-        scaler = StandardScaler()
-        numerical_cols = df.select_dtypes(exclude=['object']).columns
-        df_engineered[numerical_cols] = scaler.fit_transform(df_engineered[numerical_cols])
-        
-        # 4. Create new features
-        # Example: Create interaction features
-        df_engineered['new_feature'] = df_engineered['feature1'] * df_engineered['feature2']
-        
-        return df_engineered
-
 if __name__ == "__main__":
     # Example usage
-    from pathlib import Path
+    from sklearn.datasets import make_classification
+    from sklearn.model_selection import train_test_split
+    from sklearn.ensemble import RandomForestClassifier
     
-    # Initialize feature engineer
-    feature_engineer = FeatureEngineer(config_path=Path("config/config.json"))
+    # Generate sample data
+    X, y = make_classification(n_samples=1000, n_features=20, n_informative=15, n_redundant=5, random_state=42)
     
-    # Load sample data
-    sample_data = pd.DataFrame({
-        'A': [1, 2, 3],
-        'B': [4, 5, 6]
-    })
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    # Engineer features
-    engineered_df = feature_engineer.engineer_features(sample_data)
+    # Train model
+    model = RandomForestClassifier(random_state=42)
+    model.fit(X_train, y_train)
     
-    # Print result
-    print(engineered_df)
+    # Initialize evaluator
+    evaluator = ModelEvaluator(model, X_test, y_test, output_path='evaluation_results')
+    evaluator.run_evaluation()
