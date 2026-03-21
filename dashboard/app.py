@@ -1,61 +1,61 @@
 import streamlit as st
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
 
-# Data generation
-np.random.seed(0)
-data = np.random.rand(100)
-cpu_usage = np.random.randint(0, 100, 100)
+# Load data
+@st.cache
+def load_data():
+    data = pd.read_csv('data.csv')
+    return data
 
-# Create a Streamlit app
-st.title("Dashboard")
+# Load alerts
+@st.cache
+def load_alerts():
+    alerts = pd.read_csv('alerts.csv')
+    return alerts
 
-# Add a sidebar
-st.sidebar.title("Options")
+# Load graphiques
+@st.cache
+def load_graphiques():
+    graphiques = pd.read_csv('graphiques.csv')
+    return graphiques
 
-# Select a time range
-time_range = st.sidebar.selectbox("Select a time range", ["Last hour", "Last day", "Last week"])
+# Main function
+def main():
+    # Set page title
+    st.title('Dashboard')
 
-# Create a line plot
-fig, ax = plt.subplots()
-ax.plot(data)
-ax.set_title("CPU usage")
-ax.set_xlabel("Time")
-ax.set_ylabel("CPU usage (%)")
-st.pyplot(fig)
+    # Load data
+    data = load_data()
 
-# Create a histogram
-fig, ax = plt.subplots()
-ax.hist(cpu_usage, bins=10)
-ax.set_title("CPU usage distribution")
-ax.set_xlabel("CPU usage (%)")
-ax.set_ylabel("Frequency")
-st.pyplot(fig)
+    # Load alerts
+    alerts = load_alerts()
 
-# Create a scatter plot for anomalies
-anomalies = np.random.choice(cpu_usage, 10)
-fig, ax = plt.subplots()
-ax.scatter(anomalies, np.random.rand(10))
-ax.set_title("Anomalies")
-ax.set_xlabel("CPU usage (%)")
-ax.set_ylabel("Anomaly score")
-st.pyplot(fig)
+    # Load graphiques
+    graphiques = load_graphiques()
 
-# Create a bar chart for alerts
-alerts = np.random.choice(cpu_usage, 10)
-fig, ax = plt.subplots()
-ax.bar(alerts, np.random.rand(10))
-ax.set_title("Alerts")
-ax.set_xlabel("CPU usage (%)")
-ax.set_ylabel("Alert level")
-st.pyplot(fig)
+    # Create sidebar
+    st.sidebar.title('Options')
+    options = st.sidebar.selectbox('Select an option', ['Graphiques', 'Alertes', 'Data'])
 
-# Display a table with CPU usage data
-df = pd.DataFrame(cpu_usage, columns=["CPU usage (%)"])
-st.table(df)
+    # Display graphiques
+    if options == 'Graphiques':
+        st.title('Graphiques')
+        fig, ax = plt.subplots()
+        sns.heatmap(graphiques, ax=ax)
+        st.pyplot(fig)
 
-# Display a text area with alert messages
-alert_messages = ["CPU usage is high", "Anomaly detected", "Alert level is critical"]
-st.write("Alert messages:")
-st.write("\n".join(alert_messages))
+    # Display alertes
+    elif options == 'Alertes':
+        st.title('Alertes')
+        st.write(alerts)
+
+    # Display data
+    elif options == 'Data':
+        st.title('Data')
+        st.write(data)
+
+if __name__ == '__main__':
+    main()
