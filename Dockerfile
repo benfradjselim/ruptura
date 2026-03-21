@@ -1,11 +1,12 @@
 import logging
 import os
 import subprocess
+from typing import NoReturn
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def build_image():
+def build_image() -> None:
     """
     Construit l'image Docker en deux étapes : build et final.
 
@@ -34,13 +35,17 @@ def build_image():
         logging.error(f"Erreur inconnue : {e}")
         raise
 
-def main():
+def main() -> NoReturn:
     """
     Fonction principale.
 
     :return: None
     """
-    build_image()
+    try:
+        build_image()
+    except Exception as e:
+        logging.error(f"Erreur lors de l'exécution de la fonction principale : {e}")
+        raise
 
 if __name__ == "__main__":
     main()
