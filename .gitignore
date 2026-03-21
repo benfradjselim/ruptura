@@ -1,0 +1,74 @@
+# Fichiers de configuration
+*.pyc
+*.class
+__pycache__/
+
+# Fichiers de build
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Fichiers de cache
+*.cache/
+*.lock
+
+# Fichiers de logs
+logs/
+*.log
+
+# Fichiers de données temporaires
+*.tmp
+*.tmp.*
+
+# Fichiers de debug
+*.pyd
+*.so
+
+# Fichiers de tests
+tests/
+*_test.py
+*_test.pyc
+
+# Fichiers de déploiement
+*.whl
+*.tar.gz
+*.zip
+
+# Fichiers de code source non Python
+*.js
+*.css
+*.html
+*.txt
+*.md
+*.pdf
+*.jpg
+*.png
+*.gif
+*.bmp
+
+# Fichiers de configuration de l'éditeur
+*.suo
+*.ntvs*
+*.ipch
+*.sln.docstates
+
+# Fichiers de build de Visual Studio
+*.suo
+*.ntvs*
+*.ipch
+*.sln.docstates
+*.vcxproj
+*.vcxproj.filters
+
+# Fichiers de build de IntelliJ
+*.iml
+*.ipr
+*.iws
+*.idea
+
+# Fichiers de build de Eclipse
+*.project
+*.classpath
+*.settings
+*.metadata
