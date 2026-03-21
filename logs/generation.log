@@ -942,3 +942,33 @@
 2026-03-21 00:51:30: 🔄 Essai 2/3: meta-llama/llama-3.2-3b-instruct:free
 2026-03-21 00:51:32: ✅ OK: meta-llama/llama-3.2-3b-instruct:free
 2026-03-21 00:51:32: ✅ deploy/helm/templates/service.yaml
+2026-03-21 00:51:33: 📤 Push: Gen deploy/helm/templates/service.yaml
+2026-03-21 00:51:36: 
+--- scripts/install.sh ---
+2026-03-21 00:51:36: 📝 Generation: scripts/install.sh
+2026-03-21 00:51:36: 🔄 Essai 1/3: google/gemini-2.0-flash-exp:free
+2026-03-21 00:51:36: ⚠️ google/gemini-2.0-flash-exp:free echec: 404
+2026-03-21 00:51:38: 🔄 Essai 1/3: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-21 00:51:38: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-21 00:51:40: 🔄 Essai 1/3: mistralai/mistral-7b-instruct-v0.3
+2026-03-21 00:51:40: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-21 00:51:42: 🔄 Essai 1/3: meta-llama/llama-3.2-3b-instruct:free
+2026-03-21 00:51:42: ⚠️ Rate limit meta-llama/llama-3.2-3b-instruct:free, attente 30s
+2026-03-21 00:52:14: 🔄 Essai 1/3: deepseek/deepseek-chat:free
+2026-03-21 00:52:14: ⚠️ deepseek/deepseek-chat:free echec: 404
+2026-03-21 00:52:16: 🔄 Essai 1/3: qwen/qwen-2.5-7b-instruct:free
+2026-03-21 00:52:16: ⚠️ qwen/qwen-2.5-7b-instruct:free echec: 404
+2026-03-21 00:52:18: 🔄 Essai 1/3: cohere/command-r-plus-08-2024:free
+2026-03-21 00:52:18: ⚠️ cohere/command-r-plus-08-2024:free echec: 404
+2026-03-21 00:52:20: 🔄 Essai 1/3: microsoft/phi-3-mini-128k:free
+2026-03-21 00:52:21: ⚠️ microsoft/phi-3-mini-128k:free echec: 400
+2026-03-21 00:52:23: ⚠️ Fin du cycle, pause 30s avant retry 1/3
+2026-03-21 00:52:53: 🔄 Essai 2/3: google/gemini-2.0-flash-exp:free
+2026-03-21 00:52:53: ⚠️ google/gemini-2.0-flash-exp:free echec: 404
+2026-03-21 00:52:55: 🔄 Essai 2/3: google/gemini-2.0-flash-lite-preview-02-05:free
+2026-03-21 00:52:55: ⚠️ google/gemini-2.0-flash-lite-preview-02-05:free echec: 400
+2026-03-21 00:52:57: 🔄 Essai 2/3: mistralai/mistral-7b-instruct-v0.3
+2026-03-21 00:52:59: ⚠️ mistralai/mistral-7b-instruct-v0.3 echec: 404
+2026-03-21 00:53:01: 🔄 Essai 2/3: meta-llama/llama-3.2-3b-instruct:free
+2026-03-21 00:53:08: ✅ OK: meta-llama/llama-3.2-3b-instruct:free
+2026-03-21 00:53:08: ✅ scripts/install.sh

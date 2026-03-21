@@ -1,20 +1,30 @@
-import subprocess
+#!/bin/bash
 
-def install():
-    # Check tools
-    print("Checking tools...")
-    subprocess.run(["which", "docker"], check=True)
-    subprocess.run(["which", "helm"], check=True)
+# Set the installation directory
+INSTALL_DIR="/usr/local/bin"
 
-    # Build image
-    print("Building image...")
-    subprocess.run(["docker", "build", "-t", "my-image", "."], check=True)
+# Check if the installation directory exists, create it if not
+if [ ! -d "$INSTALL_DIR" ]; then
+  mkdir -p "$INSTALL_DIR"
+fi
 
-    # Install Helm
-    print("Installing Helm...")
-    subprocess.run(["curl", "-fsSL", "https://raw.githubusercontent.com/helm/helm/master/install.sh"], check=True)
-    subprocess.run(["chmod", "+x", "helm"], check=True)
-    subprocess.run(["./helm", "init"], check=True)
+# Set the script name
+SCRIPT_NAME="install.sh"
 
-if __name__ == "__main__":
-    install()
+# Set the script path
+SCRIPT_PATH=$(readlink -f "$0")
+
+# Check if the script is already installed
+if [ -f "$INSTALL_DIR/$SCRIPT_NAME" ]; then
+  echo "Script already installed, skipping installation."
+  exit 0
+fi
+
+# Copy the script to the installation directory
+cp "$SCRIPT_PATH" "$INSTALL_DIR/$SCRIPT_NAME"
+
+# Make the script executable
+chmod +x "$INSTALL_DIR/$SCRIPT_NAME"
+
+# Print a success message
+echo "Script installed successfully!"
