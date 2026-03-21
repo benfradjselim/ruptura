@@ -1,131 +1,68 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.express as px
-import logging
+import yfinance as yf
+import requests
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Load data
+@st.cache
+def load_data():
+    data = pd.read_csv('data.csv')
+    return data
 
-def load_data(file_path: str = 'data.csv') -> pd.DataFrame:
-    """
-    Load data from a CSV file.
+# Load stock data
+@st.cache
+def load_stock_data(ticker):
+    stock_data = yf.download(tickers=ticker, period='1d')
+    return stock_data
 
-    Args:
-        file_path (str, optional): Path to the CSV file. Defaults to 'data.csv'.
+# Load alert data
+@st.cache
+def load_alert_data():
+    alert_data = pd.read_csv('alert.csv')
+    return alert_data
 
-    Returns:
-        pd.DataFrame: Loaded data.
-    """
-    try:
-        data = pd.read_csv(file_path)
-        logger.info(f"Loaded data from {file_path}")
-        return data
-    except FileNotFoundError:
-        logger.error(f"File not found: {file_path}")
-        return None
-    except pd.errors.EmptyDataError:
-        logger.error(f"File is empty: {file_path}")
-        return None
-    except pd.errors.ParserError:
-        logger.error(f"Error parsing file: {file_path}")
-        return None
-
-def load_alerts(file_path: str = 'alerts.csv') -> pd.DataFrame:
-    """
-    Load alerts from a CSV file.
-
-    Args:
-        file_path (str, optional): Path to the CSV file. Defaults to 'alerts.csv'.
-
-    Returns:
-        pd.DataFrame: Loaded alerts.
-    """
-    try:
-        alerts = pd.read_csv(file_path)
-        logger.info(f"Loaded alerts from {file_path}")
-        return alerts
-    except FileNotFoundError:
-        logger.error(f"File not found: {file_path}")
-        return None
-    except pd.errors.EmptyDataError:
-        logger.error(f"File is empty: {file_path}")
-        return None
-    except pd.errors.ParserError:
-        logger.error(f"Error parsing file: {file_path}")
-        return None
-
-def load_graphiques(file_path: str = 'graphiques.csv') -> pd.DataFrame:
-    """
-    Load graphiques from a CSV file.
-
-    Args:
-        file_path (str, optional): Path to the CSV file. Defaults to 'graphiques.csv'.
-
-    Returns:
-        pd.DataFrame: Loaded graphiques.
-    """
-    try:
-        graphiques = pd.read_csv(file_path)
-        logger.info(f"Loaded graphiques from {file_path}")
-        return graphiques
-    except FileNotFoundError:
-        logger.error(f"File not found: {file_path}")
-        return None
-    except pd.errors.EmptyDataError:
-        logger.error(f"File is empty: {file_path}")
-        return None
-    except pd.errors.ParserError:
-        logger.error(f"Error parsing file: {file_path}")
-        return None
-
+# Main function
 def main():
-    """
-    Main function.
-    """
     # Set page title
     st.title('Dashboard')
 
-    # Load data
-    data = load_data()
-    if data is None:
-        st.error("Error loading data")
-        return
-
-    # Load alerts
-    alerts = load_alerts()
-    if alerts is None:
-        st.error("Error loading alerts")
-        return
-
-    # Load graphiques
-    graphiques = load_graphiques()
-    if graphiques is None:
-        st.error("Error loading graphiques")
-        return
-
     # Create sidebar
-    st.sidebar.title('Options')
-    options = st.sidebar.selectbox('Select an option', ['Graphiques', 'Alertes', 'Data'])
+    st.sidebar.title('Menu')
+    menu = ['Graphiques', 'Alertes']
+    choice = st.sidebar.selectbox('Choisir une option', menu)
 
-    # Display graphiques
-    if options == 'Graphiques':
-        st.title('Graphiques')
+    # Graphiques
+    if choice == 'Graphiques':
+        # Load data
+        data = load_data()
+
+        # Create line chart
         fig, ax = plt.subplots()
-        sns.heatmap(graphiques, ax=ax)
+        ax.plot(data['Date'], data['Value'])
         st.pyplot(fig)
 
-    # Display alertes
-    elif options == 'Alertes':
-        st.title('Alertes')
-        st.write(alerts)
+        # Create bar chart
+        fig, ax = plt.subplots()
+        ax.bar(data['Date'], data['Value'])
+        st.pyplot(fig)
 
-    # Display data
-    elif options == 'Data':
-        st.title('Data')
-        st.write(data)
+    # Alertes
+    elif choice == 'Alertes':
+        # Load alert data
+        alert_data = load_alert_data()
+
+        # Create table
+        st.write(alert_data)
+
+        # Create alert message
+        if st.button('Envoyer une alerte'):
+            # Send alert via API
+            requests.post('https://api.example.com/alert', json={'message': 'Alerte envoyée'})
+
+            # Display success message
+            st.success('Alerte envoyée avec succès')
 
 if __name__ == '__main__':
     main()
