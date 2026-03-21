@@ -19,7 +19,7 @@ def load_kube_config() -> None:
         config.load_kube_config()
     except kubernetes.config.ConfigException as e:
         logger.error(f"Erreur lors du chargement de la configuration Kubernetes : {e}")
-        raise
+        raise kubernetes.config.ConfigException("Erreur lors du chargement de la configuration Kubernetes")
 
 def validate_chart(chart: Dict) -> None:
     """
@@ -31,7 +31,6 @@ def validate_chart(chart: Dict) -> None:
     Raises:
         ValueError: If the chart is invalid.
     """
-    # Check if chart is a dictionary
     if not isinstance(chart, dict):
         raise ValueError("La chart doit être un dictionnaire")
 
@@ -58,32 +57,24 @@ def create_helm_chart(chart: Dict) -> client.V1Package:
         return package
     except kubernetes.client.ApiException as e:
         logger.error(f"Erreur lors de la création de la chart Helm : {e}")
-        raise
+        raise kubernetes.client.ApiException("Erreur lors de la création de la chart Helm")
 
 def main() -> None:
     """
     Main function.
+
+    Raises:
+        Exception: If an error occurs.
     """
-    # Load Kubernetes configuration
-    load_kube_config()
-
-    # Load chart from file
     try:
-        with open('chart.json', 'r') as f:
-            chart = json.load(f)
-    except FileNotFoundError:
-        logger.error("Le fichier chart.json n'existe pas")
-        return
-    except json.JSONDecodeError:
-        logger.error("Erreur lors du chargement du fichier chart.json")
-        return
-
-    # Validate the chart
-    validate_chart(chart)
-
-    # Create the Helm chart
-    package = create_helm_chart(chart)
-    print(package)
+        load_kube_config()
+        chart = {"apiVersion": "v1", "kind": "Deployment", "metadata": {"name": "my-deployment"}}
+        validate_chart(chart)
+        package = create_helm_chart(chart)
+        logger.info(f"Chart Helm créée avec succès : {package}")
+    except Exception as e:
+        logger.error(f"Erreur inattendue : {e}")
+        raise
 
 if __name__ == "__main__":
     main()
