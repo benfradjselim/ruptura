@@ -4,26 +4,73 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import yfinance as yf
 import requests
+import logging
 
-# Load data
-@st.cache
-def load_data():
-    data = pd.read_csv('data.csv')
-    return data
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Load stock data
-@st.cache
-def load_stock_data(ticker):
-    stock_data = yf.download(tickers=ticker, period='1d')
-    return stock_data
+def load_data() -> pd.DataFrame:
+    """
+    Charge les données à partir du fichier CSV.
 
-# Load alert data
-@st.cache
-def load_alert_data():
-    alert_data = pd.read_csv('alert.csv')
-    return alert_data
+    Returns:
+        pd.DataFrame: Les données chargées.
+    """
+    try:
+        data = pd.read_csv('data.csv')
+        return data
+    except FileNotFoundError:
+        logger.error("Le fichier 'data.csv' n'existe pas.")
+        raise
+    except pd.errors.EmptyDataError:
+        logger.error("Le fichier 'data.csv' est vide.")
+        raise
 
-# Main function
+def load_stock_data(ticker: str) -> pd.DataFrame:
+    """
+    Charge les données de la bourse pour le ticker spécifié.
+
+    Args:
+        ticker (str): Le ticker de la bourse.
+
+    Returns:
+        pd.DataFrame: Les données de la bourse.
+    """
+    try:
+        stock_data = yf.download(tickers=ticker, period='1d')
+        return stock_data
+    except yf.TickerDataUnavailable:
+        logger.error(f"Les données pour le ticker '{ticker}' ne sont pas disponibles.")
+        raise
+
+def load_alert_data() -> pd.DataFrame:
+    """
+    Charge les données d'alerte à partir du fichier CSV.
+
+    Returns:
+        pd.DataFrame: Les données d'alerte chargées.
+    """
+    try:
+        alert_data = pd.read_csv('alert.csv')
+        return alert_data
+    except FileNotFoundError:
+        logger.error("Le fichier 'alert.csv' n'existe pas.")
+        raise
+    except pd.errors.EmptyDataError:
+        logger.error("Le fichier 'alert.csv' est vide.")
+        raise
+
+def send_alert() -> None:
+    """
+    Envoie une alerte via l'API.
+    """
+    try:
+        requests.post('https://api.example.com/alert', json={'message': 'Alerte envoyée'})
+        logger.info("L'alerte a été envoyée avec succès.")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Erreur lors de l'envoi de l'alerte : {e}")
+
 def main():
     # Set page title
     st.title('Dashboard')
@@ -59,10 +106,10 @@ def main():
         # Create alert message
         if st.button('Envoyer une alerte'):
             # Send alert via API
-            requests.post('https://api.example.com/alert', json={'message': 'Alerte envoyée'})
+            send_alert()
 
             # Display success message
-            st.success('Alerte envoyée avec succès')
+            st.success('Alerte envoyée avec succès.')
 
 if __name__ == '__main__':
     main()
