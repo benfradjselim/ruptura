@@ -1,19 +1,91 @@
 # values.yaml
 
-# Définition des valeurs par défaut
-replicaCount: 1
+"""
+Fichier de valeurs pour la configuration de l'application.
 
-# Définition de l'image Docker
-image:
-  repository: mon-image-docker
-  tag: v1.0.0
-  pullPolicy: IfNotPresent
+Ce fichier définit les valeurs par défaut pour l'application, notamment le nombre de répliques, l'image Docker et les ressources.
+"""
 
-# Définition des ressources
-resources:
-  requests:
-    cpu: 100m
-    memory: 128Mi
-  limits:
-    cpu: 200m
-    memory: 256Mi
+import logging
+
+# Configuration du logger
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def load_values() -> dict:
+    """
+    Charge les valeurs de configuration à partir du fichier values.yaml.
+
+    Returns:
+        dict: Les valeurs de configuration chargées.
+    """
+    try:
+        # Tentative de chargement des valeurs
+        with open('values.yaml', 'r') as f:
+            values = yaml.safe_load(f)
+            return values
+    except FileNotFoundError:
+        # Gestion de l'erreur si le fichier n'existe pas
+        logging.error("Le fichier values.yaml n'existe pas.")
+        raise
+    except yaml.YAMLError as e:
+        # Gestion de l'erreur si le fichier n'est pas au format YAML
+        logging.error(f"Erreur de format YAML : {e}")
+        raise
+
+def get_default_values() -> dict:
+    """
+    Retourne les valeurs par défaut.
+
+    Returns:
+        dict: Les valeurs par défaut.
+    """
+    return {
+        "replicaCount": 1,
+        "image": {
+            "repository": "mon-image-docker",
+            "tag": "v1.0.0",
+            "pullPolicy": "IfNotPresent"
+        },
+        "resources": {
+            "requests": {
+                "cpu": "100m",
+                "memory": "128Mi"
+            },
+            "limits": {
+                "cpu": "200m",
+                "memory": "256Mi"
+            }
+        }
+    }
+
+def validate_values(values: dict) -> None:
+    """
+    Valide les valeurs de configuration.
+
+    Args:
+        values (dict): Les valeurs de configuration à valider.
+    """
+    # Validation des valeurs
+    if "replicaCount" not in values:
+        logging.error("Le champ 'replicaCount' est obligatoire.")
+        raise ValueError("Le champ 'replicaCount' est obligatoire.")
+    if "image" not in values:
+        logging.error("Le champ 'image' est obligatoire.")
+        raise ValueError("Le champ 'image' est obligatoire.")
+    if "resources" not in values:
+        logging.error("Le champ 'resources' est obligatoire.")
+        raise ValueError("Le champ 'resources' est obligatoire.")
+
+def main() -> None:
+    """
+    Programme principal.
+
+    Charge les valeurs de configuration, les valide et les retourne.
+    """
+    values = load_values()
+    validate_values(values)
+    return values
+
+if __name__ == "__main__":
+    values = main()
+    print(values)
