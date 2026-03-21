@@ -28,15 +28,15 @@ def load_data(file_path: str) -> pd.DataFrame:
         data = pd.read_csv(file_path)
         logging.info(f"Data loaded from {file_path}")
         return data
-    except FileNotFoundError:
+    except FileNotFoundError as e:
         logging.error(f"File not found: {file_path}")
-        raise
-    except pd.errors.EmptyDataError:
+        raise e
+    except pd.errors.EmptyDataError as e:
         logging.error(f"File is empty: {file_path}")
-        raise ValueError("File is empty")
-    except pd.errors.ParserError:
+        raise ValueError("File is empty") from e
+    except pd.errors.ParserError as e:
         logging.error(f"Error parsing file: {file_path}")
-        raise ValueError("Error parsing file")
+        raise ValueError("Error parsing file") from e
 
 def preprocess_data(data: pd.DataFrame) -> pd.DataFrame:
     """
@@ -52,18 +52,15 @@ def preprocess_data(data: pd.DataFrame) -> pd.DataFrame:
     ValueError: If the data is empty.
     """
     if data.empty:
-        logging.error("Data is empty")
         raise ValueError("Data is empty")
-
-    # Select relevant columns
-    relevant_columns = ['column1', 'column2']  # remplacer par les colonnes réelles
-    data = data[relevant_columns]
-
-    # Handle missing values
-    data = data.dropna()
-
-    logging.info("Data preprocessed")
-    return data
+    try:
+        # Select relevant columns
+        data = data.dropna()
+        logging.info("Data preprocessed")
+        return data
+    except Exception as e:
+        logging.error(f"Error during preprocessing: {e}")
+        raise e
 
 def train_model(data: pd.DataFrame) -> LinearRegression:
     """
@@ -79,73 +76,68 @@ def train_model(data: pd.DataFrame) -> LinearRegression:
     ValueError: If the data is empty.
     """
     if data.empty:
-        logging.error("Data is empty")
         raise ValueError("Data is empty")
+    try:
+        # Split data into training and testing sets
+        X_train, X_test, y_train, y_test = train_test_split(data.drop("target", axis=1), data["target"], test_size=0.2, random_state=42)
+        # Train linear regression model
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+        logging.info("Model trained")
+        return model
+    except Exception as e:
+        logging.error(f"Error during training: {e}")
+        raise e
 
-    X = data.drop('target', axis=1)
-    y = data['target']
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    model = LinearRegression()
-    model.fit(X_train, y_train)
-
-    logging.info("Model trained")
-    return model
-
-def evaluate_model(model: LinearRegression, X_test: pd.DataFrame, y_test: pd.Series) -> float:
+def evaluate_model(model: LinearRegression, data: pd.DataFrame) -> float:
     """
-    Evaluate the performance of the trained model.
+    Evaluate the performance of the trained model on the preprocessed data.
 
     Args:
     model (LinearRegression): Trained model.
-    X_test (pd.DataFrame): Test data.
-    y_test (pd.Series): Test target.
+    data (pd.DataFrame): Preprocessed data.
 
     Returns:
-    float: Mean squared error.
+    float: Mean squared error of the model.
 
     Raises:
     ValueError: If the data is empty.
     """
-    if X_test.empty or y_test.empty:
-        logging.error("Test data is empty")
-        raise ValueError("Test data is empty")
+    if data.empty:
+        raise ValueError("Data is empty")
+    try:
+        # Make predictions on testing set
+        y_pred = model.predict(data.drop("target", axis=1))
+        # Calculate mean squared error
+        mse = mean_squared_error(data["target"], y_pred)
+        logging.info(f"Model evaluated with MSE: {mse}")
+        return mse
+    except Exception as e:
+        logging.error(f"Error during evaluation: {e}")
+        raise e
 
-    y_pred = model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)
-
-    logging.info(f"Model evaluated with MSE: {mse}")
-    return mse
-
-def plot_results(model: LinearRegression, X_test: pd.DataFrame, y_test: pd.Series) -> None:
+def plot_results(data: pd.DataFrame, model: LinearRegression) -> None:
     """
-    Plot the results of the trained model.
+    Plot the results of the trained model on the preprocessed data.
 
     Args:
+    data (pd.DataFrame): Preprocessed data.
     model (LinearRegression): Trained model.
-    X_test (pd.DataFrame): Test data.
-    y_test (pd.Series): Test target.
 
-    Raises:
-    ValueError: If the data is empty.
+    Returns:
+    None
     """
-    if X_test.empty or y_test.empty:
-        logging.error("Test data is empty")
-        raise ValueError("Test data is empty")
-
-    y_pred = model.predict(X_test)
-    plt.scatter(y_test, y_pred)
-    plt.xlabel("True values")
-    plt.ylabel("Predicted values")
-    plt.title("Model results")
-    plt.show()
-
-# Exemple d'utilisation
-if __name__ == "__main__":
-    file_path = "data.csv"
-    data = load_data(file_path)
-    data = preprocess_data(data)
-    model = train_model(data)
-    mse = evaluate_model(model, data.drop('target', axis=1), data['target'])
-    plot_results(model, data.drop('target', axis=1), data['target'])
+    try:
+        # Make predictions on entire dataset
+        y_pred = model.predict(data.drop("target", axis=1))
+        # Plot results
+        plt.figure(figsize=(10, 6))
+        sns.scatterplot(x=data["target"], y=y_pred)
+        plt.xlabel("Actual values")
+        plt.ylabel("Predicted values")
+        plt.title("Model results")
+        plt.show()
+        logging.info("Results plotted")
+    except Exception as e:
+        logging.error(f"Error during plotting: {e}")
+        raise e
