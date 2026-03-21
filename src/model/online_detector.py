@@ -26,7 +26,12 @@ class OnlineDetector:
         Args:
         model_path (str): The path to the model file.
         data_path (str): The path to the data file.
+
+        Raises:
+        ValueError: If model_path or data_path is None.
         """
+        if model_path is None or data_path is None:
+            raise ValueError("Model path and data path cannot be None")
         self.model_path = model_path
         self.data_path = data_path
         self.model = None
@@ -42,74 +47,72 @@ class OnlineDetector:
         min_samples_leaf (int): The minimum number of samples required to be at a leaf node.
 
         Returns:
-        None
+        RandomForestClassifier: The trained model.
+
+        Raises:
+        FileNotFoundError: If data_path does not exist.
+        ValueError: If n_estimators, max_depth, min_samples_split or min_samples_leaf is invalid.
         """
         try:
-            # Load the data
-            X, y = load_data(self.data_path)
-            if X is None or y is None:
-                logger.error("Failed to load data")
-                return
+            # Load data
+            data = load_data(self.data_path)
+            X, y = data['X'], data['y']
 
-            # Split the data into training and testing sets
+            # Split data into training and testing sets
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-            # Train the model
-            self.model = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, 
-                                                 min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf)
+            # Train model
+            self.model = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf)
             self.model.fit(X_train, y_train)
 
-            # Evaluate the model
+            # Evaluate model
             y_pred = self.model.predict(X_test)
             accuracy = accuracy_score(y_test, y_pred)
-            logger.info(f"Model accuracy: {accuracy:.3f}")
+            logger.info(f"Model accuracy: {accuracy:.2f}")
 
-            # Save the model
+            # Save model
             save_model(self.model, self.model_path)
 
+            return self.model
+
+        except FileNotFoundError:
+            logger.error(f"Data file not found at {self.data_path}")
+            raise
+        except ValueError as e:
+            logger.error(f"Invalid value: {e}")
+            raise
         except Exception as e:
-            logger.error(f"Failed to train model: {str(e)}")
+            logger.error(f"An error occurred: {e}")
+            raise
 
     def predict(self, data: np.ndarray):
         """
         Make predictions using the trained model.
 
         Args:
-        data (np.ndarray): The data to make predictions on.
+        data (np.ndarray): The input data.
 
         Returns:
         np.ndarray: The predicted labels.
+
+        Raises:
+        ValueError: If data is None.
         """
-        try:
-            if self.model is None:
-                self.model = load_model(self.model_path)
-            if data is None:
-                logger.error("Data is None")
-                return None
-            return self.model.predict(data)
+        if data is None:
+            raise ValueError("Data cannot be None")
+        if self.model is None:
+            raise ValueError("Model has not been trained")
+        return self.model.predict(data)
 
-        except Exception as e:
-            logger.error(f"Failed to make predictions: {str(e)}")
-            return None
+def main():
+    # Example usage
+    model_path = "model.pkl"
+    data_path = "data.csv"
+    detector = OnlineDetector(model_path, data_path)
+    detector.train()
+    data = np.array([[1, 2, 3], [4, 5, 6]])
+    predictions = detector.predict(data)
+    print(predictions)
 
-    def update(self, new_data: np.ndarray):
-        """
-        Update the model using the new data.
-
-        Args:
-        new_data (np.ndarray): The new data to update the model with.
-
-        Returns:
-        None
-        """
-        try:
-            if self.model is None:
-                self.model = load_model(self.model_path)
-            if new_data is None:
-                logger.error("New data is None")
-                return
-            self.model.fit(new_data, np.zeros(len(new_data)))
-            save_model(self.model, self.model_path)
-
-        except Exception as e:
-            logger.error(f"Failed to update model: {str(e)}")
+if __name__ == "__main__":
+    main()
