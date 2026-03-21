@@ -1,13 +1,29 @@
-# MLOps Anomaly Detection
+# Documentation
 
+## Table of Contents
+* [Introduction](#introduction)
+* [Getting Started](#getting-started)
+* [Features](#features)
+* [Installation](#installation)
+* [Usage](#usage)
+* [Contributing](#contributing)
+* [License](#license)
+* [Acknowledgements](#acknowledgements)
 
-Cette solution MLOPS doit:
-1. Collecter les metriques CPU, memoire, latence des pods Kubernetes
-2. Collecter les logs d'erreur des pods
-3. Utiliser un modele River pour predire les anomalies
-4. Exposer une API FastAPI
-5. Fournir un dashboard Streamlit
-6. S installer en 1 clic sur Kubernetes via Helm
+## Introduction
+This is a documentation for [Project Name]. It provides an overview of the project, its features, and how to use it.
 
+## Getting Started
+To get started with [Project Name], follow these steps:
 
-Date: 2026-03-21 00:21:26.333356
+1. Install the required dependencies.
+2. Run the application.
+3. Follow the instructions in the console.
+
+## Features
+* [Feature 1]
+* [Feature 2]
+* [Feature 3]
+
+## Installation
+To install [Project Name], run the following command:
