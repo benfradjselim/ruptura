@@ -36,9 +36,17 @@ def collect_logs(namespace: str, pod_name: str, container_name: str) -> str:
 
     Returns:
         str: The collected logs.
+
+    Raises:
+        ValueError: If namespace, pod_name or container_name is None or empty.
+        client.ApiException: If there is an error collecting logs.
     """
+    if not namespace or not pod_name or not container_name:
+        raise ValueError("Namespace, pod_name and container_name must not be empty")
+
     try:
         # Get the pod logs
+        v1 = client.CoreV1Api()
         response = v1.read_namespaced_pod_log(
             name=pod_name,
             namespace=namespace,
@@ -48,41 +56,44 @@ def collect_logs(namespace: str, pod_name: str, container_name: str) -> str:
         return response
     except client.ApiException as e:
         logger.error(f"Error collecting logs: {e}")
-        return None
+        raise
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+        raise
 
 def collect_all_logs(namespace: str) -> Dict[str, str]:
     """
-    Collect logs from all pods in a namespace.
+    Collect logs from all pods in a Kubernetes namespace.
 
     Args:
         namespace (str): The namespace of the pods.
 
     Returns:
-        Dict[str, str]: A dictionary with pod names as keys and logs as values.
+        Dict[str, str]: A dictionary of pod names and their logs.
+
+    Raises:
+        ValueError: If namespace is None or empty.
+        client.ApiException: If there is an error collecting logs.
     """
-    logs = {}
+    if not namespace:
+        raise ValueError("Namespace must not be empty")
+
     try:
+        # Get the list of pods
+        v1 = client.CoreV1Api()
         pods = v1.list_namespaced_pod(namespace=namespace)
+
+        # Collect logs from each pod
+        logs = {}
         for pod in pods.items:
-            for container in pod.spec.containers:
-                logs[f"{pod.metadata.name}-{container.name}"] = collect_logs(namespace, pod.metadata.name, container.name)
+            pod_name = pod.metadata.name
+            container_name = pod.spec.containers[0].name
+            logs[pod_name] = collect_logs(namespace, pod_name, container_name)
+
+        return logs
     except client.ApiException as e:
         logger.error(f"Error collecting logs: {e}")
-    return logs
-
-def main():
-    namespace = os.environ.get("NAMESPACE", "default")
-    try:
-        logs = collect_all_logs(namespace)
-        for pod, log in logs.items():
-            if log:
-                logger.info(f"Logs from {pod}: {log}")
-            else:
-                logger.warning(f"No logs found for {pod}")
+        raise
     except Exception as e:
-        logger.error(f"Error in main: {e}")
-
-if __name__ == "__main__":
-    config.load_kube_config()
-    v1 = client.CoreV1Api()
-    main()
+        logger.error(f"An error occurred: {e}")
+        raise
