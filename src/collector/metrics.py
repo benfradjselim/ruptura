@@ -46,12 +46,10 @@ def start_metrics_server(port: int = 8000) -> None:
     Raises:
         Exception: If an error occurs while starting the metrics server.
     """
-    if not isinstance(port, int) or port < 0 or port > 65535:
-        logging.error("Invalid port number. Port must be an integer between 0 and 65535.")
-        return
-
     try:
+        # Start the Prometheus metrics server
         prometheus_client.start_http_server(port)
+        logging.info(f"Metrics server started on port {port}")
     except Exception as e:
         logging.error(f"Error starting metrics server: {e}")
 
@@ -59,14 +57,21 @@ def main() -> None:
     """
     Main function.
 
-    Collects metrics every 1 second and logs any errors.
+    Raises:
+        Exception: If an error occurs.
     """
-    logging.info("Starting metrics server...")
-    start_metrics_server()
-
-    while True:
+    try:
+        # Collect metrics
         collect_metrics()
-        time.sleep(1)
+
+        # Start the metrics server
+        start_metrics_server()
+
+        # Run indefinitely
+        while True:
+            time.sleep(1)
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
 
 if __name__ == "__main__":
     main()
