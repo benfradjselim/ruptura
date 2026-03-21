@@ -1,0 +1,19 @@
+from kubernetes import client, config
+
+# Load Kubernetes configuration
+config.load_kube_config()
+
+# Define the Helm chart
+chart = {
+    "apiVersion": "v1",
+    "kind": "Package",
+    "metadata": {
+        "name": "mlops-anomaly",
+        "version": "1.0.0"
+    }
+}
+
+# Create the Helm chart
+api = client.AppsV1Api()
+package = api.create_namespaced_package("default", chart)
+print(package)
