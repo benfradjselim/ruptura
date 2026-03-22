@@ -19,7 +19,7 @@ def load_kube_config() -> None:
         config.load_kube_config()
     except kubernetes.config.ConfigException as e:
         logger.error(f"Erreur lors du chargement de la configuration Kubernetes : {e}")
-        raise
+        raise SystemExit(1)  # Exit with a non-zero status code
 
 def validate_chart(chart: Dict) -> None:
     """
@@ -74,4 +74,7 @@ def main() -> None:
         create_helm_chart(chart)
     except Exception as e:
         logger.error(f"Erreur générale : {e}")
-        raise
+        raise SystemExit(1)  # Exit with a non-zero status code
+
+if __name__ == "__main__":
+    main()
