@@ -17,18 +17,18 @@ def build_image() -> None:
         logging.info("Construisons la première étape de l'image Docker...")
         subprocess.run([
             "docker", "build", "-t", "my-image", "--build-arg", "BUILD_STAGE=1", "."
-        ], check=True)
+        ], check=True, text=True, capture_output=True)
 
         # Stage 2: Final
         logging.info("Construisons la deuxième étape de l'image Docker...")
         subprocess.run([
             "docker", "build", "-t", "my-image", "--build-arg", "BUILD_STAGE=2", "."
-        ], check=True)
+        ], check=True, text=True, capture_output=True)
 
         logging.info("L'image Docker a été construite avec succès !")
 
     except subprocess.CalledProcessError as e:
-        logging.error(f"Erreur lors de la construction de l'image Docker : {e}")
+        logging.error(f"Erreur lors de la construction de l'image Docker : {e.stderr}")
         raise
 
     except Exception as e:
