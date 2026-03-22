@@ -74,7 +74,7 @@ def main() -> None:
         create_helm_chart(chart)
     except Exception as e:
         logger.error(f"Erreur générale : {e}")
-        raise SystemExit(1)  # Exit with a non-zero status code
+        raise
 
 if __name__ == "__main__":
     main()
