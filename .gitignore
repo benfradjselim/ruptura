@@ -1,11 +1,12 @@
 import logging
 import os
 import re
+from typing import List
 
 # Configuration du logging
 logging.basicConfig(filename='config.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def nettoyer_config():
+def nettoyer_config() -> None:
     """
     Nettoie les fichiers de configuration non nécessaires.
 
@@ -49,25 +50,33 @@ def nettoyer_config():
     # Nettoyage des fichiers
     for chemin in chemins:
         try:
-            # Récupération du chemin de fichier
+            # Récupération du chemin du fichier à nettoyer
             chemin_fichier = os.path.join(os.getcwd(), chemin)
 
-            # Vérification si le chemin existe
-            if os.path.exists(chemin_fichier):
-                # Récupération des fichiers à nettoyer
-                fichiers = os.listdir(chemin_fichier)
-
-                # Nettoyage des fichiers
-                for fichier in fichiers:
-                    # Vérification si le fichier correspond à l'expression régulière
-                    if re.search(regex[chemin], fichier):
-                        # Suppression du fichier
-                        os.remove(os.path.join(chemin_fichier, fichier))
-                        logging.info(f'Fichier supprimé : {fichier}')
-
+            # Vérification si le chemin est un fichier
+            if os.path.isfile(chemin_fichier):
+                # Suppression du fichier
+                os.remove(chemin_fichier)
+                logging.info(f"Fichier supprimé : {chemin_fichier}")
+            else:
+                # Vérification si le chemin est un répertoire
+                if os.path.isdir(chemin_fichier):
+                    # Suppression du répertoire et de tous ses fichiers
+                    for fichier in os.listdir(chemin_fichier):
+                        fichier_path = os.path.join(chemin_fichier, fichier)
+                        if os.path.isfile(fichier_path):
+                            os.remove(fichier_path)
+                            logging.info(f"Fichier supprimé : {fichier_path}")
+                        elif os.path.isdir(fichier_path):
+                            shutil.rmtree(fichier_path)
+                            logging.info(f"Répertoire supprimé : {fichier_path}")
+                    # Suppression du répertoire
+                    os.rmdir(chemin_fichier)
+                    logging.info(f"Répertoire supprimé : {chemin_fichier}")
+                else:
+                    logging.warning(f"Chemin non trouvé : {chemin_fichier}")
         except Exception as e:
-            # Gestion des erreurs
-            logging.error(f'Erreur lors du nettoyage des fichiers : {e}')
+            logging.error(f"Erreur lors du nettoyage du fichier : {e}")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     nettoyer_config()
