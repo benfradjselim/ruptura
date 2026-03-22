@@ -23,6 +23,9 @@ def load_model(model_path: str) -> RandomForestClassifier:
 
     Returns:
     RandomForestClassifier: The loaded model.
+
+    Raises:
+    HTTPException: If the model cannot be loaded.
     """
     try:
         model = RandomForestClassifier()
@@ -45,6 +48,9 @@ async def ingest_data(data: dict):
 
     Returns:
     dict: A success message.
+
+    Raises:
+    HTTPException: If the data is invalid or cannot be saved.
     """
     try:
         # Input validation
@@ -73,33 +79,16 @@ async def make_prediction(data: dict):
     data (dict): The data to make a prediction on.
 
     Returns:
-    dict: The prediction result.
+    dict: The prediction.
+
+    Raises:
+    HTTPException: If the data is invalid or the model cannot make a prediction.
     """
     try:
-        # Input validation
-        if not data:
-            raise HTTPException(status_code=400, detail="No data provided")
+        # Make a prediction using the loaded model
+        prediction = model.predict(data)
 
-        # Load the data from the CSV file
-        df = pd.read_csv('data.csv')
-
-        # Make a prediction using the model
-        prediction = model.predict(df)
-
-        logger.info("Prediction made successfully")
-        return {"prediction": prediction[0]}
+        return {"prediction": prediction}
     except Exception as e:
         logger.error(f"Failed to make prediction: {e}")
         raise HTTPException(status_code=500, detail="Failed to make prediction")
-
-# Define the endpoint to check the health of the API
-@app.get("/health")
-async def check_health():
-    """
-    Check the health of the API.
-
-    Returns:
-    dict: A health status message.
-    """
-    logger.info("API is healthy")
-    return {"status": "healthy"}
