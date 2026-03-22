@@ -63,7 +63,7 @@ main() {
   # Check if installation directory exists
   if ! check_directory "$INSTALL_DIR"; then
     log_message "ERROR" "Installation directory $INSTALL_DIR does not exist."
-    return 1
+    exit 1
   fi
 
   # Check if script is already installed
@@ -72,18 +72,15 @@ main() {
     # Install script
     if ! install_script "$SCRIPT_PATH" "$INSTALL_DIR" "$SCRIPT_NAME"; then
       log_message "ERROR" "Script installation failed."
-      return 1
+      exit 1
     fi
   fi
 
   # Print success message
   log_message "INFO" "Script installed successfully!"
   echo "Script installed successfully!"
-  return 0
+  exit 0
 }
 
 # Call main function
-if ! main; then
-  log_message "ERROR" "Script installation failed."
-  exit 1
-fi
+main
