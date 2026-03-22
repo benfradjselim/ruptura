@@ -34,8 +34,10 @@ def collect_metrics() -> None:
         latency.set((time.time() - start_time) * 1000)
     except requests.RequestException as e:
         logging.error(f"Error collecting metrics: {e}")
+        raise
     except Exception as e:
         logging.error(f"Unexpected error collecting metrics: {e}")
+        raise
 
 def start_metrics_server(port: int = 8000) -> None:
     """
@@ -53,6 +55,7 @@ def start_metrics_server(port: int = 8000) -> None:
         logging.info(f"Metrics server started on port {port}")
     except Exception as e:
         logging.error(f"Error starting metrics server: {e}")
+        raise
 
 def main() -> None:
     """
@@ -67,15 +70,6 @@ def main() -> None:
 
         # Start the metrics server
         start_metrics_server()
-
-        # Run indefinitely
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logging.info("Stopping metrics server...")
-        prometheus_client.stop_http_server()
     except Exception as e:
-        logging.error(f"Unexpected error: {e}")
-
-if __name__ == "__main__":
-    main()
+        logging.error(f"Error in main function: {e}")
+        raise
