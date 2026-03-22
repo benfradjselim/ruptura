@@ -71,31 +71,59 @@ def train_model(data: pd.DataFrame) -> Optional[LinearRegression]:
     data (pd.DataFrame): Preprocessed data.
 
     Returns:
-    LinearRegression: Trained model or None if training fails.
+    LinearRegression: Trained model.
+
+    Raises:
+    ValueError: If the data is empty.
     """
+    if data.empty:
+        raise ValueError("Data is empty")
     try:
         X = data.drop("target", axis=1)
         y = data["target"]
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         model = LinearRegression()
         model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-        mse = mean_squared_error(y_test, y_pred)
-        logging.info(f"Model trained with MSE: {mse}")
+        logging.info("Model trained")
         return model
     except Exception as e:
         logging.error(f"Error during training: {e}")
-        return None
+        raise e
+
+def evaluate_model(model: LinearRegression, data: pd.DataFrame) -> float:
+    """
+    Evaluate the trained model on the preprocessed data.
+
+    Args:
+    model (LinearRegression): Trained model.
+    data (pd.DataFrame): Preprocessed data.
+
+    Returns:
+    float: Mean squared error.
+
+    Raises:
+    ValueError: If the data is empty.
+    """
+    if data.empty:
+        raise ValueError("Data is empty")
+    try:
+        X = data.drop("target", axis=1)
+        y = data["target"]
+        y_pred = model.predict(X)
+        mse = mean_squared_error(y, y_pred)
+        logging.info(f"Model evaluated with MSE: {mse}")
+        return mse
+    except Exception as e:
+        logging.error(f"Error during evaluation: {e}")
+        raise e
 
 def main():
     file_path = "data.csv"
     data = load_data(file_path)
     data = preprocess_data(data)
     model = train_model(data)
-    if model:
-        logging.info("Model trained successfully")
-    else:
-        logging.error("Model training failed")
+    mse = evaluate_model(model, data)
+    print(f"Mean Squared Error: {mse}")
 
 if __name__ == "__main__":
     main()
