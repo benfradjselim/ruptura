@@ -19,7 +19,7 @@ def load_kube_config() -> None:
         config.load_kube_config()
     except kubernetes.config.ConfigException as e:
         logger.error(f"Erreur lors du chargement de la configuration Kubernetes : {e}")
-        raise kubernetes.config.ConfigException("Erreur lors du chargement de la configuration Kubernetes")
+        raise
 
 def validate_chart(chart: Dict) -> None:
     """
@@ -61,29 +61,17 @@ def create_helm_chart(chart: Dict) -> client.V1Package:
         return response
     except kubernetes.client.ApiException as e:
         logger.error(f"Erreur lors de la création de la chart : {e}")
-        raise kubernetes.client.ApiException("Erreur lors de la création de la chart")
+        raise
 
 def main() -> None:
     """
     Main function.
-
-    Raises:
-        Exception: If an error occurs.
     """
     try:
         load_kube_config()
-        chart = {
-            "apiVersion": "apps/v1",
-            "kind": "Deployment",
-            "metadata": {
-                "name": "mon-deployment"
-            }
-        }
+        chart = {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": "my-deployment"}}
         validate_chart(chart)
         create_helm_chart(chart)
     except Exception as e:
         logger.error(f"Erreur générale : {e}")
-        raise e
-
-if __name__ == "__main__":
-    main()
+        raise
