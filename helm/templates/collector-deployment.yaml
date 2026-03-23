@@ -17,10 +17,20 @@ spec:
         app: collector
     spec:
       serviceAccountName: mlops-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: collector
           image: {{ .Values.image.repository }}-collector:{{ .Values.image.tag }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
           ports:
             - containerPort: {{ .Values.services.collector.port }}
           envFrom:

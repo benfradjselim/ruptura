@@ -20,10 +20,20 @@ spec:
         prometheus.io/port: "{{ .Values.services.exporter.port }}"
         prometheus.io/path: "/metrics"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: exporter
           image: {{ .Values.image.repository }}-exporter:{{ .Values.image.tag }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
           ports:
             - containerPort: {{ .Values.services.exporter.port }}
           envFrom:
