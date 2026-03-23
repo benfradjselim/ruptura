@@ -73,21 +73,40 @@ def load_alert_data(file_path: str) -> pd.DataFrame:
         logger.error(f"Le fichier '{file_path}' est vide.")
         raise e
 
-def main():
+def display_data(data: pd.DataFrame) -> None:
+    """
+    Affiche les données dans un tableau.
+
+    Args:
+        data (pd.DataFrame): Les données à afficher.
+    """
+    st.write(data)
+
+def display_graph(data: pd.DataFrame) -> None:
+    """
+    Affiche un graphique à partir des données.
+
+    Args:
+        data (pd.DataFrame): Les données à afficher.
+    """
+    fig = px.line(data, x='date', y='value')
+    st.plotly_chart(fig)
+
+def main() -> None:
+    """
+    Fonction principale du script.
+    """
     st.title("Dashboard")
 
     # Chargement des données
     file_path = "data.csv"
-    try:
-        data = load_data(file_path)
-    except Exception as e:
-        logger.error(f"Erreur lors du chargement des données : {e}")
-        st.error("Erreur lors du chargement des données")
-        return
+    data = load_data(file_path)
 
-    # Création des graphiques
-    fig = px.line(data, x="date", y="value")
-    st.plotly_chart(fig, use_container_width=True)
+    # Affichage des données
+    display_data(data)
+
+    # Affichage du graphique
+    display_graph(data)
 
 if __name__ == "__main__":
     main()
