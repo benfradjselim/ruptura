@@ -58,45 +58,7 @@ def collect_logs(namespace: str, pod_name: str, container_name: str) -> str:
         logger.error(f"Error collecting logs: {e}")
         logger.error(f"Error code: {e.status}")
         logger.error(f"Error reason: {e.reason}")
-        raise ValueError(f"Error collecting logs: {e}")
-    except Exception as e:
-        logger.error(f"An error occurred: {e}")
         raise
-
-def collect_all_logs(namespace: str) -> Dict[str, str]:
-    """
-    Collect all logs from a Kubernetes namespace.
-
-    Args:
-        namespace (str): The namespace to collect logs from.
-
-    Returns:
-        Dict[str, str]: A dictionary of logs where the key is the pod name and the value is the log.
-
-    Raises:
-        ValueError: If namespace is None or empty.
-    """
-    if not namespace:
-        raise ValueError("Namespace must not be empty")
-
-    logs = {}
-    try:
-        # Get the list of pods in the namespace
-        v1 = client.CoreV1Api()
-        pods = v1.list_namespaced_pod(namespace=namespace)
-
-        # Collect logs from each pod
-        for pod in pods.items:
-            pod_name = pod.metadata.name
-            container_name = pod.spec.containers[0].name
-            logs[pod_name] = collect_logs(namespace, pod_name, container_name)
-
-        return logs
-    except client.ApiException as e:
-        logger.error(f"Error collecting logs: {e}")
-        logger.error(f"Error code: {e.status}")
-        logger.error(f"Error reason: {e.reason}")
-        raise ValueError(f"Error collecting logs: {e}")
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         raise
