@@ -42,6 +42,13 @@ def create_service(
         if not isinstance(service_type, str) or not service_type:
             raise ValueError("Service type must be a non-empty string")
 
+        # Log input parameters
+        logger.info(f"Creating service: {service_name}")
+        logger.info(f"Selector app: {selector_app}")
+        logger.info(f"Port: {port}")
+        logger.info(f"Target port: {target_port}")
+        logger.info(f"Service type: {service_type}")
+
         # Create the Service object
         service = {
             "apiVersion": "v1",
@@ -64,15 +71,16 @@ def create_service(
             }
         }
 
-        logger.info(f"Service created: {service_name}")
         return service
 
     except ValueError as e:
-        logger.error(f"Invalid input parameter: {e}")
+        logger.error(f"Invalid input parameters: {e}")
         raise
+
     except TypeError as e:
-        logger.error(f"Invalid input parameter type: {e}")
+        logger.error(f"Invalid input type: {e}")
         raise
+
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         raise
