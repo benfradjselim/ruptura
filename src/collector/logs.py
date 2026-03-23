@@ -58,7 +58,7 @@ def collect_logs(namespace: str, pod_name: str, container_name: str) -> str:
         logger.error(f"Error collecting logs: {e}")
         logger.error(f"Error code: {e.status}")
         logger.error(f"Error reason: {e.reason}")
-        raise
+        raise client.ApiException(f"Error collecting logs: {e}")
     except Exception as e:
         logger.error(f"An error occurred: {e}")
-        raise
+        raise Exception(f"An error occurred: {e}")
