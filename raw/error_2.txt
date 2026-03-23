@@ -1,1 +1,0 @@
-ERREUR: Aucun modèle disponible. Dernière erreur: Erreur 404: {"error":{"message":"No endpoints found for openai/gpt-3.5-turbo:free.","code":404},"user_id":"user_3BC5zuIIZDRv1t4zqhBJNBMUToA"}

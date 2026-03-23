@@ -1,73 +1,50 @@
-import logging
-import os
-import re
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
 
-# Configuration du logging
-logging.basicConfig(filename='config.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
 
-def nettoyer_config():
-    """
-    Nettoie les fichiers de configuration non nécessaires.
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.tox/
 
-    Retourne:
-        None
-    """
-    # Définition des chemins de fichiers à nettoyer
-    chemins = [
-        'fichiers de configuration',
-        'fichiers de build',
-        'fichiers de cache',
-        'fichiers de logs',
-        'fichiers de données temporaires',
-        'fichiers de debug',
-        'fichiers de tests',
-        'fichiers de déploiement',
-        'fichiers de code source non Python',
-        'fichiers de configuration de l\'éditeur',
-        'fichiers de build de Visual Studio',
-        'fichiers de build de IntelliJ',
-        'fichiers de build de Eclipse',
-    ]
+# Data
+data/*.db
+data/*.db-wal
+data/*.db-shm
+logs/
 
-    # Définition des expressions régulières pour les fichiers à nettoyer
-    regex = {
-        'fichiers de configuration': r'\.pyc$|\.class$|__pycache__/',
-        'fichiers de build': r'build/|dist/|\.egg-info/|\.egg$',
-        'fichiers de cache': r'\.cache/|\.lock$',
-        'fichiers de logs': r'logs/|\.log$',
-        'fichiers de données temporaires': r'\.tmp|\.tmp\.*',
-        'fichiers de debug': r'\.pyd|\.so$',
-        'fichiers de tests': r'tests/|_test\.py|_test\.pyc',
-        'fichiers de déploiement': r'\.whl|\.tar\.gz|\.zip$',
-        'fichiers de code source non Python': r'\.js|\.css|\.html|\.txt|\.md|\.pdf|\.jpg|\.png|\.gif|\.bmp$',
-        'fichiers de configuration de l\'éditeur': r'\.suo|\.ntvs\*|\.ipch|\.sln\.docstates$',
-        'fichiers de build de Visual Studio': r'\.suo|\.ntvs\*|\.ipch|\.sln\.docstates|\.vcxproj|\.vcxproj\.filters$',
-        'fichiers de build de IntelliJ': r'\.iml|\.ipr|\.iws|\.idea$',
-        'fichiers de build de Eclipse': r'\.project|\.classpath|\.settings|\.metadata$',
-    }
+# Docker
+.dockerignore
 
-    # Nettoyage des fichiers
-    for chemin in chemins:
-        try:
-            # Récupération du chemin de fichier
-            chemin_fichier = os.path.join(os.getcwd(), chemin)
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
 
-            # Vérification si le chemin existe
-            if os.path.exists(chemin_fichier):
-                # Récupération des fichiers à nettoyer
-                fichiers = os.listdir(chemin_fichier)
+# Generated files
+generated_*.py
+generated_*.yaml
 
-                # Nettoyage des fichiers
-                for fichier in fichiers:
-                    # Vérification si le fichier correspond à l'expression régulière
-                    if re.search(regex[chemin], fichier):
-                        # Suppression du fichier
-                        os.remove(os.path.join(chemin_fichier, fichier))
-                        logging.info(f'Fichier supprimé : {fichier}')
-
-        except Exception as e:
-            # Gestion des erreurs
-            logging.error(f'Erreur lors du nettoyage des fichiers : {e}')
-
-if __name__ == '__main__':
-    nettoyer_config()
+# Secrets
+*.env
+.env*
+secrets/
