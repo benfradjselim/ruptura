@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detector
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: detector
+    app.kubernetes.io/name: mlops-anomaly-detection
+spec:
+  replicas: {{ .Values.services.detector.replicas }}
+  selector:
+    matchLabels:
+      app: detector
+  template:
+    metadata:
+      labels:
+        app: detector
+    spec:
+      containers:
+        - name: detector
+          image: {{ .Values.image.repository }}-detector:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.detector.port }}
+          envFrom:
+            - configMapRef:
+                name: mlops-config
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            {{- toYaml .Values.services.detector.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.detector.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.detector.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.name }}

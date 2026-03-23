@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: dashboard
+    app.kubernetes.io/name: mlops-anomaly-detection
+spec:
+  replicas: {{ .Values.services.dashboard.replicas }}
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: {{ .Values.image.repository }}-dashboard:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.dashboard.port }}
+          envFrom:
+            - configMapRef:
+                name: mlops-config
+          resources:
+            {{- toYaml .Values.services.dashboard.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: {{ .Values.services.dashboard.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: {{ .Values.services.dashboard.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10

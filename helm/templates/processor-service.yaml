@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: processor
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: processor
+spec:
+  selector:
+    app: processor
+  ports:
+    - port: {{ .Values.services.processor.port }}
+      targetPort: {{ .Values.services.processor.port }}
+      protocol: TCP
+      name: http
+  type: ClusterIP

@@ -1,135 +1,33 @@
-import logging
-import numpy as np
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
-import matplotlib.pyplot as plt
-import seaborn as sns
-from typing import Optional
+# All dependencies (for local dev / testing)
+# For production: use requirements/<service>.txt per microservice
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.7.1
+httpx==0.27.0
 
-def load_data(file_path: str) -> pd.DataFrame:
-    """
-    Load data from a CSV file.
+# Collector
+prometheus-api-client==0.5.5
+kubernetes==29.0.0
+psutil==5.9.8
+requests==2.32.2
 
-    Args:
-    file_path (str): Path to the CSV file.
+# Processor
+numpy==1.26.4
 
-    Returns:
-    pd.DataFrame: Loaded data.
+# Trainer + Detector
+river==0.21.2
+dill==0.3.8
 
-    Raises:
-    FileNotFoundError: If the file does not exist.
-    ValueError: If the file is empty or cannot be parsed.
-    """
-    try:
-        data = pd.read_csv(file_path)
-        logging.info(f"Data loaded from {file_path}")
-        return data
-    except FileNotFoundError as e:
-        logging.error(f"File not found: {file_path}")
-        raise e
-    except pd.errors.EmptyDataError as e:
-        logging.error(f"File is empty: {file_path}")
-        raise ValueError("File is empty") from e
-    except pd.errors.ParserError as e:
-        logging.error(f"Error parsing file: {file_path}")
-        raise ValueError("Error parsing file") from e
+# Exporter
+prometheus-client==0.20.0
 
-def preprocess_data(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Preprocess the data by selecting relevant columns and handling missing values.
+# Dashboard
+streamlit==1.35.0
+plotly==5.22.0
+pandas==2.2.2
 
-    Args:
-    data (pd.DataFrame): Loaded data.
-
-    Returns:
-    pd.DataFrame: Preprocessed data.
-
-    Raises:
-    ValueError: If the data is empty.
-    """
-    if data.empty:
-        raise ValueError("Data is empty")
-    try:
-        # Select relevant columns
-        data = data.dropna()
-        logging.info("Data preprocessed")
-        return data
-    except Exception as e:
-        logging.error(f"Error during preprocessing: {e}")
-        raise e
-
-def train_model(data: pd.DataFrame) -> Optional[LinearRegression]:
-    """
-    Train a linear regression model on the preprocessed data.
-
-    Args:
-    data (pd.DataFrame): Preprocessed data.
-
-    Returns:
-    Optional[LinearRegression]: Trained model or None if training fails.
-
-    Raises:
-    ValueError: If the data is empty.
-    """
-    if data.empty:
-        raise ValueError("Data is empty")
-    try:
-        X, y = train_test_split(data, test_size=0.2, random_state=42)
-        model = LinearRegression()
-        model.fit(X, y)
-        logging.info("Model trained")
-        return model
-    except Exception as e:
-        logging.error(f"Error during training: {e}")
-        return None
-
-def evaluate_model(model: LinearRegression, data: pd.DataFrame) -> float:
-    """
-    Evaluate the model on the preprocessed data.
-
-    Args:
-    model (LinearRegression): Trained model.
-    data (pd.DataFrame): Preprocessed data.
-
-    Returns:
-    float: Mean squared error.
-
-    Raises:
-    ValueError: If the data is empty.
-    """
-    if data.empty:
-        raise ValueError("Data is empty")
-    try:
-        y_pred = model.predict(data)
-        mse = mean_squared_error(data, y_pred)
-        logging.info(f"Model evaluated with MSE: {mse}")
-        return mse
-    except Exception as e:
-        logging.error(f"Error during evaluation: {e}")
-        return None
-
-def plot_results(data: pd.DataFrame, model: LinearRegression) -> None:
-    """
-    Plot the results of the model.
-
-    Args:
-    data (pd.DataFrame): Preprocessed data.
-    model (LinearRegression): Trained model.
-
-    Returns:
-    None
-    """
-    try:
-        plt.scatter(data, model.predict(data))
-        plt.xlabel("Actual")
-        plt.ylabel("Predicted")
-        plt.title("Model Results")
-        plt.show()
-        logging.info("Results plotted")
-    except Exception as e:
-        logging.error(f"Error during plotting: {e}")
+# Testing
+pytest==8.2.0
+pytest-asyncio==0.23.7
+pytest-cov==5.0.0

@@ -1,132 +1,119 @@
-import logging
-import sys
-from typing import NoReturn
-from fastapi import FastAPI
-from streamlit import run
-from river import HalfSpaceTrees
-from kubernetes import client, config
-from prometheus_client import start_http_server
-from logging.handlers import RotatingFileHandler
+# MLOps Anomaly Detection
 
-# Configuration du logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[RotatingFileHandler('app.log', maxBytes=1000000, backupCount=5)]
-)
+Real-time anomaly detection platform with microservices architecture on Kubernetes.
 
-def get_started() -> NoReturn:
-    """
-    Fonction pour démarrer le projet.
+## Architecture
 
-    Retourne:
-        None
-    """
-    try:
-        # Installation des dépendances
-        install_dependencies()
+```
+Prometheus / K8s API
+        |
+   [COLLECTOR :8001]  -- scrapes metrics & logs every 15s
+        |
+   [PROCESSOR :8002]  -- normalizes + engineers features
+        |          \
+  [TRAINER :8003]  [DETECTOR :8004]  -- online learning / scoring
+                        |
+                   [EXPORTER :8005]  -- Prometheus metrics + REST API
+                        |
+                  [DASHBOARD :8501]  -- Streamlit real-time UI
+```
 
-        # Configuration du client Kubernetes
-        config.load_kube_config()
+All services share a SQLite database via a Kubernetes PersistentVolumeClaim.
 
-        # Démarrage de l'application
-        run_application()
+## Services
 
-        logging.info("Projet démarré avec succès !")
-    except Exception as e:
-        logging.error(f"Erreur lors du démarrage du projet : {e}")
-        sys.exit(1)
+| Service    | Port | Description |
+|-----------|------|-------------|
+| Collector  | 8001 | Scrapes Prometheus + K8s pod logs |
+| Processor  | 8002 | Normalizes data, engineers features |
+| Trainer    | 8003 | River HalfSpaceTrees online learning |
+| Detector   | 8004 | Real-time anomaly scoring |
+| Exporter   | 8005 | Prometheus metrics + dashboard REST API |
+| Dashboard  | 8501 | Streamlit real-time visualization |
 
-def install_dependencies() -> None:
-    """
-    Fonction pour installer les dépendances.
+## Quick Start
 
-    Retourne:
-        None
-    """
-    try:
-        # Code d'installation des dépendances
-        logging.info("Dépendances installées avec succès !")
-    except Exception as e:
-        logging.error(f"Erreur lors de l'installation des dépendances : {e}")
-        raise
+### One-Click Installation
 
-def run_application() -> None:
-    """
-    Fonction pour démarrer l'application.
+```bash
+./scripts/install.sh
+```
 
-    Retourne:
-        None
-    """
-    try:
-        # Configuration de l'API FastAPI
-        app = FastAPI()
+This will:
+1. Build Docker images for all 6 services
+2. Load images into your cluster (kind/minikube auto-detected)
+3. Install the Helm chart in namespace `mlops`
+4. Display service URLs
 
-        # Exposition des endpoints
-        app.add_api_route("/health", health_check)
-        app.add_api_route("/metrics", get_metrics)
-        app.add_api_route("/predict", predict)
+### Prerequisites
 
-        # Démarrage du serveur HTTP
-        start_http_server(8000)
+- `kubectl` configured with cluster access
+- `helm` >= 3.0
+- `docker`
 
-        # Démarrage du dashboard Streamlit
-        run("dashboard.py")
+### Custom configuration
 
-        logging.info("Application démarrée avec succès !")
-    except Exception as e:
-        logging.error(f"Erreur lors du démarrage de l'application : {e}")
-        sys.exit(1)
+```bash
+IMAGE_REPO=my-registry/mlops IMAGE_TAG=v1.0 ./scripts/install.sh
+```
 
-def health_check() -> dict:
-    """
-    Fonction pour vérifier la santé de l'application.
+Or edit `helm/values.yaml` before installing.
 
-    Retourne:
-        dict: Réponse de santé
-    """
-    try:
-        # Vérification de la santé de l'application
-        logging.info("Vérification de la santé de l'application...")
-        return {"status": "ok"}
-    except Exception as e:
-        logging.error(f"Erreur lors de la vérification de la santé de l'application : {e}")
-        return {"status": "error"}
+## Development
 
-def get_metrics() -> dict:
-    """
-    Fonction pour récupérer les métriques.
+### Local setup
 
-    Retourne:
-        dict: Métriques
-    """
-    try:
-        # Récupération des métriques
-        logging.info("Récupération des métriques...")
-        # Code pour récupérer les métriques
-        return {"cpu": 0.5, "memory": 0.8, "latency": 0.2}
-    except Exception as e:
-        logging.error(f"Erreur lors de la récupération des métriques : {e}")
-        return {"error": "Erreur lors de la récupération des métriques"}
+```bash
+pip install -r requirements.txt
+```
 
-def predict() -> dict:
-    """
-    Fonction pour faire une prédiction.
+### Run tests
 
-    Retourne:
-        dict: Prédiction
-    """
-    try:
-        # Prédiction
-        logging.info("Prédiction...")
-        # Code pour faire une prédiction
-        model = HalfSpaceTrees()
-        data = {"cpu": 0.5, "memory": 0.8, "latency": 0.2}
-        prediction = model.predict(data)
-        return {"prediction": prediction}
-    except Exception as e:
-        logging.error(f"Erreur lors de la prédiction : {e}")
-        return {"error": "Erreur lors de la prédiction"}
+```bash
+pytest tests/ -v --cov=src --cov-report=term-missing
+```
 
-if __name__ == "__main__":
-    get_started()
+### Run a service locally
+
+```bash
+DB_PATH=./data/mlops.db COLLECTOR_URL=http://localhost:8001 \
+  python services/collector/main.py
+```
+
+## Data Flow
+
+1. **Collector** scrapes Prometheus every `COLLECT_INTERVAL_SEC` (default 15s), writes to `raw_metrics` table, triggers Processor
+2. **Processor** normalizes metrics with online MinMax, fans out to Trainer + Detector in parallel
+3. **Trainer** calls `model.learn_one(x)` on River HalfSpaceTrees, serializes model to DB every 100 samples
+4. **Detector** loads latest model, calls `model.score_one(x)`, writes anomaly scores to `anomalies` table
+5. **Exporter** aggregates data from DB, exposes `/metrics` (Prometheus) and `/dashboard-data` (JSON)
+6. **Dashboard** polls Exporter every 5s, renders real-time charts
+
+## Key Design Decisions
+
+- **SQLite + WAL mode**: Zero-ops persistence, sufficient for ~100 writes/sec
+- **River HalfSpaceTrees**: Online learner, no labeled data required, sub-millisecond inference
+- **Push-based communication**: Upstream services POST to downstream on new data; reconciliation loop handles failures
+- **Table ownership**: Each table has one writer, avoiding SQLite write contention
+
+## Helm Configuration
+
+Key values in `helm/values.yaml`:
+
+```yaml
+config:
+  COLLECT_INTERVAL_SEC: "15"    # Scrape interval
+  ANOMALY_THRESHOLD: "0.7"      # Score threshold for anomaly flag
+  HST_N_TREES: "10"             # Number of HST trees
+  HST_WINDOW_SIZE: "250"        # Rolling window size
+
+pvc:
+  size: 5Gi                     # SQLite storage
+```
+
+## Uninstall
+
+```bash
+helm uninstall mlops-anomaly -n mlops
+kubectl delete namespace mlops
+```

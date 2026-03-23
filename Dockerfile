@@ -1,51 +1,50 @@
-import logging
-import os
-import subprocess
-from typing import NoReturn
+# Multi-stage Dockerfile for all MLOps microservices
+# Usage: docker build --build-arg SERVICE=collector -t mlops-anomaly-collector:latest .
+# Valid SERVICE values: collector, processor, trainer, detector, exporter, dashboard
 
-# Configuration du logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+ARG SERVICE=collector
 
-def build_image() -> None:
-    """
-    Construit l'image Docker en deux étapes : build et final.
+# ============================================================
+# Stage 1: Builder - install dependencies
+# ============================================================
+FROM python:3.11-slim AS builder
 
-    :return: None
-    """
-    try:
-        # Stage 1: Build
-        logging.info("Construisons la première étape de l'image Docker...")
-        subprocess.run([
-            "docker", "build", "-t", "my-image", "--build-arg", "BUILD_STAGE=1", "."
-        ], check=True, text=True, capture_output=True, env=os.environ)
+ARG SERVICE
+WORKDIR /build
 
-        # Stage 2: Final
-        logging.info("Construisons la deuxième étape de l'image Docker...")
-        subprocess.run([
-            "docker", "build", "-t", "my-image", "--build-arg", "BUILD_STAGE=2", "."
-        ], check=True, text=True, capture_output=True, env=os.environ)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-        logging.info("L'image Docker a été construite avec succès !")
+COPY requirements/common.txt /build/common.txt
+RUN pip install --no-cache-dir --prefix=/install -r /build/common.txt
 
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Erreur lors de la construction de l'image Docker : {e.stderr}")
-        raise
+COPY requirements/${SERVICE}.txt /build/service.txt
+RUN pip install --no-cache-dir --prefix=/install -r /build/service.txt
 
-    except Exception as e:
-        logging.error(f"Erreur inconnue : {e}")
-        raise
+# ============================================================
+# Stage 2: Runtime - slim image
+# ============================================================
+FROM python:3.11-slim AS runtime
 
-def main() -> NoReturn:
-    """
-    Fonction principale.
+ARG SERVICE
+ENV SERVICE=${SERVICE}
 
-    :return: None
-    """
-    try:
-        build_image()
-    except Exception as e:
-        logging.error(f"Erreur lors de l'exécution de la fonction principale : {e}")
-        raise
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
-if __name__ == "__main__":
-    main()
+COPY --from=builder /install /usr/local
+
+WORKDIR /app
+
+COPY src/shared/ ./shared/
+COPY services/${SERVICE}/ ./service/
+
+RUN mkdir -p /data
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8001}/health || exit 1
+
+CMD ["sh", "-c", "python /app/service/main.py"]

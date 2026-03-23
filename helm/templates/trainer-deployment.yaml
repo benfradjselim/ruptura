@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trainer
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: trainer
+    app.kubernetes.io/name: mlops-anomaly-detection
+spec:
+  replicas: {{ .Values.services.trainer.replicas }}
+  selector:
+    matchLabels:
+      app: trainer
+  template:
+    metadata:
+      labels:
+        app: trainer
+    spec:
+      containers:
+        - name: trainer
+          image: {{ .Values.image.repository }}-trainer:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.trainer.port }}
+          envFrom:
+            - configMapRef:
+                name: mlops-config
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            {{- toYaml .Values.services.trainer.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.trainer.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.trainer.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.name }}

@@ -1,0 +1,103 @@
+namespace: mlops
+
+image:
+  repository: mlops-anomaly
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Shared SQLite PVC
+pvc:
+  name: mlops-data
+  storageClass: ""
+  size: 5Gi
+  accessMode: ReadWriteOnce
+
+# ConfigMap environment variables
+config:
+  DB_PATH: /data/mlops.db
+  LOG_LEVEL: INFO
+  PROMETHEUS_URL: http://prometheus-server.monitoring:9090
+  K8S_NAMESPACES: default,mlops
+  COLLECT_INTERVAL_SEC: "15"
+  BATCH_SIZE: "50"
+  HST_N_TREES: "10"
+  HST_HEIGHT: "8"
+  HST_WINDOW_SIZE: "250"
+  MODEL_SAVE_EVERY_N: "100"
+  ANOMALY_THRESHOLD: "0.7"
+  DASHBOARD_REFRESH_SEC: "5"
+  COLLECTOR_URL: http://collector:8001
+  PROCESSOR_URL: http://processor:8002
+  TRAINER_URL: http://trainer:8003
+  DETECTOR_URL: http://detector:8004
+  EXPORTER_URL: http://exporter:8005
+
+services:
+  collector:
+    port: 8001
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+  processor:
+    port: 8002
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+
+  trainer:
+    port: 8003
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+
+  detector:
+    port: 8004
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+  exporter:
+    port: 8005
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+  dashboard:
+    port: 8501
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Node affinity for ReadWriteOnce PVC (all pods on same node)
+nodeAffinityKey: kubernetes.io/hostname
