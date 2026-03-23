@@ -1,0 +1,31 @@
+name: Build MLOps Microservices Images
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [collector, processor, trainer, detector, exporter, dashboard]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Build and push ${{ matrix.service }}
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        build-args: SERVICE=${{ matrix.service }}
+        push: true
+        tags: ghcr.io/${{ github.repository }}/${{ matrix.service }}:latest
