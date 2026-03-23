@@ -90,14 +90,14 @@ def train_model(data: pd.DataFrame) -> Optional[LinearRegression]:
 
 def evaluate_model(model: LinearRegression, data: pd.DataFrame) -> float:
     """
-    Evaluate the trained model on the preprocessed data.
+    Evaluate the model on the preprocessed data.
 
     Args:
     model (LinearRegression): Trained model.
     data (pd.DataFrame): Preprocessed data.
 
     Returns:
-    float: Mean squared error of the model.
+    float: Mean squared error.
 
     Raises:
     ValueError: If the data is empty.
@@ -113,16 +113,23 @@ def evaluate_model(model: LinearRegression, data: pd.DataFrame) -> float:
         logging.error(f"Error during evaluation: {e}")
         return None
 
-def main():
-    file_path = "data.csv"
-    data = load_data(file_path)
-    data = preprocess_data(data)
-    model = train_model(data)
-    if model:
-        mse = evaluate_model(model, data)
-        print(f"Mean squared error: {mse}")
-    else:
-        print("Model training failed")
+def plot_results(data: pd.DataFrame, model: LinearRegression) -> None:
+    """
+    Plot the results of the model.
 
-if __name__ == "__main__":
-    main()
+    Args:
+    data (pd.DataFrame): Preprocessed data.
+    model (LinearRegression): Trained model.
+
+    Returns:
+    None
+    """
+    try:
+        plt.scatter(data, model.predict(data))
+        plt.xlabel("Actual")
+        plt.ylabel("Predicted")
+        plt.title("Model Results")
+        plt.show()
+        logging.info("Results plotted")
+    except Exception as e:
+        logging.error(f"Error during plotting: {e}")
