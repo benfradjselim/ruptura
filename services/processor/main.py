@@ -37,31 +37,24 @@ def _normalize_minmax(name: str, value: float) -> float:
     return (value - stats["min"]) / rng
 
 
-def _extract_features(metrics: list) -> dict:
-    """Map raw metric rows to normalized feature vector."""
-    features: dict[str, float] = {
-        "cpu_norm": 0.0,
-        "memory_norm": 0.0,
-        "latency_norm": 0.0,
+def _build_feature_vector(metrics_by_name: dict[str, float]) -> dict[str, float]:
+    """Build a normalized feature vector from a dict of {metric_name: value}."""
+    return {
+        "cpu_norm": _normalize_minmax("cpu_usage", metrics_by_name.get("cpu_usage", 0.0)),
+        "memory_norm": _normalize_minmax("memory_usage", metrics_by_name.get("memory_usage", 0.0)),
+        "latency_norm": _normalize_minmax("latency_ms", metrics_by_name.get("latency_ms", 0.0)),
         "error_rate": 0.0,
         "log_volume": 0.0,
         "restart_count": 0.0,
     }
-    for row in metrics:
-        name = row["metric_name"]
-        value = float(row["value"])
-        if name == "cpu_usage":
-            features["cpu_norm"] = _normalize_minmax("cpu_usage", value)
-        elif name == "memory_usage":
-            features["memory_norm"] = _normalize_minmax("memory_usage", value)
-        elif name == "latency_ms":
-            features["latency_norm"] = _normalize_minmax("latency_ms", value)
-    return features
 
 
 async def _process_batch(batch_ids: list[int] | None = None) -> int:
-    """Process unprocessed raw metrics rows into processed_data."""
-    database.init_db()
+    """Process unprocessed raw metrics rows into processed_data.
+
+    Groups raw metrics rows by timestamp so each collection event produces
+    exactly one processed_data row with a complete feature vector.
+    """
     limit = config.get_int("BATCH_SIZE")
 
     with database.get_conn() as conn:
@@ -80,11 +73,19 @@ async def _process_batch(batch_ids: list[int] | None = None) -> int:
         if not rows:
             return 0
 
-        features = _extract_features(rows)
-        timestamp = datetime.now(timezone.utc).isoformat()
-        processed_ids = []
-
+        # Group rows by timestamp: each collection event emits multiple
+        # metric rows (cpu, memory, latency) with the same timestamp.
+        # Build one feature vector per timestamp group.
+        from collections import defaultdict
+        groups: dict[str, dict] = defaultdict(lambda: {"metrics": {}, "ids": []})
         for row in rows:
+            ts = row["timestamp"]
+            groups[ts]["metrics"][row["metric_name"]] = float(row["value"])
+            groups[ts]["ids"].append(row["id"])
+
+        processed_ids = []
+        for ts, group in groups.items():
+            features = _build_feature_vector(group["metrics"])
             cur = conn.execute(
                 """INSERT INTO processed_data
                    (timestamp, source_type, source_id,
@@ -93,7 +94,7 @@ async def _process_batch(batch_ids: list[int] | None = None) -> int:
                     pod_name, namespace)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    timestamp, "metric", row["id"],
+                    ts, "metric", group["ids"][0],
                     features["cpu_norm"], features["memory_norm"],
                     features["latency_norm"], features["error_rate"],
                     features["log_volume"], features["restart_count"],
@@ -102,38 +103,41 @@ async def _process_batch(batch_ids: list[int] | None = None) -> int:
             )
             processed_ids.append(cur.lastrowid)
 
-        # Mark raw metrics as processed
-        ids_to_mark = [r["id"] for r in rows]
+        # Mark all raw metrics as processed
         conn.executemany(
             "UPDATE raw_metrics SET processed=1 WHERE id=?",
-            [(i,) for i in ids_to_mark],
+            [(i,) for r in rows for i in [r["id"]]],
         )
 
     if processed_ids:
-        await _notify_downstream(processed_ids)
+        results = await _notify_downstream(processed_ids)
+        for svc, exc in results.items():
+            if exc:
+                logger.debug("Downstream %s notify failed: %s", svc, exc)
 
-    logger.info("Processed %d rows -> %d features", len(rows), len(processed_ids))
+    logger.info("Processed %d raw rows -> %d feature vectors", len(rows), len(processed_ids))
     return len(processed_ids)
 
 
-async def _notify_downstream(processed_ids: list[int]) -> None:
-    """Fire-and-forget: notify trainer and detector in parallel."""
+async def _notify_downstream(processed_ids: list[int]) -> dict[str, Exception | None]:
+    """Notify trainer and detector in parallel; returns {service: error_or_None}."""
     trainer_url = config.get_str("TRAINER_URL")
     detector_url = config.get_str("DETECTOR_URL")
     payload = {"processed_ids": processed_ids}
 
-    async def post(url: str, data: dict) -> None:
+    async def post(name: str, url: str) -> tuple[str, Exception | None]:
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                await client.post(url, json=data)
+                await client.post(url, json=payload)
+            return name, None
         except Exception as exc:
-            logger.debug("Downstream notify failed %s: %s", url, exc)
+            return name, exc
 
-    await asyncio.gather(
-        post(f"{trainer_url}/train", payload),
-        post(f"{detector_url}/detect", payload),
-        return_exceptions=True,
+    results = await asyncio.gather(
+        post("trainer", f"{trainer_url}/train"),
+        post("detector", f"{detector_url}/detect"),
     )
+    return dict(results)
 
 
 async def _reconciliation_loop() -> None:

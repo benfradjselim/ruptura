@@ -1,6 +1,9 @@
 """TRAINER service (port 8003) - River HalfSpaceTrees online learning."""
 import asyncio
+import hashlib
+import hmac
 import logging
+import os
 import sys
 
 import dill
@@ -24,11 +27,15 @@ app = FastAPI(title="MLOps Trainer", version="1.0.0")
 
 _FEATURE_KEYS = ["cpu_norm", "memory_norm", "latency_norm", "error_rate", "log_volume", "restart_count"]
 
+# HMAC key for model blob integrity (override via MODEL_HMAC_KEY env var in production)
+_HMAC_KEY = os.environ.get("MODEL_HMAC_KEY", "mlops-default-dev-key").encode()
+
 # In-memory model state
 _model = None
 _model_version = 0
 _samples_seen = 0
 _samples_since_save = 0
+_model_lock = asyncio.Lock()  # guards all model reads/writes
 
 
 def _make_model():
@@ -41,6 +48,23 @@ def _make_model():
     )
 
 
+def _sign_blob(blob: bytes) -> bytes:
+    """Prepend HMAC-SHA256 signature to blob: [32-byte mac][blob]."""
+    mac = hmac.new(_HMAC_KEY, blob, hashlib.sha256).digest()
+    return mac + blob
+
+
+def _verify_and_load(signed: bytes):
+    """Verify HMAC then deserialize. Raises ValueError on tamper."""
+    if len(signed) < 32:
+        raise ValueError("Model blob too short to contain HMAC signature")
+    mac, blob = signed[:32], signed[32:]
+    expected = hmac.new(_HMAC_KEY, blob, hashlib.sha256).digest()
+    if not hmac.compare_digest(mac, expected):
+        raise ValueError("Model blob HMAC verification failed — possible tampering")
+    return dill.loads(blob)
+
+
 def _load_latest_model() -> tuple:
     """Load latest model from DB. Returns (model, version, samples_seen)."""
     with database.get_conn() as conn:
@@ -50,14 +74,14 @@ def _load_latest_model() -> tuple:
     if row is None:
         logger.info("No saved model found, initializing fresh HST model")
         return _make_model(), 0, 0
-    model = dill.loads(row["model_blob"])
+    model = _verify_and_load(row["model_blob"])
     logger.info("Loaded model version=%d samples_seen=%d", row["version"], row["samples_seen"])
     return model, row["version"], row["samples_seen"]
 
 
 def _save_model(model, version: int, samples_seen: int) -> None:
-    """Serialize model to DB."""
-    blob = dill.dumps(model)
+    """Serialize model with HMAC signature to DB."""
+    blob = _sign_blob(dill.dumps(model))
     with database.get_conn() as conn:
         conn.execute(
             """INSERT OR REPLACE INTO model_state
@@ -75,48 +99,49 @@ def _save_model(model, version: int, samples_seen: int) -> None:
 
 
 async def _train_batch(processed_ids: list[int] | None = None) -> int:
-    """Learn from processed data rows."""
+    """Learn from processed data rows (serialized via asyncio.Lock)."""
     global _model, _model_version, _samples_seen, _samples_since_save
 
     limit = config.get_int("BATCH_SIZE")
     save_every = config.get_int("MODEL_SAVE_EVERY_N")
 
-    with database.get_conn() as conn:
-        if processed_ids:
-            ph = ",".join("?" * len(processed_ids))
-            rows = conn.execute(
-                f"SELECT * FROM processed_data WHERE id IN ({ph}) AND trained=0",
-                processed_ids,
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM processed_data WHERE trained=0 ORDER BY created_at LIMIT ?",
-                (limit,),
-            ).fetchall()
+    async with _model_lock:
+        with database.get_conn() as conn:
+            if processed_ids:
+                ph = ",".join("?" * len(processed_ids))
+                rows = conn.execute(
+                    f"SELECT * FROM processed_data WHERE id IN ({ph}) AND trained=0",
+                    processed_ids,
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM processed_data WHERE trained=0 ORDER BY created_at LIMIT ?",
+                    (limit,),
+                ).fetchall()
 
-        if not rows:
-            return 0
+            if not rows:
+                return 0
 
-        for row in rows:
-            x = {k: float(row[k] or 0.0) for k in _FEATURE_KEYS}
-            _model.learn_one(x)
-            _samples_seen += 1
-            _samples_since_save += 1
+            for row in rows:
+                x = {k: float(row[k] or 0.0) for k in _FEATURE_KEYS}
+                _model.learn_one(x)
+                _samples_seen += 1
+                _samples_since_save += 1
 
-        # Mark as trained
-        conn.executemany(
-            "UPDATE processed_data SET trained=1 WHERE id=?",
-            [(r["id"],) for r in rows],
-        )
+            # Mark as trained
+            conn.executemany(
+                "UPDATE processed_data SET trained=1 WHERE id=?",
+                [(r["id"],) for r in rows],
+            )
 
-    # Increment version and save periodically
-    if _samples_since_save >= save_every:
-        _model_version += 1
-        _save_model(_model, _model_version, _samples_seen)
-        _samples_since_save = 0
+        # Increment version and save periodically
+        if _samples_since_save >= save_every:
+            _model_version += 1
+            _save_model(_model, _model_version, _samples_seen)
+            _samples_since_save = 0
 
-    logger.info("Trained on %d samples (total=%d)", len(rows), _samples_seen)
-    return len(rows)
+        logger.info("Trained on %d samples (total=%d)", len(rows), _samples_seen)
+        return len(rows)
 
 
 async def _reconciliation_loop() -> None:

@@ -20,6 +20,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      automountServiceAccountToken: false
       containers:
         - name: trainer
           image: {{ .Values.image.repository }}-trainer:{{ .Values.image.tag }}

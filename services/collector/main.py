@@ -132,8 +132,11 @@ async def collect_k8s_logs() -> list[dict]:
                                     "log_level": level,
                                     "message": line[:1000],
                                 })
-                        except Exception:
-                            pass
+                        except Exception as log_exc:
+                            logger.debug(
+                                "Failed to read logs for %s/%s: %s",
+                                pod.metadata.name, container.name, log_exc,
+                            )
             except Exception as exc:
                 logger.debug("K8s log collect error for ns %s: %s", ns, exc)
     except ImportError:
@@ -164,7 +167,8 @@ async def run_collection() -> int:
         metrics = []
 
     if not metrics:
-        metrics = scrape_psutil()
+        loop = asyncio.get_event_loop()
+        metrics = await loop.run_in_executor(None, scrape_psutil)
 
     # Collect logs
     logs = await collect_k8s_logs()

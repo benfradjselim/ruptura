@@ -24,6 +24,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      automountServiceAccountToken: false
       containers:
         - name: exporter
           image: {{ .Values.image.repository }}-exporter:{{ .Values.image.tag }}

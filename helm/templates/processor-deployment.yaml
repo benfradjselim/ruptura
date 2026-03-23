@@ -20,6 +20,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      automountServiceAccountToken: false
       containers:
         - name: processor
           image: {{ .Values.image.repository }}-processor:{{ .Values.image.tag }}

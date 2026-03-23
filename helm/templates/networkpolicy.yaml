@@ -1,0 +1,120 @@
+# Collector: can reach prometheus + k8s API, receives nothing
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: collector-netpol
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: collector
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - {}  # allow all egress (prometheus, k8s API, processor)
+---
+# Processor: receives from collector only; egress to trainer + detector
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: processor-netpol
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: processor
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: collector
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: trainer
+    - to:
+        - podSelector:
+            matchLabels:
+              app: detector
+---
+# Trainer: receives from processor only; no required egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trainer-netpol
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: trainer
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: processor
+---
+# Detector: receives from processor only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: detector-netpol
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: detector
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: processor
+---
+# Exporter: receives from dashboard + prometheus scraper
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: exporter-netpol
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: exporter
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: dashboard
+    - {}  # allow prometheus scrape from any source
+---
+# Dashboard: receives from outside (NodePort); egress to exporter only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dashboard-netpol
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: dashboard
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - {}  # allow external access (NodePort)
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: exporter

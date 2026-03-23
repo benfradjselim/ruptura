@@ -19,6 +19,16 @@ ok()  { echo -e "${GREEN}[OK]${NC}  $1"; }
 warn(){ echo -e "${YELLOW}[WARN]${NC} $1"; }
 err() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
+# ---- Input validation ----
+_validate_tag() {
+    local val="$1" name="$2"
+    if ! [[ "$val" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
+        err "$name contains invalid characters. Only [a-zA-Z0-9._/-] are allowed."
+    fi
+}
+_validate_tag "$IMAGE_REPO" "IMAGE_REPO"
+_validate_tag "$IMAGE_TAG"  "IMAGE_TAG"
+
 # ---- Prerequisites ----
 for cmd in kubectl helm docker; do
     command -v "$cmd" &>/dev/null || err "$cmd not found. Please install $cmd."

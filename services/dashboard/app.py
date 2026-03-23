@@ -1,5 +1,4 @@
 """DASHBOARD service (port 8501) - Streamlit real-time anomaly visualization."""
-import os
 import sys
 import time
 from datetime import datetime
@@ -80,7 +79,7 @@ def render_anomaly_chart(series: list[dict]) -> None:
         labels={"value": "Anomaly Score", "timestamp": "Time"},
     )
     fig.add_hline(
-        y=float(os.environ.get("ANOMALY_THRESHOLD", "0.7")),
+        y=config.get_float("ANOMALY_THRESHOLD"),
         line_dash="dash",
         line_color="orange",
         annotation_text="Threshold",

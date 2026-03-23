@@ -31,7 +31,9 @@ _predictions_total = Counter(f"{PREFIX}_predictions_total", "Total predictions")
 _cpu_gauge = Gauge(f"{PREFIX}_cpu_usage", "Latest CPU usage (normalized)")
 _memory_gauge = Gauge(f"{PREFIX}_memory_usage", "Latest memory usage (normalized)")
 
-_last_export_count = 0
+# Track last-seen counts to drive Counter.inc() correctly
+_last_anomaly_count = 0
+_last_prediction_count = 0
 
 
 def _get_summary(window_hours: int = 24) -> AnomalySummary:
@@ -109,7 +111,9 @@ def _get_recent_anomalies(limit: int = 20) -> list[DetectionResult]:
 
 
 def _update_prometheus_gauges() -> None:
-    """Update Prometheus gauges from latest DB data."""
+    """Update all Prometheus metrics from latest DB data."""
+    global _last_anomaly_count, _last_prediction_count
+
     with database.get_conn() as conn:
         latest_metric = conn.execute(
             "SELECT cpu_norm, memory_norm FROM processed_data ORDER BY created_at DESC LIMIT 1"
@@ -118,15 +122,30 @@ def _update_prometheus_gauges() -> None:
             _cpu_gauge.set(latest_metric["cpu_norm"] or 0.0)
             _memory_gauge.set(latest_metric["memory_norm"] or 0.0)
 
-        summary = conn.execute(
-            """SELECT COUNT(*) as total, SUM(is_anomaly) as anomalies
-               FROM anomalies
-               WHERE timestamp >= datetime('now', '-24 hours')"""
+        row = conn.execute(
+            "SELECT COUNT(*) as total, COALESCE(SUM(is_anomaly), 0) as anomalies FROM anomalies"
         ).fetchone()
-        if summary:
-            total = summary["total"] or 0
-            anomalies = summary["anomalies"] or 0
-            _anomaly_rate.set(anomalies / total if total > 0 else 0.0)
+        if row:
+            total = row["total"] or 0
+            anomalies = int(row["anomalies"] or 0)
+
+            # Increment counters by delta since last check
+            delta_predictions = max(0, total - _last_prediction_count)
+            delta_anomalies = max(0, anomalies - _last_anomaly_count)
+            if delta_predictions:
+                _predictions_total.inc(delta_predictions)
+            if delta_anomalies:
+                _anomaly_total.inc(delta_anomalies)
+            _last_prediction_count = total
+            _last_anomaly_count = anomalies
+
+            # 24h window anomaly rate for the gauge
+            row_24h = conn.execute(
+                """SELECT COUNT(*) as total, COALESCE(SUM(is_anomaly), 0) as anomalies
+                   FROM anomalies WHERE timestamp >= datetime('now', '-24 hours')"""
+            ).fetchone()
+            if row_24h and row_24h["total"]:
+                _anomaly_rate.set(row_24h["anomalies"] / row_24h["total"])
 
 
 @app.on_event("startup")
@@ -148,7 +167,13 @@ async def metrics() -> Response:
 
 @app.get("/dashboard-data", response_model=DashboardData)
 async def dashboard_data(window: str = "1h") -> DashboardData:
-    hours = int(window.replace("h", "")) if window.endswith("h") else 1
+    if not window.endswith("h"):
+        window = "1h"
+    try:
+        hours = max(1, min(int(window[:-1]), 168))  # clamp: 1h..168h (1 week)
+    except ValueError:
+        hours = 1
+    window = f"{hours}h"
     return DashboardData(
         anomaly_series=_get_anomaly_series(hours),
         metric_series=_get_metric_series(hours),
