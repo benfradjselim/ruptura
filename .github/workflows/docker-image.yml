@@ -1,8 +1,10 @@
-name: Build MLOps Microservices Images
+name: Build and Push MLOps Images v2.0
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "v2.0" ]
+    tags: [ "v2.*" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,10 +21,18 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_TOKEN }}
     
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
     - name: Build and push ${{ matrix.service }}
       uses: docker/build-push-action@v5
       with:
         context: .
+        file: Dockerfile.v2
         build-args: SERVICE=${{ matrix.service }}
         push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/mlops-${{ matrix.service }}:latest
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mlopsv2-${{ matrix.service }}:v2.0
+          ${{ secrets.DOCKER_USERNAME }}/mlopsv2-${{ matrix.service }}:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
