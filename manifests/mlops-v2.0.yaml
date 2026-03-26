@@ -1,0 +1,298 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlops-data
+  namespace: mlops
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  namespace: mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector
+  template:
+    metadata:
+      labels:
+        app: collector
+    spec:
+      containers:
+      - name: collector
+        image: selimbf/mlops-collector:v2.0
+        ports:
+        - containerPort: 8001
+        env:
+        - name: COLLECTOR_PORT
+          value: "8001"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector
+  namespace: mlops
+spec:
+  selector:
+    app: collector
+  ports:
+  - port: 8001
+    targetPort: 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: processor
+  namespace: mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: processor
+  template:
+    metadata:
+      labels:
+        app: processor
+    spec:
+      containers:
+      - name: processor
+        image: selimbf/mlops-processor:v2.0
+        ports:
+        - containerPort: 8002
+        env:
+        - name: PROCESSOR_PORT
+          value: "8002"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: processor
+  namespace: mlops
+spec:
+  selector:
+    app: processor
+  ports:
+  - port: 8002
+    targetPort: 8002
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trainer
+  namespace: mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trainer
+  template:
+    metadata:
+      labels:
+        app: trainer
+    spec:
+      containers:
+      - name: trainer
+        image: selimbf/mlops-trainer:v2.0
+        ports:
+        - containerPort: 8003
+        env:
+        - name: TRAINER_PORT
+          value: "8003"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trainer
+  namespace: mlops
+spec:
+  selector:
+    app: trainer
+  ports:
+  - port: 8003
+    targetPort: 8003
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detector
+  namespace: mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: detector
+  template:
+    metadata:
+      labels:
+        app: detector
+    spec:
+      containers:
+      - name: detector
+        image: selimbf/mlops-detector:v2.0
+        ports:
+        - containerPort: 8004
+        env:
+        - name: DETECTOR_PORT
+          value: "8004"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: detector
+  namespace: mlops
+spec:
+  selector:
+    app: detector
+  ports:
+  - port: 8004
+    targetPort: 8004
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exporter
+  namespace: mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exporter
+  template:
+    metadata:
+      labels:
+        app: exporter
+    spec:
+      containers:
+      - name: exporter
+        image: selimbf/mlops-exporter:v2.0
+        ports:
+        - containerPort: 8005
+        env:
+        - name: EXPORTER_PORT
+          value: "8005"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: exporter
+  namespace: mlops
+spec:
+  selector:
+    app: exporter
+  ports:
+  - port: 8005
+    targetPort: 8005
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+      - name: dashboard
+        image: selimbf/mlops-dashboard:v2.0
+        ports:
+        - containerPort: 8501
+        env:
+        - name: DASHBOARD_PORT
+          value: "8501"
+        - name: EXPORTER_URL
+          value: "http://exporter:8005"
+        - name: DASHBOARD_REFRESH_SEC
+          value: "5"
+        - name: ANOMALY_THRESHOLD
+          value: "0.7"
+        - name: STREAMLIT_SERVER_PORT
+          value: "8501"
+        - name: STREAMLIT_SERVER_ADDRESS
+          value: "0.0.0.0"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: mlops
+spec:
+  selector:
+    app: dashboard
+  ports:
+  - port: 8501
+    targetPort: 8501
+    nodePort: 30851
+  type: NodePort
