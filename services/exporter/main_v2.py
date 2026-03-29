@@ -25,11 +25,11 @@ async def summary():
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
-        total = conn.execute("SELECT COUNT(*) as count FROM anomalies WHERE timestamp >= datetime('now', '-24 hours')").fetchone()["count"]
-        real = conn.execute("SELECT COUNT(*) as count FROM anomalies WHERE timestamp >= datetime('now', '-24 hours') AND anomaly_score > 0.7").fetchone()["count"]
+        anomalies = conn.execute("SELECT COUNT(*) as count FROM anomalies WHERE timestamp >= datetime('now', '-24 hours') AND anomaly_score > 0.7").fetchone()["count"]
+        predictions = conn.execute("SELECT COUNT(*) as count FROM processed_data WHERE timestamp >= datetime('now', '-24 hours')").fetchone()["count"]
         conn.close()
-        rate = real / total if total > 0 else 0.0
-        return {"total_anomalies_24h": total, "anomaly_rate": rate, "total_predictions": total}
+        rate = anomalies / predictions if predictions > 0 else 0.0
+        return {"total_anomalies_24h": anomalies, "anomaly_rate": rate, "total_predictions": predictions}
     except Exception as e:
         logger.error(f"Error in summary: {e}")
         return {"total_anomalies_24h": 0, "anomaly_rate": 0.0, "total_predictions": 0}
@@ -85,17 +85,17 @@ async def dashboard_data(window: str = "24h"):
             for r in rows
         ]
         
-        total = conn.execute("SELECT COUNT(*) as count FROM anomalies WHERE timestamp >= datetime('now', '-24 hours')").fetchone()["count"]
-        real = conn.execute("SELECT COUNT(*) as count FROM anomalies WHERE timestamp >= datetime('now', '-24 hours') AND anomaly_score > 0.7").fetchone()["count"]
+        anomalies = conn.execute("SELECT COUNT(*) as count FROM anomalies WHERE timestamp >= datetime('now', '-24 hours') AND anomaly_score > 0.7").fetchone()["count"]
+        predictions = conn.execute("SELECT COUNT(*) as count FROM processed_data WHERE timestamp >= datetime('now', '-24 hours')").fetchone()["count"]
         conn.close()
         
         return {
             "anomaly_series": anomaly_series,
             "metric_series": metric_series,
             "summary": {
-                "total_anomalies_24h": total,
-                "anomaly_rate": real / total if total > 0 else 0.0,
-                "total_predictions": total
+                "total_anomalies_24h": anomalies,
+                "anomaly_rate": anomalies / predictions if predictions > 0 else 0.0,
+                "total_predictions": predictions
             },
             "recent_anomalies": recent,
             "window": window
