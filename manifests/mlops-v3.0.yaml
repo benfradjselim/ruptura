@@ -1,0 +1,490 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlops-data
+  namespace: mlops
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+---
+# ============================================================================
+# V2 SERVICES
+# ============================================================================
+
+# Collector (port 8001)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  namespace: mlops
+  labels:
+    app: collector
+    version: v2.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector
+  template:
+    metadata:
+      labels:
+        app: collector
+        version: v2.0
+    spec:
+      containers:
+      - name: collector
+        image: selimbf/mlopsv2-collector:v2.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8001
+          name: http
+        env:
+        - name: COLLECTOR_PORT
+          value: "8001"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector
+  namespace: mlops
+spec:
+  selector:
+    app: collector
+  ports:
+  - port: 8001
+    targetPort: 8001
+    name: http
+---
+# Processor (port 8002)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: processor
+  namespace: mlops
+  labels:
+    app: processor
+    version: v2.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: processor
+  template:
+    metadata:
+      labels:
+        app: processor
+        version: v2.0
+    spec:
+      containers:
+      - name: processor
+        image: selimbf/mlopsv2-processor:v2.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8002
+          name: http
+        env:
+        - name: PROCESSOR_PORT
+          value: "8002"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: processor
+  namespace: mlops
+spec:
+  selector:
+    app: processor
+  ports:
+  - port: 8002
+    targetPort: 8002
+    name: http
+---
+# Trainer (port 8003)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trainer
+  namespace: mlops
+  labels:
+    app: trainer
+    version: v2.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trainer
+  template:
+    metadata:
+      labels:
+        app: trainer
+        version: v2.0
+    spec:
+      containers:
+      - name: trainer
+        image: selimbf/mlopsv2-trainer:v2.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8003
+          name: http
+        env:
+        - name: TRAINER_PORT
+          value: "8003"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trainer
+  namespace: mlops
+spec:
+  selector:
+    app: trainer
+  ports:
+  - port: 8003
+    targetPort: 8003
+    name: http
+---
+# Detector (port 8004)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detector
+  namespace: mlops
+  labels:
+    app: detector
+    version: v2.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: detector
+  template:
+    metadata:
+      labels:
+        app: detector
+        version: v2.0
+    spec:
+      containers:
+      - name: detector
+        image: selimbf/mlopsv2-detector:v2.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8004
+          name: http
+        env:
+        - name: DETECTOR_PORT
+          value: "8004"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: detector
+  namespace: mlops
+spec:
+  selector:
+    app: detector
+  ports:
+  - port: 8004
+    targetPort: 8004
+    name: http
+---
+# Exporter (port 8005)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exporter
+  namespace: mlops
+  labels:
+    app: exporter
+    version: v2.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exporter
+  template:
+    metadata:
+      labels:
+        app: exporter
+        version: v2.0
+    spec:
+      containers:
+      - name: exporter
+        image: selimbf/mlopsv2-exporter:v2.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8005
+          name: http
+        env:
+        - name: EXPORTER_PORT
+          value: "8005"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: exporter
+  namespace: mlops
+spec:
+  selector:
+    app: exporter
+  ports:
+  - port: 8005
+    targetPort: 8005
+    name: http
+---
+# Dashboard V2+V3 (port 8501)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: mlops
+  labels:
+    app: dashboard
+    version: v3.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+        version: v3.0
+    spec:
+      containers:
+      - name: dashboard
+        image: selimbf/mlopsv3-dashboard:v3.0
+        imagePullPolicy: IfNotPresent
+        args: ["streamlit", "run", "/app/service/main.py", "--server.port=8501", "--server.address=0.0.0.0"]
+        ports:
+        - containerPort: 8501
+          name: http
+        env:
+        - name: DASHBOARD_PORT
+          value: "8501"
+        - name: EXPORTER_URL
+          value: "http://exporter:8005"
+        - name: METRIC_PREDICTOR_URL
+          value: "http://metric-predictor:8008"
+        - name: DASHBOARD_REFRESH_SEC
+          value: "5"
+        - name: ANOMALY_THRESHOLD
+          value: "0.7"
+        - name: STREAMLIT_SERVER_PORT
+          value: "8501"
+        - name: STREAMLIT_SERVER_ADDRESS
+          value: "0.0.0.0"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: mlops
+spec:
+  selector:
+    app: dashboard
+  ports:
+  - port: 8501
+    targetPort: 8501
+    nodePort: 30851
+    name: http
+  type: NodePort
+---
+# ============================================================================
+# V3 SERVICES
+# ============================================================================
+
+# Metric Predictor (port 8008)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metric-predictor
+  namespace: mlops
+  labels:
+    app: metric-predictor
+    version: v3.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metric-predictor
+  template:
+    metadata:
+      labels:
+        app: metric-predictor
+        version: v3.0
+    spec:
+      containers:
+      - name: metric-predictor
+        image: selimbf/mlopsv3-metric-predictor:v3.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8008
+          name: http
+        env:
+        - name: METRIC_PREDICTOR_PORT
+          value: "8008"
+        - name: DB_PATH
+          value: "/data/mlops.db"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: METRIC_PREDICTION_INTERVAL_SEC
+          value: "60"
+        - name: METRIC_FORECAST_DAYS
+          value: "7"
+        - name: METRIC_MIN_HISTORY
+          value: "10"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8008
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8008
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlops-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metric-predictor
+  namespace: mlops
+  labels:
+    app: metric-predictor
+    version: v3.0
+spec:
+  selector:
+    app: metric-predictor
+  ports:
+  - port: 8008
+    targetPort: 8008
+    name: http
+  type: ClusterIP
