@@ -1,0 +1,130 @@
+name: Build and Push MLOps Images v3.0
+
+on:
+  push:
+    branches: [ "main", "v3.0" ]
+    tags: [ "v3.*" ]
+  workflow_dispatch:
+
+jobs:
+  build-v2-services:
+    name: Build V2 Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [collector, processor, trainer, detector, exporter]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build and push ${{ matrix.service }}
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile.v2
+        build-args: SERVICE=${{ matrix.service }}
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mlopsv2-${{ matrix.service }}:v2.0
+          ${{ secrets.DOCKER_USERNAME }}/mlopsv2-${{ matrix.service }}:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  build-v3-services:
+    name: Build V3 Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [dashboard, metric_predictor]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build and push ${{ matrix.service }}
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile.v2
+        build-args: SERVICE=${{ matrix.service }}
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mlopsv3-${{ matrix.service }}:v3.0
+          ${{ secrets.DOCKER_USERNAME }}/mlopsv3-${{ matrix.service }}:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  build-v3-dashboard:
+    name: Build V3 Dashboard (alias)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build and push dashboard v3
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile.v2
+        build-args: SERVICE=dashboard
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mlopsv3-dashboard:v3.0
+          ${{ secrets.DOCKER_USERNAME }}/mlopsv3-dashboard:latest
+          ${{ secrets.DOCKER_USERNAME }}/mlopsv2-dashboard:v3.0
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-v2-services, build-v3-services, build-v3-dashboard]
+    if: always()
+    steps:
+    - name: Print summary
+      run: |
+        echo "========================================="
+        echo "MLOps v3.0 Images Built and Pushed"
+        echo "========================================="
+        echo ""
+        echo "V2 Services (unchanged):"
+        echo "  - collector"
+        echo "  - processor"
+        echo "  - trainer"
+        echo "  - detector"
+        echo "  - exporter"
+        echo ""
+        echo "V3 Services (new):"
+        echo "  - metric_predictor"
+        echo "  - dashboard (v3 with predictions tab)"
+        echo ""
+        echo "Tags:"
+        echo "  - v3.0"
+        echo "  - latest"
+        echo ""
+        echo "Images:"
+        echo "  - \${{ secrets.DOCKER_USERNAME }}/mlopsv3-metric-predictor:v3.0"
+        echo "  - \${{ secrets.DOCKER_USERNAME }}/mlopsv3-dashboard:v3.0"
