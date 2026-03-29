@@ -136,3 +136,17 @@ def get_conn() -> Generator[sqlite3.Connection, None, None]:
         raise
     finally:
         conn.close()
+
+-- V3 Tables: Metric Predictions
+CREATE TABLE IF NOT EXISTS metric_predictions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp        TEXT    NOT NULL,
+    predicted_at     TEXT    NOT NULL,
+    cpu_forecast     TEXT    NOT NULL,
+    memory_forecast  TEXT    NOT NULL,
+    latency_forecast TEXT    NOT NULL,
+    global_risk      TEXT    NOT NULL,
+    risk_score       REAL    NOT NULL,
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_metric_predictions_timestamp ON metric_predictions(timestamp);

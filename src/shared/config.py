@@ -103,3 +103,10 @@ def get_list(key: str, separator: str = ",", default: Optional[List[str]] = None
             return default
         raise KeyError(f"Configuration key '{key}' not found and has no default")
     return [v.strip() for v in str(value).split(separator) if v.strip()]
+
+    # V3: Metric Predictor (port 8008)
+    "METRIC_PREDICTOR_PORT": 8008,
+    "METRIC_PREDICTOR_URL": "http://metric-predictor:8008",
+    "METRIC_PREDICTION_INTERVAL_SEC": 60,
+    "METRIC_FORECAST_DAYS": 7,
+    "METRIC_MIN_HISTORY": 10,

@@ -114,3 +114,28 @@ class DashboardData(BaseModel):
     summary: AnomalySummary
     recent_anomalies: List[DetectionResult]
     window: str
+
+# ---------------------------------------------------------------------------
+# V3 Models: Metric Predictor
+# ---------------------------------------------------------------------------
+
+class MetricForecast(BaseModel):
+    """Prédictions métriques sur 7 jours"""
+    cpu_forecast: List[float]
+    memory_forecast: List[float]
+    latency_forecast: List[float]
+    global_risk: str
+    risk_score: float
+    predicted_at: str
+
+
+class MetricPredictionResponse(BaseModel):
+    """Réponse pour l'endpoint des prédictions"""
+    id: int
+    timestamp: str
+    predicted_at: str
+    cpu_forecast: str
+    memory_forecast: str
+    latency_forecast: str
+    global_risk: str
+    risk_score: float
