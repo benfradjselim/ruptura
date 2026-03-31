@@ -1,9 +1,11 @@
-"""Shared configuration loader for all MLOps microservices (v2 + v3)."""
+"""Shared configuration loader for all MLOps microservices."""
 import os
 from typing import Any, List, Optional
 
+# ---------------------------------------------------------------------------
 # Default values for all services
-DEFAULTS = {
+# ---------------------------------------------------------------------------
+DEFAULTS: dict[str, Any] = {
     # General
     "LOG_LEVEL": "INFO",
     "DB_PATH": "/data/mlops.db",
@@ -46,17 +48,10 @@ DEFAULTS = {
     # Dashboard (port 8501)
     "DASHBOARD_PORT": 8501,
     "DASHBOARD_REFRESH_SEC": 5,
-
-    # V3: Metric Predictor (port 8008)
-    "METRIC_PREDICTOR_PORT": 8008,
-    "METRIC_PREDICTOR_URL": "http://metric-predictor:8008",
-    "METRIC_PREDICTION_INTERVAL_SEC": 60,
-    "METRIC_FORECAST_DAYS": 7,
-    "METRIC_MIN_HISTORY": 10,
 }
 
 
-def get(key, default=None):
+def get(key: str, default: Any = None) -> Any:
     """Return config value: env var overrides default."""
     raw = os.environ.get(key)
     if raw is not None:
@@ -66,45 +61,53 @@ def get(key, default=None):
     return DEFAULTS.get(key)
 
 
-def get_str(key, default=None):
+def get_str(key: str, default: Optional[str] = None) -> str:
     """Return config value as string."""
     value = get(key, default)
     if value is None:
-        raise KeyError(f"Configuration key '{key}' not found")
+        raise KeyError(f"Configuration key '{key}' not found and has no default")
     return str(value)
 
 
-def get_int(key, default=None):
+def get_int(key: str, default: Optional[int] = None) -> int:
     """Return config value as integer."""
     value = get(key, default)
     if value is None:
-        raise KeyError(f"Configuration key '{key}' not found")
+        raise KeyError(f"Configuration key '{key}' not found and has no default")
     return int(value)
 
 
-def get_float(key, default=None):
+def get_float(key: str, default: Optional[float] = None) -> float:
     """Return config value as float."""
     value = get(key, default)
     if value is None:
-        raise KeyError(f"Configuration key '{key}' not found")
+        raise KeyError(f"Configuration key '{key}' not found and has no default")
     return float(value)
 
 
-def get_bool(key, default=None):
-    """Return config value as boolean."""
+def get_bool(key: str, default: Optional[bool] = None) -> bool:
+    """Return config value as boolean (accepts 1/true/yes/on)."""
     value = get(key, default)
     if value is None:
-        raise KeyError(f"Configuration key '{key}' not found")
+        raise KeyError(f"Configuration key '{key}' not found and has no default")
     if isinstance(value, bool):
         return value
     return str(value).lower() in ("1", "true", "yes", "on")
 
 
-def get_list(key, separator=",", default=None):
-    """Return config value as a list."""
+def get_list(key: str, separator: str = ",", default: Optional[List[str]] = None) -> List[str]:
+    """Return config value as a list (comma-separated by default)."""
     value = get(key)
     if value is None:
         if default is not None:
             return default
-        raise KeyError(f"Configuration key '{key}' not found")
+        raise KeyError(f"Configuration key '{key}' not found and has no default")
     return [v.strip() for v in str(value).split(separator) if v.strip()]
+
+    # V3: Metric Predictor (port 8008)
+    "METRIC_PREDICTOR_PORT": 8008,
+    "METRIC_PREDICTOR_URL": "http://metric-predictor:8008",
+    "METRIC_PREDICTION_INTERVAL_SEC": 60,
+    "METRIC_FORECAST_DAYS": 7,
+    "METRIC_MIN_HISTORY": 10,
+    # V3: Metric Predictor (port 8008)

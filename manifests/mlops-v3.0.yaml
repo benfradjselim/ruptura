@@ -427,7 +427,7 @@ spec:
     spec:
       containers:
       - name: metric-predictor
-        image: selimbf/mlopsv3-metric-predictor:v3.0
+        image: selimbf/mlopsv3-metric_predictor:v3.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8008
