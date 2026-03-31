@@ -1,53 +1,34 @@
-"""Shared configuration loader for all MLOps microservices (v2 + v3)."""
+"""Shared configuration loader for all MLOps microservices."""
 import os
 from typing import Any, List, Optional
 
-# Default values for all services
 DEFAULTS = {
-    # General
     "LOG_LEVEL": "INFO",
     "DB_PATH": "/data/mlops.db",
-
-    # Collector (port 8001)
     "COLLECTOR_PORT": 8001,
     "COLLECTOR_URL": "http://collector:8001",
     "COLLECT_INTERVAL_SEC": 15,
     "PROMETHEUS_URL": "http://prometheus:9090",
-    "PROMETHEUS_QUERIES": "cpu_usage_seconds_total,memory_working_set_bytes,http_request_duration_seconds",
-    "K8S_NAMESPACES": "default,monitoring",
-    "K8S_LOG_TAIL_LINES": 100,
-
-    # Processor (port 8002)
     "PROCESSOR_PORT": 8002,
     "PROCESSOR_URL": "http://processor:8002",
     "NORMALIZATION_METHOD": "minmax",
     "FEATURE_WINDOW_SEC": 300,
     "BATCH_SIZE": 256,
-
-    # Trainer (port 8003)
     "TRAINER_PORT": 8003,
     "TRAINER_URL": "http://trainer:8003",
     "HST_N_TREES": 25,
     "HST_HEIGHT": 15,
     "HST_WINDOW_SIZE": 250,
     "MODEL_SAVE_EVERY_N": 100,
-
-    # Detector (port 8004)
     "DETECTOR_PORT": 8004,
     "DETECTOR_URL": "http://detector:8004",
     "ANOMALY_THRESHOLD": 0.7,
     "SCORE_BATCH_SIZE": 100,
-
-    # Exporter (port 8005)
     "EXPORTER_PORT": 8005,
     "EXPORTER_URL": "http://exporter:8005",
     "METRICS_PREFIX": "mlops_anomaly",
-
-    # Dashboard (port 8501)
     "DASHBOARD_PORT": 8501,
     "DASHBOARD_REFRESH_SEC": 5,
-
-    # V3: Metric Predictor (port 8008)
     "METRIC_PREDICTOR_PORT": 8008,
     "METRIC_PREDICTOR_URL": "http://metric-predictor:8008",
     "METRIC_PREDICTION_INTERVAL_SEC": 60,
@@ -56,8 +37,7 @@ DEFAULTS = {
 }
 
 
-def get(key, default=None):
-    """Return config value: env var overrides default."""
+def get(key: str, default: Any = None) -> Any:
     raw = os.environ.get(key)
     if raw is not None:
         return raw
@@ -66,32 +46,28 @@ def get(key, default=None):
     return DEFAULTS.get(key)
 
 
-def get_str(key, default=None):
-    """Return config value as string."""
+def get_str(key: str, default: Optional[str] = None) -> str:
     value = get(key, default)
     if value is None:
         raise KeyError(f"Configuration key '{key}' not found")
     return str(value)
 
 
-def get_int(key, default=None):
-    """Return config value as integer."""
+def get_int(key: str, default: Optional[int] = None) -> int:
     value = get(key, default)
     if value is None:
         raise KeyError(f"Configuration key '{key}' not found")
     return int(value)
 
 
-def get_float(key, default=None):
-    """Return config value as float."""
+def get_float(key: str, default: Optional[float] = None) -> float:
     value = get(key, default)
     if value is None:
         raise KeyError(f"Configuration key '{key}' not found")
     return float(value)
 
 
-def get_bool(key, default=None):
-    """Return config value as boolean."""
+def get_bool(key: str, default: Optional[bool] = None) -> bool:
     value = get(key, default)
     if value is None:
         raise KeyError(f"Configuration key '{key}' not found")
@@ -100,8 +76,7 @@ def get_bool(key, default=None):
     return str(value).lower() in ("1", "true", "yes", "on")
 
 
-def get_list(key, separator=",", default=None):
-    """Return config value as a list."""
+def get_list(key: str, separator: str = ",", default: Optional[List[str]] = None) -> List[str]:
     value = get(key)
     if value is None:
         if default is not None:
