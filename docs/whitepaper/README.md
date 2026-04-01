@@ -184,63 +184,76 @@ This philosophy transforms infrastructure monitoring from a reactive "alarm syst
 
 ---
 
+
 ## 6. Technical Architecture
 
 ### 6.1 System Overview
 
 OHE runs as a single binary with internal components communicating via channels.
-┌─────────────────────────────────────────────────────────────┐
-│                    OBSERVABILITY HOLISTIC ENGINE            │
-│                           :8080                             │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  LAYER 1: COLLECTION                                │   │
-│  │  • System metrics (procfs, sysfs)                   │   │
-│  │  • Container metrics (Docker, K8s API)              │   │
-│  │  • Logs (file tail, journald)                       │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                          ↓                                  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  LAYER 2: PROCESSING                                │   │
-│  │  • Normalization [0-1]                              │   │
-│  │  • Aggregation (avg, p95, p99)                      │   │
-│  │  • Downsampling (1m → 5m → 1h)                      │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                          ↓                                  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  LAYER 3: KPI COMPUTATION                           │   │
-│  │  • Stress, Fatigue, Mood                            │   │
-│  │  • Pressure, Humidity, Contagion                    │   │
-│  │  • Cycle detection (FFT)                            │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                          ↓                                  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  LAYER 4: PREDICTION                                │   │
-│  │  • ARIMA models                                     │   │
-│  │  • Dynamic thresholds                               │   │
-│  │  • Anomaly detection                                │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                          ↓                                  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  LAYER 5: OUTPUT                                    │   │
-│  │  • REST API                                         │   │
-│  │  • Embedded UI                                      │   │
-│  │  • Alerts (Slack, Email, Webhook)                   │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  STORAGE: Badger (embedded)                         │   │
-│  │  • TTL: 7d metrics, 30d logs                        │   │
-│  │  • Automatic compaction                             │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
 
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         OBSERVABILITY HOLISTIC ENGINE                       │
+│                                   :8080                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  LAYER 1: COLLECTION                                                  │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                │ │
+│  │  │   System     │  │  Container   │  │    Logs      │                │ │
+│  │  │   procfs     │  │  Docker/K8s  │  │  file tail   │                │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                      ↓                                     │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  LAYER 2: PROCESSING                                                  │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                │ │
+│  │  │ Normalize    │  │  Aggregate   │  │ Downsample   │                │ │
+│  │  │    [0-1]     │  │ avg, p95     │  │  1m → 1h     │                │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                      ↓                                     │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  LAYER 3: KPI COMPUTATION                                             │ │
+│  │  ┌─────────────────────────────────────────────────────────────────┐  │ │
+│  │  │  Stress = α·CPU + β·RAM + γ·Latency + δ·Errors + ε·Timeouts    │  │ │
+│  │  │  Fatigue = ∫(Stress - Recovery) dt                              │  │ │
+│  │  │  Mood = (Uptime × Throughput) / (Errors × Timeouts × Restarts) │  │ │
+│  │  │  Pressure = dStress/dt + ∫Errors dt                             │  │ │
+│  │  │  Humidity = (Errors × Timeouts) / Throughput                    │  │ │
+│  │  │  Contagion = Σ(Error_propagation × Dependency)                  │  │ │
+│  │  └─────────────────────────────────────────────────────────────────┘  │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                      ↓                                     │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  LAYER 4: PREDICTION                                                  │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                │ │
+│  │  │    ARIMA     │  │   Dynamic    │  │   Anomaly    │                │ │
+│  │  │   Models     │  │  Thresholds  │  │  Detection   │                │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                      ↓                                     │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  LAYER 5: OUTPUT                                                      │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                │ │
+│  │  │   REST API   │  │  Embedded    │  │   Alerts     │                │ │
+│  │  │  /api/v1/*   │  │     UI       │  │ Slack/Email  │                │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  STORAGE: Badger (embedded)                                           │ │
+│  │  • TTL: 7 days for metrics, 30 days for logs                         │ │
+│  │  • Automatic compaction and compression                               │ │
+│  │  • Concurrent read/write with snapshot isolation                      │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 6.2 Code Structure
 
 ```
-
 workdir/
 ├── cmd/agent/
 │   └── main.go
@@ -272,10 +285,14 @@ workdir/
 │       └── embed.go
 ├── pkg/
 │   ├── models/
+│   │   ├── metric.go
+│   │   ├── kpi.go
+│   │   └── alert.go
 │   └── utils/
+│       ├── math.go
+│       └── time.go
 └── configs/
-└── agent.yaml
-
+    └── agent.yaml
 ```
 
 ### 6.3 API Endpoints
@@ -287,11 +304,6 @@ workdir/
 | `/api/v1/kpis` | GET | Complex KPIs |
 | `/api/v1/predict` | GET | Predictions |
 | `/api/v1/alerts` | GET | Active alerts |
-
-
----
-
-## 7. Mathematical Formalization
 
 ### 7.1 Definitions
 
@@ -488,13 +500,14 @@ We invite the community to contribute to this new vision of observability.
 
 ---
 
+
 ## 6. Technical Architecture
 
 ### 6.1 System Overview
 
 OHE runs as a single binary with internal components communicating via channels.
 
-
+```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         OBSERVABILITY HOLISTIC ENGINE                       │
 │                                   :8080                                     │
@@ -552,78 +565,61 @@ OHE runs as a single binary with internal components communicating via channels.
 │  └───────────────────────────────────────────────────────────────────────┘ │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
-
 ```
 
 ### 6.2 Code Structure
 
 ```
-
 workdir/
 ├── cmd/agent/
-│   └── main.go                     # Orchestrator entry point
-│
+│   └── main.go
 ├── internal/
-│   ├── collector/                  # Data collection
-│   │   ├── system.go               # procfs, sysfs metrics
-│   │   ├── container.go            # Docker, Kubernetes API
-│   │   └── logs.go                 # File tailing, journald
-│   │
-│   ├── processor/                  # Data processing
-│   │   ├── normalize.go            # [0-1] normalization
-│   │   ├── aggregate.go            # avg, min, max, p95, p99
-│   │   └── downsample.go           # 1m → 5m → 1h → 1d
-│   │
-│   ├── analyzer/                   # KPI computation
-│   │   ├── stress.go               # Stress index
-│   │   ├── fatigue.go              # Cumulative fatigue
-│   │   ├── mood.go                 # System mood
-│   │   ├── pressure.go             # Atmospheric pressure
-│   │   ├── humidity.go             # Error humidity
-│   │   └── contagion.go            # Contagion index
-│   │
-│   ├── predictor/                  # Predictions
-│   │   ├── arima.go                # ARIMA time series
-│   │   ├── threshold.go            # Dynamic thresholds
-│   │   └── anomaly.go              # Anomaly detection
-│   │
-│   ├── storage/                    # Persistence
-│   │   └── badger.go               # Badger DB wrapper
-│   │
-│   ├── api/                        # REST API
-│   │   └── handlers.go             # HTTP handlers
-│   │
-│   └── web/                        # Embedded UI
-│       └── embed.go                # Svelte static files
-│
+│   ├── collector/
+│   │   ├── system.go
+│   │   ├── container.go
+│   │   └── logs.go
+│   ├── processor/
+│   │   ├── normalize.go
+│   │   ├── aggregate.go
+│   │   └── downsample.go
+│   ├── analyzer/
+│   │   ├── stress.go
+│   │   ├── fatigue.go
+│   │   ├── mood.go
+│   │   ├── pressure.go
+│   │   ├── humidity.go
+│   │   └── contagion.go
+│   ├── predictor/
+│   │   ├── arima.go
+│   │   ├── threshold.go
+│   │   └── anomaly.go
+│   ├── storage/
+│   │   └── badger.go
+│   ├── api/
+│   │   └── handlers.go
+│   └── web/
+│       └── embed.go
 ├── pkg/
-│   ├── models/                     # Data structures
+│   ├── models/
 │   │   ├── metric.go
 │   │   ├── kpi.go
 │   │   └── alert.go
-│   │
-│   └── utils/                      # Utilities
-│       ├── math.go                 # Mathematical helpers
-│       └── time.go                 # Time utilities
-│
+│   └── utils/
+│       ├── math.go
+│       └── time.go
 └── configs/
-└── agent.yaml                  # Configuration file
-
+    └── agent.yaml
 ```
 
 ### 6.3 API Endpoints
 
-| Endpoint | Method | Description | Response |
-|----------|--------|-------------|----------|
-| `/api/v1/health` | GET | Health check | `{"status": "ok"}` |
-| `/api/v1/metrics` | GET | Raw metrics | `[{"name":"cpu","value":0.45}]` |
-| `/api/v1/kpis` | GET | Complex KPIs | `{"stress":0.32,"fatigue":0.41}` |
-| `/api/v1/predict` | GET | Predictions | `{"storm":"2h","confidence":0.85}` |
-| `/api/v1/alerts` | GET | Active alerts | `[{"severity":"warning","message":"..."}]` |
-
----
-
-## 7. Mathematical Formalization
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/health` | GET | Health check |
+| `/api/v1/metrics` | GET | Raw metrics |
+| `/api/v1/kpis` | GET | Complex KPIs |
+| `/api/v1/predict` | GET | Predictions |
+| `/api/v1/alerts` | GET | Active alerts |
 
 ### 7.1 Core Metrics Definition
 
