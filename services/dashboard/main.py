@@ -32,7 +32,6 @@ st.markdown("""
     .risk-high { background-color: #ffa500; color: white; padding: 0.5rem; border-radius: 0.5rem; text-align: center; }
     .risk-medium { background-color: #ffde59; color: black; padding: 0.5rem; border-radius: 0.5rem; text-align: center; }
     .risk-low { background-color: #00cc96; color: white; padding: 0.5rem; border-radius: 0.5rem; text-align: center; }
-    .metric-card { background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem; margin: 0.5rem 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -59,7 +58,8 @@ st.sidebar.info(
 def fetch_anomalies():
     """Fetch anomalies from exporter"""
     try:
-        response = requests.get(f"{EXPORTER_URL}/dashboard/data", timeout=5)
+        # Correction: utiliser /dashboard-data au lieu de /dashboard/data
+        response = requests.get(f"{EXPORTER_URL}/dashboard-data", timeout=5)
         if response.status_code == 200:
             return response.json()
     except Exception as e:
