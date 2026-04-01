@@ -488,3 +488,13 @@ spec:
     targetPort: 8008
     name: http
   type: ClusterIP
+# Paramètres optimisés pour trainer (ajouter/modifier)
+          env:
+          - name: HST_N_TREES
+            value: "5"
+          - name: HST_HEIGHT
+            value: "6"
+          - name: HST_WINDOW_SIZE
+            value: "50"
+          - name: MODEL_SAVE_EVERY_N
+            value: "5"

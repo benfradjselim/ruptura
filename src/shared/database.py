@@ -8,7 +8,7 @@ from typing import Generator
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Schema DDL – all tables for every service
+# Schema DDL – all tables for every service (v2 + v3)
 # ---------------------------------------------------------------------------
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS raw_metrics (
@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS processed_data (
 );
 CREATE INDEX IF NOT EXISTS idx_processed_trained ON processed_data(trained);
 CREATE INDEX IF NOT EXISTS idx_processed_scored  ON processed_data(scored);
+CREATE INDEX IF NOT EXISTS idx_processed_timestamp ON processed_data(timestamp);
 
 CREATE TABLE IF NOT EXISTS model_state (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,6 +91,62 @@ CREATE TABLE IF NOT EXISTS config (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- V3 Tables: Metric Predictions
+CREATE TABLE IF NOT EXISTS metric_predictions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp        TEXT    NOT NULL,
+    predicted_at     TEXT    NOT NULL,
+    cpu_forecast     TEXT    NOT NULL,
+    memory_forecast  TEXT    NOT NULL,
+    latency_forecast TEXT    NOT NULL,
+    global_risk      TEXT    NOT NULL,
+    risk_score       REAL    NOT NULL,
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_metric_predictions_timestamp ON metric_predictions(timestamp);
+
+-- V3 Tables: Log Features and Predictions
+CREATE TABLE IF NOT EXISTS log_features (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    log_id           INTEGER NOT NULL,
+    timestamp        TEXT    NOT NULL,
+    pod_name         TEXT    NOT NULL,
+    error_count      INTEGER DEFAULT 0,
+    has_stacktrace   INTEGER DEFAULT 0,
+    word_count       INTEGER DEFAULT 0,
+    keywords         TEXT,
+    entropy          REAL,
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_log_features_log_id ON log_features(log_id);
+
+CREATE TABLE IF NOT EXISTS log_predictions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp        TEXT    NOT NULL,
+    predicted_at     TEXT    NOT NULL,
+    risk             TEXT    NOT NULL,
+    trend            TEXT    NOT NULL,
+    in_days          INTEGER NOT NULL,
+    confidence       REAL    NOT NULL,
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_log_predictions_timestamp ON log_predictions(timestamp);
+
+-- V3 Tables: Alerts
+CREATE TABLE IF NOT EXISTS alerts (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp        TEXT    NOT NULL,
+    alert_type       TEXT    NOT NULL,
+    severity         TEXT    NOT NULL,
+    message          TEXT    NOT NULL,
+    source           TEXT    NOT NULL,
+    acknowledged     INTEGER DEFAULT 0,
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp);
+CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity);
+CREATE INDEX IF NOT EXISTS idx_alerts_acknowledged ON alerts(acknowledged);
+
 INSERT OR IGNORE INTO config VALUES ('anomaly_threshold',    '0.7',  datetime('now'));
 INSERT OR IGNORE INTO config VALUES ('collect_interval_sec', '15',   datetime('now'));
 INSERT OR IGNORE INTO config VALUES ('dashboard_refresh_sec','5',    datetime('now'));
@@ -106,7 +163,7 @@ def _make_connection(db_path: str) -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Create all tables if they don't exist."""
+    """Create all tables if they don't exist (v2 + v3)."""
     db_path = os.environ.get("DB_PATH", "/data/mlops.db")
     path = os.path.dirname(db_path)
     if path:
@@ -136,17 +193,3 @@ def get_conn() -> Generator[sqlite3.Connection, None, None]:
         raise
     finally:
         conn.close()
-
--- V3 Tables: Metric Predictions
-CREATE TABLE IF NOT EXISTS metric_predictions (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp        TEXT    NOT NULL,
-    predicted_at     TEXT    NOT NULL,
-    cpu_forecast     TEXT    NOT NULL,
-    memory_forecast  TEXT    NOT NULL,
-    latency_forecast TEXT    NOT NULL,
-    global_risk      TEXT    NOT NULL,
-    risk_score       REAL    NOT NULL,
-    created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_metric_predictions_timestamp ON metric_predictions(timestamp);
