@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
@@ -105,41 +104,24 @@ func (s *Store) listByPrefix(prefix string, dest func(key, val []byte) error) er
 }
 
 // --- Metric storage ---
-// Key schema: m:{host}:{metric_name}:{unix_ns}
+// Key schema: m:{host}:{metric_name}:{20-digit-zero-padded-unix-ns}
+// Zero-padding makes timestamps lexicographically sortable, enabling O(log N) Seek.
+
+func tsKey(prefix string, ts time.Time) string {
+	return fmt.Sprintf("%s%020d", prefix, ts.UnixNano())
+}
 
 // SaveMetric stores a single metric value
 func (s *Store) SaveMetric(host, name string, value float64, ts time.Time) error {
-	key := fmt.Sprintf("m:%s:%s:%d", host, name, ts.UnixNano())
+	prefix := fmt.Sprintf("m:%s:%s:", host, name)
+	key := tsKey(prefix, ts)
 	return s.set(key, value, MetricsTTL)
 }
 
-// GetMetricRange retrieves metric values within [from, to]
+// GetMetricRange retrieves metric values within [from, to] using Badger Seek
 func (s *Store) GetMetricRange(host, name string, from, to time.Time) ([]TimeValue, error) {
 	prefix := fmt.Sprintf("m:%s:%s:", host, name)
-	var results []TimeValue
-
-	err := s.listByPrefix(prefix, func(key, val []byte) error {
-		keyStr := string(key)
-		parts := strings.Split(keyStr, ":")
-		if len(parts) < 4 {
-			return nil
-		}
-		var nanos int64
-		if _, err := fmt.Sscan(parts[3], &nanos); err != nil {
-			return nil
-		}
-		ts := time.Unix(0, nanos)
-		if ts.Before(from) || ts.After(to) {
-			return nil
-		}
-		var v float64
-		if err := json.Unmarshal(val, &v); err != nil {
-			return nil
-		}
-		results = append(results, TimeValue{Timestamp: ts, Value: v})
-		return nil
-	})
-	return results, err
+	return s.rangeQuery(prefix, from, to, MetricsTTL)
 }
 
 // TimeValue is a timestamp-value pair
@@ -149,41 +131,76 @@ type TimeValue struct {
 }
 
 // --- KPI storage ---
-// Key schema: k:{host}:{kpi_name}:{unix_ns}
+// Key schema: k:{host}:{kpi_name}:{20-digit-zero-padded-unix-ns}
 
 // SaveKPI stores a KPI value
 func (s *Store) SaveKPI(host, name string, value float64, ts time.Time) error {
-	key := fmt.Sprintf("k:%s:%s:%d", host, name, ts.UnixNano())
+	prefix := fmt.Sprintf("k:%s:%s:", host, name)
+	key := tsKey(prefix, ts)
 	return s.set(key, value, KPIsTTL)
 }
 
-// GetKPIRange retrieves KPI values within [from, to]
+// GetKPIRange retrieves KPI values within [from, to] using Badger Seek
 func (s *Store) GetKPIRange(host, name string, from, to time.Time) ([]TimeValue, error) {
 	prefix := fmt.Sprintf("k:%s:%s:", host, name)
-	var results []TimeValue
+	return s.rangeQuery(prefix, from, to, KPIsTTL)
+}
 
-	err := s.listByPrefix(prefix, func(key, val []byte) error {
-		keyStr := string(key)
-		parts := strings.Split(keyStr, ":")
-		if len(parts) < 4 {
-			return nil
+// rangeQuery is a generic Seek-based range scan for time-series keys
+func (s *Store) rangeQuery(prefix string, from, to time.Time, _ time.Duration) ([]TimeValue, error) {
+	seekKey := []byte(tsKey(prefix, from))
+	endKey := []byte(tsKey(prefix, to))
+	pfxBytes := []byte(prefix)
+
+	var results []TimeValue
+	err := s.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 100
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(seekKey); it.Valid(); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			// Stop when we exceed the end key or leave the prefix
+			if string(k) > string(endKey) || !hasPrefix(k, pfxBytes) {
+				break
+			}
+			// Parse timestamp from last 20 chars of key
+			keyStr := string(k)
+			if len(keyStr) < len(prefix)+20 {
+				continue
+			}
+			nanoStr := keyStr[len(prefix):]
+			var nanos int64
+			if _, err := fmt.Sscan(nanoStr, &nanos); err != nil {
+				continue
+			}
+			ts := time.Unix(0, nanos)
+			var v float64
+			err := item.Value(func(val []byte) error {
+				return json.Unmarshal(val, &v)
+			})
+			if err != nil {
+				continue
+			}
+			results = append(results, TimeValue{Timestamp: ts, Value: v})
 		}
-		var nanos int64
-		if _, err := fmt.Sscan(parts[3], &nanos); err != nil {
-			return nil
-		}
-		ts := time.Unix(0, nanos)
-		if ts.Before(from) || ts.After(to) {
-			return nil
-		}
-		var v float64
-		if err := json.Unmarshal(val, &v); err != nil {
-			return nil
-		}
-		results = append(results, TimeValue{Timestamp: ts, Value: v})
 		return nil
 	})
 	return results, err
+}
+
+func hasPrefix(key, prefix []byte) bool {
+	if len(key) < len(prefix) {
+		return false
+	}
+	for i, b := range prefix {
+		if key[i] != b {
+			return false
+		}
+	}
+	return true
 }
 
 // --- Alert storage ---

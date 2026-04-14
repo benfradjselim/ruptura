@@ -115,4 +115,37 @@ workdir/
 
 ---
 
+---
+
+## 8. Règles de Sécurité (mis à jour)
+
+| Règle | Détail |
+|-------|--------|
+| JWT Secret | Ne jamais utiliser la valeur par défaut. `auth_enabled=true` requiert un secret non vide |
+| SSRF | DataSource URLs validées: schéma http/https uniquement, IPs privées bloquées |
+| RBAC | Rôles: viewer < operator < admin. Routes admin protégées par `RequireRole("admin")` |
+| Rate limiting | 5 tentatives/min par IP sur `/auth/login` |
+| Bcrypt | Coût minimum 12 (OWASP 2024). Longueur mot de passe: 8-72 caractères |
+| Injection clés | Caractères dangereux (`:`, `\`, `/`) filtrés des noms host/metric/username |
+| CORS | Wildcard `*` uniquement en mode dev; configurer `allowed_origins` en production |
+
+## 9. Règles de Performance (mis à jour)
+
+| Règle | Détail |
+|-------|--------|
+| Clés Badger | Format zero-padded `{20 chiffres}` pour scan par plage O(log N) via Seek |
+| KPI GET | `Analyzer.Snapshot()` pour accès lecture seule; `Update()` uniquement depuis le pipeline |
+| Réseau | Deltas compteurs NIC en int64 signé pour gérer le wrap-around |
+| Collecteur | Mutex sur `SystemCollector` pour accès concurrent |
+| Fatigue dt | Plafonné à 30s pour éviter le spike au redémarrage |
+| WebSocket | Canal par client avec fermeture sécurisée (sync.Once), sans panic |
+
+## 10. Collecteurs Disponibles
+
+| Collecteur | Fichier | Description |
+|------------|---------|-------------|
+| SystemCollector | collector/system.go | /proc: CPU, RAM, disk, réseau, load avg |
+| ContainerCollector | collector/container.go | Docker socket ou cgroup fallback |
+| LogCollector | collector/logs.go | Tail de fichiers log, classification niveaux |
+
 **Document destiné aux agents IA. Respecter strictement ces contraintes.**
