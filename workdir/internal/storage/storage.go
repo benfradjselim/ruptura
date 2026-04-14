@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/dgraph-io/badger/v3"
@@ -172,8 +173,8 @@ func (s *Store) rangeQuery(prefix string, from, to time.Time, _ time.Duration) (
 				continue
 			}
 			nanoStr := keyStr[len(prefix):]
-			var nanos int64
-			if _, err := fmt.Sscan(nanoStr, &nanos); err != nil {
+			nanos, parseErr := strconv.ParseInt(nanoStr, 10, 64)
+			if parseErr != nil {
 				continue
 			}
 			ts := time.Unix(0, nanos)

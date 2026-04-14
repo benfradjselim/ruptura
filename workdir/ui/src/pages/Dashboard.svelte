@@ -29,10 +29,29 @@
     } catch {}
   }
 
+  // Metrics where value is already in 0-100 % range
+  const PCT_METRICS = new Set(['cpu_percent','memory_percent','disk_percent'])
+  // KPI scores are 0-1; multiply by 100 for display
+  const KPI_METRICS = new Set(['stress','fatigue','mood','pressure','humidity','contagion'])
+  // Only show these in the predictions panel
+  const PRED_SHOW = new Set([...PCT_METRICS, ...KPI_METRICS, 'load_avg_1'])
+
+  function fmtPred(p) {
+    const isKpi = KPI_METRICS.has(p.target)
+    const isPct = PCT_METRICS.has(p.target)
+    const scale = isKpi ? 100 : 1
+    const unit = (isKpi || isPct) ? '%' : (p.target === 'load_avg_1' ? '' : '')
+    const cur = Math.max(0, p.current * scale)
+    const pred = Math.max(0, p.predicted * scale)
+    return { cur: cur.toFixed(1) + unit, pred: pred.toFixed(1) + unit }
+  }
+
   async function loadPredictions() {
     try {
       const r = await api.predict(host, '', 120)
-      predictions = Object.entries(r.data?.predictions || {}).map(([metric, p]) => ({ metric, ...p }))
+      const all = r.data?.predictions || []
+      predictions = (Array.isArray(all) ? all : Object.values(all))
+        .filter(p => PRED_SHOW.has(p.target))
     } catch {}
   }
 
@@ -130,10 +149,11 @@
         </thead>
         <tbody>
           {#each predictions as p}
+            {@const f = fmtPred(p)}
             <tr>
-              <td>{p.metric}</td>
-              <td>{(p.current * 100).toFixed(1)}%</td>
-              <td>{(p.predicted * 100).toFixed(1)}%</td>
+              <td>{p.target}</td>
+              <td>{f.cur}</td>
+              <td>{f.pred}</td>
               <td class="trend trend-{p.trend}">{p.trend}</td>
             </tr>
           {/each}

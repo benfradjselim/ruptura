@@ -1,9 +1,11 @@
 <script>
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
+  import DashboardView from './DashboardView.svelte'
 
   let dashboards = [], templates = [], loading = true
   let showNew = false, newName = '', newRefresh = 30, creating = false
+  let openId = null   // non-null means we're in the viewer
 
   async function load() {
     loading = true
@@ -38,6 +40,9 @@
   onMount(load)
 </script>
 
+{#if openId}
+  <DashboardView dashboardId={openId} onBack={() => { openId = null; load() }} />
+{:else}
 <div class="page">
   <div class="header">
     <h1>Dashboards</h1>
@@ -65,6 +70,7 @@
               {d.widgets?.length || 0} widgets · refresh {d.refresh_seconds}s
             </div>
             <div class="dash-actions">
+              <button class="btn-sm" on:click={() => openId = d.id}>Open</button>
               <button class="btn-sm danger" on:click={() => del(d.id)}>Delete</button>
             </div>
           </div>
@@ -90,6 +96,7 @@
     {/if}
   {/if}
 </div>
+{/if}
 
 <style>
   .page { padding: 0; }
