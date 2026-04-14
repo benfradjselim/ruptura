@@ -3,6 +3,8 @@ package orchestrator
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,19 +22,21 @@ import (
 	"github.com/benfradjselim/ohe/internal/processor"
 	"github.com/benfradjselim/ohe/internal/storage"
 	"github.com/benfradjselim/ohe/pkg/models"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Config holds all runtime configuration
 type Config struct {
-	Mode        string `yaml:"mode"`          // "agent" or "central"
-	Host        string `yaml:"host"`          // hostname override
-	Port        int    `yaml:"port"`          // HTTP port
-	StoragePath string `yaml:"storage_path"`  // Badger directory
-	CentralURL  string `yaml:"central_url"`   // agent→central endpoint
-	JWTSecret   string `yaml:"jwt_secret"`
-	AuthEnabled bool   `yaml:"auth_enabled"`
+	Mode            string        `yaml:"mode"`             // "agent" or "central"
+	Host            string        `yaml:"host"`             // hostname override
+	Port            int           `yaml:"port"`             // HTTP port
+	StoragePath     string        `yaml:"storage_path"`     // Badger directory
+	CentralURL      string        `yaml:"central_url"`      // agent→central endpoint
+	JWTSecret       string        `yaml:"jwt_secret"`
+	AuthEnabled     bool          `yaml:"auth_enabled"`
 	CollectInterval time.Duration `yaml:"collect_interval"` // default 15s
-	BufferSize  int    `yaml:"buffer_size"`   // circular buffer size
+	BufferSize      int           `yaml:"buffer_size"`      // circular buffer size
+	AllowedOrigins  []string      `yaml:"allowed_origins"`  // CORS origins; empty = wildcard
 }
 
 // DefaultConfig returns sensible production defaults
@@ -52,16 +56,18 @@ func DefaultConfig() Config {
 
 // Engine is the main orchestrator that wires all internal components
 type Engine struct {
-	cfg       Config
-	store     *storage.Store
-	proc      *processor.Processor
-	ana       *analyzer.Analyzer
-	pred      *predictor.Predictor
-	alrt      *alerter.Alerter
-	collector *collector.SystemCollector
-	server    *http.Server
-	wg        sync.WaitGroup
-	cancel    context.CancelFunc
+	cfg             Config
+	store           *storage.Store
+	proc            *processor.Processor
+	ana             *analyzer.Analyzer
+	pred            *predictor.Predictor
+	alrt            *alerter.Alerter
+	sysColl         *collector.SystemCollector
+	containerColl   *collector.ContainerCollector
+	logColl         *collector.LogCollector
+	server          *http.Server
+	wg              sync.WaitGroup
+	cancel          context.CancelFunc
 }
 
 // New creates a fully-wired engine
@@ -85,10 +91,17 @@ func New(cfg Config) (*Engine, error) {
 	ana := analyzer.NewAnalyzer()
 	pred := predictor.NewPredictor()
 	alrt := alerter.NewAlerter(1000)
-	coll := collector.NewSystemCollector(cfg.Host)
+	sysColl := collector.NewSystemCollector(cfg.Host)
+	containerColl := collector.NewContainerCollector(cfg.Host)
+	logColl := collector.NewLogCollector(cfg.Host, nil) // nil = default log sources
+
+	// Seed admin user on first boot if no users exist
+	if err := seedAdminIfEmpty(store); err != nil {
+		log.Printf("[ohe] admin seed warning: %v", err)
+	}
 
 	handlers := api.NewHandlers(store, proc, ana, pred, alrt, cfg.JWTSecret, cfg.AuthEnabled)
-	router := api.NewRouter(handlers, cfg.JWTSecret, cfg.AuthEnabled)
+	router := api.NewRouter(handlers, cfg.JWTSecret, cfg.AuthEnabled, cfg.AllowedOrigins)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
@@ -99,14 +112,16 @@ func New(cfg Config) (*Engine, error) {
 	}
 
 	return &Engine{
-		cfg:       cfg,
-		store:     store,
-		proc:      proc,
-		ana:       ana,
-		pred:      pred,
-		alrt:      alrt,
-		collector: coll,
-		server:    srv,
+		cfg:           cfg,
+		store:         store,
+		proc:          proc,
+		ana:           ana,
+		pred:          pred,
+		alrt:          alrt,
+		sysColl:       sysColl,
+		containerColl: containerColl,
+		logColl:       logColl,
+		server:        srv,
 	}, nil
 }
 
@@ -170,11 +185,27 @@ func (e *Engine) collectLocally(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			metrics, err := e.collector.Collect()
+			metrics, err := e.sysColl.Collect()
 			if err != nil {
-				log.Printf("[collector] error: %v", err)
+				log.Printf("[collector] system: %v", err)
 				continue
 			}
+
+			// Container metrics (best-effort)
+			if containerMetrics, err := e.containerColl.Collect(); err == nil {
+				metrics = append(metrics, containerMetrics...)
+			}
+
+			// Log-derived metrics: inject error_rate and timeout_rate
+			if logEntries, err := e.logColl.Collect(); err == nil && len(logEntries) > 0 {
+				errRate := collector.ErrorRate(logEntries)
+				now := time.Now()
+				metrics = append(metrics,
+					models.Metric{Name: "error_rate", Value: errRate, Timestamp: now, Host: e.cfg.Host},
+					models.Metric{Name: "timeout_rate", Value: 0, Timestamp: now, Host: e.cfg.Host},
+				)
+			}
+
 			e.proc.Ingest(metrics)
 
 			// Persist to storage
@@ -237,10 +268,21 @@ func (e *Engine) collectAndPush(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			metrics, err := e.collector.Collect()
+			metrics, err := e.sysColl.Collect()
 			if err != nil {
 				log.Printf("[agent] collect error: %v", err)
 				continue
+			}
+			if containerMetrics, err := e.containerColl.Collect(); err == nil {
+				metrics = append(metrics, containerMetrics...)
+			}
+			if logEntries, err := e.logColl.Collect(); err == nil && len(logEntries) > 0 {
+				errRate := collector.ErrorRate(logEntries)
+				now := time.Now()
+				metrics = append(metrics,
+					models.Metric{Name: "error_rate", Value: errRate, Timestamp: now, Host: e.cfg.Host},
+					models.Metric{Name: "timeout_rate", Value: 0, Timestamp: now, Host: e.cfg.Host},
+				)
 			}
 
 			batch := models.MetricBatch{
@@ -308,6 +350,49 @@ func (e *Engine) runGC(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// seedAdminIfEmpty creates the first admin user when the store has no users.
+// The generated password is printed to stdout and logged at startup.
+func seedAdminIfEmpty(store *storage.Store) error {
+	count := 0
+	_ = store.ListUsers(func([]byte) error {
+		count++
+		return nil
+	})
+	if count > 0 {
+		return nil
+	}
+
+	// Generate a random 16-byte password
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Errorf("generate password: %w", err)
+	}
+	password := hex.EncodeToString(b)
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	user := models.User{
+		ID:       "admin",
+		Username: "admin",
+		Password: string(hash),
+		Role:     "admin",
+	}
+	if err := store.SaveUser("admin", user); err != nil {
+		return fmt.Errorf("save admin: %w", err)
+	}
+
+	log.Printf("╔══════════════════════════════════════════════════╗")
+	log.Printf("║  FIRST BOOT — admin credentials generated         ║")
+	log.Printf("║  Username : admin                                  ║")
+	log.Printf("║  Password : %-35s ║", password)
+	log.Printf("║  Change this password immediately after login!     ║")
+	log.Printf("╚══════════════════════════════════════════════════╝")
+	return nil
 }
 
 func (e *Engine) buildMetricsMap(host string) map[string]float64 {

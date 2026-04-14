@@ -38,7 +38,7 @@ func setupServer(t *testing.T) *httptest.Server {
 	alrt := alerter.NewAlerter(100)
 
 	handlers := api.NewHandlers(store, proc, ana, pred, alrt, "test-secret", false)
-	router := api.NewRouter(handlers, "test-secret", false)
+	router := api.NewRouter(handlers, "test-secret", false, nil) // nil = wildcard CORS for tests
 	return httptest.NewServer(router)
 }
 
@@ -211,6 +211,87 @@ func TestPredictEndpoint(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status = %d; want 200", resp.StatusCode)
+	}
+}
+
+func TestSetupEndpoint(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	// First setup should succeed
+	payload := map[string]string{"username": "testadmin", "password": "securepassword1"}
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(srv.URL+"/api/v1/auth/setup", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST /auth/setup: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("setup status = %d; want 201", resp.StatusCode)
+	}
+
+	// Second setup should fail with 409
+	body2, _ := json.Marshal(payload)
+	resp2, err := http.Post(srv.URL+"/api/v1/auth/setup", "application/json", bytes.NewReader(body2))
+	if err != nil {
+		t.Fatalf("POST /auth/setup (second): %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusConflict {
+		t.Errorf("second setup status = %d; want 409", resp2.StatusCode)
+	}
+}
+
+func TestTemplatesEndpoints(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	// List templates
+	resp, err := http.Get(srv.URL + "/api/v1/templates")
+	if err != nil {
+		t.Fatalf("GET /templates: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("list templates status = %d; want 200", resp.StatusCode)
+	}
+
+	var listResult map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&listResult)
+	data := listResult["data"].([]interface{})
+	if len(data) == 0 {
+		t.Error("expected at least one template")
+	}
+
+	// Get specific template
+	resp2, err := http.Get(srv.URL + "/api/v1/templates/kpi-holistic")
+	if err != nil {
+		t.Fatalf("GET /templates/kpi-holistic: %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Errorf("get template status = %d; want 200", resp2.StatusCode)
+	}
+
+	// Get non-existent template
+	resp3, err := http.Get(srv.URL + "/api/v1/templates/nonexistent")
+	if err != nil {
+		t.Fatalf("GET /templates/nonexistent: %v", err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusNotFound {
+		t.Errorf("nonexistent template status = %d; want 404", resp3.StatusCode)
+	}
+
+	// Apply a template
+	applyBody, _ := json.Marshal(map[string]string{"name": "My KPI Board"})
+	resp4, err := http.Post(srv.URL+"/api/v1/templates/system-overview/apply", "application/json", bytes.NewReader(applyBody))
+	if err != nil {
+		t.Fatalf("POST /templates/system-overview/apply: %v", err)
+	}
+	defer resp4.Body.Close()
+	if resp4.StatusCode != http.StatusCreated {
+		t.Errorf("apply template status = %d; want 201", resp4.StatusCode)
 	}
 }
 

@@ -503,6 +503,13 @@ func (h *Handlers) DataSourceCreateHandler(w http.ResponseWriter, r *http.Reques
 		respondError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
 	}
+	// Validate URL at creation time to prevent stored SSRF
+	if ds.URL != "" {
+		if err := validateDataSourceURL(ds.URL); err != nil {
+			respondError(w, http.StatusBadRequest, "INVALID_URL", "datasource URL is not allowed")
+			return
+		}
+	}
 	ds.ID = utils.GenerateID(8)
 	ds.Enabled = true
 	if err := h.store.SaveDataSource(ds.ID, ds); err != nil {
@@ -532,6 +539,13 @@ func (h *Handlers) DataSourceUpdateHandler(w http.ResponseWriter, r *http.Reques
 	if err := decodeBody(r, &ds); err != nil {
 		respondError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
+	}
+	// Validate URL at update time to prevent stored SSRF
+	if ds.URL != "" {
+		if err := validateDataSourceURL(ds.URL); err != nil {
+			respondError(w, http.StatusBadRequest, "INVALID_URL", "datasource URL is not allowed")
+			return
+		}
 	}
 	ds.ID = id
 	if err := h.store.SaveDataSource(id, ds); err != nil {
@@ -770,6 +784,190 @@ func (h *Handlers) QueryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondSuccess(w, models.QueryResult{Metric: req.Query, Points: points})
+}
+
+// SetupHandler POST /api/v1/auth/setup — creates the first admin account.
+// Only works when the user store is empty; returns 409 if any user already exists.
+func (h *Handlers) SetupHandler(w http.ResponseWriter, r *http.Request) {
+	// Check if any users already exist
+	count := 0
+	_ = h.store.ListUsers(func([]byte) error {
+		count++
+		return nil
+	})
+	if count > 0 {
+		respondError(w, http.StatusConflict, "ALREADY_SETUP", "system has already been configured")
+		return
+	}
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := decodeBody(r, &req); err != nil {
+		respondError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		return
+	}
+	if err := validateUsername(req.Username); err != nil {
+		respondError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		return
+	}
+	if len(req.Password) < 8 || len(req.Password) > 72 {
+		respondError(w, http.StatusBadRequest, "BAD_REQUEST", "password must be 8–72 characters")
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "HASH_ERROR", "could not hash password")
+		return
+	}
+	user := models.User{
+		ID:       utils.GenerateID(8),
+		Username: req.Username,
+		Password: string(hash),
+		Role:     "admin",
+	}
+	if err := h.store.SaveUser(req.Username, user); err != nil {
+		respondError(w, http.StatusInternalServerError, "STORAGE_ERROR", err.Error())
+		return
+	}
+	user.Password = ""
+	log.Printf("[auth] first admin user '%s' created via setup endpoint", req.Username)
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"success": true, "data": user, "timestamp": time.Now().UTC(),
+	})
+}
+
+// --- Built-in dashboard templates ---
+
+type dashboardTemplate struct {
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Tags        []string         `json:"tags"`
+	Dashboard   models.Dashboard `json:"dashboard"`
+}
+
+var builtinTemplates = []dashboardTemplate{
+	{
+		ID:          "system-overview",
+		Name:        "System Overview",
+		Description: "CPU, memory, disk and network metrics for a single host",
+		Tags:        []string{"system", "infrastructure"},
+		Dashboard: models.Dashboard{
+			Name:    "System Overview",
+			Refresh: 30,
+			Widgets: []models.Widget{
+				{Title: "CPU Usage", Type: "timeseries", Metric: "cpu_percent"},
+				{Title: "Memory Usage", Type: "timeseries", Metric: "memory_percent"},
+				{Title: "Disk Usage", Type: "gauge", Metric: "disk_percent"},
+				{Title: "Load Average", Type: "timeseries", Metric: "load_avg_1"},
+				{Title: "Network RX", Type: "timeseries", Metric: "net_rx_bps"},
+				{Title: "Network TX", Type: "timeseries", Metric: "net_tx_bps"},
+			},
+		},
+	},
+	{
+		ID:          "kpi-holistic",
+		Name:        "Holistic KPI Dashboard",
+		Description: "The six OHE vital signs: Stress, Fatigue, Mood, Pressure, Humidity, Contagion",
+		Tags:        []string{"kpi", "holistic", "ohe"},
+		Dashboard: models.Dashboard{
+			Name:    "Holistic KPI Dashboard",
+			Refresh: 15,
+			Widgets: []models.Widget{
+				{Title: "Stress Index", Type: "gauge", KPI: "stress"},
+				{Title: "Fatigue Level", Type: "timeseries", KPI: "fatigue"},
+				{Title: "System Mood", Type: "timeseries", KPI: "mood"},
+				{Title: "Atmospheric Pressure", Type: "timeseries", KPI: "pressure"},
+				{Title: "Error Humidity", Type: "gauge", KPI: "humidity"},
+				{Title: "Contagion Index", Type: "gauge", KPI: "contagion"},
+			},
+		},
+	},
+	{
+		ID:          "container-overview",
+		Name:        "Container Overview",
+		Description: "Per-container CPU and memory usage",
+		Tags:        []string{"containers", "docker"},
+		Dashboard: models.Dashboard{
+			Name:    "Container Overview",
+			Refresh: 30,
+			Widgets: []models.Widget{
+				{Title: "Container CPU", Type: "timeseries", Metric: "container_cpu_percent"},
+				{Title: "Container Memory %", Type: "gauge", Metric: "container_mem_percent"},
+				{Title: "Container Memory MB", Type: "timeseries", Metric: "container_mem_used_mb"},
+				{Title: "Net RX Bytes", Type: "timeseries", Metric: "container_net_rx_bytes"},
+				{Title: "Net TX Bytes", Type: "timeseries", Metric: "container_net_tx_bytes"},
+			},
+		},
+	},
+}
+
+// TemplateListHandler GET /api/v1/templates
+func (h *Handlers) TemplateListHandler(w http.ResponseWriter, r *http.Request) {
+	// Return lightweight list (no full dashboard payload)
+	type entry struct {
+		ID          string   `json:"id"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Tags        []string `json:"tags"`
+	}
+	list := make([]entry, 0, len(builtinTemplates))
+	for _, t := range builtinTemplates {
+		list = append(list, entry{ID: t.ID, Name: t.Name, Description: t.Description, Tags: t.Tags})
+	}
+	respondSuccess(w, list)
+}
+
+// TemplateGetHandler GET /api/v1/templates/{id}
+func (h *Handlers) TemplateGetHandler(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	for _, t := range builtinTemplates {
+		if t.ID == id {
+			respondSuccess(w, t)
+			return
+		}
+	}
+	respondError(w, http.StatusNotFound, "NOT_FOUND", "template not found")
+}
+
+// TemplateApplyHandler POST /api/v1/templates/{id}/apply — instantiates a template as a new dashboard
+func (h *Handlers) TemplateApplyHandler(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var tmpl *dashboardTemplate
+	for i := range builtinTemplates {
+		if builtinTemplates[i].ID == id {
+			tmpl = &builtinTemplates[i]
+			break
+		}
+	}
+	if tmpl == nil {
+		respondError(w, http.StatusNotFound, "NOT_FOUND", "template not found")
+		return
+	}
+
+	// Allow caller to override the dashboard name
+	var opts struct {
+		Name string `json:"name"`
+	}
+	_ = decodeBody(r, &opts)
+
+	d := tmpl.Dashboard
+	d.ID = utils.GenerateID(8)
+	d.CreatedAt = time.Now()
+	d.UpdatedAt = d.CreatedAt
+	if opts.Name != "" {
+		d.Name = opts.Name
+	}
+
+	if err := h.store.SaveDashboard(d.ID, d); err != nil {
+		respondError(w, http.StatusInternalServerError, "STORAGE_ERROR", err.Error())
+		return
+	}
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"success": true, "data": d, "timestamp": time.Now().UTC(),
+	})
 }
 
 // --- Helpers ---

@@ -6,13 +6,15 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// NewRouter builds and returns the HTTP router with all routes registered
-func NewRouter(h *Handlers, jwtSecret string, authEnabled bool) http.Handler {
+// NewRouter builds and returns the HTTP router with all routes registered.
+// allowedOrigins is the CORS origin allowlist; empty means wildcard (dev only).
+func NewRouter(h *Handlers, jwtSecret string, authEnabled bool, allowedOrigins []string) http.Handler {
 	r := mux.NewRouter()
 
-	// Apply global middleware
+	// Apply global middleware (outermost first)
+	r.Use(SecurityHeadersMiddleware)
 	r.Use(LoggingMiddleware)
-	r.Use(CORSMiddleware)
+	r.Use(mux.MiddlewareFunc(CORSMiddleware(allowedOrigins)))
 	r.Use(mux.MiddlewareFunc(AuthMiddleware(jwtSecret, authEnabled)))
 	r.Use(mux.MiddlewareFunc(RateLimitLogin))
 
@@ -22,11 +24,15 @@ func NewRouter(h *Handlers, jwtSecret string, authEnabled bool) http.Handler {
 	api.HandleFunc("/health", h.HealthHandler).Methods(http.MethodGet)
 	api.HandleFunc("/config", h.ConfigHandler).Methods(http.MethodGet)
 
-	// Auth
+	// Auth — setup endpoint only active when no users exist
+	api.HandleFunc("/auth/setup", h.SetupHandler).Methods(http.MethodPost)
 	api.HandleFunc("/auth/login", h.LoginHandler).Methods(http.MethodPost)
 	api.HandleFunc("/auth/logout", h.LogoutHandler).Methods(http.MethodPost)
 	api.HandleFunc("/auth/refresh", h.RefreshHandler).Methods(http.MethodPost)
+
 	adminOnly := RequireRole("admin")
+	operatorOnly := RequireRole("operator")
+
 	api.Handle("/auth/users", adminOnly(http.HandlerFunc(h.UserListHandler))).Methods(http.MethodGet)
 	api.Handle("/auth/users", adminOnly(http.HandlerFunc(h.UserCreateHandler))).Methods(http.MethodPost)
 	api.Handle("/auth/users/{id}", adminOnly(http.HandlerFunc(h.UserGetHandler))).Methods(http.MethodGet)
@@ -50,31 +56,36 @@ func NewRouter(h *Handlers, jwtSecret string, authEnabled bool) http.Handler {
 	// Alerts
 	api.HandleFunc("/alerts", h.AlertListHandler).Methods(http.MethodGet)
 	api.HandleFunc("/alerts/{id}", h.AlertGetHandler).Methods(http.MethodGet)
-	api.HandleFunc("/alerts/{id}", h.AlertDeleteHandler).Methods(http.MethodDelete)
+	api.Handle("/alerts/{id}", operatorOnly(http.HandlerFunc(h.AlertDeleteHandler))).Methods(http.MethodDelete)
 	api.HandleFunc("/alerts/{id}/acknowledge", h.AlertAcknowledgeHandler).Methods(http.MethodPost)
 	api.HandleFunc("/alerts/{id}/silence", h.AlertSilenceHandler).Methods(http.MethodPost)
 
-	// Dashboards
+	// Dashboards (import route must come before {id} to avoid shadowing)
 	api.HandleFunc("/dashboards", h.DashboardListHandler).Methods(http.MethodGet)
 	api.HandleFunc("/dashboards", h.DashboardCreateHandler).Methods(http.MethodPost)
-	api.HandleFunc("/dashboards/import", h.DashboardImportHandler).Methods(http.MethodPost)
+	api.Handle("/dashboards/import", operatorOnly(http.HandlerFunc(h.DashboardImportHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/dashboards/{id}", h.DashboardGetHandler).Methods(http.MethodGet)
-	api.HandleFunc("/dashboards/{id}", h.DashboardUpdateHandler).Methods(http.MethodPut)
-	api.HandleFunc("/dashboards/{id}", h.DashboardDeleteHandler).Methods(http.MethodDelete)
+	api.Handle("/dashboards/{id}", operatorOnly(http.HandlerFunc(h.DashboardUpdateHandler))).Methods(http.MethodPut)
+	api.Handle("/dashboards/{id}", operatorOnly(http.HandlerFunc(h.DashboardDeleteHandler))).Methods(http.MethodDelete)
 	api.HandleFunc("/dashboards/{id}/export", h.DashboardExportHandler).Methods(http.MethodGet)
 
 	// DataSources
 	api.HandleFunc("/datasources", h.DataSourceListHandler).Methods(http.MethodGet)
-	api.HandleFunc("/datasources", h.DataSourceCreateHandler).Methods(http.MethodPost)
+	api.Handle("/datasources", operatorOnly(http.HandlerFunc(h.DataSourceCreateHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/datasources/{id}", h.DataSourceGetHandler).Methods(http.MethodGet)
-	api.HandleFunc("/datasources/{id}", h.DataSourceUpdateHandler).Methods(http.MethodPut)
-	api.HandleFunc("/datasources/{id}", h.DataSourceDeleteHandler).Methods(http.MethodDelete)
-	api.HandleFunc("/datasources/{id}/test", h.DataSourceTestHandler).Methods(http.MethodPost)
+	api.Handle("/datasources/{id}", operatorOnly(http.HandlerFunc(h.DataSourceUpdateHandler))).Methods(http.MethodPut)
+	api.Handle("/datasources/{id}", operatorOnly(http.HandlerFunc(h.DataSourceDeleteHandler))).Methods(http.MethodDelete)
+	api.Handle("/datasources/{id}/test", operatorOnly(http.HandlerFunc(h.DataSourceTestHandler))).Methods(http.MethodPost)
 
-	// Ingest (agent → central push endpoint)
-	api.HandleFunc("/ingest", h.IngestHandler).Methods(http.MethodPost)
+	// Templates
+	api.HandleFunc("/templates", h.TemplateListHandler).Methods(http.MethodGet)
+	api.HandleFunc("/templates/{id}", h.TemplateGetHandler).Methods(http.MethodGet)
+	api.Handle("/templates/{id}/apply", operatorOnly(http.HandlerFunc(h.TemplateApplyHandler))).Methods(http.MethodPost)
 
-	// WebSocket streaming
+	// Ingest (agent → central push, requires at least operator role)
+	api.Handle("/ingest", operatorOnly(http.HandlerFunc(h.IngestHandler))).Methods(http.MethodPost)
+
+	// WebSocket streaming (requires at least viewer role — enforced by AuthMiddleware)
 	api.HandleFunc("/ws", h.WebSocketHandler)
 
 	// Embedded UI

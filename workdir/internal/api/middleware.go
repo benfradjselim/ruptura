@@ -104,22 +104,56 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// CORSMiddleware adds CORS headers
-func CORSMiddleware(next http.Handler) http.Handler {
+// CORSMiddleware returns a middleware that enforces the CORS allowlist.
+// If allowedOrigins is empty, wildcard "*" is used (dev mode only).
+// In production, pass the configured origin allowlist.
+func CORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
+	allowed := make(map[string]struct{}, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		allowed[o] = struct{}{}
+	}
+	wildcard := len(allowedOrigins) == 0
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			if wildcard {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+			} else if origin != "" {
+				if _, ok := allowed[origin]; ok {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Add("Vary", "Origin")
+				}
+				// No CORS header if origin not in allowlist — browser will block
+			}
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// SecurityHeadersMiddleware adds security response headers
+func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'")
 		next.ServeHTTP(w, r)
 	})
 }
 
 // RequireRole returns a middleware that enforces the minimum role level.
-// Roles: viewer < operator < admin
+// Roles: viewer < operator < admin.
+// When auth is disabled (no claims in context) all roles are permitted — the
+// AuthMiddleware upstream already decided not to enforce authentication.
 func RequireRole(role string) func(http.Handler) http.Handler {
 	roleLevel := map[string]int{"viewer": 1, "operator": 2, "admin": 3}
 	required := roleLevel[role]
@@ -127,7 +161,8 @@ func RequireRole(role string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, ok := claimsFromContext(r.Context())
 			if !ok {
-				respondError(w, http.StatusForbidden, "FORBIDDEN", "insufficient permissions")
+				// No claims means auth is disabled globally; allow the request.
+				next.ServeHTTP(w, r)
 				return
 			}
 			if roleLevel[claims.Role] < required {
@@ -152,6 +187,17 @@ type bucket struct {
 
 var loginLimiter = &ipLimiter{buckets: make(map[string]*bucket)}
 
+// evictStaleBuckets removes buckets inactive for more than 10 minutes.
+// Must be called with loginLimiter.mu held.
+func evictStaleBuckets() {
+	threshold := time.Now().Add(-10 * time.Minute)
+	for ip, b := range loginLimiter.buckets {
+		if b.lastSeen.Before(threshold) {
+			delete(loginLimiter.buckets, ip)
+		}
+	}
+}
+
 // RateLimitLogin allows up to 5 login attempts per minute per IP
 func RateLimitLogin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -166,6 +212,10 @@ func RateLimitLogin(next http.Handler) http.Handler {
 		loginLimiter.mu.Lock()
 		b, ok := loginLimiter.buckets[ip]
 		if !ok {
+			// Evict stale entries on new IP registration to bound memory
+			if len(loginLimiter.buckets) > 10000 {
+				evictStaleBuckets()
+			}
 			b = &bucket{tokens: 5, lastSeen: time.Now()}
 			loginLimiter.buckets[ip] = b
 		}
