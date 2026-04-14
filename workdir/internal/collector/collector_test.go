@@ -203,3 +203,34 @@ func TestSystemCollectorConcurrent(t *testing.T) {
 		<-done
 	}
 }
+
+func TestCollectSystemMetrics(t *testing.T) {
+	sc := collector.NewSystemCollector("syshost")
+	sm, err := sc.CollectSystemMetrics()
+	if err != nil {
+		t.Fatalf("CollectSystemMetrics: %v", err)
+	}
+	if sm == nil {
+		t.Fatal("CollectSystemMetrics returned nil")
+	}
+	if sm.Host != "syshost" {
+		t.Errorf("Host = %q; want syshost", sm.Host)
+	}
+	if sm.CPUPercent < 0 || sm.CPUPercent > 100 {
+		t.Errorf("CPUPercent = %v; want [0,100]", sm.CPUPercent)
+	}
+	if sm.MemoryPercent < 0 || sm.MemoryPercent > 100 {
+		t.Errorf("MemoryPercent = %v; want [0,100]", sm.MemoryPercent)
+	}
+}
+
+func TestLogCollectorDefaultSources(t *testing.T) {
+	// nil sources → uses defaultLogSources(); should not panic
+	lc := collector.NewLogCollector("host", nil)
+	entries, err := lc.Collect()
+	if err != nil {
+		t.Fatalf("Collect with default sources: %v", err)
+	}
+	// Default paths (/var/log/syslog etc.) may or may not exist — just verify no panic
+	_ = entries
+}
