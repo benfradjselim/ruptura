@@ -22,6 +22,8 @@ func NewRouter(h *Handlers, jwtSecret string, authEnabled bool, allowedOrigins [
 
 	// System
 	api.HandleFunc("/health", h.HealthHandler).Methods(http.MethodGet)
+	api.HandleFunc("/health/live", h.LivenessHandler).Methods(http.MethodGet)
+	api.HandleFunc("/health/ready", h.ReadinessHandler).Methods(http.MethodGet)
 	api.HandleFunc("/config", h.ConfigHandler).Methods(http.MethodGet)
 
 	// Auth — setup endpoint only active when no users exist

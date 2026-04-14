@@ -66,6 +66,7 @@ type Engine struct {
 	containerColl   *collector.ContainerCollector
 	logColl         *collector.LogCollector
 	server          *http.Server
+	handlers        *api.Handlers
 	wg              sync.WaitGroup
 	cancel          context.CancelFunc
 }
@@ -122,6 +123,7 @@ func New(cfg Config) (*Engine, error) {
 		containerColl: containerColl,
 		logColl:       logColl,
 		server:        srv,
+		handlers:      handlers,
 	}, nil
 }
 
@@ -154,7 +156,9 @@ func (e *Engine) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
 	go func() {
 		log.Printf("[ohe] HTTP server listening on :%d", e.cfg.Port)
+		e.handlers.SetReady(true)
 		if err := e.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			e.handlers.SetReady(false)
 			errCh <- err
 		}
 	}()

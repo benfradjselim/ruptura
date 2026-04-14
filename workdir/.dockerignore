@@ -1,0 +1,6 @@
+ui/node_modules
+ui/.svelte-kit
+ohe
+*.test
+**/*_test.go
+.git

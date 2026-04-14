@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	oheproc "github.com/benfradjselim/ohe/internal/processor"
@@ -38,6 +39,16 @@ type Handlers struct {
 	jwtSecret   string
 	startTime   time.Time
 	authEnabled bool
+	ready       int32 // 1 = ready; 0 = not ready; accessed via atomic ops (Go 1.18 compat)
+}
+
+// SetReady marks the server as ready to serve traffic (called by the orchestrator).
+func (h *Handlers) SetReady(v bool) {
+	if v {
+		atomic.StoreInt32(&h.ready, 1)
+	} else {
+		atomic.StoreInt32(&h.ready, 0)
+	}
 }
 
 // NewHandlers constructs the handler set
@@ -84,6 +95,28 @@ func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
 		Checks:    checks,
 		Timestamp: time.Now().UTC(),
 	})
+}
+
+// LivenessHandler GET /api/v1/health/live
+// Returns 200 while the process is running. K8s liveness probe target.
+func (h *Handlers) LivenessHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"status":"alive"}`)
+}
+
+// ReadinessHandler GET /api/v1/health/ready
+// Returns 200 when storage is healthy and the engine has finished initialising.
+// Returns 503 otherwise. K8s readiness probe target.
+func (h *Handlers) ReadinessHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if atomic.LoadInt32(&h.ready) == 0 || !h.store.Healthy() {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, `{"status":"not_ready"}`)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"status":"ready"}`)
 }
 
 // MetricsListHandler GET /api/v1/metrics

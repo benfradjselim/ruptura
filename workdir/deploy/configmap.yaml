@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ohe-config
+  namespace: ohe-system
+  labels:
+    app.kubernetes.io/name: ohe
+    app.kubernetes.io/component: config
+data:
+  config.yaml: |
+    mode: central
+    port: 8080
+    collect_interval: 15s
+    buffer_size: 10000
+    auth_enabled: true
+    allowed_origins: []
+    # storage_path is set via env / flag; PVC mounted at /var/lib/ohe/data

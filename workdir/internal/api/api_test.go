@@ -561,3 +561,78 @@ func TestAlertGetAndDelete(t *testing.T) {
 		t.Errorf("alert delete = %d; want 204", resp3.StatusCode)
 	}
 }
+
+// --- Phase 5: liveness + readiness probe tests ---
+
+func TestLivenessProbe(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/health/live")
+	if err != nil {
+		t.Fatalf("GET /health/live: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("liveness = %d; want 200", resp.StatusCode)
+	}
+	var body map[string]string
+	json.NewDecoder(resp.Body).Decode(&body)
+	if body["status"] != "alive" {
+		t.Errorf("status = %q; want alive", body["status"])
+	}
+}
+
+func TestReadinessProbeNotReady(t *testing.T) {
+	srv := setupServer(t) // ready flag is false by default in test servers
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/health/ready")
+	if err != nil {
+		t.Fatalf("GET /health/ready: %v", err)
+	}
+	defer resp.Body.Close()
+	// setupServer never calls SetReady(true), so should return 503
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("readiness (not ready) = %d; want 503", resp.StatusCode)
+	}
+}
+
+func TestReadinessProbeReady(t *testing.T) {
+	dir, err := os.MkdirTemp("", "ohe-ready-test-*")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+
+	store, err := storage.Open(dir)
+	if err != nil {
+		t.Fatalf("Open storage: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+
+	proc := processor.NewProcessor(1000)
+	ana := analyzer.NewAnalyzer()
+	pred := predictor.NewPredictor()
+	alrt := alerter.NewAlerter(100)
+
+	handlers := api.NewHandlers(store, proc, ana, pred, alrt, "secret", false)
+	handlers.SetReady(true) // explicitly mark ready
+	router := api.NewRouter(handlers, "secret", false, nil)
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/health/ready")
+	if err != nil {
+		t.Fatalf("GET /health/ready: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("readiness (ready) = %d; want 200", resp.StatusCode)
+	}
+	var body map[string]string
+	json.NewDecoder(resp.Body).Decode(&body)
+	if body["status"] != "ready" {
+		t.Errorf("status = %q; want ready", body["status"])
+	}
+}
