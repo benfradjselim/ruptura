@@ -148,4 +148,38 @@ workdir/
 | ContainerCollector | collector/container.go | Docker socket ou cgroup fallback |
 | LogCollector | collector/logs.go | Tail de fichiers log, classification niveaux |
 
+## 11. Règles de Sécurité Avancées (v4.0.0+)
+
+| Règle | Détail |
+|-------|--------|
+| CORS | `CORSMiddleware(allowedOrigins []string)` — factory func. Wildcard `*` uniquement si `allowed_origins` est vide (dev). En production, lister les origines dans `configs/central.yaml`. |
+| En-têtes sécurité | `SecurityHeadersMiddleware` appliqué globalement: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Content-Security-Policy: default-src 'self'` |
+| RequireRole | Laisser passer si pas de claims en contexte (auth désactivée). Bloquer avec 403 si rôle insuffisant. |
+| Rate limiter | Éviction des buckets inactifs depuis > 10 min dès que `len(buckets) > 10000` — évite la fuite mémoire sur IP cycling. |
+| SSRF DataSource | `validateDataSourceURL()` appelée à la création ET mise à jour (pas seulement au test). |
+| Premier démarrage | `seedAdminIfEmpty()` dans `orchestrator.New()`: génère mot de passe random (16 bytes hex) si aucun user en base. Affiche dans les logs. |
+| Setup endpoint | `POST /api/v1/auth/setup` — sans auth, crée le premier admin. Retourne 409 si au moins un user existe. |
+
+## 12. Endpoints Manquants Implémentés (v4.0.0+)
+
+| Endpoint | Méthode | Auth | Description |
+|----------|---------|------|-------------|
+| /api/v1/auth/setup | POST | — | Premier admin (once-only) |
+| /api/v1/templates | GET | viewer | Liste templates intégrés |
+| /api/v1/templates/{id} | GET | viewer | Détail d'un template |
+| /api/v1/templates/{id}/apply | POST | operator | Instancier template → dashboard |
+
+**Templates intégrés:** `system-overview`, `kpi-holistic`, `container-overview`
+
+## 13. RBAC Complet
+
+| Route | Rôle minimum |
+|-------|-------------|
+| /api/v1/health, /config | public |
+| /api/v1/auth/setup, /auth/login | public |
+| Lectures (metrics, kpis, alerts, dashboards, templates) | viewer |
+| /api/v1/ingest | operator |
+| Écritures (dashboards create/update/delete, datasources, templates/apply) | operator |
+| /api/v1/auth/users, /reload | admin |
+
 **Document destiné aux agents IA. Respecter strictement ces contraintes.**

@@ -96,30 +96,41 @@ All responses follow:
 
 ### Core Endpoints
 
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/v1/health` | Health check |
-| GET | `/api/v1/metrics` | Current normalized metrics |
-| GET | `/api/v1/metrics/{name}` | Metric time series |
-| GET | `/api/v1/metrics/{name}/aggregate` | avg/min/max/p95/p99 |
-| POST | `/api/v1/query` | QQL metric query |
-| GET | `/api/v1/kpis` | Current KPI snapshot |
-| GET | `/api/v1/kpis/{name}` | KPI time series |
-| GET | `/api/v1/kpis/{name}/predict` | ILR prediction |
-| GET | `/api/v1/predict?horizon=120` | All predictions |
-| GET | `/api/v1/alerts` | Active alerts |
-| POST | `/api/v1/alerts/{id}/acknowledge` | Acknowledge alert |
-| POST | `/api/v1/alerts/{id}/silence` | Silence alert |
-| GET/POST/PUT/DELETE | `/api/v1/dashboards` | Dashboard CRUD |
-| GET | `/api/v1/dashboards/{id}/export` | Export dashboard JSON |
-| POST | `/api/v1/dashboards/import` | Import dashboard |
-| GET/POST/PUT/DELETE | `/api/v1/datasources` | DataSource CRUD |
-| POST | `/api/v1/datasources/{id}/test` | Test datasource |
-| POST | `/api/v1/auth/login` | JWT login |
-| POST | `/api/v1/auth/refresh` | Refresh token |
-| GET/POST/DELETE | `/api/v1/auth/users` | User management |
-| POST | `/api/v1/ingest` | Agent metric push |
-| WS | `/api/v1/ws` | Live KPI stream |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/health` | — | Health check |
+| GET | `/api/v1/config` | — | Runtime config |
+| GET | `/api/v1/metrics` | viewer | Current normalized metrics |
+| GET | `/api/v1/metrics/{name}` | viewer | Metric time series |
+| GET | `/api/v1/metrics/{name}/aggregate` | viewer | avg/min/max/p95/p99 |
+| POST | `/api/v1/query` | viewer | Metric query by name + time range |
+| GET | `/api/v1/kpis` | viewer | Current KPI snapshot |
+| GET | `/api/v1/kpis/{name}` | viewer | KPI time series |
+| GET | `/api/v1/kpis/{name}/predict` | viewer | ILR prediction |
+| GET | `/api/v1/predict?horizon=120` | viewer | All predictions |
+| GET | `/api/v1/alerts` | viewer | Active alerts |
+| POST | `/api/v1/alerts/{id}/acknowledge` | viewer | Acknowledge alert |
+| POST | `/api/v1/alerts/{id}/silence` | viewer | Silence alert |
+| DELETE | `/api/v1/alerts/{id}` | operator | Delete alert |
+| GET/POST | `/api/v1/dashboards` | viewer/operator | List / Create |
+| GET | `/api/v1/dashboards/{id}` | viewer | Get dashboard |
+| PUT/DELETE | `/api/v1/dashboards/{id}` | operator | Update / Delete |
+| GET | `/api/v1/dashboards/{id}/export` | viewer | Export dashboard JSON |
+| POST | `/api/v1/dashboards/import` | operator | Import dashboard |
+| GET | `/api/v1/templates` | viewer | List built-in templates |
+| GET | `/api/v1/templates/{id}` | viewer | Get template |
+| POST | `/api/v1/templates/{id}/apply` | operator | Instantiate template as dashboard |
+| GET/POST | `/api/v1/datasources` | viewer/operator | List / Create |
+| GET | `/api/v1/datasources/{id}` | viewer | Get datasource |
+| PUT/DELETE | `/api/v1/datasources/{id}` | operator | Update / Delete |
+| POST | `/api/v1/datasources/{id}/test` | operator | Test connectivity |
+| POST | `/api/v1/auth/setup` | — | First-boot admin creation (once only) |
+| POST | `/api/v1/auth/login` | — | JWT login |
+| POST | `/api/v1/auth/refresh` | viewer | Refresh token |
+| POST | `/api/v1/auth/logout` | viewer | Logout (stateless) |
+| GET/POST/DELETE | `/api/v1/auth/users` | admin | User management |
+| POST | `/api/v1/ingest` | operator | Agent metric push |
+| WS | `/api/v1/ws` | viewer | Live KPI stream |
 
 ---
 
@@ -143,13 +154,15 @@ ILR is 193,750× more resource-efficient than ARIMA while achieving comparable t
 ```yaml
 # configs/central.yaml
 mode: central
-host: ""                      # auto-detected
+host: ""                        # auto-detected via os.Hostname()
 port: 8080
 storage_path: /var/lib/ohe/central
 collect_interval: 15s
 buffer_size: 10000
 auth_enabled: false
 jwt_secret: "change-me-in-production"
+allowed_origins: []             # empty = wildcard * (dev); list origins for prod
+                                # e.g. ["https://dashboard.example.com"]
 ```
 
 ```yaml
@@ -159,6 +172,18 @@ port: 8081
 central_url: http://central:8080
 collect_interval: 15s
 ```
+
+### First-Boot Admin Setup
+
+On first start with an empty database, OHE auto-generates a random admin password and prints it to stdout. Alternatively, call the setup endpoint once manually:
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/auth/setup \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"ChangeMe123!"}'
+```
+
+The `/auth/setup` endpoint returns `409 Conflict` if any user already exists, making it safe to call idempotently during provisioning.
 
 ---
 
@@ -216,7 +241,9 @@ go build -ldflags="-s -w" -o ohe ./cmd/ohe/
 |---|---|---|
 | 1 | Collection + Core KPIs + Storage | ✅ Done |
 | 2 | ILR Predictions + Alerting | ✅ Done |
-| 3 | Full REST API + WebSocket | ✅ Done |
+| 3 | Full REST API + WebSocket + Security | ✅ Done |
+| 3.1 | RBAC · CORS allowlist · Rate limiting · SSRF protection | ✅ Done |
+| 3.2 | First-boot admin seeding · Templates · Setup endpoint | ✅ Done |
 | 4 | Svelte UI + Dashboards | 🔄 In Progress |
 | 5 | HA + K8s Operator | Planned |
 | 6 | Distributed Tracing + Multi-cluster | Planned |
