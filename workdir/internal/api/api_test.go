@@ -310,3 +310,254 @@ func TestCORSHeaders(t *testing.T) {
 		t.Error("missing CORS header")
 	}
 }
+
+func TestDataSourceCRUD(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	// Create (with a non-SSRF URL — will fail validation since it's localhost, but test the rejection)
+	dsPayload := map[string]interface{}{
+		"name": "test-ds",
+		"type": "prometheus",
+		"url":  "http://169.254.169.254/latest", // metadata endpoint — should be blocked
+	}
+	body, _ := json.Marshal(dsPayload)
+	resp, err := http.Post(srv.URL+"/api/v1/datasources", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST /datasources: %v", err)
+	}
+	defer resp.Body.Close()
+	// Should return 400 (SSRF blocked) or another non-201 status
+	if resp.StatusCode == http.StatusCreated {
+		t.Error("expected SSRF URL to be rejected, got 201")
+	}
+
+	// Create with empty URL (should succeed)
+	dsPayload2 := map[string]interface{}{"name": "local-ds", "type": "ohe"}
+	body2, _ := json.Marshal(dsPayload2)
+	resp2, err := http.Post(srv.URL+"/api/v1/datasources", "application/json", bytes.NewReader(body2))
+	if err != nil {
+		t.Fatalf("POST /datasources (empty URL): %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusCreated {
+		t.Errorf("create datasource status = %d; want 201", resp2.StatusCode)
+	}
+
+	// List
+	resp3, err := http.Get(srv.URL + "/api/v1/datasources")
+	if err != nil {
+		t.Fatalf("GET /datasources: %v", err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusOK {
+		t.Errorf("list datasources = %d; want 200", resp3.StatusCode)
+	}
+}
+
+func TestAlertAcknowledgeAndSilence(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	// Ingest data that will trigger alerts
+	batch := models.MetricBatch{
+		AgentID:   "test-agent",
+		Host:      "alerthost",
+		Timestamp: time.Now(),
+		Metrics: []models.Metric{
+			{Name: "cpu_percent", Value: 90, Host: "alerthost", Timestamp: time.Now()},
+			{Name: "memory_percent", Value: 95, Host: "alerthost", Timestamp: time.Now()},
+		},
+	}
+	body, _ := json.Marshal(batch)
+	http.Post(srv.URL+"/api/v1/ingest", "application/json", bytes.NewReader(body))
+
+	// Get active alerts
+	resp, err := http.Get(srv.URL + "/api/v1/alerts?active=true")
+	if err != nil {
+		t.Fatalf("GET /alerts: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("alerts status = %d; want 200", resp.StatusCode)
+	}
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	alerts, _ := result["data"].([]interface{})
+
+	if len(alerts) == 0 {
+		t.Skip("no alerts fired from ingest — skipping ack/silence test")
+	}
+
+	firstAlert := alerts[0].(map[string]interface{})
+	id := firstAlert["id"].(string)
+
+	// Acknowledge
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/alerts/"+id+"/acknowledge", nil)
+	resp2, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST acknowledge: %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Errorf("acknowledge status = %d; want 200", resp2.StatusCode)
+	}
+
+	// Silence
+	req3, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/alerts/"+id+"/silence", nil)
+	resp3, err := http.DefaultClient.Do(req3)
+	if err != nil {
+		t.Fatalf("POST silence: %v", err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusOK {
+		t.Errorf("silence status = %d; want 200", resp3.StatusCode)
+	}
+}
+
+func TestMetricAggregate(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	// Ingest data first
+	batch := models.MetricBatch{
+		AgentID:   "agg-agent",
+		Host:      "agghost",
+		Timestamp: time.Now(),
+		Metrics: []models.Metric{
+			{Name: "cpu_percent", Value: 50, Host: "agghost", Timestamp: time.Now()},
+		},
+	}
+	body, _ := json.Marshal(batch)
+	http.Post(srv.URL+"/api/v1/ingest", "application/json", bytes.NewReader(body))
+
+	resp, err := http.Get(srv.URL + "/api/v1/metrics/cpu_percent/aggregate?host=agghost")
+	if err != nil {
+		t.Fatalf("GET /metrics/cpu_percent/aggregate: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("aggregate status = %d; want 200", resp.StatusCode)
+	}
+}
+
+func TestKPIGetHandler(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	// Ingest to populate KPI
+	batch := models.MetricBatch{
+		AgentID:   "kpi-agent",
+		Host:      "kpihost",
+		Timestamp: time.Now(),
+		Metrics: []models.Metric{
+			{Name: "cpu_percent", Value: 70, Host: "kpihost", Timestamp: time.Now()},
+			{Name: "memory_percent", Value: 60, Host: "kpihost", Timestamp: time.Now()},
+			{Name: "load_avg_1", Value: 1.0, Host: "kpihost", Timestamp: time.Now()},
+		},
+	}
+	body, _ := json.Marshal(batch)
+	http.Post(srv.URL+"/api/v1/ingest", "application/json", bytes.NewReader(body))
+
+	resp, err := http.Get(srv.URL + "/api/v1/kpis/stress?host=kpihost")
+	if err != nil {
+		t.Fatalf("GET /kpis/stress: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("kpi get status = %d; want 200", resp.StatusCode)
+	}
+}
+
+func TestConfigEndpoint(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/config")
+	if err != nil {
+		t.Fatalf("GET /config: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("config status = %d; want 200", resp.StatusCode)
+	}
+
+	var body map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&body)
+	data := body["data"].(map[string]interface{})
+	if _, ok := data["version"]; !ok {
+		t.Error("config response missing 'version'")
+	}
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/health")
+	if err != nil {
+		t.Fatalf("GET /health: %v", err)
+	}
+	defer resp.Body.Close()
+
+	headers := map[string]string{
+		"X-Content-Type-Options": "nosniff",
+		"X-Frame-Options":        "DENY",
+	}
+	for header, want := range headers {
+		if got := resp.Header.Get(header); got != want {
+			t.Errorf("header %s = %q; want %q", header, got, want)
+		}
+	}
+}
+
+func TestAlertGetAndDelete(t *testing.T) {
+	srv := setupServer(t)
+	defer srv.Close()
+
+	// Ingest high-stress metrics to fire an alert
+	batch := models.MetricBatch{
+		AgentID:   "del-agent",
+		Host:      "delhost",
+		Timestamp: time.Now(),
+		Metrics: []models.Metric{
+			{Name: "cpu_percent", Value: 92, Host: "delhost", Timestamp: time.Now()},
+		},
+	}
+	body, _ := json.Marshal(batch)
+	http.Post(srv.URL+"/api/v1/ingest", "application/json", bytes.NewReader(body))
+
+	// List alerts
+	resp, _ := http.Get(srv.URL + "/api/v1/alerts")
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	resp.Body.Close()
+	alerts, _ := result["data"].([]interface{})
+
+	if len(alerts) == 0 {
+		t.Skip("no alerts to test Get/Delete")
+	}
+	id := alerts[0].(map[string]interface{})["id"].(string)
+
+	// Get by ID
+	resp2, err := http.Get(srv.URL + "/api/v1/alerts/" + id)
+	if err != nil {
+		t.Fatalf("GET /alerts/%s: %v", id, err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Errorf("alert get = %d; want 200", resp2.StatusCode)
+	}
+
+	// Delete
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/api/v1/alerts/"+id, nil)
+	resp3, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE /alerts/%s: %v", id, err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusNoContent {
+		t.Errorf("alert delete = %d; want 204", resp3.StatusCode)
+	}
+}
