@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -22,7 +23,7 @@ type Analyzer struct {
 type hostState struct {
 	// Stress history for fatigue integration
 	stressHistory *utils.CircularBuffer
-	// Error history for humidity
+	// Error history for humidity/pressure
 	errorHistory *utils.CircularBuffer
 	// Timeout history
 	timeoutHistory *utils.CircularBuffer
@@ -36,8 +37,10 @@ type hostState struct {
 	lastStress float64
 	// Last update time
 	lastUpdate time.Time
-	// Uptime in seconds
+	// Uptime in seconds (always updated, including 0)
 	uptime float64
+	// firstUpdate tracks whether lastStress is valid for derivative
+	firstUpdate bool
 }
 
 // NewAnalyzer creates a new holistic analyzer
@@ -58,6 +61,7 @@ func (a *Analyzer) getOrCreate(host string) *hostState {
 		timeoutHistory: utils.NewCircularBuffer(600),
 		requestHistory: utils.NewCircularBuffer(600),
 		lastUpdate:     time.Now(),
+		firstUpdate:    true,
 	}
 	a.hosts[host] = hs
 	return hs
@@ -104,25 +108,34 @@ func (a *Analyzer) Update(host string, metrics map[string]float64) models.KPISna
 
 	// --- Mood ---
 	// M = (Uptime × Throughput) / (Errors × Timeouts × Restarts + ε)
+	// ε guards the WHOLE denominator product (not individual factors) per spec.
+	// Log normalization: log(rawMood + 1) / log(max_expected + 1) maps to [0, 1].
 	uptime := getMetric(metrics, "uptime_seconds")
-	if uptime > 0 {
-		hs.uptime = uptime
-	}
+	hs.uptime = uptime // always update (including 0) to avoid stale value
+
 	requests := getMetric(metrics, "request_rate")
 	hs.requestHistory.Push(requests)
 	hs.errorHistory.Push(errors)
 	hs.timeoutHistory.Push(timeouts)
 
 	restarts := hs.restartCount + 1 // always at least 1 to avoid division by zero
-	rawMood := (hs.uptime * (requests + epsilon)) / ((errors + epsilon) * (timeouts + epsilon) * restarts)
-	// Map mood to [0, 1] using log scale. rawMood > 100 = happy = 1.0
-	mood := utils.Clamp(rawMood/200.0, 0, 1)
+	// Denominator: errors × timeouts × restarts with ε protecting against zero
+	denominator := errors*timeouts*restarts + epsilon
+	rawMood := (hs.uptime * (requests + epsilon)) / denominator
+	// Log-normalize: log(1 + rawMood) / log(1 + expectedMax)
+	// expectedMax ≈ uptime(86400s) × throughput(1) / epsilon ≈ 8.64e14 → use log ceiling 35
+	const moodLogCeiling = 35.0
+	mood := utils.Clamp(math.Log1p(rawMood)/moodLogCeiling, 0, 1)
 
 	// --- Atmospheric Pressure ---
-	// P = dS/dt + integral of errors
-	dSdt := utils.Derivative(hs.lastStress, stress, dt)
+	// P = dS/dt + ∫errors dt (raw integral per spec, not normalized by count)
+	// Skip derivative on first call to avoid artificially high spike from zero lastStress.
+	dSdt := 0.0
+	if !hs.firstUpdate {
+		dSdt = utils.Derivative(hs.lastStress, stress, dt)
+	}
 	errorIntegral := utils.TrapezoidIntegrate(hs.errorHistory.Values(), 1.0)
-	pressure := dSdt + errorIntegral/float64(hs.errorHistory.Len()+1)
+	pressure := dSdt + errorIntegral
 	pressure = utils.Clamp(pressure, -1, 1)
 	// Normalize to [0,1]: -1 → 0, 0 → 0.5, +1 → 1
 	pressureNorm := utils.Clamp((pressure+1)/2.0, 0, 1)
@@ -140,6 +153,7 @@ func (a *Analyzer) Update(host string, metrics map[string]float64) models.KPISna
 	// Update last state
 	hs.lastStress = stress
 	hs.lastUpdate = now
+	hs.firstUpdate = false
 
 	snap := models.KPISnapshot{
 		Host:      host,

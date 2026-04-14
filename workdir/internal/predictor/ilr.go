@@ -81,12 +81,14 @@ type Point struct {
 	Y float64
 }
 
-// BatchILR buffers samples and updates the model every batchSize points
+// BatchILR buffers samples and updates the model every batchSize points.
+// All exported methods are NOT independently thread-safe; callers must hold
+// the parent Predictor mutex (p.mu) before calling any method. This eliminates
+// a double-lock pattern and removes the lock-inversion risk.
 type BatchILR struct {
 	model     *ILR
 	buffer    []Point
 	batchSize int
-	mu        sync.RWMutex
 }
 
 // NewBatchILR creates an incremental batch learner
@@ -98,11 +100,9 @@ func NewBatchILR(batchSize int) *BatchILR {
 	}
 }
 
-// Update adds a point; flushes to model when batch is full
+// Update adds a point; flushes to model when batch is full.
+// Caller must hold Predictor.mu (write).
 func (b *BatchILR) Update(x, y float64) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	b.buffer = append(b.buffer, Point{X: x, Y: y})
 	if len(b.buffer) >= b.batchSize {
 		for _, p := range b.buffer {
@@ -112,24 +112,21 @@ func (b *BatchILR) Update(x, y float64) {
 	}
 }
 
-// Predict returns y for x
+// Predict returns y for x.
+// Caller must hold Predictor.mu (read or write).
 func (b *BatchILR) Predict(x float64) float64 {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
 	return b.model.Predict(x)
 }
 
-// Trend returns the current trend direction
+// Trend returns the current trend direction.
+// Caller must hold Predictor.mu (read or write).
 func (b *BatchILR) Trend() string {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
 	return b.model.Trend()
 }
 
-// Alpha returns the slope
+// Alpha returns the slope.
+// Caller must hold Predictor.mu (read or write).
 func (b *BatchILR) Alpha() float64 {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
 	return b.model.Alpha
 }
 

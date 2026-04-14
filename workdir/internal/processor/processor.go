@@ -1,6 +1,8 @@
 package processor
 
 import (
+	"log"
+	"runtime"
 	"sync"
 	"time"
 
@@ -138,8 +140,12 @@ func normalize(name string, value float64) float64 {
 	case "cpu_percent", "memory_percent", "disk_percent":
 		return utils.NormalizePercent(value)
 	case "load_avg_1", "load_avg_5", "load_avg_15":
-		// Normalize load avg: treat 0-4 as [0,1]
-		return utils.Clamp(value/4.0, 0, 1)
+		// Normalize load avg relative to CPU count: 1.0 = fully loaded
+		numCPU := float64(runtime.NumCPU())
+		if numCPU < 1 {
+			numCPU = 1
+		}
+		return utils.Clamp(value/numCPU, 0, 1)
 	case "net_rx_bps", "net_tx_bps":
 		// Normalize to 1Gbps = 1.0
 		return utils.Clamp(value/1e9, 0, 1)
@@ -153,8 +159,10 @@ func normalize(name string, value float64) float64 {
 	case "processes":
 		return utils.Clamp(value/1000.0, 0, 1)
 	default:
-		// Default: assume already in [0,1] or percentage
+		// Unknown metric: clamp to [0,1]. If value > 1.0, assume it's a percentage
+		// and divide by 100. Log a warning to aid debugging of misclassified metrics.
 		if value > 1 {
+			log.Printf("[processor] unknown metric %q value=%.3f treated as percentage", name, value)
 			return utils.NormalizePercent(value)
 		}
 		return utils.Clamp(value, 0, 1)

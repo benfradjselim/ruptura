@@ -1,5 +1,5 @@
 mode: central
-host: ""  # auto-detected from hostname
+host: ""                        # auto-detected from hostname
 port: 8080
 storage_path: /var/lib/ohe/central
 central_url: ""
@@ -7,3 +7,9 @@ collect_interval: 15s
 buffer_size: 10000
 auth_enabled: false
 jwt_secret: "change-me-in-production"
+# CORS origin allowlist — leave empty for wildcard * (development only)
+# In production, list your dashboard origin(s):
+# allowed_origins:
+#   - https://dashboard.example.com
+#   - https://ops.example.com
+allowed_origins: []
