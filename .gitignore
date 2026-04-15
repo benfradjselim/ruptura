@@ -29,3 +29,4 @@ logs/
 tmp/
 temp/
 ohe
+workdir/operator/ohe-operator
