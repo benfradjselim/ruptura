@@ -241,3 +241,29 @@ func (a *Alerter) GetRules() []Rule {
 	copy(cp, a.rules)
 	return cp
 }
+
+// UpdateRule replaces the first rule whose Name matches; returns false if not found.
+func (a *Alerter) UpdateRule(name string, updated Rule) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for i, r := range a.rules {
+		if r.Name == name {
+			a.rules[i] = updated
+			return true
+		}
+	}
+	return false
+}
+
+// DeleteRule removes the first rule whose Name matches; returns false if not found.
+func (a *Alerter) DeleteRule(name string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for i, r := range a.rules {
+		if r.Name == name {
+			a.rules = append(a.rules[:i], a.rules[i+1:]...)
+			return true
+		}
+	}
+	return false
+}

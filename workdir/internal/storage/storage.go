@@ -440,3 +440,98 @@ func (s *Store) QuerySpansByTrace(traceID string) ([]json.RawMessage, error) {
 	})
 	return results, err
 }
+
+// TraceHeader is a lightweight trace summary for list views.
+type TraceHeader struct {
+	TraceID     string  `json:"traceId"`
+	RootService string  `json:"rootService"`
+	RootOp      string  `json:"rootOp"`
+	StartTimeMs int64   `json:"startTimeMs"`
+	DurationMs  float64 `json:"durationMs"`
+	SpanCount   int     `json:"spanCount"`
+	HasError    bool    `json:"hasError"`
+}
+
+// QueryTraceList returns lightweight trace summaries, newest first, up to limit.
+// It scans the "sp:" prefix and groups spans by traceID.
+func (s *Store) QueryTraceList(service string, limit int) ([]TraceHeader, error) {
+	type spanMin struct {
+		TraceID   string  `json:"trace_id"`
+		SpanID    string  `json:"span_id"`
+		ParentID  string  `json:"parent_id"`
+		Service   string  `json:"service"`
+		Operation string  `json:"name"`
+		StartMs   int64   `json:"start_time_ms"`
+		DurationMs float64 `json:"duration_ms"`
+		Status    string  `json:"status"`
+	}
+
+	byTrace := make(map[string][]spanMin)
+	err := s.listByPrefix("sp:", func(_, val []byte) error {
+		var sp spanMin
+		if err := json.Unmarshal(val, &sp); err == nil {
+			byTrace[sp.TraceID] = append(byTrace[sp.TraceID], sp)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var headers []TraceHeader
+	for tid, spans := range byTrace {
+		if service != "" {
+			found := false
+			for _, sp := range spans {
+				if strings.EqualFold(sp.Service, service) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+		// Find root span (no parent or earliest start)
+		var root spanMin
+		var minStart int64 = 1<<62
+		hasError := false
+		for _, sp := range spans {
+			if sp.StartMs < minStart {
+				minStart = sp.StartMs
+				root = sp
+			}
+			if sp.Status == "error" || sp.Status == "ERROR" {
+				hasError = true
+			}
+		}
+		var totalDur float64
+		for _, sp := range spans {
+			if sp.StartMs+int64(sp.DurationMs) > minStart+int64(totalDur) {
+				totalDur = float64(sp.StartMs+int64(sp.DurationMs)) - float64(minStart)
+			}
+		}
+		headers = append(headers, TraceHeader{
+			TraceID:     tid,
+			RootService: root.Service,
+			RootOp:      root.Operation,
+			StartTimeMs: minStart,
+			DurationMs:  totalDur,
+			SpanCount:   len(spans),
+			HasError:    hasError,
+		})
+	}
+
+	// Sort newest first
+	for i := 0; i < len(headers)-1; i++ {
+		for j := i + 1; j < len(headers); j++ {
+			if headers[j].StartTimeMs > headers[i].StartTimeMs {
+				headers[i], headers[j] = headers[j], headers[i]
+			}
+		}
+	}
+	if limit > 0 && len(headers) > limit {
+		headers = headers[:limit]
+	}
+	return headers, nil
+}

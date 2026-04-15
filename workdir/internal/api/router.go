@@ -99,6 +99,8 @@ func NewRouter(h *Handlers, jwtSecret string, authEnabled bool, allowedOrigins [
 	// Alert rules CRUD
 	api.HandleFunc("/alert-rules", h.AlertRuleListHandler).Methods(http.MethodGet)
 	api.Handle("/alert-rules", operatorOnly(http.HandlerFunc(h.AlertRuleCreateHandler))).Methods(http.MethodPost)
+	api.Handle("/alert-rules/{name}", operatorOnly(http.HandlerFunc(h.AlertRuleUpdateHandler))).Methods(http.MethodPut)
+	api.Handle("/alert-rules/{name}", operatorOnly(http.HandlerFunc(h.AlertRuleDeleteHandler))).Methods(http.MethodDelete)
 
 	// Notification channels
 	api.HandleFunc("/notifications", h.NotificationChannelListHandler).Methods(http.MethodGet)
@@ -114,10 +116,12 @@ func NewRouter(h *Handlers, jwtSecret string, authEnabled bool, allowedOrigins [
 	// Topology (APM-style service dependency graph)
 	api.HandleFunc("/topology", h.TopologyHandler).Methods(http.MethodGet)
 
-	// Logs query
+	// Logs query + live stream
 	api.HandleFunc("/logs", h.LogQueryHandler).Methods(http.MethodGet)
+	api.HandleFunc("/logs/stream", h.LogStreamHandler).Methods(http.MethodGet)
 
-	// Traces / APM
+	// Traces / APM (list must come before {traceID} to avoid route shadowing)
+	api.HandleFunc("/traces", h.TraceSearchHandler).Methods(http.MethodGet)
 	api.HandleFunc("/traces/{traceID}", h.TraceQueryHandler).Methods(http.MethodGet)
 
 	// OTLP HTTP receiver — replaces Grafana Agent / Datadog OTEL collector

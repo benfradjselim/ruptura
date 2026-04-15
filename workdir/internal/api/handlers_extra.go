@@ -8,10 +8,12 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/benfradjselim/ohe/internal/alerter"
+	"github.com/benfradjselim/ohe/internal/storage"
 	"github.com/benfradjselim/ohe/pkg/models"
 	"github.com/benfradjselim/ohe/pkg/utils"
 	"github.com/gorilla/mux"
@@ -434,4 +436,125 @@ func (h *Handlers) AlertRuleCreateHandler(w http.ResponseWriter, r *http.Request
 	respondJSON(w, http.StatusCreated, map[string]interface{}{
 		"success": true, "data": rule, "timestamp": time.Now().UTC(),
 	})
+}
+
+// AlertRuleUpdateHandler PUT /api/v1/alert-rules/{name}
+func (h *Handlers) AlertRuleUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	var rule struct {
+		Name      string  `json:"name"`
+		Metric    string  `json:"metric"`
+		Threshold float64 `json:"threshold"`
+		Severity  string  `json:"severity"`
+		Message   string  `json:"message"`
+	}
+	if err := decodeBody(r, &rule); err != nil {
+		respondError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		return
+	}
+	if rule.Name == "" {
+		rule.Name = name
+	}
+	if !h.alerter.UpdateRule(name, alerter.Rule{
+		Name:      rule.Name,
+		Metric:    rule.Metric,
+		Threshold: rule.Threshold,
+		Severity:  rule.Severity,
+		Message:   rule.Message,
+	}) {
+		respondError(w, http.StatusNotFound, "NOT_FOUND", "rule not found: "+name)
+		return
+	}
+	respondSuccess(w, rule)
+}
+
+// AlertRuleDeleteHandler DELETE /api/v1/alert-rules/{name}
+func (h *Handlers) AlertRuleDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if !h.alerter.DeleteRule(name) {
+		respondError(w, http.StatusNotFound, "NOT_FOUND", "rule not found: "+name)
+		return
+	}
+	respondSuccess(w, map[string]string{"deleted": name})
+}
+
+// TraceSearchHandler GET /api/v1/traces — search traces by service and time range
+func (h *Handlers) TraceSearchHandler(w http.ResponseWriter, r *http.Request) {
+	service := r.URL.Query().Get("service")
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50
+	if v, err := strconv.Atoi(limitStr); err == nil && v > 0 && v <= 500 {
+		limit = v
+	}
+	headers, err := h.store.QueryTraceList(service, limit)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "STORAGE_ERROR", err.Error())
+		return
+	}
+	if headers == nil {
+		headers = []storage.TraceHeader{}
+	}
+	respondSuccess(w, map[string]interface{}{"traces": headers, "total": len(headers)})
+}
+
+// LogStreamHandler GET /api/v1/logs/stream — Server-Sent Events tail of recent logs
+func (h *Handlers) LogStreamHandler(w http.ResponseWriter, r *http.Request) {
+	// SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	service := r.URL.Query().Get("service")
+	severity := r.URL.Query().Get("severity")
+	q := r.URL.Query().Get("q")
+
+	// Send a heartbeat immediately so the client knows the stream is live
+	fmt.Fprintf(w, "event: connected\ndata: {}\n\n")
+	flusher.Flush()
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	var lastSeen int64
+	ctx := r.Context()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			from := time.Unix(0, lastSeen)
+			if lastSeen == 0 {
+				from = time.Now().Add(-10 * time.Second)
+			}
+			to := time.Now()
+			raw, err := h.store.QueryLogs(service, from, to, 100)
+			if err != nil || len(raw) == 0 {
+				// send keepalive comment
+				fmt.Fprintf(w, ": keepalive\n\n")
+				flusher.Flush()
+				continue
+			}
+			for _, entry := range raw {
+				// Apply severity and query filters client-side (fast enough at tail rates)
+				s := string(entry)
+				if severity != "" && !strings.Contains(s, `"`+severity+`"`) {
+					continue
+				}
+				if q != "" && !strings.Contains(strings.ToLower(s), strings.ToLower(q)) {
+					continue
+				}
+				fmt.Fprintf(w, "data: %s\n\n", s)
+			}
+			lastSeen = to.UnixNano()
+			flusher.Flush()
+		}
+	}
 }
