@@ -1,20 +1,5 @@
 ---
-# PersistentVolumeClaim — Badger time-series data
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: ohe-data
-  namespace: ohe-system
-  labels:
-    app.kubernetes.io/name: ohe
-    app.kubernetes.io/component: central
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: 10Gi
-  # storageClassName: standard   # uncomment and set for your cluster
----
+# PVC is defined in pvc.yaml — apply that file first.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

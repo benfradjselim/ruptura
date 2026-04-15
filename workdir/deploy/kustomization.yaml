@@ -6,9 +6,11 @@ namespace: ohe-system
 resources:
   - rbac.yaml
   - configmap.yaml
+  - pvc.yaml              # must come before central-deployment.yaml
   - central-deployment.yaml
   - agent-daemonset.yaml
   - crd/oheclusters.yaml
+  - operator.yaml
 
 # Override image tag for a specific release
 images:
