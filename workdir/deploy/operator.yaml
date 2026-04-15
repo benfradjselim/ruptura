@@ -1,0 +1,72 @@
+---
+# OHE Operator — watches OHECluster CRDs and reconciles Deployments.
+# Apply after: crd/oheclusters.yaml and rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ohe-operator
+  namespace: ohe-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ohe-operator
+rules:
+- apiGroups: ["ohe.io"]
+  resources: ["oheclusters", "oheclusters/status"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["services", "configmaps", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ohe-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ohe-operator
+subjects:
+- kind: ServiceAccount
+  name: ohe-operator
+  namespace: ohe-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ohe-operator
+  namespace: ohe-system
+  labels:
+    app: ohe-operator
+    app.kubernetes.io/name: ohe
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/version: "4.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ohe-operator
+  template:
+    metadata:
+      labels:
+        app: ohe-operator
+        app.kubernetes.io/name: ohe
+        app.kubernetes.io/component: operator
+    spec:
+      serviceAccountName: ohe-operator
+      containers:
+      - name: ohe-operator
+        image: ghcr.io/benfradjselim/ohe-operator:4.0.0
+        imagePullPolicy: IfNotPresent
+        args: ["--interval=30s"]
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "32Mi"
+          limits:
+            cpu: "200m"
+            memory: "128Mi"
