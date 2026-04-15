@@ -67,6 +67,31 @@ func reconcileCentral(c *k8sClient, cluster OHECluster, image string) error {
 
 	rep := replicas(spec)
 
+	// Ensure PVC exists before creating the Deployment that references it.
+	pvc := PVC{
+		APIVersion: "v1",
+		Kind:       "PersistentVolumeClaim",
+		Metadata: ObjectMeta{
+			Name:      name + "-data",
+			Namespace: ns,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":       "ohe",
+				"app.kubernetes.io/component":  "central",
+				"app.kubernetes.io/managed-by": "ohe-operator",
+			},
+		},
+		Spec: PVCSpec{
+			AccessModes: []string{"ReadWriteOnce"},
+			Resources: map[string]interface{}{
+				"requests": map[string]string{"storage": "10Gi"},
+			},
+		},
+	}
+	pvcPath := fmt.Sprintf("/api/v1/namespaces/%s/persistentvolumeclaims/%s", ns, name+"-data")
+	if err := c.apply(pvcPath, pvc); err != nil {
+		return fmt.Errorf("reconcile PVC: %w", err)
+	}
+
 	dep := Deployment{
 		APIVersion: "apps/v1",
 		Kind:       "Deployment",
@@ -185,15 +210,15 @@ func reconcileAgent(c *k8sClient, cluster OHECluster, image string) error {
 					ServiceAccountName: "ohe-agent",
 					Containers: []Container{
 						{
-							Name:  "ohe-agent",
-							Image: image,
+							Name:    "ohe-agent",
+							Image:   image,
+							Command: []string{"/ohe", "agent"}, // override ENTRYPOINT (defaults to 'central')
 							Args: []string{
-								"agent",
 								"--central-url=" + central,
 								"--interval=15s",
 							},
 							Ports: []ContainerPort{
-								{Name: "http", ContainerPort: 8081, Protocol: "TCP"},
+								{Name: "http", ContainerPort: 8080, Protocol: "TCP"}, // OHE listens on 8080
 							},
 							LivenessProbe: &Probe{
 								HTTPGet:             HTTPGetAction{Path: "/api/v1/health/live", Port: "http"},

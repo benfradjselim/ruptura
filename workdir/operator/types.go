@@ -82,9 +82,23 @@ type PodSpec struct {
 	Volumes            []Volume    `json:"volumes,omitempty"`
 }
 
+// PVC is the minimal K8s PersistentVolumeClaim shape for reconciliation.
+type PVC struct {
+	APIVersion string     `json:"apiVersion"`
+	Kind       string     `json:"kind"`
+	Metadata   ObjectMeta `json:"metadata"`
+	Spec       PVCSpec    `json:"spec"`
+}
+
+type PVCSpec struct {
+	AccessModes []string               `json:"accessModes"`
+	Resources   map[string]interface{} `json:"resources"`
+}
+
 type Container struct {
 	Name            string               `json:"name"`
 	Image           string               `json:"image"`
+	Command         []string             `json:"command,omitempty"` // overrides ENTRYPOINT
 	Args            []string             `json:"args,omitempty"`
 	Ports           []ContainerPort      `json:"ports,omitempty"`
 	Env             []EnvVar             `json:"env,omitempty"`
