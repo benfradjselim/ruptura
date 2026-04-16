@@ -13,10 +13,14 @@
   let activeTab = null   // tab.id | null = show list
   let editId    = null   // dashboard id being edited
 
+  function uid() {
+    return Math.random().toString(36).slice(2) + Date.now().toString(36)
+  }
+
   function openDashboard(d) {
     const existing = openTabs.find(t => t.dashboardId === d.id)
     if (existing) { activeTab = existing.id; return }
-    const tab = { id: crypto.randomUUID(), name: d.name, dashboardId: d.id, reloadKey: 0 }
+    const tab = { id: uid(), name: d.name, dashboardId: d.id, reloadKey: 0 }
     openTabs  = [...openTabs, tab]
     activeTab = tab.id
   }
