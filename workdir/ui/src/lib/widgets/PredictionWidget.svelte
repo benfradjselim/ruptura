@@ -3,10 +3,10 @@
   import { api } from '../api.js'
   import { toFromParam } from '../stores/timeRange.js'
   import { humanise } from '../util/format.js'
-  import { buildPath, buildArea, buildTimeTicks, buildYLabels, buildHGridLines, buildVGridLines } from '../util/svgChart.js'
+  import { buildPath, buildArea, buildTimeTicks, buildForecastTicks, buildYLabels, buildHGridLines, buildVGridLines } from '../util/svgChart.js'
 
   export let widget = {}
-  export let timeRange = { preset: 60, from: null, to: null }
+  export let timeRange = { preset: 60, from: null, to: null, future: false }
   export let refreshTick = 0
 
   const W = 420, H = 120, PX = 38, PY = 10
@@ -47,13 +47,12 @@
       const preds = predRes?.data?.predictions || []
       prediction = preds.find(p => p.target === metric) || preds[0] || null
 
-      // Build simple forecast line: current value → predicted value over horizon
+      // Build forecast line: from now → now+horizon
       if (prediction && actualPts.length) {
-        const now   = Date.now()
-        const end   = now + horizon * 60_000
+        const now = Date.now()
         forecastPts = [
-          { t: actualPts[actualPts.length - 1].t, v: prediction.current },
-          { t: end, v: prediction.predicted },
+          { t: now, v: prediction.current },
+          { t: now + horizon * 60_000, v: prediction.predicted },
         ]
       }
     } catch (e) { error = e.message }
@@ -66,7 +65,11 @@
   const metricKey = widget.kpi || widget.metric || ''
 
   $: allPts      = [...actualPts, ...forecastPts]
-  $: ticks       = buildTimeTicks(allPts, W, PX)
+  // In future mode: ticks span only the forecast window (labels show future times)
+  // but are positioned in the full allPts coordinate space so they align with the chart.
+  $: ticks       = timeRange.future && forecastPts.length >= 2
+    ? buildForecastTicks(allPts, forecastPts, W, PX)
+    : buildTimeTicks(allPts, W, PX)
   $: yLabel      = buildYLabels(allPts, metricKey)
   $: hLines      = buildHGridLines(allPts, H, PY, 4)
   $: vLines      = buildVGridLines(allPts, W, PX)

@@ -57,6 +57,28 @@ export function buildTimeTicks(points, width, padX = 10) {
 }
 
 /**
+ * Build X-axis ticks for a forecast chart.
+ * Tick X positions are calculated in the full allPts coordinate space,
+ * but labels span only the forecastPts time window (future range).
+ */
+export function buildForecastTicks(allPts, forecastPts, width, padX = 10) {
+  if (!forecastPts || forecastPts.length < 2) return buildTimeTicks(allPts, width, padX)
+  const tMin   = Math.min(...allPts.map(p => p.t))
+  const tMax   = Math.max(...allPts.map(p => p.t))
+  const tRange = tMax - tMin || 1
+  const fMin   = forecastPts[0].t
+  const fMax   = forecastPts[forecastPts.length - 1].t
+  return [0, 0.33, 0.66, 1].map(frac => {
+    const t = fMin + frac * (fMax - fMin)
+    return {
+      x: padX + ((t - tMin) / tRange) * (width - 2 * padX),
+      label: new Date(t).toTimeString().slice(0, 5),
+      frac,
+    }
+  })
+}
+
+/**
  * Build Y-axis labels {min, mid, max} formatted for the given metric.
  * If metricName is provided, uses humanise() for correct units.
  */
