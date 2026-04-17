@@ -35,12 +35,15 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ohe-agent
-          image: ghcr.io/benfradjselim/ohe:4.0.0
-          imagePullPolicy: IfNotPresent
+          image: docker.io/library/ohe:latest
+          imagePullPolicy: Never
           command: ["/ohe", "agent"]   # override ENTRYPOINT which defaults to 'central'
           args:
             - --central-url=http://ohe-central.ohe-system.svc.cluster.local
             - --interval=15s
+          env:
+            - name: OHE_CENTRAL_URL
+              value: "http://10.43.59.23"   # ClusterIP fallback when CoreDNS unavailable
           env:
             - name: NODE_NAME
               valueFrom:
