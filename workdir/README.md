@@ -1,21 +1,48 @@
 # OHE — Observability Holistic Engine
 
-**Version 4.4.0** · Self-hosted · Kubernetes-native · ML-powered predictive alerting
+<p align="center">
+  <img src="https://img.shields.io/badge/version-4.4.0-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/go-1.22+-00ADD8?style=for-the-badge&logo=go" alt="Go">
+  <img src="https://img.shields.io/badge/kubernetes-native-326CE5?style=for-the-badge&logo=kubernetes" alt="Kubernetes">
+  <img src="https://img.shields.io/badge/ML--powered-predictions-FF6B35?style=for-the-badge" alt="ML Powered">
+  <img src="https://img.shields.io/badge/single%20binary-no%20deps-success?style=for-the-badge" alt="Single Binary">
+</p>
 
-OHE is a production-grade observability platform that predicts infrastructure failures before they happen. It replaces Grafana + Prometheus + Alertmanager + Loki with a single binary and an embedded UI — no external databases required.
+<p align="center">
+  <strong>Predict infrastructure failures before they happen — hours ahead, not seconds after.</strong><br>
+  Replace Grafana + Prometheus + Alertmanager + Loki with a <em>single binary</em>. No databases. No setup headaches.
+</p>
 
 ---
 
-## Why OHE
+## Why OHE?
 
-| Pain point | OHE solution |
+> Most observability tools tell you what **broke**. OHE tells you what **will break**.
+
+| Pain Point | OHE Solution |
 |-----------|-------------|
-| Tools tell you what *broke* | OHE tells you what *will break* — hours ahead |
-| 5+ tools to install and wire together | 1 binary, 1 `kubectl apply` |
-| Alert fatigue from threshold-based rules | ML-scored KPIs with dynamic thresholds |
-| Data expires after days | 3-tier retention: 7 days raw → 35 days 5-min → 400 days 1-hour |
-| No SLO tracking without expensive SaaS | Built-in error budget + burn rate engine |
-| Teams need separate dashboards | Multi-tenant orgs with RBAC |
+| Alert fatigue from noisy thresholds | ML-scored KPIs with dynamic, self-adjusting thresholds |
+| 5+ tools to install, wire, and maintain | **1 binary**, `1 kubectl apply`, done |
+| Data expires after a few days | **3-tier retention**: 7 days raw → 35 days 5-min → 400 days 1-hour |
+| No SLO tracking without expensive SaaS | Built-in SLO engine: compliance %, burn rate, error budget |
+| Teams sharing one dashboard namespace | Multi-tenant orgs with role-based access control |
+| Grafana dashboards take hours to build | **20 production-ready templates** — deploy in 30 seconds |
+| Can't forecast capacity before it's too late | ML predictions: CPU/memory exhaustion hours ahead |
+
+---
+
+## What's New in v4.4.0
+
+> Full changelog at the [bottom of this document](#changelog).
+
+| Feature | Description |
+|---------|-------------|
+| **SLO / Error Budget Engine** | Define SLO targets, track compliance %, burn rate, remaining budget |
+| **Widget Resize** | Drag-to-resize widgets (◀ ▶ ▲ ▼) on a 4-column grid |
+| **Gauge Redesign** | 300° arc gauge, color-inverted for stress/fatigue KPIs |
+| **6 New Templates** | Executive Health Board, Capacity Planning, SRE Golden Signals, Full-Stack App, Network Monitor, Predictions Panorama |
+| **20 Built-in Templates Total** | Cover every standard ops use case out of the box |
 
 ---
 
@@ -24,15 +51,15 @@ OHE is a production-grade observability platform that predicts infrastructure fa
 ### Prerequisites
 - Kubernetes cluster (k3s, EKS, GKE, AKS, or local)
 - `kubectl` configured
-- `docker` or equivalent to build the image
+- `docker` (or compatible runtime) to build the image
 
-### Step 1 — Build the image
+### Step 1 — Build
 
 ```bash
 git clone https://github.com/benfradjselim/Mlops_crew_automation.git
 cd Mlops_crew_automation/workdir
 
-# Build UI + Go binary
+# Build the Svelte UI then the Go binary
 cd ui && npm install && npm run build && cd ..
 docker build -t ohe:latest .
 ```
@@ -41,53 +68,45 @@ For a private registry:
 ```bash
 docker tag ohe:latest your-registry/ohe:4.4.0
 docker push your-registry/ohe:4.4.0
-# Update image field in deploy/central-deployment.yaml
+# Update the image field in deploy/central-deployment.yaml
 ```
 
-### Step 2 — Deploy to Kubernetes
+### Step 2 — Deploy
 
 ```bash
-# Create namespace and persistent storage
-kubectl apply -f deploy/pvc.yaml
-
-# Secrets, config, and RBAC
-kubectl apply -f deploy/secrets.yaml
-kubectl apply -f deploy/configmap.yaml
-kubectl apply -f deploy/rbac.yaml
-
-# Central server
-kubectl apply -f deploy/central-deployment.yaml
-
-# Agent DaemonSet (collects metrics from every node)
-kubectl apply -f deploy/agent-daemonset.yaml
+kubectl apply -f deploy/pvc.yaml               # Persistent storage
+kubectl apply -f deploy/secrets.yaml           # Secrets
+kubectl apply -f deploy/configmap.yaml         # Runtime config
+kubectl apply -f deploy/rbac.yaml              # RBAC for agent DaemonSet
+kubectl apply -f deploy/central-deployment.yaml # Central server
+kubectl apply -f deploy/agent-daemonset.yaml   # Agent on every node
 ```
 
-### Step 3 — Get your credentials
+### Step 3 — Get credentials
 
 ```bash
 kubectl logs -n ohe-system deploy/ohe-central | grep -A4 "FIRST BOOT"
 ```
 
-Output:
 ```
 ║  Username : admin
 ║  Password : <auto-generated>
 ```
 
-Force a specific password:
+Override the password:
 ```bash
 kubectl set env deployment/ohe-central -n ohe-system OHE_ADMIN_PASSWORD=YourPassword123
 ```
 
-### Step 4 — Access the UI
+### Step 4 — Open the UI
 
-**Option A — Port-forward (local / development)**
+**Local / development**
 ```bash
 kubectl port-forward svc/ohe-central 8080:80 -n ohe-system
 # Open http://localhost:8080
 ```
 
-**Option B — Ingress (production)**
+**Production — Ingress**
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -108,10 +127,10 @@ spec:
               number: 80
 ```
 
-**Option C — LoadBalancer**
+**Production — LoadBalancer**
 ```bash
 kubectl patch svc ohe-central -n ohe-system -p '{"spec":{"type":"LoadBalancer"}}'
-kubectl get svc ohe-central -n ohe-system  # wait for EXTERNAL-IP
+kubectl get svc ohe-central -n ohe-system   # wait for EXTERNAL-IP
 ```
 
 ---
@@ -142,21 +161,20 @@ docker compose up -d
 
 ## Configuration
 
-All configuration is done via environment variables — no config file required.
+All configuration is done via environment variables — no YAML config file needed.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OHE_ADMIN_PASSWORD` | random (printed at boot) | Admin password. Set to override auto-generation |
-| `OHE_TRUSTED_DATASOURCE_HOSTS` | — | Comma-separated IPs/hostnames that bypass the SSRF check (e.g. Prometheus ClusterIP) |
-| `OHE_JWT_SECRET` | `change-me-in-production` | JWT signing secret. **Must be changed in production** |
-| `OHE_AUTH_ENABLED` | `false` | Set to `true` to enforce JWT authentication |
+| `OHE_ADMIN_PASSWORD` | auto-generated (printed at boot) | Override the admin password |
+| `OHE_AUTH_ENABLED` | `false` | Set `true` to enforce JWT authentication |
+| `OHE_JWT_SECRET` | `change-me-in-production` | JWT signing secret — **must be changed in production** |
+| `OHE_TRUSTED_DATASOURCE_HOSTS` | — | Comma-separated IPs/hostnames that bypass the SSRF check |
 | `OHE_PORT` | `8080` | HTTP listen port |
 | `OHE_STORAGE_PATH` | `/var/lib/ohe/data` | BadgerDB data directory |
 | `OHE_COLLECT_INTERVAL` | `15s` | Metric collection interval |
-| `OHE_DOGSTATSD_ADDR` | `:8125` | DogStatsD UDP listener address |
+| `OHE_DOGSTATSD_ADDR` | `:8125` | DogStatsD UDP listener |
 
-### Enabling authentication (production)
-
+**Enable authentication (production)**
 ```bash
 kubectl set env deployment/ohe-central -n ohe-system \
   OHE_AUTH_ENABLED=true \
@@ -169,15 +187,15 @@ kubectl set env deployment/ohe-central -n ohe-system \
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        ohe-central                           │
-│                                                              │
-│   collector → processor → analyzer → alerter → notifier     │
-│                  ↓             ↓          ↓                  │
-│             BadgerDB       predictor   SLO engine            │
-│           (3-tier store)       ↓           ↓                 │
-│                  ↓          REST API ── WebSocket hub        │
-│            retention            ↓                            │
-│           compaction       Svelte UI (embedded, no CDN)      │
+│                        ohe-central                          │
+│                                                             │
+│   collector → processor → analyzer → alerter → notifier    │
+│                  ↓             ↓          ↓                 │
+│             BadgerDB       predictor   SLO engine           │
+│           (3-tier store)       ↓           ↓                │
+│                  ↓          REST API ── WebSocket hub       │
+│            retention            ↓                           │
+│           compaction       Svelte UI (embedded, no CDN)     │
 └─────────────────────────────────────────────────────────────┘
          ↑                           ↑
     ohe-agent                   Prometheus / OTLP / Loki
@@ -185,11 +203,15 @@ kubectl set env deployment/ohe-central -n ohe-system \
   1 per node)
 ```
 
-**Key design decisions:**
-- **Single binary** — Go binary with Svelte UI embedded via `embed.FS`. No Node.js at runtime
-- **BadgerDB** — embedded key-value store. No external database required
-- **3-tier retention** — raw → 5-min rollups → 1-hour rollups, all in BadgerDB
-- **Agent mode** — the same binary runs as a lightweight DaemonSet agent that pushes metrics to central
+**Key design decisions**
+
+| Decision | Rationale |
+|---------|-----------|
+| Single Go binary | No runtime dependencies, minimal container image, simple upgrades |
+| BadgerDB embedded | Zero external database — survives network partitions, works offline |
+| 3-tier retention | 400-day history without unbounded storage growth |
+| Svelte UI via `embed.FS` | No CDN, works air-gapped, ships as part of the binary |
+| Agent = same binary | One image to build, one image to maintain |
 
 ---
 
@@ -202,56 +224,78 @@ kubectl set env deployment/ohe-central -n ohe-system \
 - **Distributed traces** — trace search and span viewer (APM)
 - **Topology graph** — service dependency map built from traces
 
-### Intelligence
+### Intelligence & ML
 - **10 Holistic KPIs** — stress, fatigue, mood, pressure, humidity, contagion, resilience, entropy, velocity, health_score
 - **ML forecasting** — exponential smoothing + trend extrapolation. Predicts CPU/memory exhaustion hours ahead
 - **SLO / Error Budget** — define targets, track compliance %, burn rate, remaining budget minutes
 - **Predictive dashboards** — switch any dashboard to "Next 1h / 6h / 24h" forecast mode
 
 ### Dashboards & UI
-- **20 built-in templates** — system, KPI, security, SRE, capacity planning, executive, and more
-- **Widget types** — timeseries, gauge, stat, KPI card, prediction, alerts, top-N, PromQL query, SLO status
-- **Widget resize** — drag to reorder, resize (w × h) in edit mode
+- **20 built-in templates** — system overview, KPI panorama, security, SRE golden signals, capacity planning, executive health board, predictions panorama, and more
+- **Widget types** — timeseries, gauge (300° arc), stat card, KPI card, prediction chart, alert feed, top-N table, PromQL query, SLO status
+- **Widget resize** — ◀ ▶ ▲ ▼ controls in edit mode; size stored as `w × h` on a 4-column grid
 - **Dashboard tabs** — multiple dashboards in a single tabbed view
-- **Live refresh** — configurable auto-refresh (5s to 5m)
+- **Live refresh** — configurable auto-refresh from 5 seconds to 5 minutes
 
 ### Alerting
-- **Rule engine** — threshold and KPI-based alert rules with severity levels (info / warning / critical / emergency)
-- **Delivery channels** — webhook, Slack, PagerDuty with severity filtering and custom headers
+- **Rule engine** — threshold and KPI-based rules with severity: info / warning / critical / emergency
+- **Delivery channels** — webhook, Slack, PagerDuty with per-severity filtering and custom headers
 - **Alert lifecycle** — active → acknowledged → silenced → resolved
-- **Test endpoint** — fire a live test payload to any channel
+- **Test endpoint** — fire a live test payload to any channel instantly
 
 ### Multi-tenancy & Access Control
-- **Organisations** — tenant workspaces with slug-based identification
-- **RBAC** — admin / operator / viewer roles enforced at the API level
+- **Organisations** — isolated tenant workspaces with slug-based identification
+- **RBAC** — admin / operator / viewer roles enforced at API level
 - **User management** — create, assign to org, delete via API or UI
-- **JWT authentication** — stateless, configurable secret
+- **JWT authentication** — stateless, org-aware, configurable secret
 
-### Data Ingestion (protocol compatibility)
-| Protocol | Endpoint | Use case |
-|---------|---------|---------|
+### Data Ingestion — Protocol Compatibility
+
+| Protocol | Endpoint | Compatible With |
+|---------|---------|----------------|
 | Native agent | `POST /api/v1/ingest` | OHE DaemonSet agent |
-| Prometheus | `GET /metrics` | Prometheus scrape target |
-| OTLP HTTP | `POST /otlp/v1/traces`, `/metrics`, `/logs` | OpenTelemetry |
+| Prometheus | `GET /metrics` | Prometheus, VictoriaMetrics |
+| OTLP HTTP | `POST /otlp/v1/{traces,metrics,logs}` | OpenTelemetry Collector |
 | Loki | `POST /loki/api/v1/push` | Grafana Agent, Promtail |
-| Elasticsearch | `POST /_bulk`, `/{index}/_bulk` | Filebeat, Vector, Logstash |
+| Elasticsearch | `POST /_bulk` | Filebeat, Vector, Logstash |
 | Datadog | `POST /api/v1/series`, `/api/v2/logs` | Datadog Agent |
 | DogStatsD | UDP `:8125` | StatsD, DogStatsD |
 
 ### Storage & Retention
-| Tier | Prefix | Retention | Resolution |
-|------|--------|-----------|------------|
-| Raw | `m:` / `k:` | 7 days | As-collected |
-| 5-min rollup | `r5:` / `kr5:` | 35 days | 5-min average |
+
+| Tier | Key Prefix | Retention | Resolution |
+|------|-----------|-----------|------------|
+| Raw | `m:` / `k:` | 7 days | As-collected (~15s) |
+| 5-min rollup | `r5:` / `kr5:` | 35 days | 5-minute average |
 | 1-hour rollup | `r1h:` / `kr1h:` | 400 days | 1-hour average |
 
-Compaction runs automatically every 30 minutes in the background.
+Compaction runs automatically every 30 minutes in the background. Trigger on-demand: `POST /api/v1/retention/compact`.
+
+---
+
+## Dashboard Templates
+
+OHE ships 20 production-ready dashboard templates. Apply any in one click:
+
+| Template | Description |
+|---------|-------------|
+| `system-overview` | CPU, memory, disk, network, load |
+| `kpi-panorama` | All 10 holistic KPIs with gauges |
+| `predictions-panorama` | ML forecast charts for every metric |
+| `sre-golden-signals` | Latency, traffic, errors, saturation |
+| `executive-health-board` | Single-pane executive summary |
+| `capacity-planning` | Trend extrapolation for resource planning |
+| `full-stack-app` | App + infra + logs in one view |
+| `network-monitor` | Bandwidth, packet loss, interface health |
+| `security-overview` | Auth events, anomaly scores, access patterns |
+| `alert-center` | Active alerts + rule inventory |
+| + 10 more | Logs, APM, containers, SLO tracker, and custom |
 
 ---
 
 ## API Reference
 
-All endpoints are prefixed with `/api/v1`. Authentication via `Authorization: Bearer <jwt>`.
+All endpoints are prefixed `/api/v1`. Authentication: `Authorization: Bearer <jwt>`.
 
 ### System
 ```
@@ -263,15 +307,15 @@ GET  /config                Runtime configuration
 
 ### Metrics & KPIs
 ```
-GET  /metrics               Current metric snapshot (all hosts)
-GET  /metrics/{name}        Time-series range (?from=&to=&host=)
-GET  /metrics/{name}/range  Tiered range query (auto-selects tier by window)
-GET  /metrics/{name}/aggregate  Aggregation (?agg=avg|min|max|p95)
-GET  /kpis                  Holistic KPI snapshot
-GET  /kpis/{name}           Single KPI value
-GET  /kpis/{name}/predict   KPI forecast
-GET  /predict               ML forecast (?host=&horizon=120&metric=)
-POST /query                 QQL metric query {query, from, to, step_seconds}
+GET  /metrics                     Current snapshot (all hosts)
+GET  /metrics/{name}              Time-series range (?from=&to=&host=)
+GET  /metrics/{name}/range        Tiered range query (auto-selects tier)
+GET  /metrics/{name}/aggregate    Aggregation (?agg=avg|min|max|p95)
+GET  /kpis                        Holistic KPI snapshot
+GET  /kpis/{name}                 Single KPI value
+GET  /kpis/{name}/predict         KPI forecast
+GET  /predict                     ML forecast (?host=&horizon=120&metric=)
+POST /query                       QQL query {query, from, to, step_seconds}
 ```
 
 ### SLOs
@@ -282,55 +326,55 @@ GET  /slos/{id}             Get SLO definition
 PUT  /slos/{id}             Update SLO
 DEL  /slos/{id}             Delete SLO
 GET  /slos/status           Live status for all SLOs
-GET  /slos/{id}/status      Live status: compliance, burn rate, error budget
+GET  /slos/{id}/status      Compliance %, burn rate, error budget
 ```
 
 ### Dashboards & Templates
 ```
-GET  /dashboards            List dashboards
-POST /dashboards            Create dashboard
-GET  /dashboards/{id}       Get dashboard
-PUT  /dashboards/{id}       Update dashboard  [operator]
-DEL  /dashboards/{id}       Delete dashboard  [operator]
-GET  /dashboards/{id}/export  Export as JSON
-POST /dashboards/import     Import from JSON  [operator]
-GET  /templates             List 20 built-in templates
-GET  /templates/{id}        Get template definition
-POST /templates/{id}/apply  Instantiate template as dashboard  [operator]
+GET  /dashboards               List dashboards
+POST /dashboards               Create dashboard
+GET  /dashboards/{id}          Get dashboard
+PUT  /dashboards/{id}          Update dashboard  [operator]
+DEL  /dashboards/{id}          Delete dashboard  [operator]
+GET  /dashboards/{id}/export   Export as JSON
+POST /dashboards/import        Import from JSON  [operator]
+GET  /templates                List 20 built-in templates
+GET  /templates/{id}           Get template definition
+POST /templates/{id}/apply     Instantiate template as dashboard  [operator]
 ```
 
 ### Alerts
 ```
-GET  /alerts                List alerts (?active=true&severity=critical)
-GET  /alerts/{id}           Get alert
-DEL  /alerts/{id}           Delete alert  [operator]
+GET  /alerts                         List alerts (?active=true&severity=critical)
+GET  /alerts/{id}                    Get alert
+DEL  /alerts/{id}                    Delete alert  [operator]
 POST /alerts/{id}/acknowledge
 POST /alerts/{id}/silence
-GET  /alert-rules           List alert rules
-POST /alert-rules           Create rule  [operator]
-PUT  /alert-rules/{name}    Update rule  [operator]
-DEL  /alert-rules/{name}    Delete rule  [operator]
+GET  /alert-rules                    List rules
+POST /alert-rules                    Create rule  [operator]
+PUT  /alert-rules/{name}             Update rule  [operator]
+DEL  /alert-rules/{name}             Delete rule  [operator]
 ```
 
 ### Notifications
 ```
-GET  /notifications         List channels
-POST /notifications         Create channel {name, type, url, severities}  [operator]
-GET  /notifications/{id}    Get channel
-PUT  /notifications/{id}    Update channel  [operator]
-DEL  /notifications/{id}    Delete channel  [operator]
-POST /notifications/{id}/test  Fire test payload  [operator]
+GET  /notifications             List channels
+POST /notifications             Create channel {name, type, url, severities}  [operator]
+GET  /notifications/{id}        Get channel
+PUT  /notifications/{id}        Update  [operator]
+DEL  /notifications/{id}        Delete  [operator]
+POST /notifications/{id}/test   Fire test payload  [operator]
 ```
 
-### Datasources & Proxy
+### Datasources & PromQL Proxy
 ```
-GET  /datasources           List datasources
-POST /datasources           Register datasource  [operator]
-GET  /datasources/{id}      Get datasource
-PUT  /datasources/{id}      Update datasource  [operator]
-DEL  /datasources/{id}      Delete datasource  [operator]
-POST /datasources/{id}/test Test connectivity  [operator]
-POST /datasources/{id}/proxy  Proxy PromQL query {query, start, end, step, type}
+GET  /datasources               List datasources
+POST /datasources               Register datasource  [operator]
+GET  /datasources/{id}          Get datasource
+PUT  /datasources/{id}          Update  [operator]
+DEL  /datasources/{id}          Delete  [operator]
+POST /datasources/{id}/test     Test connectivity  [operator]
+POST /datasources/{id}/proxy    Proxy PromQL query {query, start, end, step, type}
 ```
 
 ### Multi-tenancy
@@ -338,15 +382,15 @@ POST /datasources/{id}/proxy  Proxy PromQL query {query, start, end, step, type}
 GET  /orgs                  List organisations
 POST /orgs                  Create org {name, slug, description}  [operator]
 GET  /orgs/{id}             Get org
-PUT  /orgs/{id}             Update org  [operator]
-DEL  /orgs/{id}             Delete org  [operator]
+PUT  /orgs/{id}             Update  [operator]
+DEL  /orgs/{id}             Delete  [operator]
 GET  /orgs/{id}/members     List org members
 POST /orgs/{id}/members     Invite user to org  [operator]
 ```
 
 ### Auth & Users
 ```
-POST /auth/setup            First-run admin creation (only when no users exist)
+POST /auth/setup            First-run admin creation
 POST /auth/login            Login → JWT {username, password}
 POST /auth/logout
 POST /auth/refresh
@@ -359,13 +403,13 @@ PUT  /auth/users/{id}/org   Assign user to org  [admin]
 
 ### Retention & Fleet
 ```
-GET  /retention/stats       Data point counts per storage tier
+GET  /retention/stats       Data point counts per tier
 POST /retention/compact     Trigger on-demand downsampling  [operator]
 GET  /fleet                 Aggregated health across all hosts
 GET  /kpis/multi            KPI snapshot for multiple hosts
 ```
 
-### Observability Endpoints (outside /api/v1)
+### Ingest Endpoints (outside /api/v1)
 ```
 GET  /metrics                    Prometheus exposition format
 POST /otlp/v1/traces             OTLP traces
@@ -373,7 +417,7 @@ POST /otlp/v1/metrics            OTLP metrics
 POST /otlp/v1/logs               OTLP logs
 POST /loki/api/v1/push           Loki log push
 GET  /loki/api/v1/query_range    Loki query
-POST /_bulk                      Elasticsearch bulk
+POST /_bulk                      Elasticsearch bulk ingest
 POST /api/v1/series              Datadog metrics
 POST /api/v2/logs                Datadog logs
 ```
@@ -382,48 +426,50 @@ POST /api/v2/logs                Datadog logs
 
 ## Changelog
 
-### v4.4.0
-- **SLO / Error Budget engine** — define targets, track compliance, burn rate and remaining budget per SLO
-- **SLO widget** (`type: "slo"`) and full SLOs management page
-- **Gauge widget redesign** — 300° arc, responsive, color-inverted for stress/fatigue
-- **Widget resize** — ◀ ▶ ▲ ▼ in edit mode, stored as `w` × `h` on 4-column grid
-- **6 new templates** — Executive Health Board, Capacity Planning, Full-Stack Application, Network Monitor, SRE Golden Signals, Predictions Panorama (20 templates total)
-- Clean README rewrite with standardised deployment guide
+### v4.4.0 — SLOs, Resize, 20 Templates
+- **SLO / Error Budget engine** — define targets, track compliance %, burn rate, remaining budget per SLO
+- **SLO widget** (`type: "slo"`) and full SLO management page in the UI
+- **Gauge redesign** — 300° arc, responsive, color-inverted for stress/fatigue KPIs
+- **Widget resize** — ◀ ▶ ▲ ▼ controls in edit mode, stored as `w × h` on a 4-column grid
+- **6 new dashboard templates** — Executive Health Board, Capacity Planning, Full-Stack App, Network Monitor, SRE Golden Signals, Predictions Panorama (20 templates total)
 
-### v4.3.0
+### v4.3.0 — Long-Term Retention + Full RBAC
 - **3-tier retention** — raw (7d) → 5-min rollups (35d) → 1-hour rollups (400d)
-- Automatic compaction goroutine (30-min interval) and on-demand `POST /retention/compact`
-- `GET /metrics/{name}/range` auto-selects tier by query window
-- **Full RBAC** — `org_id` on users, dashboards, datasources; user→org assignment API
+- Automatic compaction goroutine (30-min interval) + on-demand `POST /retention/compact`
+- `GET /metrics/{name}/range` auto-selects the correct tier by query window
+- **Full RBAC** — `org_id` on users, dashboards, and datasources; JWT carries org context
 - Org member management (`GET/POST /orgs/{id}/members`)
 
-### v4.2.0
-- **PromQL passthrough** — `POST /datasources/{id}/proxy` proxies queries to Prometheus/Thanos/VictoriaMetrics
+### v4.2.0 — PromQL Passthrough + Multi-tenancy
+- **PromQL passthrough** — `POST /datasources/{id}/proxy` proxies to Prometheus/Thanos/VictoriaMetrics
 - **Query widget** (`type: "query"`) — live PromQL results table in any dashboard
 - **Organisations API** — full CRUD with slug auto-generation and BadgerDB persistence
 
-### v4.1.0
-- **Alert delivery** — webhook, Slack, PagerDuty channels wired end-to-end with severity filtering
-- **Kubernetes DaemonSet agent** — ships real host metrics (CPU, memory, disk, network) to central
-- **Datasource SSRF hardening** — cluster-internal hostnames allowed; `OHE_TRUSTED_DATASOURCE_HOSTS` env var for explicit ClusterIPs
+### v4.1.0 — Alert Delivery + Kubernetes Agent
+- **Alert delivery** — webhook, Slack, PagerDuty wired end-to-end with severity filtering
+- **Kubernetes DaemonSet agent** — real host metrics (CPU, memory, disk, network) pushed to central
+- **Datasource SSRF hardening** — `OHE_TRUSTED_DATASOURCE_HOSTS` for cluster-internal Prometheus
 
-### v4.0.0
-- Initial release: system metrics, holistic KPIs, ML forecasting, REST API, WebSocket feed, embedded Svelte UI, dashboard templates, alert rules engine, Prometheus exposition, OTLP/Loki/Elasticsearch/Datadog ingestion, DogStatsD, JWT auth, BadgerDB storage, Kubernetes operator
+### v4.0.0 — Initial Release
+- System metrics, 10 holistic KPIs, ML forecasting, REST API, WebSocket live feed
+- Embedded Svelte UI, 14 dashboard templates, alert rules engine
+- Prometheus exposition, OTLP / Loki / Elasticsearch / Datadog ingestion, DogStatsD
+- JWT authentication, BadgerDB storage, Kubernetes operator
 
 ---
 
 ## Security Checklist (production)
 
 - [ ] Set `OHE_AUTH_ENABLED=true`
-- [ ] Set a strong `OHE_JWT_SECRET` (32+ random bytes)
+- [ ] Set a strong `OHE_JWT_SECRET` (minimum 32 random bytes)
 - [ ] Change the default admin password
-- [ ] Set `OHE_TRUSTED_DATASOURCE_HOSTS` to your Prometheus ClusterIP if using internal datasources
+- [ ] Set `OHE_TRUSTED_DATASOURCE_HOSTS` to your Prometheus ClusterIP
 - [ ] Mount a PVC at `/var/lib/ohe/data` for persistent storage
-- [ ] Restrict the `ohe-system` namespace with NetworkPolicy
-- [ ] Use TLS termination at the Ingress layer
+- [ ] Restrict `ohe-system` namespace with NetworkPolicy
+- [ ] Terminate TLS at the Ingress layer — never expose port 8080 directly
 
 ---
 
 ## License
 
-MIT — free to use, modify and deploy. Contributions welcome.
+MIT — free to use, modify, and deploy. Contributions welcome.
