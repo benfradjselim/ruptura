@@ -12,12 +12,14 @@
   import AlertRules   from './pages/AlertRules.svelte'
   import Datasources  from './pages/Datasources.svelte'
   import Orgs         from './pages/Orgs.svelte'
+  import SLOs         from './pages/SLOs.svelte'
   import { api }      from './lib/api.js'
   import { SECURITY_TEMPLATE } from './lib/templates/security.js'
 
   // SVG icon paths (Lucide-style)
   const NAV_ICONS = {
     orgs:            'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
+    slos:            'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
     dashboard:       'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2zM9 22V12h6v10',
     fleet:           'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
     dashboards:      'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
@@ -51,6 +53,7 @@
       items: [
         { id: 'alerts',      label: 'Alerts'      },
         { id: 'alert-rules', label: 'Alert Rules' },
+        { id: 'slos',        label: 'SLOs'        },
       ],
     },
     {
@@ -142,6 +145,8 @@
         <Datasources />
       {:else if $currentPage === 'orgs'}
         <Orgs />
+      {:else if $currentPage === 'slos'}
+        <SLOs />
       {/if}
     </main>
   </div>

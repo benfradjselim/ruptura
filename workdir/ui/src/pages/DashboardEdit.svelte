@@ -82,6 +82,15 @@
     dragSrc = -1
   }
 
+  function resizeWidget(idx, dw, dh) {
+    const ws = [...dashboard.widgets]
+    const w = { ...ws[idx] }
+    w.w = Math.min(4, Math.max(1, (w.w || 1) + dw))
+    w.h = Math.min(4, Math.max(1, (w.h || 1) + dh))
+    ws[idx] = w
+    dashboard.widgets = ws
+  }
+
   async function save() {
     saving = true; success = ''; error = ''
     try {
@@ -133,6 +142,10 @@
             <span class="type-badge">{reg.icon} {reg.label}</span>
             <span class="de-wtitle">{widget.title || reg.label}</span>
             <div class="de-card-actions">
+              <button title="Narrower (w-1)"  on:click={() => resizeWidget(idx, -1, 0)} disabled={(dashboard.widgets[idx].w||1) <= 1}>◀</button>
+              <button title="Wider (w+1)"     on:click={() => resizeWidget(idx,  1, 0)} disabled={(dashboard.widgets[idx].w||1) >= 4}>▶</button>
+              <button title="Shorter (h-1)"   on:click={() => resizeWidget(idx,  0,-1)} disabled={(dashboard.widgets[idx].h||1) <= 1}>▲</button>
+              <button title="Taller (h+1)"    on:click={() => resizeWidget(idx,  0, 1)} disabled={(dashboard.widgets[idx].h||1) >= 4}>▼</button>
               <button title="Move up"   on:click={() => moveUp(idx)}>↑</button>
               <button title="Move down" on:click={() => moveDown(idx)}>↓</button>
               <button title="Edit"      on:click={() => openEdit(idx)}>✏</button>
@@ -143,7 +156,7 @@
             {#if widget.metric}<span class="meta-chip">metric: {widget.metric}</span>{/if}
             {#if widget.kpi}   <span class="meta-chip">kpi: {widget.kpi}</span>{/if}
             {#if widget.host}  <span class="meta-chip">host: {widget.host}</span>{/if}
-            {#if widget.w}     <span class="meta-chip">{widget.w}×{widget.h || 1}</span>{/if}
+            <span class="meta-chip size-chip">{widget.w||1}w × {widget.h||1}h</span>
           </div>
         </div>
       {/each}
@@ -212,4 +225,5 @@
 
   .de-card-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .meta-chip { font-size: 0.7rem; color: #64748b; background: #0f172a; padding: 2px 6px; border-radius: 4px; }
+  .size-chip { color: #38bdf8; border: 1px solid #0284c730; }
 </style>

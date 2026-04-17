@@ -104,7 +104,7 @@
         {@const ew  = effectiveWidget(widget)}
         <div
           class="widget-card"
-          style={widget.w ? `grid-column: span ${Math.min(widget.w, 3)}` : ''}
+          style="grid-column: span {Math.min(widget.w || 1, 4)}; {widget.h && widget.h > 1 ? `grid-row: span ${widget.h};` : ''}"
         >
           <div class="widget-header">
             <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -185,8 +185,15 @@
   /* ── Widget Grid ─────────────────────────────────────────────────────────── */
   .widget-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: minmax(180px, auto);
     gap: 1rem;
+  }
+  @media (max-width: 900px) {
+    .widget-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 500px) {
+    .widget-grid { grid-template-columns: 1fr; }
   }
 
   .widget-card {
@@ -196,6 +203,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     transition: border-color 0.15s, box-shadow 0.15s;
   }
   .widget-card:hover {
@@ -221,5 +229,5 @@
     padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
   }
 
-  .widget-body  { padding: 10px 12px 12px; flex: 1; }
+  .widget-body  { padding: 10px 12px 12px; flex: 1; min-height: 0; overflow: auto; }
 </style>

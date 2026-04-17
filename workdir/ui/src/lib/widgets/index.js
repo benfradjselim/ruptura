@@ -7,6 +7,7 @@ import PredictionWidget  from './PredictionWidget.svelte'
 import AlertsWidget      from './AlertsWidget.svelte'
 import TopNWidget        from './TopNWidget.svelte'
 import QueryWidget       from './QueryWidget.svelte'
+import SLOWidget         from './SLOWidget.svelte'
 
 // SVG paths (Lucide-style, viewBox 0 0 24 24, stroke-based)
 export const WIDGET_SVG = {
@@ -18,6 +19,7 @@ export const WIDGET_SVG = {
   alerts:     'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
   topn:       'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   query:      'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7',
+  slo:        'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z',
 }
 
 export const WIDGET_TYPES = {
@@ -76,6 +78,13 @@ export const WIDGET_TYPES = {
     icon: WIDGET_SVG.query,
     defaults: { title: 'PromQL', options: { datasource_id: '', query: '', range: '1h', step: 15 } },
     fields: ['title', 'datasource_id', 'query', 'range', 'step'],
+  },
+  slo: {
+    component: SLOWidget,
+    label: 'SLO Status',
+    icon: WIDGET_SVG.slo,
+    defaults: { title: 'SLO', options: { slo_id: '' } },
+    fields: ['title', 'slo_id'],
   },
 }
 

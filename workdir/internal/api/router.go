@@ -129,6 +129,15 @@ func NewRouter(h *Handlers, jwtSecret string, authEnabled bool, allowedOrigins [
 	// Prometheus exposition — served at /metrics (outside /api/v1 prefix for standard compat)
 	r.HandleFunc("/metrics", h.PrometheusMetricsHandler).Methods(http.MethodGet)
 
+	// SLOs (status must come before {id} to avoid route shadowing)
+	api.HandleFunc("/slos/status", h.SLOAllStatusHandler).Methods(http.MethodGet)
+	api.HandleFunc("/slos", h.SLOListHandler).Methods(http.MethodGet)
+	api.Handle("/slos", operatorOnly(http.HandlerFunc(h.SLOCreateHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/slos/{id}", h.SLOGetHandler).Methods(http.MethodGet)
+	api.Handle("/slos/{id}", operatorOnly(http.HandlerFunc(h.SLOUpdateHandler))).Methods(http.MethodPut)
+	api.Handle("/slos/{id}", operatorOnly(http.HandlerFunc(h.SLODeleteHandler))).Methods(http.MethodDelete)
+	api.HandleFunc("/slos/{id}/status", h.SLOStatusHandler).Methods(http.MethodGet)
+
 	// Topology (APM-style service dependency graph)
 	api.HandleFunc("/topology", h.TopologyHandler).Methods(http.MethodGet)
 

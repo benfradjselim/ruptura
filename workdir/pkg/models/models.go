@@ -162,6 +162,31 @@ type Dashboard struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// SLO defines a Service Level Objective
+type SLO struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Metric      string    `json:"metric"`            // metric or KPI name to track
+	Target      float64   `json:"target"`            // e.g. 99.9 (percent)
+	Window      string    `json:"window"`            // "7d", "30d", "90d"
+	Comparator  string    `json:"comparator"`        // "gte" (value >= threshold = good) | "lte"
+	Threshold   float64   `json:"threshold"`         // value that defines "good" state
+	OrgID       string    `json:"org_id,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// SLOStatus is the live computed state of an SLO
+type SLOStatus struct {
+	SLO            SLO     `json:"slo"`
+	ErrorBudget    float64 `json:"error_budget_pct"`    // remaining % of allowed bad minutes
+	BurnRate       float64 `json:"burn_rate"`            // current burn rate (1 = steady-state)
+	Compliance     float64 `json:"compliance_pct"`       // actual uptime % over window
+	RemainingMinutes float64 `json:"remaining_minutes"`  // minutes of budget left
+	State          string  `json:"state"`                // "healthy" | "at_risk" | "breached"
+}
+
 // RetentionStats exposes storage tier counts
 type RetentionStats struct {
 	RawMetrics    int64 `json:"raw_metrics"`

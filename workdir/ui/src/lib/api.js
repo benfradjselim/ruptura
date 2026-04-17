@@ -93,6 +93,15 @@ export const api = {
   orgUpdate:  (id, o)    => req('PUT', `/orgs/${id}`, o),
   orgDelete:  (id)       => req('DELETE', `/orgs/${id}`),
 
+  // ── SLOs ────────────────────────────────────────────────────────────────────
+  slos:          ()         => req('GET', '/slos'),
+  sloCreate:     (s)        => req('POST', '/slos', s),
+  sloGet:        (id)       => req('GET', `/slos/${id}`),
+  sloUpdate:     (id, s)    => req('PUT', `/slos/${id}`, s),
+  sloDelete:     (id)       => req('DELETE', `/slos/${id}`),
+  sloStatus:     (id)       => req('GET', `/slos/${id}/status`),
+  slosStatus:    ()         => req('GET', '/slos/status'),
+
   // ── Users (admin) ──────────────────────────────────────────────────────────
   users:      ()         => req('GET', '/auth/users'),
   userCreate: (u)        => req('POST', '/auth/users', u),

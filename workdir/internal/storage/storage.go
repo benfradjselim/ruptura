@@ -332,6 +332,27 @@ func (s *Store) ListNotificationChannels(dest func(val []byte) error) error {
 	})
 }
 
+// --- SLO storage ---
+// Key schema: slo:{id}
+
+func (s *Store) SaveSLO(id string, data interface{}) error {
+	return s.set(fmt.Sprintf("slo:%s", id), data, 0)
+}
+
+func (s *Store) GetSLO(id string, dest interface{}) error {
+	return s.get(fmt.Sprintf("slo:%s", id), dest)
+}
+
+func (s *Store) DeleteSLO(id string) error {
+	return s.delete(fmt.Sprintf("slo:%s", id))
+}
+
+func (s *Store) ListSLOs(dest func(val []byte) error) error {
+	return s.listByPrefix("slo:", func(_, val []byte) error {
+		return dest(val)
+	})
+}
+
 // --- Org storage ---
 // Key schema: org:{id}
 
