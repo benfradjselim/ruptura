@@ -1580,12 +1580,24 @@ func decodeBody(r *http.Request, dest interface{}) error {
 	return nil
 }
 
+// trustedDatasourceHosts returns hosts/IPs explicitly trusted via
+// OHE_TRUSTED_DATASOURCE_HOSTS (comma-separated). Intended for in-cluster
+// ClusterIPs when cluster DNS is unavailable.
+func trustedDatasourceHosts() map[string]struct{} {
+	m := make(map[string]struct{})
+	for _, h := range strings.Split(os.Getenv("OHE_TRUSTED_DATASOURCE_HOSTS"), ",") {
+		if h = strings.TrimSpace(h); h != "" {
+			m[h] = struct{}{}
+		}
+	}
+	return m
+}
+
 // isClusterInternalHost returns true for Kubernetes in-cluster service DNS names
 // (e.g. prometheus.monitoring.svc.cluster.local, prometheus.monitoring.svc).
 // These are trusted because they can only resolve inside the cluster network.
 func isClusterInternalHost(host string) bool {
-	internal := []string{".svc.cluster.local", ".svc"}
-	for _, suffix := range internal {
+	for _, suffix := range []string{".svc.cluster.local", ".svc"} {
 		if strings.HasSuffix(host, suffix) {
 			return true
 		}
@@ -1594,7 +1606,8 @@ func isClusterInternalHost(host string) bool {
 }
 
 // validateDataSourceURL enforces scheme allowlist and blocks SSRF targets.
-// Kubernetes in-cluster service DNS names are explicitly allowed.
+// Kubernetes cluster-internal DNS names and hosts in OHE_TRUSTED_DATASOURCE_HOSTS
+// are explicitly allowed.
 func validateDataSourceURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -1607,10 +1620,13 @@ func validateDataSourceURL(rawURL string) error {
 	if err != nil {
 		host = u.Host
 	}
-	// Allow Kubernetes cluster-internal service DNS — these can only be reached
-	// from within the same cluster and are safe from external SSRF.
 	if isClusterInternalHost(host) {
 		return nil
+	}
+	if trusted := trustedDatasourceHosts(); len(trusted) > 0 {
+		if _, ok := trusted[host]; ok {
+			return nil
+		}
 	}
 	addrs, err := net.LookupHost(host)
 	if err != nil {
@@ -1624,7 +1640,6 @@ func validateDataSourceURL(rawURL string) error {
 		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 			return fmt.Errorf("target IP is in a private/reserved range")
 		}
-		// Block AWS/GCP/Azure metadata endpoints
 		for _, blocked := range []string{"169.254.169.254", "metadata.google.internal"} {
 			if addr == blocked || host == blocked {
 				return fmt.Errorf("metadata endpoint not allowed")
