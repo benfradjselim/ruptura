@@ -76,7 +76,9 @@
     testResult = null; error = ''
     try {
       const res = await api.datasourceTest(selected.id)
-      testResult = res?.data || { ok: true }
+      const d = res?.data || {}
+      // API returns {status:"ok"|"error", http_status, message}
+      testResult = { ok: d.status === 'ok', ...d }
     } catch (e) {
       testResult = { ok: false, error: e.message }
     }
@@ -146,10 +148,9 @@
         {#if testResult}
           <div class="test-result" class:ok={testResult.ok} class:fail={!testResult.ok}>
             {#if testResult.ok}
-              ✓ Connection OK
-              {#if testResult.latency_ms} — {testResult.latency_ms}ms {/if}
+              ✓ Connection OK {#if testResult.http_status}(HTTP {testResult.http_status}){/if}
             {:else}
-              ✕ {testResult.error || 'Connection failed'}
+              ✕ {testResult.message || testResult.error || 'Connection failed'}
             {/if}
           </div>
         {/if}
