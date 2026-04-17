@@ -332,6 +332,31 @@ func (s *Store) ListNotificationChannels(dest func(val []byte) error) error {
 	})
 }
 
+// --- Org storage ---
+// Key schema: org:{id}
+
+// SaveOrg persists an org
+func (s *Store) SaveOrg(id string, data interface{}) error {
+	return s.set(fmt.Sprintf("org:%s", id), data, 0)
+}
+
+// GetOrg retrieves an org
+func (s *Store) GetOrg(id string, dest interface{}) error {
+	return s.get(fmt.Sprintf("org:%s", id), dest)
+}
+
+// DeleteOrg removes an org
+func (s *Store) DeleteOrg(id string) error {
+	return s.delete(fmt.Sprintf("org:%s", id))
+}
+
+// ListOrgs returns all orgs
+func (s *Store) ListOrgs(dest func(val []byte) error) error {
+	return s.listByPrefix("org:", func(_, val []byte) error {
+		return dest(val)
+	})
+}
+
 // Healthy returns true if the database is responsive
 func (s *Store) Healthy() bool {
 	err := s.db.View(func(txn *badger.Txn) error {

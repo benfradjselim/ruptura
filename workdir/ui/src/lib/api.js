@@ -84,6 +84,14 @@ export const api = {
   datasourceUpdate:  (id, ds)   => req('PUT', `/datasources/${id}`, ds),
   datasourceDelete:  (id)       => req('DELETE', `/datasources/${id}`),
   datasourceTest:    (id)       => req('POST', `/datasources/${id}/test`),
+  datasourceProxy:   (id, body) => req('POST', `/datasources/${id}/proxy`, body),
+
+  // ── Orgs ────────────────────────────────────────────────────────────────────
+  orgs:       ()         => req('GET', '/orgs'),
+  orgCreate:  (o)        => req('POST', '/orgs', o),
+  orgGet:     (id)       => req('GET', `/orgs/${id}`),
+  orgUpdate:  (id, o)    => req('PUT', `/orgs/${id}`, o),
+  orgDelete:  (id)       => req('DELETE', `/orgs/${id}`),
 
   // ── Users (admin) ──────────────────────────────────────────────────────────
   users:      ()         => req('GET', '/auth/users'),

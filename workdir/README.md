@@ -93,6 +93,25 @@ Override with env var: `OHE_ADMIN_PASSWORD=yourpassword`
 
 ---
 
+## v4.2.0 — What's New
+
+### PromQL Passthrough
+- `POST /api/v1/datasources/{id}/proxy` — proxy PromQL queries to any registered datasource
+- Body: `{"query":"...", "start":"unix", "end":"unix", "step":15, "type":"query_range"}`
+- New **PromQL Query** widget type (`query`) in dashboards — configure `datasource_id`, `query`, `range`, `step` via widget options
+- Supports all registered datasources (Prometheus, Thanos, VictoriaMetrics, etc.)
+
+### Multi-Tenancy Foundation
+- **Orgs API** — tenant workspace model for multi-tenancy
+  - `GET/POST /api/v1/orgs` — list and create orgs
+  - `GET/PUT/DELETE /api/v1/orgs/{id}` — manage individual orgs
+- **Orgs UI** — new "Orgs" page under Configure section
+- Org fields: `id`, `name`, `slug` (URL-safe auto-generated), `description`, `created_at`, `updated_at`
+- Storage key schema: `org:{id}` in BadgerDB
+- Default "default" org conventions for backward compatibility
+
+---
+
 ## v4.1.0 — What's New
 
 ### Alert Delivery — webhook & Slack (fully wired)
@@ -124,8 +143,8 @@ Notification channels are now end-to-end functional:
 | 1 | Persistent storage (PVC) | ✅ v4.0.0 |
 | 2 | Real metrics ingestion (agent DaemonSet) | ✅ v4.1.0 |
 | 3 | Alert delivery (webhook / Slack / PagerDuty) | ✅ v4.1.0 |
-| 4 | PromQL passthrough to Prometheus datasource | 🔜 v4.2.0 |
-| 5 | Multi-tenancy (orgs, teams, RBAC) | 🔜 v4.2.0 |
+| 4 | PromQL passthrough to Prometheus datasource | ✅ v4.2.0 |
+| 5 | Multi-tenancy (orgs, teams, RBAC) | ✅ v4.2.0 (foundation) |
 | 6 | Long-term retention + downsampling | 🔜 v4.3.0 |
 
 ---

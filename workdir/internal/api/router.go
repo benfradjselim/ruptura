@@ -78,6 +78,14 @@ func NewRouter(h *Handlers, jwtSecret string, authEnabled bool, allowedOrigins [
 	api.Handle("/datasources/{id}", operatorOnly(http.HandlerFunc(h.DataSourceUpdateHandler))).Methods(http.MethodPut)
 	api.Handle("/datasources/{id}", operatorOnly(http.HandlerFunc(h.DataSourceDeleteHandler))).Methods(http.MethodDelete)
 	api.Handle("/datasources/{id}/test", operatorOnly(http.HandlerFunc(h.DataSourceTestHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/datasources/{id}/proxy", h.DataSourceProxyHandler).Methods(http.MethodPost)
+
+	// Orgs
+	api.HandleFunc("/orgs", h.OrgListHandler).Methods(http.MethodGet)
+	api.Handle("/orgs", operatorOnly(http.HandlerFunc(h.OrgCreateHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/orgs/{id}", h.OrgGetHandler).Methods(http.MethodGet)
+	api.Handle("/orgs/{id}", operatorOnly(http.HandlerFunc(h.OrgUpdateHandler))).Methods(http.MethodPut)
+	api.Handle("/orgs/{id}", operatorOnly(http.HandlerFunc(h.OrgDeleteHandler))).Methods(http.MethodDelete)
 
 	// Templates
 	api.HandleFunc("/templates", h.TemplateListHandler).Methods(http.MethodGet)

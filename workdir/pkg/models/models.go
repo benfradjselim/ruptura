@@ -57,6 +57,25 @@ type NotificationChannel struct {
 	Severities []string        `json:"severities,omitempty"`
 }
 
+// Org is a tenant workspace. Resources (dashboards, datasources, etc.) can be
+// scoped to an org. The built-in "default" org always exists and holds legacy
+// resources that predate multi-tenancy.
+type Org struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Slug        string    `json:"slug"`             // URL-safe identifier
+	Description string    `json:"description,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// OrgMember binds a user to an org with a role.
+type OrgMember struct {
+	OrgID    string `json:"org_id"`
+	Username string `json:"username"`
+	Role     string `json:"role"` // "admin" | "editor" | "viewer"
+}
+
 // FleetStatus is the aggregated health summary for all known hosts
 type FleetStatus struct {
 	Timestamp    time.Time              `json:"timestamp"`
