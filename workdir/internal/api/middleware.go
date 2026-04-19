@@ -68,12 +68,6 @@ func respondSuccess(w http.ResponseWriter, data interface{}) {
 	})
 }
 
-// apiKeyStore is the minimal interface needed by AuthMiddleware to validate API keys.
-// It is satisfied by *storage.OrgStore but decoupled to avoid an import cycle.
-type apiKeyStore interface {
-	LookupAPIKeyByPrefix(prefix string, dest interface{}) error
-}
-
 // authMiddlewareMu guards the two pluggable auth functions below.
 var authMiddlewareMu sync.RWMutex
 

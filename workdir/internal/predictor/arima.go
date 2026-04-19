@@ -19,7 +19,6 @@ type ARIMA struct {
 
 	// Residual/MA state
 	residuals [2]float64
-	resPos    int
 
 	// Previous raw value for differencing
 	prev    float64

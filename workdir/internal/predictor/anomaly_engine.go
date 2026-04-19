@@ -11,7 +11,6 @@ import (
 // AnomalyEngine runs all three anomaly detectors per metric and
 // reports consensus anomalies (≥2 methods agree = HighConfidence).
 type AnomalyEngine struct {
-	mu       sync.Mutex
 	zscore   *AnomalyDetector
 	mad      *MADAnomalyDetector
 	seasonal *SeasonalAnomalyDetector

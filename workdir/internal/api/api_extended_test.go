@@ -91,48 +91,6 @@ func authGet(t *testing.T, srv *httptest.Server, path, token string) *http.Respo
 	return resp
 }
 
-func authPost(t *testing.T, srv *httptest.Server, path, token string, body interface{}) *http.Response {
-	t.Helper()
-	var buf *bytes.Reader
-	if body != nil {
-		b, _ := json.Marshal(body)
-		buf = bytes.NewReader(b)
-	} else {
-		buf = bytes.NewReader(nil)
-	}
-	req, _ := http.NewRequest(http.MethodPost, srv.URL+path, buf)
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("POST %s: %v", path, err)
-	}
-	return resp
-}
-
-func authDo(t *testing.T, method, url, token string, body interface{}) *http.Response {
-	t.Helper()
-	var buf *bytes.Reader
-	if body != nil {
-		b, _ := json.Marshal(body)
-		buf = bytes.NewReader(b)
-	} else {
-		buf = bytes.NewReader(nil)
-	}
-	req, _ := http.NewRequest(method, url, buf)
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("%s %s: %v", method, url, err)
-	}
-	return resp
-}
-
 // mustGet is a test helper that fatalf's on HTTP error.
 func mustGet(t *testing.T, url string) *http.Response {
 	t.Helper()

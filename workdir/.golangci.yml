@@ -1,0 +1,44 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - typecheck
+
+linters-settings:
+  errcheck:
+    # These are intentionally unchecked — suppress globally
+    ignore: >
+      fmt:.*,
+      io:Close,
+      encoding/json:Encode,
+      encoding/json:Decode
+
+issues:
+  # Suppress errcheck in test files — test helpers routinely ignore errors
+  # from local httptest servers that never fail in practice.
+  exclude-rules:
+    - path: "_test\\.go"
+      linters:
+        - errcheck
+
+    # WebSocket deadline/close calls: errors mean the connection is already broken.
+    - path: "websocket\\.go"
+      text: "WriteMessage|SetWriteDeadline|SetReadDeadline"
+      linters:
+        - errcheck
+
+    # io.Copy drain on response body — error means connection is dead, nothing to do.
+    - path: "handlers\\.go"
+      text: "io.Copy"
+      linters:
+        - errcheck
+
+  # Don't report the same issue more than once per line.
+  max-same-issues: 1

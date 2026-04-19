@@ -755,7 +755,7 @@ func (h *Handlers) DataSourceTestHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	defer func() {
-		io.Copy(io.Discard, resp.Body) //nolint:errcheck — drain for connection reuse
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}()
 	respondSuccess(w, map[string]interface{}{"status": "ok", "http_status": resp.StatusCode})

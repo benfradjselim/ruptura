@@ -20,8 +20,6 @@ import (
 	"github.com/benfradjselim/ohe/pkg/logger"
 )
 
-const serviceDesc = "/ohe.v1.AgentService/"
-
 // StorageBackend is the subset of *storage.Store used by the gRPC server.
 type StorageBackend interface {
 	ForOrg(orgID string) *storage.OrgStore
@@ -56,9 +54,6 @@ func New(store StorageBackend, cfg Config) (*Server, error) {
 		}
 		opts = append(opts, grpc.Creds(creds))
 	}
-
-	// Use ohe-json codec for message serialization
-	opts = append(opts, grpc.CustomCodec(jsonCodec{}))
 
 	gs := grpc.NewServer(opts...)
 	s := &Server{

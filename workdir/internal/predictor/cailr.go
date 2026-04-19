@@ -95,16 +95,6 @@ func (s *cailrStore) ruptureIndex(key string) float64 {
 	return 0
 }
 
-func (s *cailrStore) snapshot(key string) (alphaStable, alphaBurst, index float64, ok bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	c, exists := s.models[key]
-	if !exists {
-		return 0, 0, 0, false
-	}
-	return c.AlphaStable(), c.AlphaBurst(), c.RuptureIndex(), true
-}
-
 // SetRuptureThreshold overrides the R threshold used by AcceleratingMetrics.
 // The default is 3.0. Lower values produce earlier (more sensitive) alerts.
 func (p *Predictor) SetRuptureThreshold(threshold float64) {

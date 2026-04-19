@@ -482,7 +482,7 @@ func pushBatch(ctx context.Context, client *http.Client, url string, batch model
 		return err
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body) //nolint:errcheck — drain for connection reuse
+	_, _ = io.Copy(io.Discard, resp.Body)
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("central returned %d", resp.StatusCode)
 	}

@@ -1,9 +1,7 @@
 package plugin_test
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -162,10 +160,3 @@ func TestManagerDotFilesSkipped(t *testing.T) {
 	}
 }
 
-// writeJSONRPC is a helper that formats a JSON-RPC object for manual testing.
-func writeJSONRPC(w *bufio.Writer, v interface{}) {
-	b, _ := json.Marshal(v)
-	w.Write(b)
-	w.WriteByte('\n')
-	w.Flush()
-}
