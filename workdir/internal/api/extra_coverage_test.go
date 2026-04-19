@@ -46,7 +46,10 @@ func TestOrgGetHandler(t *testing.T) {
 
 	// Create an org first
 	body, _ := json.Marshal(map[string]string{"name": "Test Corp", "slug": "testcorp"})
-	resp, _ := http.Post(srv.URL+"/api/v1/orgs", "application/json", bytes.NewReader(body))
+	resp, err := http.Post(srv.URL+"/api/v1/orgs", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST /orgs: %v", err)
+	}
 	defer resp.Body.Close()
 
 	var created map[string]interface{}
