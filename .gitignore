@@ -28,5 +28,9 @@ logs/
 # Temp
 tmp/
 temp/
-ohe
+/ohe
+/workdir/ohe
 workdir/operator/ohe-operator
+!sdk/python/ohe/
+sdk/python/**/__pycache__/
+sdk/python/**/*.pyc
