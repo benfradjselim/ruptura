@@ -58,25 +58,26 @@ jobs:
 
       - name: Test with coverage
         run: |
-          go test -race -coverprofile=coverage.out -covermode=atomic -timeout=120s ./...
+          go test -race -coverprofile=coverage.out -covermode=atomic -timeout=120s ./... 2>&1 | tee test-output.txt
           go tool cover -func=coverage.out | tail -1
 
       - name: Coverage gate — per-package ≥60%
         run: |
+          # Re-run without -race to get clean per-package coverage percentages.
+          # The -race run above caught data races; this run extracts coverage numbers.
           failed=0
           while IFS= read -r line; do
-            pkg=$(echo "$line" | awk '{print $1}')
-            pct=$(echo "$line" | awk '{print $3}' | tr -d '%')
-            # Skip summary line and packages with no statements
-            if [[ "$pkg" == "total:" ]] || [[ "$pct" == "" ]]; then
-              continue
+            # Match lines like: ok   github.com/...   0.123s   coverage: 83.1% of statements
+            if [[ "$line" =~ ^ok[[:space:]]+(.*)[[:space:]]+[0-9]+\.[0-9]+s[[:space:]]+coverage:[[:space:]]+([0-9.]+)% ]]; then
+              pkg="${BASH_REMATCH[1]}"
+              pct="${BASH_REMATCH[2]}"
+              result=$(awk -v p="$pct" 'BEGIN { print (p+0 < 60) ? "fail" : "ok" }')
+              if [[ "$result" == "fail" ]]; then
+                echo "FAIL: $pkg — ${pct}% (below 60% gate)"
+                failed=1
+              fi
             fi
-            result=$(awk -v p="$pct" 'BEGIN { print (p+0 < 60) ? "fail" : "ok" }')
-            if [[ "$result" == "fail" ]]; then
-              echo "FAIL: $pkg — ${pct}% (below 60% gate)"
-              failed=1
-            fi
-          done < <(go tool cover -func=coverage.out)
+          done < <(go test -cover -timeout=120s ./...)
           if [[ "$failed" -eq 1 ]]; then
             exit 1
           fi
