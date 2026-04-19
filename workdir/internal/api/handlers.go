@@ -27,7 +27,7 @@ import (
 	"github.com/benfradjselim/ohe/pkg/logger"
 )
 
-const version = "4.0.0"
+const version = "5.0.0"
 
 // Handlers holds all API dependencies
 // UsageRecorder is a function that records a billable usage event.

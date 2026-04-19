@@ -18,6 +18,10 @@ type Analyzer struct {
 	// Per-host accumulated state
 	hosts     map[string]*hostState
 	snapshots map[string]models.KPISnapshot // last computed snapshot per host
+
+	// Default fatigue config applied to new hosts; overridable per-host via SetFatigueConfig.
+	defaultFatigueRThreshold float64
+	defaultFatigueLambda     float64
 }
 
 type hostState struct {
@@ -55,9 +59,20 @@ type hostState struct {
 // NewAnalyzer creates a new holistic analyzer
 func NewAnalyzer() *Analyzer {
 	return &Analyzer{
-		hosts:     make(map[string]*hostState),
-		snapshots: make(map[string]models.KPISnapshot),
+		hosts:                    make(map[string]*hostState),
+		snapshots:                make(map[string]models.KPISnapshot),
+		defaultFatigueRThreshold: 0.3,
+		defaultFatigueLambda:     0.05,
 	}
+}
+
+// SetDefaultFatigueConfig sets the dissipative fatigue parameters applied to
+// all new hosts. Existing hosts are not affected; use SetFatigueConfig for those.
+func (a *Analyzer) SetDefaultFatigueConfig(rThreshold, lambda float64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.defaultFatigueRThreshold = rThreshold
+	a.defaultFatigueLambda = lambda
 }
 
 func (a *Analyzer) getOrCreate(host string) *hostState {
@@ -65,15 +80,15 @@ func (a *Analyzer) getOrCreate(host string) *hostState {
 		return hs
 	}
 	hs := &hostState{
-		stressHistory:     utils.NewCircularBuffer(600), // 10 min at 1s
+		stressHistory:     utils.NewCircularBuffer(600),
 		errorHistory:      utils.NewCircularBuffer(600),
 		timeoutHistory:    utils.NewCircularBuffer(600),
 		requestHistory:    utils.NewCircularBuffer(600),
-		healthHistory:     utils.NewCircularBuffer(60), // last 60 samples for entropy
+		healthHistory:     utils.NewCircularBuffer(60),
 		lastUpdate:        time.Now(),
 		firstUpdate:       true,
-		fatigueRThreshold: 0.3,  // canonical v5.0 default
-		fatigueLambda:     0.05, // canonical v5.0 default
+		fatigueRThreshold: a.defaultFatigueRThreshold,
+		fatigueLambda:     a.defaultFatigueLambda,
 	}
 	a.hosts[host] = hs
 	return hs

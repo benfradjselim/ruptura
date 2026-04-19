@@ -21,7 +21,7 @@ const banner = `
 ██║   ██║██╔══██║██╔══╝
 ╚██████╔╝██║  ██║███████╗
  ╚═════╝ ╚═╝  ╚═╝╚══════╝
-Observability Holistic Engine v4.0.0
+Observability Holistic Engine v5.0.0
 "Prevention is better than cure"
 `
 
@@ -39,7 +39,7 @@ func main() {
 	case "central":
 		runMode("central", os.Args[2:])
 	case "version":
-		fmt.Println("ohe version 4.0.0")
+		fmt.Println("ohe version 5.0.0")
 	case "help", "--help", "-h":
 		printUsage()
 	default:

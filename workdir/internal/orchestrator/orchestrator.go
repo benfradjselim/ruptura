@@ -28,6 +28,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// PredictorConfig holds CA-ILR tuning knobs. All fields are optional — omitting
+// them from the YAML file leaves the v5.0 defaults in place.
+type PredictorConfig struct {
+	StableWindow     time.Duration `yaml:"stable_window"`    // ILR stable model window; default 60m → λ=0.995
+	BurstWindow      time.Duration `yaml:"burst_window"`     // ILR burst model window;  default 5m  → λ=0.80
+	RuptureThreshold float64       `yaml:"rupture_threshold"` // R > threshold → ExponentialFailure; default 3.0
+}
+
+// FatigueConfig holds dissipative-fatigue tuning knobs. Optional — defaults to v5.0 spec.
+type FatigueConfig struct {
+	RThreshold float64 `yaml:"r_threshold"` // stress floor; default 0.3
+	Lambda     float64 `yaml:"lambda"`      // dissipation per 15 s tick; default 0.05
+}
+
 // Config holds all runtime configuration
 type Config struct {
 	Mode            string        `yaml:"mode"`             // "agent" or "central"
@@ -41,11 +55,13 @@ type Config struct {
 	BufferSize      int           `yaml:"buffer_size"`      // circular buffer size
 	AllowedOrigins  []string      `yaml:"allowed_origins"`  // CORS origins; empty = wildcard
 	DogStatsDAddr   string        `yaml:"dogstatsd_addr"`   // UDP addr for DogStatsD; empty = disabled
-	TLSCertFile        string        `yaml:"tls_cert"`            // path to TLS certificate (PEM); enables HTTPS when both set
-	TLSKeyFile         string        `yaml:"tls_key"`             // path to TLS private key (PEM)
-	ReplicaURL         string        `yaml:"replica_url"`         // Litestream replica URL (s3://bucket/path, gcs://, etc.); empty = no replication
-	BillingWebhookURL  string        `yaml:"billing_webhook_url"` // optional webhook for usage metering (Stripe, Lago, etc.)
-	GRPCAddr           string        `yaml:"grpc_addr"`           // gRPC agent ingest address, e.g. ":9090"; empty = disabled
+	TLSCertFile       string          `yaml:"tls_cert"`            // path to TLS certificate (PEM); enables HTTPS when both set
+	TLSKeyFile        string          `yaml:"tls_key"`             // path to TLS private key (PEM)
+	ReplicaURL        string          `yaml:"replica_url"`         // Litestream replica URL (s3://bucket/path, gcs://, etc.); empty = no replication
+	BillingWebhookURL string          `yaml:"billing_webhook_url"` // optional webhook for usage metering (Stripe, Lago, etc.)
+	GRPCAddr          string          `yaml:"grpc_addr"`           // gRPC agent ingest address, e.g. ":9090"; empty = disabled
+	Predictor         PredictorConfig `yaml:"predictor"`           // CA-ILR tuning (v5.0); all fields optional
+	Fatigue           FatigueConfig   `yaml:"fatigue"`             // dissipative-fatigue tuning (v5.0); all fields optional
 }
 
 // DefaultConfig returns sensible production defaults
@@ -60,7 +76,16 @@ func DefaultConfig() Config {
 		AuthEnabled:     false,
 		CollectInterval: 15 * time.Second,
 		BufferSize:      10000,
-		DogStatsDAddr:   ":8125", // DogStatsD on by default (UDP)
+		DogStatsDAddr:   ":8125",
+		Predictor: PredictorConfig{
+			StableWindow:     60 * time.Minute,
+			BurstWindow:      5 * time.Minute,
+			RuptureThreshold: 3.0,
+		},
+		Fatigue: FatigueConfig{
+			RThreshold: 0.3,
+			Lambda:     0.05,
+		},
 	}
 }
 
@@ -103,6 +128,22 @@ func New(cfg Config) (*Engine, error) {
 	ana := analyzer.NewAnalyzer()
 	pred := predictor.NewPredictor()
 	alrt := alerter.NewAlerter(1000)
+
+	// Apply v5.0 config knobs (defaults are set if YAML fields are zero-valued).
+	if cfg.Fatigue.RThreshold != 0 || cfg.Fatigue.Lambda != 0 {
+		rThreshold := cfg.Fatigue.RThreshold
+		lambda := cfg.Fatigue.Lambda
+		if rThreshold == 0 {
+			rThreshold = 0.3
+		}
+		if lambda == 0 {
+			lambda = 0.05
+		}
+		ana.SetDefaultFatigueConfig(rThreshold, lambda)
+	}
+	if cfg.Predictor.RuptureThreshold != 0 {
+		pred.SetRuptureThreshold(cfg.Predictor.RuptureThreshold)
+	}
 	meter := billing.New(cfg.BillingWebhookURL, 10000, time.Minute)
 	sysColl := collector.NewSystemCollector(cfg.Host)
 	containerColl := collector.NewContainerCollector(cfg.Host)

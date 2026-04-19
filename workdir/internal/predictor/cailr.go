@@ -68,12 +68,13 @@ func (c *CAILR) AlphaBurst() float64 { return c.burst.Alpha }
 // cailrState extends Predictor with per-metric dual-scale tracking.
 // Stored separately from the ensemble map to avoid coupling.
 type cailrStore struct {
-	mu     sync.RWMutex
-	models map[string]*CAILR // key: "host:metric"
+	mu               sync.RWMutex
+	models           map[string]*CAILR // key: "host:metric"
+	ruptureThreshold float64           // default 3.0; configurable via SetRuptureThreshold
 }
 
 func newCAILRStore() *cailrStore {
-	return &cailrStore{models: make(map[string]*CAILR)}
+	return &cailrStore{models: make(map[string]*CAILR), ruptureThreshold: 3.0}
 }
 
 func (s *cailrStore) update(key string, x, y float64) {
@@ -104,12 +105,21 @@ func (s *cailrStore) snapshot(key string) (alphaStable, alphaBurst, index float6
 	return c.AlphaStable(), c.AlphaBurst(), c.RuptureIndex(), true
 }
 
+// SetRuptureThreshold overrides the R threshold used by AcceleratingMetrics.
+// The default is 3.0. Lower values produce earlier (more sensitive) alerts.
+func (p *Predictor) SetRuptureThreshold(threshold float64) {
+	p.cailr.mu.Lock()
+	p.cailr.ruptureThreshold = threshold
+	p.cailr.mu.Unlock()
+}
+
 // AcceleratingMetrics returns RuptureEvent records for all metrics of a host
-// where R > 3 (exponential failure threshold).
+// where R > ruptureThreshold (default 3.0).
 func (p *Predictor) AcceleratingMetrics(host string) []models.RuptureEvent {
 	p.cailr.mu.RLock()
 	defer p.cailr.mu.RUnlock()
 
+	threshold := p.cailr.ruptureThreshold
 	prefix := host + ":"
 	now := time.Now()
 	var events []models.RuptureEvent
@@ -117,7 +127,7 @@ func (p *Predictor) AcceleratingMetrics(host string) []models.RuptureEvent {
 		if len(key) <= len(prefix) || key[:len(prefix)] != prefix {
 			continue
 		}
-		if !c.IsAccelerating() {
+		if c.RuptureIndex() <= threshold {
 			continue
 		}
 		events = append(events, models.RuptureEvent{
