@@ -63,30 +63,28 @@ jobs:
 
       - name: Coverage gate — per-package ≥60%
         run: |
-          # Re-run without -race to get clean per-package coverage percentages.
-          # The -race run above caught data races; this run extracts coverage numbers.
+          # Get list of all packages
+          all_pkgs=$(go list ./...)
+          # Exclude main package and models from coverage gate
+          pkgs_to_check=$(echo "$all_pkgs" | grep -v "github.com/benfradjselim/ohe/cmd/ohe" | grep -v "github.com/benfradjselim/ohe/pkg/models")
+          
+          # Run tests and check coverage for permitted packages
           failed=0
-          while IFS= read -r line; do
-            # Match lines like: ok   github.com/...   0.123s   coverage: 83.1% of statements
-            # Also matches cached: ok   github.com/...   (cached)   coverage: 83.1% of statements
-            if [[ "$line" =~ ^ok[[:space:]]+(.*)[[:space:]]+([0-9]+\.[0-9]+s|\(cached\))[[:space:]]+coverage:[[:space:]]+([0-9.]+)% ]]; then
-              pkg="${BASH_REMATCH[1]}"
-              pct="${BASH_REMATCH[3]}"
-              # Skip coverage gate for main package and models (too low/difficult to test)
-              case "$pkg" in
-                github.com/benfradjselim/ohe/cmd/ohe|github.com/benfradjselim/ohe/pkg/models)
-                  echo "SKIP: $pkg — ${pct}% (exempt from gate)"
-                  continue
-                  ;;
-              esac
+          for pkg in $pkgs_to_check; do
+            pct=$(go test -cover -timeout=120s "$pkg" | awk '/coverage:/ {print $NF}' | sed 's/%//')
+            if [ -n "$pct" ]; then
               result=$(awk -v p="$pct" 'BEGIN { print (p+0 < 60) ? "fail" : "ok" }')
-              if [[ "$result" == "fail" ]]; then
+              if [ "$result" == "fail" ]; then
                 echo "FAIL: $pkg — ${pct}% (below 60% gate)"
                 failed=1
+              else
+                echo "OK: $pkg — ${pct}%"
               fi
             fi
-          done < <(go test -cover -timeout=120s ./...)
+          done
+          
           if [[ "$failed" -eq 1 ]]; then
+            echo "Coverage gate failed for one or more packages."
             exit 1
           fi
           echo "All packages meet ≥60% coverage gate."
