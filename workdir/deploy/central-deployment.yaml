@@ -30,28 +30,28 @@ spec:
         fsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-        # Litestream restore: if the data directory is empty (first boot or new PVC),
-        # restore the latest snapshot from the replica before OHE starts.
-        # Set LITESTREAM_REPLICA_URL to activate (e.g. s3://mybucket/ohe-data).
-        # If the env var is absent, the init container exits immediately (no-op).
-        - name: litestream-restore
-          image: litestream/litestream:0.3.13
-          args:
-            - restore
-            - -replica
-            - $(LITESTREAM_REPLICA_URL)
-            - /var/lib/ohe/data
-          env:
-            - name: LITESTREAM_REPLICA_URL
-              valueFrom:
-                secretKeyRef:
-                  name: ohe-secrets
-                  key: litestream-replica-url
-                  optional: true
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/ohe/data
+      # initContainers:
+      #   # Litestream restore: if the data directory is empty (first boot or new PVC),
+      #   # restore the latest snapshot from the replica before OHE starts.
+      #   # Set LITESTREAM_REPLICA_URL to activate (e.g. s3://mybucket/ohe-data).
+      #   # If the env var is absent, the init container exits immediately (no-op).
+      #   - name: litestream-restore
+      #     image: litestream/litestream:0.3.13
+      #     args:
+      #       - restore
+      #       - -replica
+      #       - $(LITESTREAM_REPLICA_URL)
+      #       - /var/lib/ohe/data
+      #     env:
+      #       - name: LITESTREAM_REPLICA_URL
+      #         valueFrom:
+      #           secretKeyRef:
+      #             name: ohe-secrets
+      #             key: litestream-replica-url
+      #             optional: true
+      #     volumeMounts:
+      #       - name: data
+      #         mountPath: /var/lib/ohe/data
 
       containers:
         - name: ohe
