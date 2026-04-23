@@ -24,6 +24,8 @@ spec:
         app.kubernetes.io/component: central
     spec:
       serviceAccountName: ohe-central
+      imagePullSecrets:
+        - name: ghcr-secret
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532        # distroless nonroot
@@ -104,45 +106,45 @@ spec:
             capabilities:
               drop: [ALL]
 
-        # Litestream sidecar: continuously replicates Badger WAL to the replica URL.
-        # Runs alongside OHE in the same pod, sharing the /var/lib/ohe/data volume.
-        # Omit this container (or set LITESTREAM_REPLICA_URL to empty) for single-node mode.
-        - name: litestream
-          image: litestream/litestream:0.3.13
-          args:
-            - replicate
-            - /var/lib/ohe/data
-            - $(LITESTREAM_REPLICA_URL)
-          env:
-            - name: LITESTREAM_REPLICA_URL
-              valueFrom:
-                secretKeyRef:
-                  name: ohe-secrets
-                  key: litestream-replica-url
-                  optional: true
-            # AWS credentials — set if using S3 replica
-            - name: AWS_ACCESS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: ohe-secrets
-                  key: aws-access-key-id
-                  optional: true
-            - name: AWS_SECRET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: ohe-secrets
-                  key: aws-secret-access-key
-                  optional: true
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/ohe/data
-          resources:
-            requests:
-              cpu: "20m"
-              memory: "32Mi"
-            limits:
-              cpu: "100m"
-              memory: "128Mi"
+      # Litestream sidecar: continuously replicates Badger WAL to the replica URL.
+      # Runs alongside OHE in the same pod, sharing the /var/lib/ohe/data volume.
+      # Omit this container (or set LITESTREAM_REPLICA_URL to empty) for single-node mode.
+      # - name: litestream
+      #   image: litestream/litestream:0.3.13
+      #   args:
+      #     - replicate
+      #     - /var/lib/ohe/data
+      #     - $(LITESTREAM_REPLICA_URL)
+      #   env:
+      #     - name: LITESTREAM_REPLICA_URL
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: ohe-secrets
+      #           key: litestream-replica-url
+      #           optional: true
+      #     # AWS credentials — set if using S3 replica
+      #     - name: AWS_ACCESS_KEY_ID
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: ohe-secrets
+      #           key: aws-access-key-id
+      #           optional: true
+      #     - name: AWS_SECRET_ACCESS_KEY
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: ohe-secrets
+      #           key: aws-secret-access-key
+      #           optional: true
+      #   volumeMounts:
+      #     - name: data
+      #       mountPath: /var/lib/ohe/data
+      #   resources:
+      #     requests:
+      #       cpu: "20m"
+      #       memory: "32Mi"
+      #     limits:
+      #       cpu: "100m"
+      #       memory: "128Mi"
 
       volumes:
         - name: data
