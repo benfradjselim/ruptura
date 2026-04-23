@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -150,6 +152,12 @@ func runMode(mode string, args []string) {
 		}
 	}
 
+	// Security: Ensure JWT secret is set if auth is enabled
+	if cfg.AuthEnabled && cfg.JWTSecret == "" {
+		logger.Default.Warn("Auth enabled but no JWT secret set; generating a random one. Change this in production!")
+		cfg.JWTSecret = generateSecureSecret(32)
+	}
+
 	logger.Default.Info("ohe starting", "mode", cfg.Mode, "host", cfg.Host, "port", cfg.Port, "storage", cfg.StoragePath)
 
 	engine, err := orchestrator.New(cfg)
@@ -174,4 +182,13 @@ func loadConfigFile(path string, cfg *orchestrator.Config) error {
 		return fmt.Errorf("read file: %w", err)
 	}
 	return yaml.Unmarshal(data, cfg)
+}
+
+func generateSecureSecret(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		logger.Default.Error("failed to generate random secret", "err", err)
+		os.Exit(1)
+	}
+	return hex.EncodeToString(b)
 }

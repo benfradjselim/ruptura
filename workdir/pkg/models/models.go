@@ -1,6 +1,14 @@
 package models
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
+
+// Validatable defines an interface for request payload validation.
+type Validatable interface {
+	Validate() error
+}
 
 // Metric represents a single time-series data point
 type Metric struct {
@@ -438,6 +446,16 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+func (r *LoginRequest) Validate() error {
+	if r.Username == "" {
+		return fmt.Errorf("username is required")
+	}
+	if r.Password == "" {
+		return fmt.Errorf("password is required")
+	}
+	return nil
+}
+
 // LoginResponse contains JWT token
 type LoginResponse struct {
 	Token   string `json:"token"`
@@ -476,6 +494,16 @@ type APIKeyCreateRequest struct {
 	Name      string `json:"name"`
 	Role      string `json:"role"`
 	ExpiresIn string `json:"expires_in"` // duration string e.g. "30d", "90d", "" = never
+}
+
+func (r *APIKeyCreateRequest) Validate() error {
+	if r.Name == "" {
+		return fmt.Errorf("name is required")
+	}
+	if r.Role == "" {
+		return fmt.Errorf("role is required")
+	}
+	return nil
 }
 
 // APIKeyCreateResponse is returned once at creation — includes the full plaintext key.

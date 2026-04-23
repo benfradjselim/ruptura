@@ -30,6 +30,11 @@ func (h *Handlers) DataSourceProxyHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if err := validateDataSourceURL(ds.URL); err != nil {
+		respondError(w, http.StatusBadRequest, "INVALID_URL", err.Error())
+		return
+	}
+
 	var req struct {
 		Query string `json:"query"`
 		Start string `json:"start"`

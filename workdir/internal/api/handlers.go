@@ -1824,6 +1824,11 @@ func decodeBody(r *http.Request, dest interface{}) error {
 	if err := json.Unmarshal(body, dest); err != nil {
 		return fmt.Errorf("decode JSON: %w", err)
 	}
+	if v, ok := dest.(models.Validatable); ok {
+		if err := v.Validate(); err != nil {
+			return fmt.Errorf("validation failed: %w", err)
+		}
+	}
 	return nil
 }
 

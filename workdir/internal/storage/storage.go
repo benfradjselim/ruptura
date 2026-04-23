@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -607,13 +608,9 @@ func (s *Store) QueryTraceList(service string, limit int) ([]TraceHeader, error)
 	}
 
 	// Sort newest first
-	for i := 0; i < len(headers)-1; i++ {
-		for j := i + 1; j < len(headers); j++ {
-			if headers[j].StartTimeMs > headers[i].StartTimeMs {
-				headers[i], headers[j] = headers[j], headers[i]
-			}
-		}
-	}
+	sort.Slice(headers, func(i, j int) bool {
+		return headers[i].StartTimeMs > headers[j].StartTimeMs
+	})
 	if limit > 0 && len(headers) > limit {
 		headers = headers[:limit]
 	}
