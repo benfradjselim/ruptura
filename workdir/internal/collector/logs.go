@@ -74,7 +74,7 @@ func (lc *LogCollector) readNewLines(path string, now time.Time) []LogEntry {
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	offset := lc.offsets[path]
 	if _, err := f.Seek(offset, 0); err != nil {

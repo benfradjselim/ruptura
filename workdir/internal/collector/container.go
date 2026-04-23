@@ -63,7 +63,7 @@ func (c *ContainerCollector) collectViaDocker() ([]models.Metric, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list containers: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var containers []struct {
 		ID    string `json:"Id"`
@@ -86,7 +86,7 @@ func (c *ContainerCollector) collectViaDocker() ([]models.Metric, error) {
 		if err != nil {
 			continue
 		}
-		defer statsResp.Body.Close()
+		defer func() { _ = statsResp.Body.Close() }()
 
 		var stats dockerStats
 		if err := json.NewDecoder(statsResp.Body).Decode(&stats); err != nil {
@@ -203,11 +203,11 @@ func readCgroupUint64(path string) uint64 {
 	if err != nil {
 		return 0
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	sc := bufio.NewScanner(f)
 	if sc.Scan() {
 		var v uint64
-		fmt.Sscan(sc.Text(), &v)
+		_, _ = fmt.Sscan(sc.Text(), &v)
 		return v
 	}
 	return 0

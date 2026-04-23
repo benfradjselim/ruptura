@@ -39,7 +39,7 @@ jobs:
           lines = open("/tmp/cover-raw.txt").readlines()
           rows = []
           for line in lines:
-              m = re.match(r'^ok\s+(\S+)\s+[\d.]+s\s+coverage:\s+([\d.]+)%', line)
+              m = re.match(r'^ok\s+(\S+)\s+(?:[\d.]+s|\(cached\))\s+coverage:\s+([\d.]+)%', line)
               if m:
                   pkg = m.group(1).replace("github.com/benfradjselim/ohe/", "")
                   pct = float(m.group(2))
@@ -75,7 +75,7 @@ jobs:
           lines = open("/tmp/cover-raw.txt").readlines()
           failed = []
           for line in lines:
-              m = re.match(r'^ok\s+(\S+)\s+[\d.]+s\s+coverage:\s+([\d.]+)%', line)
+              m = re.match(r'^ok\s+(\S+)\s+(?:[\d.]+s|\(cached\))\s+coverage:\s+([\d.]+)%', line)
               if m and float(m.group(2)) < 60:
                   failed.append(f"{m.group(1)}: {m.group(2)}%")
           if failed:

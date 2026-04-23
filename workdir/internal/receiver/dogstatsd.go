@@ -39,7 +39,7 @@ func (r *DogStatsDReceiver) Run(ctx context.Context) error {
 
 	// Use sync.Once to guarantee exactly one Close regardless of who triggers it
 	var closeOnce sync.Once
-	closeConn := func() { closeOnce.Do(func() { conn.Close() }) }
+	closeConn := func() { closeOnce.Do(func() { _ = conn.Close() }) }
 	defer closeConn()
 
 	logger.Default.Info("dogstatsd listening", "addr", r.addr)

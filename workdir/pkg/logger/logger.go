@@ -97,7 +97,7 @@ func (lg *Logger) emit(level, msg string, ctx context.Context, kvs ...interface{
 
 	for i := 0; i+1 < len(kvs); i += 2 {
 		b.WriteByte(' ')
-		b.WriteString(fmt.Sprint(kvs[i]))
+		_, _ = fmt.Fprint(&b, kvs[i])
 		b.WriteByte('=')
 		b.WriteString(quoteIfNeeded(fmt.Sprint(kvs[i+1])))
 	}

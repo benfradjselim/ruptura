@@ -196,7 +196,7 @@ func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) LivenessHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status":"alive"}`)
+	_, _ = fmt.Fprintf(w, `{"status":"alive"}`)
 }
 
 // ReadinessHandler GET /api/v1/health/ready
@@ -206,11 +206,11 @@ func (h *Handlers) ReadinessHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if atomic.LoadInt32(&h.ready) == 0 || !h.store.Healthy() {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, `{"status":"not_ready"}`)
+		_, _ = fmt.Fprintf(w, `{"status":"not_ready"}`)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status":"ready"}`)
+	_, _ = fmt.Fprintf(w, `{"status":"ready"}`)
 }
 
 // MetricsListHandler GET /api/v1/metrics
@@ -756,7 +756,7 @@ func (h *Handlers) DataSourceTestHandler(w http.ResponseWriter, r *http.Request)
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}()
 	respondSuccess(w, map[string]interface{}{"status": "ok", "http_status": resp.StatusCode})
 }
@@ -1816,7 +1816,7 @@ func parseRelativeOffset(s string, now time.Time) time.Time {
 }
 
 func decodeBody(r *http.Request, dest interface{}) error {
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(r.Body, 10<<20)) // 10MB limit
 	if err != nil {
 		return fmt.Errorf("read body: %w", err)

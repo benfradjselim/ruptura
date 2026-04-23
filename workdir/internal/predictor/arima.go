@@ -185,7 +185,7 @@ func levinsonDurbin(r []float64, p int) []float64 {
 		return phi
 	}
 	phi[0] = r[0]
-	var err float64 = 1 - r[0]*r[0]
+	err := 1 - r[0]*r[0]
 	if err < 1e-12 {
 		return phi
 	}

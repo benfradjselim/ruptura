@@ -14,13 +14,13 @@ import (
 
 // TopologyAnalyzer maintains a live service dependency graph from ingested spans
 type TopologyAnalyzer struct {
-	mu      sync.RWMutex
+	mu sync.RWMutex
 	// spanIndex: traceID → spanID → Span (for parent resolution)
 	spanIndex map[string]map[string]models.Span
 	// edges: "from:to" → EdgeStats
-	edges     map[string]*edgeStats
+	edges map[string]*edgeStats
 	// window: how far back to look when returning topology
-	window    time.Duration
+	window time.Duration
 }
 
 type edgeStats struct {

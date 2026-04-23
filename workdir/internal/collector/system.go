@@ -190,7 +190,7 @@ func readCPUStat() (cpuStat, error) {
 	if err != nil {
 		return cpuStat{}, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -214,7 +214,13 @@ func readCPUStat() (cpuStat, error) {
 			iowait:  parse(fields[5]),
 			irq:     parse(fields[6]),
 			softirq: parse(fields[7]),
-			steal:   func() uint64 { if len(fields) > 8 { v, _ := strconv.ParseUint(fields[8], 10, 64); return v }; return 0 }(),
+			steal: func() uint64 {
+				if len(fields) > 8 {
+					v, _ := strconv.ParseUint(fields[8], 10, 64)
+					return v
+				}
+				return 0
+			}(),
 		}, nil
 	}
 	return cpuStat{}, fmt.Errorf("cpu line not found")
@@ -239,7 +245,7 @@ func readMemInfo() (total, available uint64, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -273,7 +279,7 @@ func readNetStat() (netStat, error) {
 	if err != nil {
 		return netStat{}, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var rxTotal, txTotal uint64
 	scanner := bufio.NewScanner(f)

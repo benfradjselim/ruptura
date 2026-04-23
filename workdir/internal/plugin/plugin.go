@@ -55,13 +55,13 @@ type Info struct {
 
 // Plugin wraps a running plugin subprocess.
 type Plugin struct {
-	Info    Info
-	cmd     *exec.Cmd
-	enc     *json.Encoder
-	dec     *json.Decoder
-	mu      sync.Mutex
-	nextID  int64
-	log     *logger.Logger
+	Info   Info
+	cmd    *exec.Cmd
+	enc    *json.Encoder
+	dec    *json.Decoder
+	mu     sync.Mutex
+	nextID int64
+	log    *logger.Logger
 }
 
 type rpcRequest struct {

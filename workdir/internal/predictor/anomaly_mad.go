@@ -7,13 +7,12 @@ import (
 	"time"
 )
 
-
 // runningMedian tracks an approximate streaming median using two heaps
 // (max-heap for the lower half, min-heap for the upper half).
 // This avoids the O(n log n) sort-per-observe of the naive approach.
 type runningMedian struct {
-	lo  maxHeap // lower half — top is the largest of the small values
-	hi  minHeap // upper half — top is the smallest of the large values
+	lo maxHeap // lower half — top is the largest of the small values
+	hi minHeap // upper half — top is the smallest of the large values
 }
 
 func (r *runningMedian) push(v float64) {
@@ -175,4 +174,3 @@ type MADResult struct {
 	Score     float64
 	Timestamp time.Time
 }
-

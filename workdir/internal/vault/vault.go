@@ -114,7 +114,7 @@ func (c *Client) fetch(ctx context.Context, path, key string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("vault: http: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return "", fmt.Errorf("vault: secret %q not found", path)

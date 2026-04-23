@@ -27,9 +27,9 @@ type StorageBackend interface {
 
 // Server is the OHE gRPC agent ingest server.
 type Server struct {
-	store    StorageBackend
-	grpc     *grpc.Server
-	log      *logger.Logger
+	store StorageBackend
+	grpc  *grpc.Server
+	log   *logger.Logger
 }
 
 // Config holds options for the gRPC server.

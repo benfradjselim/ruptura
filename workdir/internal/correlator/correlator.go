@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	correlationWindow  = 120 * time.Second // ±2 min burst-KPI matching
-	kpiDeltaThreshold  = 10.0              // health_score drop of >10 pts
-	pearsonWindow      = 300               // 5-min rolling Pearson window (samples)
+	correlationWindow = 120 * time.Second // ±2 min burst-KPI matching
+	kpiDeltaThreshold = 10.0              // health_score drop of >10 pts
+	pearsonWindow     = 300               // 5-min rolling Pearson window (samples)
 )
 
 // CorrelationStore persists and queries correlation events in memory.
@@ -226,7 +226,7 @@ func (r *kpiRing) prev() float64 {
 // --- pearsonTracker: online Pearson correlation ---
 
 type pearsonTracker struct {
-	n    int
+	n                               int
 	sumX, sumY, sumXY, sumX2, sumY2 float64
 }
 

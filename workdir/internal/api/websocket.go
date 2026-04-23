@@ -126,15 +126,15 @@ func (h *Handlers) WebSocketHandler(w http.ResponseWriter, r *http.Request) {
 			select {
 			case msg, ok := <-client.send:
 				if !ok {
-					conn.WriteMessage(websocket.CloseMessage, []byte{})
+					_ = conn.WriteMessage(websocket.CloseMessage, []byte{})
 					return
 				}
-				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 				if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
 					return
 				}
 			case <-pingTicker.C:
-				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 					return
 				}
@@ -144,9 +144,9 @@ func (h *Handlers) WebSocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Reader: keep-alive pong handler; runs in handler goroutine
 	conn.SetReadLimit(512)
-	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
 	for {

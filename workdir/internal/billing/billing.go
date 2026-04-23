@@ -114,7 +114,7 @@ func (m *Meter) flush() {
 		return
 	}
 	body, err := json.Marshal(map[string]interface{}{
-		"events":    events,
+		"events":     events,
 		"flushed_at": time.Now().UTC(),
 	})
 	if err != nil {
@@ -126,7 +126,7 @@ func (m *Meter) flush() {
 		logger.Default.Error("billing flush webhook error", "err", err, "events", len(events))
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		logger.Default.Warn("billing webhook returned error", "status", resp.StatusCode, "events", len(events))
 		return

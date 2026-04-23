@@ -70,8 +70,8 @@ func (d *BurstDetector) Observe(service, level string, ts time.Time) {
 // --- burstSeries: per-service per-level rolling window state ---
 
 const (
-	bucketSize   = 10 * time.Second  // granularity of rate counting
-	baselineSize = 30                // number of buckets for baseline (5 min)
+	bucketSize   = 10 * time.Second // granularity of rate counting
+	baselineSize = 30               // number of buckets for baseline (5 min)
 	burstSigma   = 3.0
 )
 

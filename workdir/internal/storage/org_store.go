@@ -304,7 +304,7 @@ func (o *OrgStore) QueryLogs(service string, from, to time.Time, limit int) ([]j
 		startKey = tsKey(prefix, from)
 		endKey = tsKey(prefix, to)
 	}
-	return o.Store.queryLogsRaw(prefix, startKey, endKey, service != "", from, to, limit)
+	return o.queryLogsRaw(prefix, startKey, endKey, service != "", from, to, limit)
 }
 
 func (o *OrgStore) QueryAllLogs(from, to time.Time, limit int) ([]json.RawMessage, error) {

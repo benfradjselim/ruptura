@@ -56,8 +56,9 @@ func NewRouter(h *Handlers, jwtSecret string, authEnabled bool, allowedOrigins [
 	// Query (QQL)
 	api.HandleFunc("/query", h.QueryHandler).Methods(http.MethodPost)
 
-	// KPIs
+	// KPIs (multi must come before {name} to avoid route shadowing)
 	api.HandleFunc("/kpis", h.KPIListHandler).Methods(http.MethodGet)
+	api.HandleFunc("/kpis/multi", h.KPIMultiHandler).Methods(http.MethodGet)
 	api.HandleFunc("/kpis/{name}", h.KPIGetHandler).Methods(http.MethodGet)
 	api.HandleFunc("/kpis/{name}/predict", h.PredictHandler).Methods(http.MethodGet)
 	api.HandleFunc("/predict", h.PredictHandler).Methods(http.MethodGet)
@@ -112,9 +113,6 @@ func NewRouter(h *Handlers, jwtSecret string, authEnabled bool, allowedOrigins [
 
 	// Fleet overview (all hosts aggregate)
 	api.HandleFunc("/fleet", h.FleetHandler).Methods(http.MethodGet)
-
-	// Multi-host KPI snapshot
-	api.HandleFunc("/kpis/multi", h.KPIMultiHandler).Methods(http.MethodGet)
 
 	// Alert rules CRUD
 	api.HandleFunc("/alert-rules", h.AlertRuleListHandler).Methods(http.MethodGet)

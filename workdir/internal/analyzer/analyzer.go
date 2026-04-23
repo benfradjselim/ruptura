@@ -130,7 +130,7 @@ func (a *Analyzer) Update(host string, metrics map[string]float64) models.KPISna
 	// λ is specified per 15s interval; scale by actual dt for variable-rate robustness.
 	// Cap dt to avoid first-call spike on restart.
 	const (
-		maxDt          = 30.0  // cap to 2× expected interval
+		maxDt           = 30.0 // cap to 2× expected interval
 		nominalInterval = 15.0 // seconds per collection cycle
 	)
 	if dt > maxDt {

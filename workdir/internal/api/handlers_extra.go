@@ -88,7 +88,7 @@ func (h *Handlers) PrometheusMetricsHandler(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, buf.String())
+	_, _ = fmt.Fprint(w, buf.String())
 }
 
 func writePrometheusKPI(buf *strings.Builder, name string, val float64, state, host string, ts time.Time) {

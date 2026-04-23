@@ -110,7 +110,7 @@ func (h *Handlers) APIKeyCreateHandler(w http.ResponseWriter, r *http.Request) {
 		APIKey:       key,
 		PlaintextKey: fullKey,
 	}
-	resp.APIKey.KeyHash = "" // do not expose hash in response
+	resp.KeyHash = "" // do not expose hash in response
 	respondSuccess(w, resp)
 }
 

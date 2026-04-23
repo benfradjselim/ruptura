@@ -68,9 +68,10 @@ jobs:
           failed=0
           while IFS= read -r line; do
             # Match lines like: ok   github.com/...   0.123s   coverage: 83.1% of statements
-            if [[ "$line" =~ ^ok[[:space:]]+(.*)[[:space:]]+[0-9]+\.[0-9]+s[[:space:]]+coverage:[[:space:]]+([0-9.]+)% ]]; then
+            # Also matches cached: ok   github.com/...   (cached)   coverage: 83.1% of statements
+            if [[ "$line" =~ ^ok[[:space:]]+(.*)[[:space:]]+([0-9]+\.[0-9]+s|\(cached\))[[:space:]]+coverage:[[:space:]]+([0-9.]+)% ]]; then
               pkg="${BASH_REMATCH[1]}"
-              pct="${BASH_REMATCH[2]}"
+              pct="${BASH_REMATCH[3]}"
               result=$(awk -v p="$pct" 'BEGIN { print (p+0 < 60) ? "fail" : "ok" }')
               if [[ "$result" == "fail" ]]; then
                 echo "FAIL: $pkg — ${pct}% (below 60% gate)"

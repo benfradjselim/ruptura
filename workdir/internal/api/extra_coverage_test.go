@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 )
 
 // TestLokiLabelValues covers the label values endpoint.
@@ -308,6 +309,8 @@ func TestRetentionCompact(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status = %d; want 200", resp.StatusCode)
 	}
+	// Give the async Compact() goroutine time to finish before the store closes.
+	time.Sleep(150 * time.Millisecond)
 }
 
 // TestOrgUpdateDelete covers OrgUpdateHandler and OrgDeleteHandler.
