@@ -1,0 +1,40 @@
+# CODEOWNERS — Kairo Core v6.0.0
+# Maps packages to agent roles (see docs/v6.0.0/AGENTS.md)
+# Format: <pattern> <owner>
+
+# ALPHA — Core engine (Rupture Index, CA-ILR, ensemble, surge profiles)
+/workdir/internal/pipeline/metrics/   @agent-alpha
+/workdir/pkg/rupture/                 @agent-alpha
+
+# BRAVO — Ingest layer + log/trace pipelines
+/workdir/internal/ingest/             @agent-bravo
+/workdir/internal/pipeline/logs/      @agent-bravo
+/workdir/internal/pipeline/traces/    @agent-bravo
+
+# CHARLIE — Signal fusion + composite signals
+/workdir/internal/fusion/             @agent-charlie
+/workdir/internal/composites/         @agent-charlie
+/workdir/pkg/composites/              @agent-charlie
+
+# DELTA — Action engine + explainability
+/workdir/internal/actions/            @agent-delta
+/workdir/internal/explain/            @agent-delta
+
+# ECHO — API, context awareness, storage, telemetry
+/workdir/internal/api/                @agent-echo
+/workdir/internal/context/            @agent-echo
+/workdir/internal/storage/            @agent-echo
+/workdir/internal/telemetry/          @agent-echo
+
+# FOXTROT — Binary entry point, event bus, vault, SDK
+/workdir/cmd/                         @agent-foxtrot
+/workdir/internal/eventbus/           @agent-foxtrot
+/workdir/internal/vault/              @agent-foxtrot
+/workdir/pkg/client/                  @agent-foxtrot
+/sdk/                                 @agent-foxtrot
+
+# Governance docs — Orchestrator only
+/docs/v6.0.0/                         @agent-orchestrator
+/.github/                             @agent-orchestrator
+/workdir/Dockerfile                   @agent-orchestrator
+/CODEOWNERS                           @agent-orchestrator

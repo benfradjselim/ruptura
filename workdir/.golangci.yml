@@ -16,14 +16,13 @@ issues:
       linters:
         - errcheck
 
-    # WebSocket: deadline/close errors mean the connection is already dead
-    - path: "websocket\\.go"
-      text: "WriteMessage|SetWriteDeadline|SetReadDeadline"
+    # io.Copy drain on response body — error = connection dead, nothing actionable
+    - path: "handlers.*\\.go"
+      text: "io.Copy"
       linters:
         - errcheck
 
-    # io.Copy drain on response body — error = connection dead, nothing actionable
-    - path: "handlers\\.go|orchestrator\\.go"
+    - path: "cmd/kairo-core/main\\.go"
       text: "io.Copy"
       linters:
         - errcheck

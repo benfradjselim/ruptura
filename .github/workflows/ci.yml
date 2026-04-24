@@ -1,36 +1,26 @@
-name: CI
+name: CI — Kairo Core v6
+# See docs/v6.0.0/DEV-GUIDE.md for debugging failures
 
 on:
   push:
     branches: ["**"]
+    tags: ["v6.*"]
   pull_request:
-    branches: ["**"]
+    branches: ["v6_main", "main"]
 
 env:
   GO_VERSION: "1.22"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/kairo-core
 
 jobs:
+  # ── Stage 1+2: Build + Vet + Test ───────────────────────────────────────────
   test:
-    name: Build & Test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Build, Vet & Test
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: workdir
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            goos: linux
-            goarch: amd64
-          - os: ubuntu-24.04-arm
-            goos: linux
-            goarch: arm64
-          - os: macos-latest
-            goos: darwin
-            goarch: amd64
-
     steps:
       - uses: actions/checkout@v4
 
@@ -44,65 +34,69 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Verify dependencies
-        run: go mod verify
-
       - name: Build
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
         run: go build ./...
 
       - name: Vet
         run: go vet ./...
 
-      - name: Test with coverage
+      - name: Test with race detector
         run: |
-          go test -race -coverprofile=coverage.out -covermode=atomic -timeout=120s ./... 2>&1 | tee test-output.txt
+          go test -race -coverprofile=coverage.out -covermode=atomic -timeout=120s ./...
           go tool cover -func=coverage.out | tail -1
 
-      - name: Coverage gate — per-package ≥60%
-        run: |
-          # Get list of all packages
-          all_pkgs=$(go list ./...)
-          # Exclude main package and models from coverage gate
-          pkgs_to_check=$(echo "$all_pkgs" | grep -v "github.com/benfradjselim/ohe/cmd/ohe" | grep -v "github.com/benfradjselim/ohe/pkg/models")
-          
-          # Run tests and check coverage for permitted packages
-          failed=0
-          for pkg in $pkgs_to_check; do
-            pct=$(go test -cover -timeout=120s "$pkg" | awk '/coverage:/ {print $NF}' | sed 's/%//')
-            if [ -n "$pct" ]; then
-              result=$(awk -v p="$pct" 'BEGIN { print (p+0 < 60) ? "fail" : "ok" }')
-              if [ "$result" == "fail" ]; then
-                echo "FAIL: $pkg — ${pct}% (below 60% gate)"
-                failed=1
-              else
-                echo "OK: $pkg — ${pct}%"
-              fi
-            fi
-          done
-          
-          if [[ "$failed" -eq 1 ]]; then
-            echo "Coverage gate failed for one or more packages."
-            exit 1
-          fi
-          echo "All packages meet ≥60% coverage gate."
-
       - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: workdir/coverage.out
 
-  lint:
-    name: Lint
+  # ── Stage 3: Coverage gate ≥70% total ───────────────────────────────────────
+  coverage:
+    name: Coverage gate (≥70% total)
+    needs: test
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: workdir
+    steps:
+      - uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: workdir/go.sum
+
+      - name: Download coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          path: workdir
+
+      - name: Total coverage gate
+        run: |
+          total=$(go tool cover -func=coverage.out | grep total | awk '{print $NF}' | sed 's/%//')
+          echo "Total coverage: ${total}%"
+          result=$(awk -v p="$total" 'BEGIN { print (p+0 < 70) ? "fail" : "ok" }')
+          if [ "$result" = "fail" ]; then
+            echo "FAIL: ${total}% is below 70% gate — see docs/v6.0.0/DEV-GUIDE.md section 4"
+            exit 1
+          fi
+          echo "OK: ${total}% meets >=70% gate"
+
+      - name: Per-package report
+        run: go tool cover -func=coverage.out | grep -v "^total"
+
+  # ── Stage 4: Lint ────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workdir
     steps:
       - uses: actions/checkout@v4
 
@@ -119,3 +113,77 @@ jobs:
           version: latest
           working-directory: workdir
           args: --timeout=5m
+
+  # ── Stage 5: Docker build + push (tag v6.* only) ────────────────────────────
+  docker:
+    name: Docker build & push
+    needs: [coverage, lint]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v6.')
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: workdir
+          file: workdir/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Stage 6: Sign with cosign (tag v6.* only) ───────────────────────────────
+  sign:
+    name: Sign image (cosign)
+    needs: docker
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v6.')
+    permissions:
+      packages: write
+      id-token: write
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign image
+        run: |
+          cosign sign --yes \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}

@@ -1,41 +1,30 @@
-# ── Stage 1: build the UI ────────────────────────────────────────────────────
-FROM node:20-alpine AS ui-builder
-WORKDIR /app/ui
-COPY ui/package*.json ./
-RUN npm ci --silent
-COPY ui/ ./
-RUN npm run build          # outputs to ../web (vite.config.js: outDir: '../web')
-
-# ── Stage 2: build the Go binary ─────────────────────────────────────────────
-FROM golang:1.25-alpine AS go-builder
+# ── Stage 1: build the Go binary ─────────────────────────────────────────────
+FROM golang:1.22-alpine AS builder
 WORKDIR /app
 
-# Cache dependencies first
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy sources
-COPY cmd/    cmd/
+COPY cmd/      cmd/
 COPY internal/ internal/
-COPY pkg/    pkg/
+COPY pkg/      pkg/
+COPY sdk/      sdk/
 
-# Copy compiled UI artefacts from stage 1
-COPY --from=ui-builder /app/web ./web
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /kairo-core \
+    ./cmd/kairo-core
 
-# Embed web dir at build time (served at runtime via http.FileServer)
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /ohe ./cmd/ohe
-
-# ── Stage 3: minimal runtime image ───────────────────────────────────────────
+# ── Stage 2: minimal runtime image ───────────────────────────────────────────
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 
-COPY --from=go-builder /ohe /ohe
-
-# Embed the compiled UI so the binary can serve it
-COPY --from=go-builder /app/web /web
+COPY --from=builder /kairo-core /kairo-core
 
 WORKDIR /
-EXPOSE 8080
+EXPOSE 8080 9090
 
-# Liveness  probe: GET /api/v1/health/live  → 200
-# Readiness probe: GET /api/v1/health/ready → 200
-ENTRYPOINT ["/ohe", "central"]
+# Liveness  probe: GET /api/v2/health -> 200
+# Readiness probe: GET /api/v2/ready  -> 200
+ENTRYPOINT ["/kairo-core"]
+CMD ["--config", "/etc/kairo/kairo.yaml"]
