@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benfradjselim/ohe/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/models"
 )
 
 // ContainerCollector reads cgroup-based metrics for running containers.

@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/ohe/internal/storage"
-	"github.com/benfradjselim/ohe/pkg/models"
-	"github.com/benfradjselim/ohe/pkg/logger"
+	"github.com/benfradjselim/kairo-core/internal/storage"
+	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/logger"
 )
 
 // DogStatsDReceiver listens on UDP 8125 for DogStatsD / StatsD protocol metrics.

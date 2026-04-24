@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/ohe/pkg/models"
-	"github.com/benfradjselim/ohe/pkg/utils"
+	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/utils"
 )
 
 // Rule defines an alert trigger condition

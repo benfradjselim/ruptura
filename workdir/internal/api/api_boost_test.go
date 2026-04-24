@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/benfradjselim/ohe/internal/alerter"
-	"github.com/benfradjselim/ohe/internal/analyzer"
-	"github.com/benfradjselim/ohe/internal/api"
-	"github.com/benfradjselim/ohe/internal/predictor"
-	"github.com/benfradjselim/ohe/internal/processor"
-	"github.com/benfradjselim/ohe/internal/storage"
-	"github.com/benfradjselim/ohe/pkg/models"
+	"github.com/benfradjselim/kairo-core/internal/alerter"
+	"github.com/benfradjselim/kairo-core/internal/analyzer"
+	"github.com/benfradjselim/kairo-core/internal/api"
+	"github.com/benfradjselim/kairo-core/internal/predictor"
+	"github.com/benfradjselim/kairo-core/internal/processor"
+	"github.com/benfradjselim/kairo-core/internal/storage"
+	"github.com/benfradjselim/kairo-core/pkg/models"
 )
 
 func setupHandlers(t *testing.T) (*api.Handlers, func()) {

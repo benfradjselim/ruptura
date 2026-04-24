@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/benfradjselim/ohe/internal/plugin"
+	"github.com/benfradjselim/kairo-core/internal/plugin"
 )
 
 // writeStubPlugin writes a small Go-source plugin, compiles it, and returns its path.

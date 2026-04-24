@@ -7,7 +7,7 @@ package api
 import (
 	"testing"
 
-	"github.com/benfradjselim/ohe/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/models"
 )
 
 // --- otlpSeverityToLevel ---

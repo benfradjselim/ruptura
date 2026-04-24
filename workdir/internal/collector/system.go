@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/ohe/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/models"
 )
 
 // SystemCollector reads metrics from /proc on Linux, or uses runtime on other platforms.

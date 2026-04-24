@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/ohe/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/models"
 )
 
 func TestDefaultConfig(t *testing.T) {

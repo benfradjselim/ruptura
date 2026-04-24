@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/ohe/internal/vault"
+	"github.com/benfradjselim/kairo-core/internal/vault"
 )
 
 func vaultResponse(data map[string]string) interface{} {

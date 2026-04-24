@@ -2,10 +2,10 @@ package receiver
 
 import (
 
-	"github.com/benfradjselim/ohe/internal/analyzer"
-	"github.com/benfradjselim/ohe/internal/storage"
-	"github.com/benfradjselim/ohe/pkg/models"
-	"github.com/benfradjselim/ohe/pkg/logger"
+	"github.com/benfradjselim/kairo-core/internal/analyzer"
+	"github.com/benfradjselim/kairo-core/internal/storage"
+	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/logger"
 )
 
 // Bus wires ingested data from all receivers into the OHE pipeline.

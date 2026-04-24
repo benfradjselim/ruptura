@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benfradjselim/ohe/pkg/models"
-	"github.com/benfradjselim/ohe/pkg/utils"
+	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/utils"
 	"github.com/gorilla/mux"
 )
 

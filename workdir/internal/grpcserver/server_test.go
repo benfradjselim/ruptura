@@ -9,9 +9,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/benfradjselim/ohe/internal/grpcserver"
-	pb "github.com/benfradjselim/ohe/internal/grpcserver/proto"
-	"github.com/benfradjselim/ohe/internal/storage"
+	"github.com/benfradjselim/kairo-core/internal/grpcserver"
+	pb "github.com/benfradjselim/kairo-core/internal/grpcserver/proto"
+	"github.com/benfradjselim/kairo-core/internal/storage"
 )
 
 func openTestStore(t *testing.T) *storage.Store {

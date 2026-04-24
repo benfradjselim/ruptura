@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benfradjselim/ohe/internal/alerter"
-	"github.com/benfradjselim/ohe/internal/storage"
-	"github.com/benfradjselim/ohe/pkg/models"
-	"github.com/benfradjselim/ohe/pkg/utils"
+	"github.com/benfradjselim/kairo-core/internal/alerter"
+	"github.com/benfradjselim/kairo-core/internal/storage"
+	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/utils"
 	"github.com/gorilla/mux"
-	"github.com/benfradjselim/ohe/pkg/logger"
+	"github.com/benfradjselim/kairo-core/pkg/logger"
 )
 
 // ---------------------------------------------------------------------------

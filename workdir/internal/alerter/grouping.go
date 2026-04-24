@@ -4,9 +4,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/ohe/internal/analyzer"
-	"github.com/benfradjselim/ohe/pkg/models"
-	"github.com/benfradjselim/ohe/pkg/utils"
+	"github.com/benfradjselim/kairo-core/internal/analyzer"
+	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/utils"
 )
 
 const suppressionCeiling = 5 * time.Minute

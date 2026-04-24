@@ -1,4 +1,4 @@
-module github.com/benfradjselim/ohe
+module github.com/benfradjselim/kairo-core
 
 go 1.18
 

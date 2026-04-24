@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/ohe/internal/notifier"
-	"github.com/benfradjselim/ohe/pkg/models"
+	"github.com/benfradjselim/kairo-core/internal/notifier"
+	"github.com/benfradjselim/kairo-core/pkg/models"
 )
 
 func makeAlert(name, severity string) models.Alert {

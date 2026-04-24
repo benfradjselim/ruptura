@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/benfradjselim/ohe/internal/storage"
+	"github.com/benfradjselim/kairo-core/internal/storage"
 )
 
 // AuditLogHandler GET /api/v1/audit (admin only)

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benfradjselim/ohe/pkg/models"
-	"github.com/benfradjselim/ohe/pkg/logger"
+	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/logger"
 )
 
 const otlpMaxBodyBytes = 32 << 20 // 32 MB

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/benfradjselim/ohe/pkg/logger"
+	"github.com/benfradjselim/kairo-core/pkg/logger"
 )
 
 // newUpgrader returns a WebSocket upgrader that enforces the CORS origin allowlist.

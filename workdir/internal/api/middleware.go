@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/ohe/pkg/logger"
+	"github.com/benfradjselim/kairo-core/pkg/logger"
 	"github.com/golang-jwt/jwt/v5"
 )
 

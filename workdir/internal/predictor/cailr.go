@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/ohe/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/models"
 )
 
 // CAILR is the Context-Aware Incremental Linear Regression dual-scale detector (v5.0).

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/ohe/internal/analyzer"
-	"github.com/benfradjselim/ohe/pkg/models"
+	"github.com/benfradjselim/kairo-core/internal/analyzer"
+	"github.com/benfradjselim/kairo-core/pkg/models"
 )
 
 func TestGroupingEngineNoSuppression(t *testing.T) {

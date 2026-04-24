@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/ohe/internal/storage"
-	"github.com/benfradjselim/ohe/pkg/models"
+	"github.com/benfradjselim/kairo-core/internal/storage"
+	"github.com/benfradjselim/kairo-core/pkg/models"
 )
 
 // --- mock sinks ---

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benfradjselim/ohe/pkg/models"
-	"github.com/benfradjselim/ohe/pkg/logger"
+	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/kairo-core/pkg/logger"
 )
 
 // MetricSink accepts parsed metrics from any receiver

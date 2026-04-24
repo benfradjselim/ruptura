@@ -27,7 +27,7 @@ import (
 
 	"github.com/golang/snappy"
 
-	"github.com/benfradjselim/ohe/pkg/logger"
+	"github.com/benfradjselim/kairo-core/pkg/logger"
 )
 
 // RemoteWriteHandler accepts Prometheus remote_write payloads and converts them

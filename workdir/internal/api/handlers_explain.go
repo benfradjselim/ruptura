@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/benfradjselim/ohe/pkg/utils"
+	"github.com/benfradjselim/kairo-core/pkg/utils"
 )
 
 // kpiExplanation is the canonical response shape for GET /api/v1/explain/:kpi.
