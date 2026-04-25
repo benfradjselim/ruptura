@@ -70,9 +70,9 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 
 | WP Section | Spec Item | Package | Test File | Agent | Phase | Status |
 |-----------|-----------|---------|-----------|-------|-------|--------|
-| §9 | R_fused = 0.6*R_metric + 0.2*R_log + 0.2*R_trace | `internal/fusion/fusion.go` | `fusion_test.go` | CHARLIE | 2c | PENDING |
-| §9 | Time alignment: reject lag > 30s | `internal/fusion/fusion.go` | `fusion_test.go` | CHARLIE | 2c | PENDING |
-| §9 | Conflict detection: divergence > 2.0 | `internal/fusion/fusion.go` | `fusion_test.go` | CHARLIE | 2c | PENDING |
+| §9 | R_fused = 0.6*R_metric + 0.2*R_log + 0.2*R_trace | `internal/fusion/fusion.go` | `fusion_test.go` | CHARLIE | 2c | CI_GREEN |
+| §9 | Time alignment: reject lag > 30s | `internal/fusion/fusion.go` | `fusion_test.go` | CHARLIE | 2c | CI_GREEN |
+| §9 | Conflict detection: divergence > 2.0 | `internal/fusion/fusion.go` | `fusion_test.go` | CHARLIE | 2c | CI_GREEN |
 
 ---
 
@@ -80,16 +80,16 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 
 | WP Section | Spec Item | Package | Test File | Agent | Phase | Status |
 |-----------|-----------|---------|-----------|-------|-------|--------|
-| §11.3 | Stress (5-factor weighted) | `internal/composites/stress.go` | `composites_test.go` | CHARLIE | 2c | PENDING |
-| §11.4 | Fatigue accumulator (lambda=0.05) | `internal/composites/fatigue.go` | `composites_test.go` | CHARLIE | 2c | PENDING |
-| §11.4 | Fatigue half-life = ln(2)/lambda | `internal/composites/fatigue.go` | `composites_test.go` | CHARLIE | 2c | PENDING |
-| §11.5 | Pressure z-score composite | `internal/composites/pressure.go` | `composites_test.go` | CHARLIE | 2c | PENDING |
-| §11.6 | Contagion graph propagation | `internal/composites/contagion.go` | `composites_test.go` | CHARLIE | 2c | PENDING |
-| §11.7 | Resilience: 1/(1+mean(Stress,W=30m)) | `internal/composites/resilience.go` | `composites_test.go` | CHARLIE | 2c | PENDING |
-| §11.8 | Entropy: Shannon variance | `internal/composites/entropy.go` | `composites_test.go` | CHARLIE | 2c | PENDING |
-| §11.9 | Sentiment: log(N_pos+1)-log(N_neg+1) | `internal/composites/sentiment.go` | `composites_test.go` | CHARLIE | 2c | PENDING |
-| §11.10 | HealthScore: multiplicative [0,100] | `internal/composites/healthscore.go` | `composites_test.go` | CHARLIE | 2c | PENDING |
-| §11 | pkg/composites pure exported functions | `pkg/composites/composites.go` | `pkg_composites_test.go` | CHARLIE | 2c | PENDING |
+| §11.3 | Stress (5-factor weighted) | `internal/composites/stress.go` | `composites_test.go` | CHARLIE | 2c | CI_GREEN |
+| §11.4 | Fatigue accumulator (lambda=0.05) | `internal/composites/fatigue.go` | `composites_test.go` | CHARLIE | 2c | CI_GREEN |
+| §11.4 | Fatigue half-life = ln(2)/lambda | `internal/composites/fatigue.go` | `composites_test.go` | CHARLIE | 2c | CI_GREEN |
+| §11.5 | Pressure z-score composite | `internal/composites/pressure.go` | `composites_test.go` | CHARLIE | 2c | CI_GREEN |
+| §11.6 | Contagion graph propagation | `internal/composites/contagion.go` | `composites_test.go` | CHARLIE | 2c | CI_GREEN |
+| §11.7 | Resilience: 1/(1+mean(Stress,W=30m)) | `internal/composites/resilience.go` | `composites_test.go` | CHARLIE | 2c | CI_GREEN |
+| §11.8 | Entropy: Shannon variance | `internal/composites/entropy.go` | `composites_test.go` | CHARLIE | 2c | CI_GREEN |
+| §11.9 | Sentiment: log(N_pos+1)-log(N_neg+1) | `internal/composites/sentiment.go` | `composites_test.go` | CHARLIE | 2c | CI_GREEN |
+| §11.10 | HealthScore: multiplicative [0,100] | `internal/composites/healthscore.go` | `composites_test.go` | CHARLIE | 2c | CI_GREEN |
+| §11 | pkg/composites pure exported functions | `pkg/composites/composites.go` | `pkg_composites_test.go` | CHARLIE | 2c | CI_GREEN |
 
 ---
 
@@ -179,4 +179,4 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 ---
 
 Produced: 2026-04-24
-Last updated: 2026-04-24 (Phase 1 — all items PENDING)
+Last updated: 2026-04-25 (Phase 2c — CHARLIE work completed)
