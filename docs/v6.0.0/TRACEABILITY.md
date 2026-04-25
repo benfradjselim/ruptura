@@ -179,4 +179,4 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 ---
 
 Produced: 2026-04-24
-Last updated: 2026-04-25 (Phase 4 — ECHO complete)
+Last updated: 2026-04-25 (Phase 5 — FOXTROT complete; v6.0.0 tagged)
