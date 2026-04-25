@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kairo-client"
+version = "6.0.0"
+description = "Official Python SDK for Kairo Core v6 — autonomous observability"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "benfradjselim", email = "benfradjselim@gmail.com" }]
+keywords = ["observability", "monitoring", "mlops", "kairo", "rupture"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = ["requests>=2.28"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-cov>=4", "responses>=0.24"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["kairo*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
