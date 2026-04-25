@@ -1,0 +1,14 @@
+apiVersion: v2
+name: kairo-core
+description: Kairo anomaly-detection engine — single-binary HTTP/metrics server
+type: application
+version: 6.0.0
+appVersion: "6.0.0"
+keywords:
+  - kairo
+  - anomaly-detection
+  - mlops
+  - observability
+maintainers:
+  - name: benfradjselim
+    email: benfradjselim@gmail.com

@@ -27,4 +27,4 @@ EXPOSE 8080 9090
 # Liveness  probe: GET /api/v2/health -> 200
 # Readiness probe: GET /api/v2/ready  -> 200
 ENTRYPOINT ["/kairo-core"]
-CMD ["--config", "/etc/kairo/kairo.yaml"]
+CMD ["--port", "8080", "--storage", "/var/lib/kairo/data"]
