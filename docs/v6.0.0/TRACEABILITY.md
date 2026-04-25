@@ -32,13 +32,13 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 
 | WP Section | Spec Item | Package | Test File | Agent | Phase | Status |
 |-----------|-----------|---------|-----------|-------|-------|--------|
-| §15.1 | Prometheus remote_write (Snappy) | `internal/ingest/remotewrite.go` | `ingest_test.go` | BRAVO | 2b | PENDING |
-| §15.1 | OTLP/HTTP metrics | `internal/ingest/otlp.go` | `ingest_test.go` | BRAVO | 2b | PENDING |
-| §15.1 | OTLP/HTTP logs | `internal/ingest/otlp.go` | `ingest_test.go` | BRAVO | 2b | PENDING |
-| §15.1 | OTLP/HTTP traces | `internal/ingest/otlp.go` | `ingest_test.go` | BRAVO | 2b | PENDING |
-| §15.1 | DogStatsD UDP | `internal/ingest/dogstatsd.go` | `ingest_test.go` | BRAVO | 2b | PENDING |
-| §15.1 | gRPC push | `internal/ingest/grpc.go` | `ingest_test.go` | BRAVO | 2b | PENDING |
-| §8.4 | Cardinality: max 50k streams | `internal/ingest/cardinality.go` | `ingest_test.go` | BRAVO | 2b | PENDING |
+| §15.1 | Prometheus remote_write (Snappy) | `internal/ingest/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §15.1 | OTLP/HTTP metrics | `internal/ingest/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §15.1 | OTLP/HTTP logs | `internal/ingest/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §15.1 | OTLP/HTTP traces | `internal/ingest/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §15.1 | DogStatsD UDP | `internal/ingest/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §15.1 | gRPC push (v6.1 stub) | `internal/ingest/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §8.4 | Cardinality: max 50k streams | `internal/ingest/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
 
 ---
 
@@ -46,10 +46,10 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 
 | WP Section | Spec Item | Package | Test File | Agent | Phase | Status |
 |-----------|-----------|---------|-----------|-------|-------|--------|
-| §8.2 | ErrorRateExtractor (15s bucket) | `internal/pipeline/logs/error_rate.go` | `logs_test.go` | BRAVO | 2b | PENDING |
-| §8.2 | KeywordCounter regex | `internal/pipeline/logs/keyword.go` | `logs_test.go` | BRAVO | 2b | PENDING |
-| §8.2 | BurstDetector | `internal/pipeline/logs/burst.go` | `logs_test.go` | BRAVO | 2b | PENDING |
-| §8.2 | NoveltyScorer (disabled default) | `internal/pipeline/logs/novelty.go` | `logs_test.go` | BRAVO | 2b | PENDING |
+| §8.2 | ErrorRateExtractor (15s bucket) | `internal/pipeline/logs/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §8.2 | KeywordCounter regex | `internal/pipeline/logs/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §8.2 | BurstDetector | `internal/pipeline/logs/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §8.2 | NoveltyScorer (disabled default) | `internal/pipeline/logs/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
 
 ---
 
@@ -57,12 +57,12 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 
 | WP Section | Spec Item | Package | Test File | Agent | Phase | Status |
 |-----------|-----------|---------|-----------|-------|-------|--------|
-| §8.3 | TopologyBuilder | `internal/pipeline/traces/topology.go` | `traces_test.go` | BRAVO | 2b | PENDING |
-| §8.3 | LatencyPropagationAnalyzer | `internal/pipeline/traces/latency.go` | `traces_test.go` | BRAVO | 2b | PENDING |
-| §8.3 | BottleneckScoreAnalyzer (pct=0.3) | `internal/pipeline/traces/bottleneck.go` | `traces_test.go` | BRAVO | 2b | PENDING |
-| §8.3 | ErrorCascadeAnalyzer (cascade_index formula) | `internal/pipeline/traces/cascade.go` | `traces_test.go` | BRAVO | 2b | PENDING |
-| §8.3 | FanoutPressureAnalyzer (threshold=50) | `internal/pipeline/traces/fanout.go` | `traces_test.go` | BRAVO | 2b | PENDING |
-| §8.3 | Topology: max_services=500, min_samples=100 | `internal/pipeline/traces/topology.go` | `traces_test.go` | BRAVO | 2b | PENDING |
+| §8.3 | TopologyBuilder | `internal/pipeline/traces/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §8.3 | LatencyPropagationAnalyzer | `internal/pipeline/traces/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §8.3 | BottleneckScoreAnalyzer (pct=0.3) | `internal/pipeline/traces/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §8.3 | ErrorCascadeAnalyzer (cascade_index formula) | `internal/pipeline/traces/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §8.3 | FanoutPressureAnalyzer (threshold=50) | `internal/pipeline/traces/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
+| §8.3 | Topology: max_services=500, min_samples=100 | `internal/pipeline/traces/engine.go` | `engine_test.go` | BRAVO | 2b | CI_GREEN |
 
 ---
 
@@ -179,4 +179,4 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 ---
 
 Produced: 2026-04-24
-Last updated: 2026-04-25 (Phase 2c — CHARLIE work completed)
+Last updated: 2026-04-25 (Phase 2b+2c — BRAVO+CHARLIE complete)
