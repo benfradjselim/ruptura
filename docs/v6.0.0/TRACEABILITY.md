@@ -97,18 +97,18 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 
 | WP Section | Spec Item | Package | Test File | Agent | Phase | Status |
 |-----------|-----------|---------|-----------|-------|-------|--------|
-| §12.2 | Tier 1 (C>0.85, automated) | `internal/actions/engine/tier.go` | `engine_test.go` | DELTA | 3 | PENDING |
-| §12.2 | Tier 2 (C>0.60, approval) | `internal/actions/engine/tier.go` | `engine_test.go` | DELTA | 3 | PENDING |
-| §12.2 | Tier 3 (human only) | `internal/actions/engine/tier.go` | `engine_test.go` | DELTA | 3 | PENDING |
-| §12.4 | WebhookProvider | `internal/actions/providers/webhook.go` | `providers_test.go` | DELTA | 3 | PENDING |
-| §12.4 | AlertmanagerProvider | `internal/actions/providers/alertmanager.go` | `providers_test.go` | DELTA | 3 | PENDING |
-| §12.4 | KubernetesProvider | `internal/actions/providers/kubernetes.go` | `providers_test.go` | DELTA | 3 | PENDING |
-| §12.4 | PagerDutyProvider | `internal/actions/providers/pagerduty.go` | `providers_test.go` | DELTA | 3 | PENDING |
-| §12.5 | Rate limit: 6 Tier-1/target/hour | `internal/actions/safety/ratelimit.go` | `safety_test.go` | DELTA | 3 | PENDING |
-| §12.5 | Cooldown tracker | `internal/actions/safety/cooldown.go` | `safety_test.go` | DELTA | 3 | PENDING |
-| §12.5 | Rollback: R_new > R_old | `internal/actions/safety/rollback.go` | `safety_test.go` | DELTA | 3 | PENDING |
-| §12.5 | Emergency stop | `internal/actions/safety/emergencystop.go` | `safety_test.go` | DELTA | 3 | PENDING |
-| §12.5 | Shadow mode | `internal/actions/safety/shadow.go` | `safety_test.go` | DELTA | 3 | PENDING |
+| §12.2 | Tier 1 (C>0.85, automated) | `internal/actions/engine/tier.go` | `engine_test.go` | DELTA | 3 | CI_GREEN |
+| §12.2 | Tier 2 (C>0.60, approval) | `internal/actions/engine/tier.go` | `engine_test.go` | DELTA | 3 | CI_GREEN |
+| §12.2 | Tier 3 (human only) | `internal/actions/engine/tier.go` | `engine_test.go` | DELTA | 3 | CI_GREEN |
+| §12.4 | WebhookProvider | `internal/actions/providers/webhook.go` | `providers_test.go` | DELTA | 3 | CI_GREEN |
+| §12.4 | AlertmanagerProvider | `internal/actions/providers/alertmanager.go` | `providers_test.go` | DELTA | 3 | CI_GREEN |
+| §12.4 | KubernetesProvider | `internal/actions/providers/kubernetes.go` | `providers_test.go` | DELTA | 3 | CI_GREEN |
+| §12.4 | PagerDutyProvider | `internal/actions/providers/pagerduty.go` | `providers_test.go` | DELTA | 3 | CI_GREEN |
+| §12.5 | Rate limit: 6 Tier-1/target/hour | `internal/actions/safety/ratelimit.go` | `safety_test.go` | DELTA | 3 | CI_GREEN |
+| §12.5 | Cooldown tracker | `internal/actions/safety/cooldown.go` | `safety_test.go` | DELTA | 3 | CI_GREEN |
+| §12.5 | Rollback: R_new > R_old | `internal/actions/safety/rollback.go` | `safety_test.go` | DELTA | 3 | CI_GREEN |
+| §12.5 | Emergency stop | `internal/actions/safety/emergencystop.go` | `safety_test.go` | DELTA | 3 | CI_GREEN |
+| §12.5 | Shadow mode | `internal/actions/safety/shadow.go` | `safety_test.go` | DELTA | 3 | CI_GREEN |
 
 ---
 
@@ -116,9 +116,9 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 
 | WP Section | Spec Item | Package | Test File | Agent | Phase | Status |
 |-----------|-----------|---------|-----------|-------|-------|--------|
-| §13.2 | Level 1: metric contribution | `internal/explain/trace.go` | `explain_test.go` | DELTA | 3 | PENDING |
-| §13.2 | Level 2: temporal ordering (partial) | `internal/explain/trace.go` | `explain_test.go` | DELTA | 3 | PENDING |
-| §13.4 | Formula audit: intermediate values | `internal/explain/formula.go` | `explain_test.go` | DELTA | 3 | PENDING |
+| §13.2 | Level 1: metric contribution | `internal/explain/trace.go` | `explain_test.go` | DELTA | 3 | CI_GREEN |
+| §13.2 | Level 2: temporal ordering (partial) | `internal/explain/trace.go` | `explain_test.go` | DELTA | 3 | CI_GREEN |
+| §13.4 | Formula audit: intermediate values | `internal/explain/formula.go` | `explain_test.go` | DELTA | 3 | CI_GREEN |
 | §16.1 | GET /api/v2/explain/{id} | `internal/api/handlers_explain.go` | `api_test.go` | ECHO | 4 | PENDING |
 | §16.1 | GET /api/v2/explain/{id}/formula | `internal/api/handlers_explain.go` | `api_test.go` | ECHO | 4 | PENDING |
 
@@ -179,4 +179,4 @@ Matrix: WP Section <-> Package <-> Test File <-> Agent <-> Phase <-> Status
 ---
 
 Produced: 2026-04-24
-Last updated: 2026-04-25 (Phase 2b+2c — BRAVO+CHARLIE complete)
+Last updated: 2026-04-25 (Phase 3 — DELTA complete)
