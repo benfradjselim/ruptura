@@ -68,7 +68,7 @@ func (e *seriesEnsemble) Update(x, y float64) {
 
 // Forecast returns a full ForecastResult for the given horizon in minutes.
 // horizonSteps is computed as horizonMin*60/15 (one step = 15s).
-func (e *seriesEnsemble) Forecast(host, metric string, horizonMin int, startTS time.Time) models.ForecastResult {
+func (e *seriesEnsemble) Forecast(host, metric string, horizonMin int, startTS time.Time, mode EnsembleMode) models.ForecastResult {
 	now := time.Now()
 	x := now.Sub(startTS).Seconds()
 	steps := (horizonMin * 60) / 15
@@ -76,7 +76,7 @@ func (e *seriesEnsemble) Forecast(host, metric string, horizonMin int, startTS t
 		steps = 1
 	}
 
-	wILR, wHW, wAR := e.weights()
+	wILR, wHW, wAR := e.weights(mode)
 
 	// Build forecast points at 1, 5, 10, 30, horizonMin offsets
 	offsets := forecastOffsets(horizonMin)
@@ -123,9 +123,9 @@ func (e *seriesEnsemble) Forecast(host, metric string, horizonMin int, startTS t
 }
 
 // ForecastSingle returns the ensemble mean for horizonMin ahead (for backwards compat).
-func (e *seriesEnsemble) ForecastSingle(x float64, horizonMin int, startTS time.Time) (mean, low80, up80, low95, up95 float64) {
+func (e *seriesEnsemble) ForecastSingle(x float64, horizonMin int, startTS time.Time, mode EnsembleMode) (mean, low80, up80, low95, up95 float64) {
 	steps := horizonMin * 4
-	wILR, wHW, wAR := e.weights()
+	wILR, wHW, wAR := e.weights(mode)
 	m, sd := e.ensembleMeanStddev(x, steps, startTS, wILR, wHW, wAR)
 	return m, m - z80*sd, m + z80*sd, m - z95*sd, m + z95*sd
 }
@@ -160,7 +160,10 @@ func (e *seriesEnsemble) hwForecast(steps int) float64 {
 // ensemble (weight=0) so the remaining warm models carry full weight. ILR is
 // always at least partially weighted once it has 3 points, since it is the
 // only model that is available from the very first samples.
-func (e *seriesEnsemble) weights() (wILR, wHW, wAR float64) {
+func (e *seriesEnsemble) weights(mode EnsembleMode) (wILR, wHW, wAR float64) {
+	if mode == EnsembleModeFixed {
+		return FixedWeightILR, FixedWeightHW, FixedWeightARIM
+	}
 	iILR := 0.0
 	if e.ilrMSE.ready() {
 		iILR = e.ilrMSE.inverseMSE()

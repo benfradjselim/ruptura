@@ -14,16 +14,26 @@ type Engine struct {
 	cailr    *cailrStore
 	ensemble map[string]*seriesEnsemble // key: "host:metric"
 	start    time.Time
+	cfg      EngineConfig
 }
 
-// NewEngine constructs a ready-to-use MetricPipeline engine.
-func NewEngine() *Engine {
+// NewEngineWithConfig constructs a ready-to-use MetricPipeline engine with custom config.
+func NewEngineWithConfig(cfg EngineConfig) *Engine {
 	return &Engine{
 		cailr:    newCAILRStore(),
 		ensemble: make(map[string]*seriesEnsemble),
 		start:    time.Now(),
+		cfg:      cfg,
 	}
 }
+
+// NewEngine constructs a ready-to-use MetricPipeline engine.
+func NewEngine() *Engine {
+	return NewEngineWithConfig(DefaultEngineConfig())
+}
+
+// EnsembleMode returns the configured ensemble mode.
+func (e *Engine) EnsembleMode() EnsembleMode { return e.cfg.EnsembleMode }
 
 func (e *Engine) key(host, metric string) string { return host + ":" + metric }
 
@@ -81,7 +91,7 @@ func (e *Engine) Confidence(host, metric string) (float64, error) {
 	if !ok {
 		return 0, fmt.Errorf("metrics: no ensemble for %s", k)
 	}
-	result := ens.Forecast(host, metric, 5, e.start)
+	result := ens.Forecast(host, metric, 5, e.start, e.cfg.EnsembleMode)
 	return result.Confidence, nil
 }
 

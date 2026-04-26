@@ -351,7 +351,7 @@ func TestEnsembleColdStartWeightsILR(t *testing.T) {
 	e.Update(0, 10)
 	e.Update(1, 12)
 
-	wILR, wHW, wAR := e.weights()
+	wILR, wHW, wAR := e.weights(EnsembleModeAdaptive)
 	if wHW != 0 || wAR != 0 {
 		t.Errorf("cold start: wHW=%v wAR=%v should be 0", wHW, wAR)
 	}

@@ -234,9 +234,9 @@ func (p *Predictor) Predict(host, metric string, horizonMinutes int) (models.Pre
 
 	now := time.Now()
 	x := now.Sub(p.startTS).Seconds()
-	mean, low80, up80, low95, up95 := ens.ForecastSingle(x, horizonMinutes, p.startTS)
+	mean, low80, up80, low95, up95 := ens.ForecastSingle(x, horizonMinutes, p.startTS, EnsembleModeAdaptive)
 
-	wILR, wHW, wAR := ens.weights()
+	wILR, wHW, wAR := ens.weights(EnsembleModeAdaptive)
 	contribs := []models.ModelContribution{
 		{Name: "ilr", Weight: wILR, Mean: ens.ilr.Predict(x + float64(horizonMinutes)*60)},
 		{Name: "holt_winters", Weight: wHW, Mean: ens.hwForecast(horizonMinutes * 4)},
@@ -270,7 +270,7 @@ func (p *Predictor) Forecast(host, metric string, horizonMinutes int) (models.Fo
 	if !ok {
 		return models.ForecastResult{}, false
 	}
-	return ens.Forecast(host, metric, horizonMinutes, p.startTS), true
+	return ens.Forecast(host, metric, horizonMinutes, p.startTS, EnsembleModeAdaptive), true
 }
 
 // PredictAll returns predictions for all known metrics for a host
@@ -286,7 +286,7 @@ func (p *Predictor) PredictAll(host string, horizonMinutes int) []models.Predict
 	for key, ens := range p.ensembles {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix {
 			metric := key[len(prefix):]
-			mean, low80, up80, low95, up95 := ens.ForecastSingle(x, horizonMinutes, p.startTS)
+			mean, low80, up80, low95, up95 := ens.ForecastSingle(x, horizonMinutes, p.startTS, EnsembleModeAdaptive)
 			preds = append(preds, models.Prediction{
 				Target:     metric,
 				Current:    ens.lastValue,
