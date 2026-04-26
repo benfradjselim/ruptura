@@ -3,14 +3,15 @@
 // The Bus interface is implemented by:
 //   - MemBus   — in-process pub/sub (zero deps, default)
 //   - NATSBus  — NATS JetStream backend (enabled when NATS_URL is set)
+//   - KafkaBus — Kafka backend (enabled when KAFKA_BROKERS is set)
 //
 // All events are JSON-encoded. Topics follow the pattern:
 //
-//	ohe.metric.ingest    — metric batch pushed
-//	ohe.alert.fire       — alert fired
-//	ohe.alert.resolve    — alert resolved
-//	ohe.slo.breach       — SLO breached
-//	ohe.kpi.anomaly      — anomaly detected
+//	kairo.rupture.{host}   — rupture state change
+//	kairo.action.tier1     — Tier-1 action fired
+//	kairo.ingest.batch     — metric batch ingested
+//	kairo.alert.fire       — alert fired
+//	kairo.alert.resolve    — alert resolved
 package eventbus
 
 import (
@@ -244,4 +245,17 @@ func New(ctx context.Context, natsURL, subjectPrefix string) Bus {
 		URL:           natsURL,
 		SubjectPrefix: subjectPrefix,
 	})
+}
+
+// NewWithKafka returns a KafkaBus or falls back to MemBus on error.
+func NewWithKafka(ctx context.Context, brokers, topicPrefix string) Bus {
+	if brokers == "" {
+		return NewMemBus()
+	}
+	b, err := NewKafkaBus(ctx, KafkaConfig{Brokers: brokers, TopicPrefix: topicPrefix})
+	if err != nil {
+		// Fallback to MemBus — Kafka unavailable at startup
+		return NewMemBus()
+	}
+	return b
 }

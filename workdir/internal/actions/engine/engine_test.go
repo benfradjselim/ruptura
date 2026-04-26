@@ -5,7 +5,7 @@ import (
 )
 
 func TestRecommend_tier1(t *testing.T) {
-	e, _ := New(nil)
+	e, _ := New(nil, nil)
 	event := RuptureEvent{Confidence: 0.90}
 	recs, _ := e.Recommend(event)
 	if len(recs) > 0 && recs[0].Tier != Tier1 {
@@ -14,7 +14,7 @@ func TestRecommend_tier1(t *testing.T) {
 }
 
 func TestRecommend_tier2(t *testing.T) {
-	e, _ := New(nil)
+	e, _ := New(nil, nil)
 	event := RuptureEvent{Confidence: 0.70}
 	recs, _ := e.Recommend(event)
 	if len(recs) > 0 && recs[0].Tier != Tier2 {
@@ -23,7 +23,7 @@ func TestRecommend_tier2(t *testing.T) {
 }
 
 func TestRecommend_tier3(t *testing.T) {
-	e, _ := New(nil)
+	e, _ := New(nil, nil)
 	event := RuptureEvent{Confidence: 0.50}
 	recs, _ := e.Recommend(event)
 	if len(recs) > 0 && recs[0].Tier != Tier3 {
@@ -32,7 +32,7 @@ func TestRecommend_tier3(t *testing.T) {
 }
 
 func TestRecommend_defaultRules(t *testing.T) {
-	e, _ := New(nil)
+	e, _ := New(nil, nil)
 	event := RuptureEvent{Profile: "spike", R: 5.0} // Matches default-spike (R>=3) and default-any (R>=5)
 	recs, _ := e.Recommend(event)
 
@@ -48,7 +48,7 @@ func TestRecommend_defaultRules(t *testing.T) {
 }
 
 func TestRecommend_profileFilter(t *testing.T) {
-	e, _ := New(nil)
+	e, _ := New(nil, nil)
 	event := RuptureEvent{Profile: "fatigue", R: 2.0} // Matches default-fatigue (R>=1.5)
 	recs, _ := e.Recommend(event)
 
@@ -60,7 +60,7 @@ func TestRecommend_profileFilter(t *testing.T) {
 }
 
 func TestEmergencyStop_preventsAutoExec(t *testing.T) {
-	e, _ := New(nil)
+	e, _ := New(nil, nil)
 	e.EmergencyStop()
 	if !e.IsEmergencyStopped() {
 		t.Error("EmergencyStop failed")
@@ -74,7 +74,7 @@ func TestLoadRules_validYAML(t *testing.T) {
   min_r: 10.0
   action_type: custom
 `)
-	e, err := New(yaml)
+	e, err := New(yaml, nil)
 	if err != nil {
 		t.Fatalf("Failed to load rules: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestLoadRules_validYAML(t *testing.T) {
 }
 
 func TestLoadRules_emptyYAML(t *testing.T) {
-	e, err := New(nil)
+	e, err := New(nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to load rules: %v", err)
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/benfradjselim/kairo-core/internal/actions/engine"
 	"github.com/benfradjselim/kairo-core/internal/api"
 	apicontext "github.com/benfradjselim/kairo-core/internal/context"
+	"github.com/benfradjselim/kairo-core/internal/eventbus"
 	"github.com/benfradjselim/kairo-core/internal/explain"
 	"github.com/benfradjselim/kairo-core/internal/storage"
 	"github.com/benfradjselim/kairo-core/internal/telemetry"
@@ -78,7 +79,10 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	defer store.Close()
 
-	actionEngine, err := engine.New(nil)
+	bus := eventbus.NewWithKafka(ctx, os.Getenv("KAFKA_BROKERS"), "kairo")
+	defer bus.Close()
+
+	actionEngine, err := engine.New(nil, bus)
 	if err != nil {
 		return fmt.Errorf("init action engine failed: %w", err)
 	}

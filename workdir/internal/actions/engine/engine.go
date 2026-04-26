@@ -1,10 +1,12 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
 
+	"github.com/benfradjselim/kairo-core/internal/eventbus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -56,6 +58,7 @@ type Rule struct {
 type Engine struct {
 	rules           []Rule
 	emergencyStopped int32
+	bus             eventbus.Bus
 }
 
 var defaultRules = []Rule{
@@ -64,8 +67,8 @@ var defaultRules = []Rule{
 	{Name: "default-any", Profile: "", MinR: 5.0, ActionType: "page"},
 }
 
-func New(rulesYAML []byte) (*Engine, error) {
-	e := &Engine{}
+func New(rulesYAML []byte, bus eventbus.Bus) (*Engine, error) {
+	e := &Engine{bus: bus}
 	if len(rulesYAML) == 0 {
 		e.rules = defaultRules
 		return e, nil
@@ -77,6 +80,11 @@ func New(rulesYAML []byte) (*Engine, error) {
 }
 
 func (e *Engine) Recommend(event RuptureEvent) ([]ActionRecommendation, error) {
+	if e.bus != nil {
+		topic := fmt.Sprintf("kairo.rupture.%s", event.Host)
+		_ = e.bus.Publish(context.Background(), topic, "system", event)
+	}
+
 	var recs []ActionRecommendation
 
 	tier := Tier3
