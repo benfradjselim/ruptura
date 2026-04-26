@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"google.golang.org/grpc"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -42,6 +43,8 @@ type Engine struct {
 
 	httpServer *http.Server
 	udpConn    *net.UDPConn
+	grpcServer  *grpc.Server
+	grpcSamples chan *GRPCMetricPoint
 }
 
 func New(pipeline metrics.MetricPipeline, logs LogSink, spans SpanSink) *Engine {
@@ -49,6 +52,7 @@ func New(pipeline metrics.MetricPipeline, logs LogSink, spans SpanSink) *Engine 
 		pipeline: pipeline,
 		logs:     logs,
 		spans:    spans,
+		grpcSamples: make(chan *GRPCMetricPoint, 1024),
 	}
 }
 
@@ -61,10 +65,6 @@ func (e *Engine) StartHTTP(addr string) error {
 			logger.Default.Error("HTTP ingest failed", "error", err)
 		}
 	}()
-	return nil
-}
-
-func (e *Engine) StartGRPC(addr string) error {
 	return nil
 }
 
@@ -103,6 +103,9 @@ func (e *Engine) Stop(ctx context.Context) error {
 	}
 	if e.udpConn != nil {
 		e.udpConn.Close()
+	}
+	if e.grpcServer != nil {
+		e.grpcServer.GracefulStop()
 	}
 	return nil
 }
