@@ -195,7 +195,7 @@ Phase 2b: BRAVO     Phase 2c: CHARLIE   (parallel after ALPHA green)
 | Event streaming NATS/Kafka | P0 | BRAVO | TODO |
 | Adaptive ensemble weighting | P1 | CHARLIE | TODO |
 | Operator/multi-cluster wiring (`ohe/operator/`) | P1 | FOXTROT | TODO |
-| cmd/kairo-core coverage ≥ 70% (actuellement 63%) | P0 | FOXTROT | TODO |
+| cmd/kairo-core coverage ≥ 70% (actuellement 63%) | P0 | FOXTROT | ✅ DONE — 72.2% (v6_main cd2f52d) |
 
 ---
 
