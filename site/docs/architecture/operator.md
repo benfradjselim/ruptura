@@ -1,6 +1,6 @@
 # Kubernetes Operator
 
-Kairo v6.1 ships a Kubernetes operator that manages `RupturaInstance` custom resources. The operator reconciles a Deployment, Service, and PersistentVolumeClaim for each instance, keeping the cluster state aligned with the declared spec.
+Ruptura v6.1 ships a Kubernetes operator that manages `RupturaInstance` custom resources. The operator reconciles a Deployment, Service, and PersistentVolumeClaim for each instance, keeping the cluster state aligned with the declared spec.
 
 ## CRD: RupturaInstance
 

@@ -1,4 +1,4 @@
-// Package kairo provides a typed Go client for the Ruptura API.
+// Package ruptura provides a typed Go client for the Ruptura API.
 //
 // Quick start:
 //
@@ -59,7 +59,7 @@ func WithTimeout(d time.Duration) Option {
 	return func(c *Client) { c.httpClient.Timeout = d }
 }
 
-// New creates a Kairo client for baseURL (e.g. "https://ruptura.example.com").
+// New creates a Ruptura client for baseURL (e.g. "https://ruptura.example.com").
 func New(baseURL string, opts ...Option) *Client {
 	c := &Client{
 		baseURL:    strings.TrimRight(baseURL, "/"),

@@ -4,4 +4,4 @@ class RupturaError(Exception):
     def __init__(self, status_code: int, message: str = ""):
         self.status_code = status_code
         self.message = message
-        super().__init__(f"kairo {status_code}: {message}")
+        super().__init__(f"ruptura {status_code}: {message}")

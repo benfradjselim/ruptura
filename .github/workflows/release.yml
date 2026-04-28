@@ -187,7 +187,7 @@ jobs:
   # ── Stage 7: Deploy to k3s ─────────────────────────────────────────────────
   # Prerequisites (set in repo Settings → Secrets and variables → Actions):
   #   K3S_KUBECONFIG  : base64 of /etc/rancher/k3s/k3s.yaml with server IP replaced
-  #   KAIRO_API_KEY   : (optional) bearer token for the Ruptura API
+  #   RUPTURA_API_KEY : (optional) bearer token for the Ruptura API
   #
   # To get K3S_KUBECONFIG from your workspace VM:
   #   sudo cat /etc/rancher/k3s/k3s.yaml \

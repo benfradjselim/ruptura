@@ -1,6 +1,6 @@
 # Configuration
 
-Kairo is configured via `ruptura.yaml`. Pass the path with `--config`.
+Ruptura is configured via `ruptura.yaml`. Pass the path with `--config`.
 
 ## Full reference
 

@@ -13,13 +13,13 @@ Requires Python 3.9+. The only runtime dependency is `requests>=2.28`.
 ## Create a client
 
 ```python
-from ruptura import KairoClient
+from ruptura import RupturaClient
 
 # API key auth (recommended for services)
-c = KairoClient("http://ruptura:8080", api_key="ohe_abc123")
+c = RupturaClient("http://ruptura:8080", api_key="rpt_abc123")
 
 # Custom timeout
-c = KairoClient("http://ruptura:8080", api_key="ohe_abc123", timeout=10.0)
+c = RupturaClient("http://ruptura:8080", api_key="rpt_abc123", timeout=10.0)
 ```
 
 ## Health check
@@ -81,7 +81,7 @@ c.emergency_stop()
 ## Error handling
 
 ```python
-from ruptura.exceptions import KairoError
+from ruptura.exceptions import RupturaError
 
 try:
     rupture = c.rupture_index("unknown-host")
@@ -95,9 +95,9 @@ The client is synchronous (`requests`-based). For async usage, wrap calls with `
 
 ```python
 import asyncio
-from ruptura import KairoClient
+from ruptura import RupturaClient
 
-c = KairoClient("http://ruptura:8080", api_key="ohe_abc123")
+c = RupturaClient("http://ruptura:8080", api_key="rpt_abc123")
 
 async def get_rupture(host: str):
     return await asyncio.to_thread(c.rupture_index, host)

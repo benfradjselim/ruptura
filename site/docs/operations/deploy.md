@@ -97,7 +97,7 @@ services:
       - "9090:9090"
     volumes:
       - ruptura-data:/var/lib/ruptura
-      - ./ruptura.yaml:/etc/kairo/ruptura.yaml:ro
+      - ./ruptura.yaml:/etc/ruptura/ruptura.yaml:ro
     environment:
       RUPTURA_JWT_SECRET: "${RUPTURA_JWT_SECRET}"
     restart: unless-stopped

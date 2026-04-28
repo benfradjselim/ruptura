@@ -80,7 +80,7 @@ curl -H "Authorization: Bearer $KEY" http://localhost:8080/api/v2/actions
 
 ```bash
 # Verify eventbus driver is set
-grep -A5 eventbus /etc/kairo/ruptura.yaml
+grep -A5 eventbus /etc/ruptura/ruptura.yaml
 ```
 
 **Check connectivity:**

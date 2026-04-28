@@ -99,11 +99,11 @@ Download the latest release binary and run it directly:
 
 ```bash
 # Linux amd64
-curl -fsSL https://github.com/benfradjselim/ruptura/releases/latest/download/kairo-linux-amd64 \
+curl -fsSL https://github.com/benfradjselim/ruptura/releases/latest/download/ruptura-linux-amd64 \
   -o /usr/local/bin/ruptura
 chmod +x /usr/local/bin/ruptura
 
-ruptura --config=/etc/kairo/ruptura.yaml
+ruptura --config=/etc/ruptura/ruptura.yaml
 ```
 
 Ruptura ships as a **single static binary** — no runtime dependencies, no external database.

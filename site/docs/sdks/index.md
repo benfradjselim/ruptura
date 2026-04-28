@@ -25,9 +25,9 @@ Both SDKs wrap the REST API v2 and handle auth, error decoding, and JSON unmarsh
 === "Python"
 
     ```python
-    from ruptura import KairoClient
+    from ruptura import RupturaClient
 
-    c = KairoClient("http://ruptura:8080", api_key="ohe_abc123")
+    c = RupturaClient("http://ruptura:8080", api_key="rpt_abc123")
     health = c.health()
     rupture = c.rupture_index("web-01")
     ```

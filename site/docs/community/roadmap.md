@@ -46,7 +46,7 @@ Clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/ruptura`:
 
 | Feature | Detail |
 |---------|--------|
-| SaaS self-serve | Hosted Kairo at `ruptura.io` — managed instance, usage billing |
+| SaaS self-serve | Hosted Ruptura at `ruptura.io` — managed instance, usage billing |
 | Cluster mode (WAL + S3) | Raft-based replication, S3-compatible snapshot target (MinIO / AWS / GCS) |
 | Median pre-filter for ILR | Outlier robustness before slope computation |
 

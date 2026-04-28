@@ -1,11 +1,11 @@
 apiVersion: v2
 name: ruptura
-description: Kairo anomaly-detection engine — single-binary HTTP/metrics server
+description: Ruptura predictive failure detection engine — single-binary HTTP/metrics server
 type: application
 version: 6.0.0
 appVersion: "6.0.0"
 keywords:
-  - kairo
+  - ruptura
   - anomaly-detection
   - mlops
   - observability

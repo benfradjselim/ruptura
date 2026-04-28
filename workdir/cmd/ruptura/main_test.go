@@ -70,7 +70,7 @@ func TestVersion_Constant(t *testing.T) {
 
 func TestRunWithContext_InvalidStorage(t *testing.T) {
 	ctx := context.Background()
-	err := runWithContext(ctx, Config{StoragePath: "/proc/nonexistent/kairo", Port: 0})
+	err := runWithContext(ctx, Config{StoragePath: "/proc/nonexistent/ruptura", Port: 0})
 	if err == nil {
 		t.Error("expected error for invalid storage path")
 	}

@@ -70,7 +70,7 @@ class RupturaClient:
         return self._get("/api/v2/health")
 
     def ready(self) -> None:
-        """Verify Kairo is ready to serve traffic (k8s readinessProbe)."""
+        """Verify Ruptura is ready to serve traffic (k8s readinessProbe)."""
         self._get("/api/v2/ready")
 
     # ------------------------------------------------------------------

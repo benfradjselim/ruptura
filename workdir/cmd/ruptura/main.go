@@ -79,7 +79,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	defer store.Close()
 
-	bus := eventbus.NewWithKafka(ctx, os.Getenv("KAFKA_BROKERS"), "kairo")
+	bus := eventbus.NewWithKafka(ctx, os.Getenv("KAFKA_BROKERS"), "ruptura")
 	defer bus.Close()
 
 	actionEngine, err := engine.New(nil, bus)

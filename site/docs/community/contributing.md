@@ -55,7 +55,7 @@ go tool cover -func=coverage.out
 
 Open an issue on GitHub with:
 
-1. Kairo version (`ruptura --version`)
+1. Ruptura version (`ruptura --version`)
 2. `ruptura.yaml` (sanitised — remove secrets)
 3. Relevant logs
 4. Steps to reproduce
