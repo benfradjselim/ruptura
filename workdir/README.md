@@ -1,7 +1,7 @@
 # Kairo Core
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-6.1.0-0069ff?style=for-the-badge" alt="v6.1.0">
+  <img src="https://img.shields.io/badge/version-6.1.1-0069ff?style=for-the-badge" alt="v6.1.1">
   <img src="https://img.shields.io/badge/go-1.18+-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go 1.18+">
   <img src="https://img.shields.io/badge/license-Apache%202.0-green?style=for-the-badge" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/kubernetes-native-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" alt="Kubernetes Native">
@@ -94,7 +94,7 @@ git clone https://github.com/benfradjselim/kairo-core.git
 cd kairo-core
 
 # Build
-docker build -t kairo-core:6.1.0 .
+docker build -t kairo-core:6.1.1 .
 
 # Deploy
 kubectl apply -f deploy/
@@ -113,7 +113,7 @@ docker run -d \
   -p 8080:8080 \
   -v kairo-data:/var/lib/kairo \
   -e KAIRO_JWT_SECRET=$(openssl rand -hex 32) \
-  kairo-core:6.1.0
+  kairo-core:6.1.1
 
 curl http://localhost:8080/api/v2/health
 ```
@@ -260,7 +260,7 @@ kind: KairoInstance
 metadata:
   name: production
 spec:
-  image: kairo-core:6.1.0
+  image: kairo-core:6.1.1
   port: 8080
   storageSize: 10Gi
   apiKey:
