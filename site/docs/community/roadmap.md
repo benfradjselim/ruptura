@@ -2,6 +2,10 @@
 
 ## Released
 
+### v6.1.1 — 2026-04-28 ✅
+
+Bug fixes, documentation site launch, all 8 composite signal formulas published.
+
 ### v6.1.0 — 2026-04-27 ✅
 
 | § | Feature | Detail |
@@ -53,6 +57,14 @@ Clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/kairo-core`:
 | FFT cycle detection | Replace manual seasonality buckets with frequency-domain analysis |
 | Confidence intervals | Residual-based uncertainty quantification on predictions |
 | Auto-remediation webhooks | Closed-loop healing: Kairo triggers and verifies its own remediation |
+
+---
+
+## CNCF
+
+Kairo Core is an independent open-source project targeting alignment with CNCF sandbox criteria. The project follows CNCF principles: Apache 2.0 license, open governance (`GOVERNANCE.md`), documented security policy (`SECURITY.md`), and a public roadmap.
+
+A CNCF sandbox application requires demonstrable production adoption and a committed maintainer community. Achieving that is a **long-term goal**, not a current status. Contributions and production feedback from the community are the path there.
 
 ---
 

@@ -79,7 +79,7 @@ Each maps raw metrics to a single interpretable 0–1 index with published formu
 
 ## Current Release
 
-**v6.1.0** — gRPC ingest · NATS/Kafka eventbus · Adaptive ensemble weighting · K8s Operator · Go SDK
+**v6.1.1** — gRPC ingest · NATS/Kafka eventbus · Adaptive ensemble weighting · K8s Operator · Go SDK
 
 [Full changelog →](community/roadmap.md) · [Getting Started →](getting-started/installation.md) · [API Reference →](api/reference.md)
 

@@ -5,7 +5,7 @@ The Go SDK is part of the `kairo-core` module at `sdk/go`.
 ## Install
 
 ```bash
-go get github.com/benfradjselim/kairo-core/sdk/go@v6.1.0
+go get github.com/benfradjselim/kairo-core/sdk/go@v6.1.1
 ```
 
 ## Import
