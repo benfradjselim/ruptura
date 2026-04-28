@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "kairo-core.name" -}}
+{{- define "ruptura.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "kairo-core.fullname" -}}
+{{- define "ruptura.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -20,9 +20,9 @@ Create a default fully qualified app name.
 {{/*
 Common labels
 */}}
-{{- define "kairo-core.labels" -}}
+{{- define "ruptura.labels" -}}
 helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
-{{ include "kairo-core.selectorLabels" . }}
+{{ include "ruptura.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
@@ -30,17 +30,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "kairo-core.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "kairo-core.name" . }}
+{{- define "ruptura.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "ruptura.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 ServiceAccount name
 */}}
-{{- define "kairo-core.serviceAccountName" -}}
+{{- define "ruptura.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "kairo-core.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "ruptura.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -50,10 +50,10 @@ ServiceAccount name
 Name of the secret that holds the API key.
 Prefers existingSecret if set, otherwise derives from fullname.
 */}}
-{{- define "kairo-core.secretName" -}}
+{{- define "ruptura.secretName" -}}
 {{- if .Values.existingSecret }}
 {{- .Values.existingSecret }}
 {{- else }}
-{{- printf "%s-secret" (include "kairo-core.fullname" .) }}
+{{- printf "%s-secret" (include "ruptura.fullname" .) }}
 {{- end }}
 {{- end }}
