@@ -1,0 +1,17 @@
+mode: set
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:37.43,49.2 2 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:59.24,63.2 1 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:66.54,70.2 3 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:73.47,79.25 5 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:79.25,80.18 1 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:83.3,83.23 1 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:80.18,81.12 1 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:83.23,84.40 1 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:84.40,86.5 1 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:91.61,94.16 3 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:97.2,98.16 2 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:101.2,102.28 2 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:105.2,105.12 1 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:94.16,96.3 1 0
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:98.16,100.3 1 1
+github.com/benfradjselim/ohe/internal/notifier/notifier.go:102.28,104.3 1 1

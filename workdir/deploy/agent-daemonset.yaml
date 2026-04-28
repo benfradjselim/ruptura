@@ -1,0 +1,105 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ohe-agent
+  namespace: ohe-system
+  labels:
+    app.kubernetes.io/name: ohe
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/version: "4.0.0"
+spec:
+  selector:
+    matchLabels:
+      app: ohe-agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: ohe-agent
+        app.kubernetes.io/name: ohe
+        app.kubernetes.io/component: agent
+    spec:
+      serviceAccountName: ohe-agent
+      hostPID: true          # needed to collect host process metrics
+      hostNetwork: false
+      dnsPolicy: ClusterFirstWithHostNet
+      tolerations:
+        - operator: Exists   # schedule on all nodes including taints
+      securityContext:
+        runAsNonRoot: false  # agent needs host metrics access
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ohe-agent
+          image: docker.io/library/ohe:latest
+          imagePullPolicy: Never
+          command: ["/ohe", "agent"]   # override ENTRYPOINT which defaults to 'central'
+          args:
+            - --central-url=http://ohe-central.ohe-system.svc.cluster.local
+            - --interval=15s
+          env:
+            - name: OHE_CENTRAL_URL
+              value: "http://10.43.59.23"   # ClusterIP fallback when CoreDNS unavailable
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - name: http
+              containerPort: 8080   # OHE always listens on 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/ready
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          securityContext:
+            runAsUser: 0             # needs root for /proc inspection
+            privileged: false
+            capabilities:
+              add: ["SYS_PTRACE"]   # needed for /proc inspection
+              drop: ["ALL"]
+          volumeMounts:
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+            - name: rootfs
+              mountPath: /rootfs
+              readOnly: true
+            - name: ohe-data
+              mountPath: /var/lib/ohe
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: rootfs
+          hostPath:
+            path: /
+        - name: ohe-data
+          emptyDir: {}

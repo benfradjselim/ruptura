@@ -1,0 +1,44 @@
+kairo-core {{ .Chart.AppVersion }} deployed to namespace {{ .Release.Namespace }}.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Access kairo-core
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if eq .Values.service.type "LoadBalancer" }}
+  Run the following command and wait for EXTERNAL-IP to appear:
+
+    kubectl get svc -n {{ .Release.Namespace }} {{ include "kairo-core.fullname" . }} -w
+
+  Then curl the health endpoint:
+
+    export IP=$(kubectl get svc -n {{ .Release.Namespace }} {{ include "kairo-core.fullname" . }} \
+      -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    curl http://$IP/api/v2/health
+    curl http://$IP/api/v2/ready
+
+{{- else if eq .Values.service.type "NodePort" }}
+  NodePort {{ .Values.service.nodePort }} is exposed on every cluster node.
+
+    export NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+    curl http://$NODE_IP:{{ .Values.service.nodePort }}/api/v2/health
+
+{{- else }}
+  Port-forward to reach kairo-core locally:
+
+    kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "kairo-core.fullname" . }} 8080:80
+    curl http://localhost:8080/api/v2/health
+
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Verify Cosign signature
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  cosign verify \
+    --certificate-identity-regexp "https://github.com/benfradjselim/.*" \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    {{ .Values.image.repository }}:{{ .Values.image.tag }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Quick status check
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  kubectl get all -n {{ .Release.Namespace }}
+  kubectl logs -n {{ .Release.Namespace }} deployment/{{ include "kairo-core.fullname" . }}

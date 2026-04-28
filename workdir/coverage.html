@@ -1,0 +1,209 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>notifier: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/benfradjselim/ohe/internal/notifier/notifier.go (92.6%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Package notifier delivers OHE alerts to external channels (Slack, webhook).
+package notifier
+
+import (
+        "bytes"
+        "encoding/json"
+        "fmt"
+        "net/http"
+        "sync"
+        "time"
+
+        "github.com/benfradjselim/ohe/pkg/models"
+        "github.com/benfradjselim/ohe/pkg/logger"
+)
+
+// Channel defines a notification destination persisted in storage.
+type Channel struct {
+        ID      string `json:"id"`
+        Name    string `json:"name"`
+        Type    string `json:"type"`    // "webhook" | "slack"
+        URL     string `json:"url"`     // delivery endpoint
+        Enabled bool   `json:"enabled"`
+}
+
+// payload is the JSON body sent to webhook and Slack channels.
+type payload struct {
+        Text        string `json:"text,omitempty"`         // Slack plain-text fallback
+        AlertID     string `json:"alert_id,omitempty"`
+        AlertName   string `json:"alert_name,omitempty"`
+        Host        string `json:"host,omitempty"`
+        Severity    string `json:"severity,omitempty"`
+        Message     string `json:"message,omitempty"`
+        Status      string `json:"status,omitempty"`
+        FiredAt     string `json:"fired_at,omitempty"`
+}
+
+func buildPayload(a models.Alert) payload <span class="cov8" title="1">{
+        text := fmt.Sprintf("[OHE %s] %s on %s — %s", a.Severity, a.Name, a.Host, a.Description)
+        return payload{
+                Text:      text,
+                AlertID:   a.ID,
+                AlertName: a.Name,
+                Host:      a.Host,
+                Severity:  a.Severity,
+                Message:   a.Description,
+                Status:    a.Status,
+                FiredAt:   a.CreatedAt.Format(time.RFC3339),
+        }
+}</span>
+
+// Dispatcher fans alerts out to all enabled channels.
+type Dispatcher struct {
+        mu       sync.RWMutex
+        channels []Channel
+        client   *http.Client
+}
+
+// New returns a Dispatcher ready to use.
+func New() *Dispatcher <span class="cov8" title="1">{
+        return &amp;Dispatcher{
+                client: &amp;http.Client{Timeout: 5 * time.Second},
+        }
+}</span>
+
+// SetChannels replaces the active channel list (call after every storage update).
+func (d *Dispatcher) SetChannels(channels []Channel) <span class="cov8" title="1">{
+        d.mu.Lock()
+        defer d.mu.Unlock()
+        d.channels = channels
+}</span>
+
+// Dispatch sends alert a to all enabled channels concurrently.
+func (d *Dispatcher) Dispatch(a models.Alert) <span class="cov8" title="1">{
+        d.mu.RLock()
+        chs := make([]Channel, len(d.channels))
+        copy(chs, d.channels)
+        d.mu.RUnlock()
+
+        for _, ch := range chs </span><span class="cov8" title="1">{
+                if !ch.Enabled </span><span class="cov8" title="1">{
+                        continue</span>
+                }
+                <span class="cov8" title="1">go func(ch Channel) </span><span class="cov8" title="1">{
+                        if err := d.send(ch, a); err != nil </span><span class="cov8" title="1">{
+                                logger.Default.Error("notifier channel error", "name", ch.Name, "type", ch.Type, "err", err)
+                        }</span>
+                }(ch)
+        }
+}
+
+func (d *Dispatcher) send(ch Channel, a models.Alert) error <span class="cov8" title="1">{
+        p := buildPayload(a)
+        body, err := json.Marshal(p)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">resp, err := d.client.Post(ch.URL, "application/json", bytes.NewReader(body))
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close()
+        if resp.StatusCode &gt;= 400 </span><span class="cov8" title="1">{
+                return fmt.Errorf("HTTP %d from %s", resp.StatusCode, ch.URL)
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

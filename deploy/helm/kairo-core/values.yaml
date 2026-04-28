@@ -1,0 +1,81 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/benfradjselim/kairo-core
+  tag: "v6.0.0"
+  pullPolicy: IfNotPresent
+
+# Optional: pull secret for GHCR private images
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# API bearer token — set via --set apiKey=<value> or a pre-created secret.
+# Leave empty to disable auth.
+apiKey: ""
+
+# Existing Secret that contains the key "api-key".
+# When set, apiKey above is ignored.
+existingSecret: ""
+
+service:
+  type: LoadBalancer   # LoadBalancer → klipper-lb on k3s gives you a real IP
+  port: 80
+  targetPort: 8080
+  # Only used when type=NodePort
+  nodePort: 30080
+  # Metrics port (Prometheus scrape)
+  metricsPort: 9090
+
+persistence:
+  enabled: true
+  storageClass: ""     # "" = cluster default (local-path on k3s)
+  accessMode: ReadWriteOnce
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /api/v2/health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/v2/ready
+    port: 8080
+  initialDelaySeconds: 3
+  periodSeconds: 5
+  failureThreshold: 2
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+
+podSecurityContext:
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

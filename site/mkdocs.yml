@@ -1,0 +1,62 @@
+site_name: Kairo Core
+site_description: "Predictive failure detection engine for cloud-native infrastructure"
+site_url: https://benfradjselim.github.io/Mlops_crew_automation/
+repo_url: https://github.com/benfradjselim/Mlops_crew_automation
+copyright: "© 2026 Selim Benfradj — Apache 2.0"
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mermaid2
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - index.md
+    - Installation: getting-started/installation.md
+    - Quickstart: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - Concepts:
+    - index.md
+    - Rupture Index: concepts/rupture-index.md
+    - Composite Signals: concepts/composite-signals.md
+    - Surge Profiles: concepts/surge-profiles.md
+    - Action Engine: concepts/action-engine.md
+  - Architecture:
+    - index.md
+    - Pipelines: architecture/pipelines.md
+    - Fusion Engine: architecture/fusion-engine.md
+    - Operator: architecture/operator.md
+  - API:
+    - index.md
+    - Reference: api/reference.md
+  - SDKs:
+    - index.md
+    - Go SDK: sdks/go-sdk.md
+    - Python SDK: sdks/python-sdk.md
+  - Operations:
+    - index.md
+    - Deployment: operations/deploy.md
+    - Self Monitoring: operations/self-monitoring.md
+    - Troubleshooting: operations/troubleshooting.md
+  - Community:
+    - index.md
+    - Contributing: community/contributing.md
+    - Roadmap: community/roadmap.md
+  - About:
+    - index.md
+    - Whitepaper: about/whitepaper.md
+    - License: about/license.md

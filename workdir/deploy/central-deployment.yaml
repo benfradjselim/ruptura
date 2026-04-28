@@ -1,0 +1,187 @@
+---
+# PVC is defined in pvc.yaml — apply that file first.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ohe-central
+  namespace: ohe-system
+  labels:
+    app.kubernetes.io/name: ohe
+    app.kubernetes.io/component: central
+    app.kubernetes.io/version: "5.1.0"
+spec:
+  replicas: 1          # Badger is single-writer; for HA use replicas: 1 + PVC RWO
+  selector:
+    matchLabels:
+      app: ohe-central
+  strategy:
+    type: Recreate     # PVC is RWO — rolling update would cause two writers
+  template:
+    metadata:
+      labels:
+        app: ohe-central
+        app.kubernetes.io/name: ohe
+        app.kubernetes.io/component: central
+    spec:
+      serviceAccountName: ohe-central
+      imagePullSecrets:
+        - name: ghcr-secret
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532        # distroless nonroot
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      # initContainers:
+      #   # Litestream restore: if the data directory is empty (first boot or new PVC),
+      #   # restore the latest snapshot from the replica before OHE starts.
+      #   # Set LITESTREAM_REPLICA_URL to activate (e.g. s3://mybucket/ohe-data).
+      #   # If the env var is absent, the init container exits immediately (no-op).
+      #   - name: litestream-restore
+      #     image: litestream/litestream:0.3.13
+      #     args:
+      #       - restore
+      #       - -replica
+      #       - $(LITESTREAM_REPLICA_URL)
+      #       - /var/lib/ohe/data
+      #     env:
+      #       - name: LITESTREAM_REPLICA_URL
+      #         valueFrom:
+      #           secretKeyRef:
+      #             name: ohe-secrets
+      #             key: litestream-replica-url
+      #             optional: true
+      #     volumeMounts:
+      #       - name: data
+      #         mountPath: /var/lib/ohe/data
+
+      containers:
+        - name: ohe
+          image: ghcr.io/benfradjselim/ohe:5.1.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - central
+            - --config=/etc/ohe/config.yaml
+            - --storage=/var/lib/ohe/data
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: OHE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ohe-secrets
+                  key: jwt-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/ohe/data
+            - name: config
+              mountPath: /etc/ohe
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/ready
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+
+      # Litestream sidecar: continuously replicates Badger WAL to the replica URL.
+      # Runs alongside OHE in the same pod, sharing the /var/lib/ohe/data volume.
+      # Omit this container (or set LITESTREAM_REPLICA_URL to empty) for single-node mode.
+      # - name: litestream
+      #   image: litestream/litestream:0.3.13
+      #   args:
+      #     - replicate
+      #     - /var/lib/ohe/data
+      #     - $(LITESTREAM_REPLICA_URL)
+      #   env:
+      #     - name: LITESTREAM_REPLICA_URL
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: ohe-secrets
+      #           key: litestream-replica-url
+      #           optional: true
+      #     # AWS credentials — set if using S3 replica
+      #     - name: AWS_ACCESS_KEY_ID
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: ohe-secrets
+      #           key: aws-access-key-id
+      #           optional: true
+      #     - name: AWS_SECRET_ACCESS_KEY
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: ohe-secrets
+      #           key: aws-secret-access-key
+      #           optional: true
+      #   volumeMounts:
+      #     - name: data
+      #       mountPath: /var/lib/ohe/data
+      #   resources:
+      #     requests:
+      #       cpu: "20m"
+      #       memory: "32Mi"
+      #     limits:
+      #       cpu: "100m"
+      #       memory: "128Mi"
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ohe-data
+        - name: config
+          configMap:
+            name: ohe-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ohe-central
+  namespace: ohe-system
+  labels:
+    app.kubernetes.io/name: ohe
+    app.kubernetes.io/component: central
+spec:
+  selector:
+    app: ohe-central
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  type: ClusterIP
+---
+# Optional: expose externally via LoadBalancer
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: ohe-central-lb
+#   namespace: ohe-system
+# spec:
+#   selector:
+#     app: ohe-central
+#   ports:
+#     - port: 80
+#       targetPort: http
+#   type: LoadBalancer

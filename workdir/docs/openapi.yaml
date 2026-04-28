@@ -1,0 +1,1773 @@
+openapi: "3.0.3"
+info:
+  title: OHE — Observability Holistic Engine
+  version: "4.4.0"
+  description: |
+    MLOps monitoring platform: metrics, KPIs, alerts, dashboards, SLOs, logs, traces,
+    multi-tenant organisations, API-key auth, and predictive analytics.
+  contact:
+    email: benfradjselim@gmail.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - BearerJWT: []
+  - BearerAPIKey: []
+
+components:
+  securitySchemes:
+    BearerJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    BearerAPIKey:
+      type: http
+      scheme: bearer
+      description: OHE API key — starts with "ohe_"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    Success:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          description: Payload — structure varies per endpoint
+        timestamp:
+          type: string
+          format: date-time
+
+    Metric:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+          format: double
+        timestamp:
+          type: string
+          format: date-time
+        host:
+          type: string
+
+    KPI:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+        trend:
+          type: string
+          enum: [up, down, stable]
+        timestamp:
+          type: string
+          format: date-time
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+        metric:
+          type: string
+        value:
+          type: number
+        threshold:
+          type: number
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        host:
+          type: string
+        description:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        acknowledged:
+          type: boolean
+
+    AlertRule:
+      type: object
+      required: [name, metric, threshold, severity]
+      properties:
+        name:
+          type: string
+        metric:
+          type: string
+        threshold:
+          type: number
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        condition:
+          type: string
+          enum: [above, below]
+          default: above
+        for_duration:
+          type: string
+          description: "e.g. 5m, 1h"
+
+    Dashboard:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        widgets:
+          type: array
+          items:
+            type: object
+        created_at:
+          type: string
+          format: date-time
+
+    DataSource:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [prometheus, ohe, elasticsearch, loki]
+        url:
+          type: string
+        org_id:
+          type: string
+
+    Org:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [viewer, operator, admin]
+        org_id:
+          type: string
+
+    APIKey:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [viewer, operator, admin]
+        prefix:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+
+    SLO:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        target:
+          type: number
+          description: Target ratio (0–1), e.g. 0.999 for 99.9%
+        metric:
+          type: string
+        window:
+          type: string
+          description: Rolling window, e.g. "30d"
+
+    NotificationChannel:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [slack, webhook, pagerduty, email]
+        config:
+          type: object
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        org_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        action:
+          type: string
+        resource:
+          type: string
+        resource_id:
+          type: string
+        details:
+          type: string
+        remote_ip:
+          type: string
+
+paths:
+  # ── System ──────────────────────────────────────────────────────────────────
+
+  /api/v1/health:
+    get:
+      tags: [system]
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: Healthy
+
+  /api/v1/health/live:
+    get:
+      tags: [system]
+      summary: Liveness probe (Kubernetes)
+      security: []
+      responses:
+        "200":
+          description: Alive
+
+  /api/v1/health/ready:
+    get:
+      tags: [system]
+      summary: Readiness probe (Kubernetes)
+      security: []
+      responses:
+        "200":
+          description: Ready
+
+  /api/v1/config:
+    get:
+      tags: [system]
+      summary: Runtime configuration (non-sensitive fields)
+      responses:
+        "200":
+          description: Config object
+
+  /api/v1/openapi.yaml:
+    get:
+      tags: [system]
+      summary: This OpenAPI specification
+      security: []
+      responses:
+        "200":
+          description: OpenAPI 3.0 YAML document
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  # ── Auth ─────────────────────────────────────────────────────────────────────
+
+  /api/v1/auth/setup:
+    post:
+      tags: [auth]
+      summary: First-run admin setup (only active when no users exist)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Admin user created
+        "409":
+          description: Users already exist
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Authenticate and receive a JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: JWT token
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Success"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          token:
+                            type: string
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke the current JWT (JTI blocklist)
+      responses:
+        "200":
+          description: Token revoked
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Issue a fresh JWT using a valid existing token
+      responses:
+        "200":
+          description: New token
+
+  /api/v1/auth/users:
+    get:
+      tags: [auth]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: User list
+    post:
+      tags: [auth]
+      summary: Create user (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        "200":
+          description: Created user
+
+  /api/v1/auth/users/{id}:
+    get:
+      tags: [auth]
+      summary: Get user by ID (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User
+    delete:
+      tags: [auth]
+      summary: Delete user (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  /api/v1/auth/users/{id}/org:
+    put:
+      tags: [auth]
+      summary: Assign user to org (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                org_id:
+                  type: string
+      responses:
+        "200":
+          description: Updated
+
+  /api/v1/reload:
+    post:
+      tags: [system]
+      summary: Hot-reload config (admin only)
+      responses:
+        "200":
+          description: Reloaded
+
+  # ── Metrics ──────────────────────────────────────────────────────────────────
+
+  /api/v1/metrics:
+    get:
+      tags: [metrics]
+      summary: List available metric names
+      parameters:
+        - in: query
+          name: host
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Metric names
+
+  /api/v1/metrics/{name}:
+    get:
+      tags: [metrics]
+      summary: Get latest value of a metric
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: host
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Metric samples
+
+  /api/v1/metrics/{name}/range:
+    get:
+      tags: [metrics]
+      summary: Range query with automatic tier selection (raw / 5m / 1h)
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: host
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Time-series samples
+
+  /api/v1/metrics/{name}/aggregate:
+    get:
+      tags: [metrics]
+      summary: Aggregated metric (avg, min, max, p95, p99)
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: host
+          schema:
+            type: string
+        - in: query
+          name: fn
+          schema:
+            type: string
+            enum: [avg, min, max, p95, p99]
+            default: avg
+      responses:
+        "200":
+          description: Aggregated value
+
+  # ── Query ────────────────────────────────────────────────────────────────────
+
+  /api/v1/query:
+    post:
+      tags: [query]
+      summary: Execute a QQL (Query Query Language) expression
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  example: "stress{host='web-01'} > 0.8"
+                from:
+                  type: string
+                  format: date-time
+                to:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: Query results
+
+  # ── KPIs ─────────────────────────────────────────────────────────────────────
+
+  /api/v1/kpis:
+    get:
+      tags: [kpis]
+      summary: List KPIs for a host
+      parameters:
+        - in: query
+          name: host
+          schema:
+            type: string
+      responses:
+        "200":
+          description: KPI snapshots
+
+  /api/v1/kpis/{name}:
+    get:
+      tags: [kpis]
+      summary: Get a single KPI time-series
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: host
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: KPI samples
+
+  /api/v1/kpis/{name}/predict:
+    get:
+      tags: [kpis]
+      summary: Ensemble forecast for a KPI (ILR + Holt-Winters + ARIMA)
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: host
+          schema:
+            type: string
+        - in: query
+          name: steps
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Forecast points
+
+  /api/v1/predict:
+    get:
+      tags: [kpis]
+      summary: Predict any metric or KPI (alias)
+      parameters:
+        - in: query
+          name: name
+          schema:
+            type: string
+        - in: query
+          name: host
+          schema:
+            type: string
+        - in: query
+          name: steps
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Forecast points
+
+  /api/v1/kpis/multi:
+    get:
+      tags: [kpis]
+      summary: Multi-host KPI snapshot
+      responses:
+        "200":
+          description: Map of host → KPI snapshot
+
+  # ── Alerts ───────────────────────────────────────────────────────────────────
+
+  /api/v1/alerts:
+    get:
+      tags: [alerts]
+      summary: List active alerts
+      parameters:
+        - in: query
+          name: severity
+          schema:
+            type: string
+            enum: [info, warning, critical]
+        - in: query
+          name: host
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Alert list
+
+  /api/v1/alerts/{id}:
+    get:
+      tags: [alerts]
+      summary: Get alert by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Alert
+    delete:
+      tags: [alerts]
+      summary: Delete alert (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  /api/v1/alerts/{id}/acknowledge:
+    post:
+      tags: [alerts]
+      summary: Acknowledge an alert
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Acknowledged
+
+  /api/v1/alerts/{id}/silence:
+    post:
+      tags: [alerts]
+      summary: Silence an alert for a duration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                duration:
+                  type: string
+                  example: "1h"
+      responses:
+        "200":
+          description: Silenced
+
+  /api/v1/alert-rules:
+    get:
+      tags: [alerts]
+      summary: List alert rules
+      responses:
+        "200":
+          description: Alert rule list
+    post:
+      tags: [alerts]
+      summary: Create alert rule (operator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertRule"
+      responses:
+        "200":
+          description: Created rule
+
+  /api/v1/alert-rules/{name}:
+    put:
+      tags: [alerts]
+      summary: Update alert rule (operator only)
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertRule"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags: [alerts]
+      summary: Delete alert rule (operator only)
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  # ── Dashboards ───────────────────────────────────────────────────────────────
+
+  /api/v1/dashboards:
+    get:
+      tags: [dashboards]
+      summary: List dashboards
+      responses:
+        "200":
+          description: Dashboard list
+    post:
+      tags: [dashboards]
+      summary: Create dashboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Dashboard"
+      responses:
+        "200":
+          description: Created dashboard
+
+  /api/v1/dashboards/import:
+    post:
+      tags: [dashboards]
+      summary: Import dashboard from JSON (operator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Dashboard"
+      responses:
+        "200":
+          description: Imported
+
+  /api/v1/dashboards/{id}:
+    get:
+      tags: [dashboards]
+      summary: Get dashboard by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dashboard
+    put:
+      tags: [dashboards]
+      summary: Update dashboard (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Dashboard"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags: [dashboards]
+      summary: Delete dashboard (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  /api/v1/dashboards/{id}/export:
+    get:
+      tags: [dashboards]
+      summary: Export dashboard as JSON
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dashboard JSON
+
+  # ── DataSources ──────────────────────────────────────────────────────────────
+
+  /api/v1/datasources:
+    get:
+      tags: [datasources]
+      summary: List data sources
+      responses:
+        "200":
+          description: DataSource list
+    post:
+      tags: [datasources]
+      summary: Create data source (operator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataSource"
+      responses:
+        "200":
+          description: Created
+
+  /api/v1/datasources/{id}:
+    get:
+      tags: [datasources]
+      summary: Get data source
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: DataSource
+    put:
+      tags: [datasources]
+      summary: Update data source (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataSource"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags: [datasources]
+      summary: Delete data source (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  /api/v1/datasources/{id}/test:
+    post:
+      tags: [datasources]
+      summary: Test data source connectivity (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Test result
+
+  /api/v1/datasources/{id}/proxy:
+    post:
+      tags: [datasources]
+      summary: Proxy query to the data source backend
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Proxied response
+
+  # ── Orgs ─────────────────────────────────────────────────────────────────────
+
+  /api/v1/orgs:
+    get:
+      tags: [orgs]
+      summary: List organisations
+      responses:
+        "200":
+          description: Org list
+    post:
+      tags: [orgs]
+      summary: Create org (operator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Org"
+      responses:
+        "200":
+          description: Created org
+
+  /api/v1/orgs/{id}:
+    get:
+      tags: [orgs]
+      summary: Get org by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Org
+    put:
+      tags: [orgs]
+      summary: Update org (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Org"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags: [orgs]
+      summary: Delete org (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  /api/v1/orgs/{id}/members:
+    get:
+      tags: [orgs]
+      summary: List org members
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Member list
+    post:
+      tags: [orgs]
+      summary: Invite user to org (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                role:
+                  type: string
+                  enum: [viewer, operator, admin]
+      responses:
+        "200":
+          description: Invited
+
+  # ── Templates ────────────────────────────────────────────────────────────────
+
+  /api/v1/templates:
+    get:
+      tags: [templates]
+      summary: List built-in dashboard templates
+      responses:
+        "200":
+          description: Template list
+
+  /api/v1/templates/{id}:
+    get:
+      tags: [templates]
+      summary: Get template by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Template
+
+  /api/v1/templates/{id}/apply:
+    post:
+      tags: [templates]
+      summary: Instantiate a template as a new dashboard (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Created dashboard
+
+  # ── Ingest ───────────────────────────────────────────────────────────────────
+
+  /api/v1/ingest:
+    post:
+      tags: [ingest]
+      summary: Push a metric batch from an agent (operator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agent_id:
+                  type: string
+                host:
+                  type: string
+                metrics:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Metric"
+                timestamp:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: Ingested
+
+  # ── Fleet ────────────────────────────────────────────────────────────────────
+
+  /api/v1/fleet:
+    get:
+      tags: [fleet]
+      summary: Aggregated health across all monitored hosts
+      responses:
+        "200":
+          description: Fleet overview
+
+  # ── Retention ────────────────────────────────────────────────────────────────
+
+  /api/v1/retention/stats:
+    get:
+      tags: [retention]
+      summary: Storage tier statistics (raw / 5m / 1h sizes)
+      responses:
+        "200":
+          description: Retention stats
+
+  /api/v1/retention/compact:
+    post:
+      tags: [retention]
+      summary: Trigger immediate compaction (operator only)
+      responses:
+        "200":
+          description: Compaction result
+
+  # ── Notifications ────────────────────────────────────────────────────────────
+
+  /api/v1/notifications:
+    get:
+      tags: [notifications]
+      summary: List notification channels
+      responses:
+        "200":
+          description: Channel list
+    post:
+      tags: [notifications]
+      summary: Create notification channel (operator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationChannel"
+      responses:
+        "200":
+          description: Created
+
+  /api/v1/notifications/{id}:
+    get:
+      tags: [notifications]
+      summary: Get channel
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Channel
+    put:
+      tags: [notifications]
+      summary: Update channel (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationChannel"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags: [notifications]
+      summary: Delete channel (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  /api/v1/notifications/{id}/test:
+    post:
+      tags: [notifications]
+      summary: Send test notification (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Test sent
+
+  # ── SLOs ─────────────────────────────────────────────────────────────────────
+
+  /api/v1/slos:
+    get:
+      tags: [slos]
+      summary: List SLO definitions
+      responses:
+        "200":
+          description: SLO list
+    post:
+      tags: [slos]
+      summary: Create SLO (operator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SLO"
+      responses:
+        "200":
+          description: Created
+
+  /api/v1/slos/status:
+    get:
+      tags: [slos]
+      summary: Current status of all SLOs (error budget, burn rate)
+      responses:
+        "200":
+          description: SLO status map
+
+  /api/v1/slos/{id}:
+    get:
+      tags: [slos]
+      summary: Get SLO by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SLO
+    put:
+      tags: [slos]
+      summary: Update SLO (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SLO"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags: [slos]
+      summary: Delete SLO (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  /api/v1/slos/{id}/status:
+    get:
+      tags: [slos]
+      summary: Status of a single SLO
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SLO status
+
+  # ── API Keys ─────────────────────────────────────────────────────────────────
+
+  /api/v1/api-keys:
+    get:
+      tags: [api-keys]
+      summary: List API keys for the caller's org (hashes omitted)
+      responses:
+        "200":
+          description: API key list
+    post:
+      tags: [api-keys]
+      summary: Create API key (operator only) — plaintext returned once
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                role:
+                  type: string
+                  enum: [viewer, operator, admin]
+                  default: viewer
+                expires_in:
+                  type: string
+                  description: "e.g. 30d, 90d, 1y; omit for no expiry"
+      responses:
+        "200":
+          description: Created key with plaintext (shown once)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Success"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          api_key:
+                            $ref: "#/components/schemas/APIKey"
+                          plaintext_key:
+                            type: string
+                            description: Full ohe_* token — store securely, shown once
+
+  /api/v1/api-keys/{id}:
+    delete:
+      tags: [api-keys]
+      summary: Revoke API key (operator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  # ── Audit ────────────────────────────────────────────────────────────────────
+
+  /api/v1/audit:
+    get:
+      tags: [audit]
+      summary: Compliance audit log (admin only)
+      parameters:
+        - in: query
+          name: org_id
+          schema:
+            type: string
+        - in: query
+          name: username
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+      responses:
+        "200":
+          description: Audit entries
+
+  # ── Topology ─────────────────────────────────────────────────────────────────
+
+  /api/v1/topology:
+    get:
+      tags: [topology]
+      summary: APM service dependency graph
+      responses:
+        "200":
+          description: Topology edges
+
+  # ── Logs ─────────────────────────────────────────────────────────────────────
+
+  /api/v1/logs:
+    get:
+      tags: [logs]
+      summary: Query structured log entries
+      parameters:
+        - in: query
+          name: service
+          schema:
+            type: string
+        - in: query
+          name: level
+          schema:
+            type: string
+            enum: [debug, info, warn, error]
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 200
+      responses:
+        "200":
+          description: Log entries
+
+  /api/v1/logs/stream:
+    get:
+      tags: [logs]
+      summary: Server-Sent Events live log tail
+      responses:
+        "200":
+          description: SSE stream
+
+  # ── Traces ───────────────────────────────────────────────────────────────────
+
+  /api/v1/traces:
+    get:
+      tags: [traces]
+      summary: Search traces
+      parameters:
+        - in: query
+          name: service
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Trace summaries
+
+  /api/v1/traces/{traceID}:
+    get:
+      tags: [traces]
+      summary: Get all spans for a trace
+      parameters:
+        - in: path
+          name: traceID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Span list
+
+  # ── WebSocket ────────────────────────────────────────────────────────────────
+
+  /api/v1/ws:
+    get:
+      tags: [websocket]
+      summary: WebSocket — real-time metric / KPI / alert stream
+      description: |
+        Upgrade to WebSocket. On connection, the server streams JSON frames
+        of type `{type: "metric"|"kpi"|"alert", data: {...}}`.
+      responses:
+        "101":
+          description: Switching Protocols
+
+  # ── Prometheus ───────────────────────────────────────────────────────────────
+
+  /metrics:
+    get:
+      tags: [prometheus]
+      summary: Prometheus text exposition (standard /metrics endpoint)
+      security: []
+      responses:
+        "200":
+          description: Prometheus text format
+
+  # ── OTLP ─────────────────────────────────────────────────────────────────────
+
+  /otlp/v1/traces:
+    post:
+      tags: [otlp]
+      summary: OTLP HTTP — receive trace data
+      security: []
+      responses:
+        "200":
+          description: Accepted
+
+  /otlp/v1/metrics:
+    post:
+      tags: [otlp]
+      summary: OTLP HTTP — receive metric data
+      security: []
+      responses:
+        "200":
+          description: Accepted
+
+  /otlp/v1/logs:
+    post:
+      tags: [otlp]
+      summary: OTLP HTTP — receive log data
+      security: []
+      responses:
+        "200":
+          description: Accepted
+
+  # ── Loki compat ──────────────────────────────────────────────────────────────
+
+  /loki/api/v1/push:
+    post:
+      tags: [loki-compat]
+      summary: Loki-compatible log push
+      security: []
+      responses:
+        "204":
+          description: Accepted
+
+  /loki/api/v1/query_range:
+    get:
+      tags: [loki-compat]
+      summary: Loki-compatible range query
+      responses:
+        "200":
+          description: Loki query result
+
+  /loki/api/v1/labels:
+    get:
+      tags: [loki-compat]
+      summary: Loki label names
+      responses:
+        "200":
+          description: Label list
+
+  /loki/api/v1/label/{name}/values:
+    get:
+      tags: [loki-compat]
+      summary: Loki label values
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Value list
+
+  # ── Elasticsearch compat ──────────────────────────────────────────────────────
+
+  /_bulk:
+    post:
+      tags: [es-compat]
+      summary: Elasticsearch bulk ingest
+      security: []
+      responses:
+        "200":
+          description: Bulk result
+
+  /_search:
+    get:
+      tags: [es-compat]
+      summary: Elasticsearch search
+      responses:
+        "200":
+          description: Search result
+    post:
+      tags: [es-compat]
+      summary: Elasticsearch search (POST body)
+      responses:
+        "200":
+          description: Search result
+
+  /_cat/indices:
+    get:
+      tags: [es-compat]
+      summary: Elasticsearch cat indices
+      responses:
+        "200":
+          description: Index list
+
+  # ── Datadog compat ────────────────────────────────────────────────────────────
+
+  /api/v1/series:
+    post:
+      tags: [dd-compat]
+      summary: Datadog v1 metrics series ingest
+      security: []
+      responses:
+        "202":
+          description: Accepted
+
+  /api/v2/logs:
+    post:
+      tags: [dd-compat]
+      summary: Datadog v2 log ingest
+      security: []
+      responses:
+        "202":
+          description: Accepted
+
+tags:
+  - name: system
+    description: Health, config, reload
+  - name: auth
+    description: Authentication and user management
+  - name: metrics
+    description: Raw time-series metrics
+  - name: query
+    description: QQL query engine
+  - name: kpis
+    description: Holistic KPIs and prediction
+  - name: alerts
+    description: Alerts and alert rules
+  - name: dashboards
+    description: Dashboard CRUD and templates
+  - name: datasources
+    description: Data source connections
+  - name: orgs
+    description: Multi-tenant organisations
+  - name: templates
+    description: Built-in dashboard templates
+  - name: ingest
+    description: Agent metric push
+  - name: fleet
+    description: Multi-host fleet view
+  - name: retention
+    description: Storage tier management
+  - name: notifications
+    description: Notification channels
+  - name: slos
+    description: Service Level Objectives
+  - name: api-keys
+    description: Programmatic access tokens
+  - name: audit
+    description: Compliance audit log
+  - name: topology
+    description: Service dependency graph
+  - name: logs
+    description: Structured log query
+  - name: traces
+    description: Distributed trace query
+  - name: websocket
+    description: Real-time streaming
+  - name: prometheus
+    description: Prometheus exposition
+  - name: otlp
+    description: OpenTelemetry Protocol receivers
+  - name: loki-compat
+    description: Grafana Loki-compatible API
+  - name: es-compat
+    description: Elasticsearch-compatible API
+  - name: dd-compat
+    description: Datadog-compatible API

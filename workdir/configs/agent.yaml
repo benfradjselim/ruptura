@@ -1,0 +1,9 @@
+mode: agent
+host: ""  # auto-detected from hostname
+port: 8081
+storage_path: /var/lib/ohe/agent
+central_url: http://localhost:8080
+collect_interval: 15s
+buffer_size: 10000
+auth_enabled: false
+jwt_secret: ""
