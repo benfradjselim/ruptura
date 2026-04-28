@@ -4,32 +4,12 @@ Kairo Core is built around three layered ideas: **predict**, **explain**, **act*
 
 ## Core model
 
-```
-Raw metrics / logs / traces
-        │
-        ▼
-  ┌─────────────────┐
-  │  Composite      │  8 signals: stress, fatigue, pressure, contagion,
-  │  Signals        │  resilience, entropy, sentiment, healthscore
-  └────────┬────────┘
-           │
-           ▼
-  ┌─────────────────┐
-  │  Adaptive       │  CA-ILR × ARIMA × Holt-Winters × MAD × EWMA
-  │  Ensemble       │  Online MAE-based weight adaptation (v6.1)
-  └────────┬────────┘
-           │
-           ▼
-  ┌─────────────────┐
-  │  Rupture        │  R = |α_burst| / |α_stable|
-  │  Index™         │  R ≥ 3.0 → Warning  /  R ≥ 5.0 → Emergency
-  └────────┬────────┘
-           │
-           ▼
-  ┌─────────────────┐
-  │  Action         │  Tier-1 auto / Tier-2 suggested / Tier-3 human
-  │  Engine         │  K8s · Webhook · Alertmanager · PagerDuty
-  └─────────────────┘
+```mermaid
+graph TD
+    A[Raw metrics / logs / traces] --> B["Composite Signals\nstress · fatigue · pressure · contagion\nresilience · entropy · sentiment · healthscore"]
+    B --> C["Adaptive Ensemble\nCA-ILR x ARIMA x Holt-Winters x MAD x EWMA\nOnline MAE-based weights — v6.1"]
+    C --> D["Rupture Index™\nR = |α_burst| / |α_stable|\nR ≥ 3.0 Warning  /  R ≥ 5.0 Emergency"]
+    D --> E["Action Engine\nTier-1 auto · Tier-2 suggested · Tier-3 human\nK8s · Webhook · Alertmanager · PagerDuty"]
 ```
 
 ## Concept pages

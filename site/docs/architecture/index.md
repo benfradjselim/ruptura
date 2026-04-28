@@ -4,54 +4,42 @@ Kairo Core ships as a **single Go binary** with BadgerDB embedded — no externa
 
 ## System diagram
 
-```
-┌──────────���───────────────────────────────────────────────────┐
-│                        kairo-core                            ��
-│                                                              │
-��  ┌──────────��───────────────────���──────────────────────┐    │
-│  │  Ingest layer                                        │    │
-│  │  gRPC :9090 · OTLP/HTTP · Prom remote_write · DogSD │    │
-│  └──────────────────────┬────────────────────���─────────┘    │
-│                         │                                    │
-│                         ▼                                    │
-│  ┌────────────���──────────────────────────────────────���──┐   │
-│  │  Pipeline layer                                      │   │
-│  │  Metric pipeline · Log pipeline · Trace pipeline     │   │
-│  └──────────────────────┬───────────────────────────────┘   │
-│                         │                                    │
-│                         ▼                                    │
-│  ┌───────────────��──────────────────────────────────────┐   │
-│  │  Fusion Engine                                       │   │
-│  │  8 Composite signals · Adaptive Ensemble (v6.1)      │   │
-│  │  Rupture Detector (CA-ILR dual-scale)                │   │
-│  └──────────────────────┬─────────────────────���─────────┘   │
-│                         │                                    │
-│              ┌──────────┴──────────┐                        │
-│              ▼                     ▼                         │
-│  ┌───────────────────┐  ┌──────────────────────────┐        │
-│  │  REST API v2      │  │  Action Engine           │        │
-│  │  44 endpoints     │  │  K8s · Webhook · AM · PD │        │
-│  │  XAI explain      │  │  Tier-1/2/3 + safety     │        │
-│  └───────────────────┘  └─────────��────────────────┘        │
-│                                    │                         │
-│              ┌─────────────────────┘                        │
-│              ▼                                               │
-│  ┌───────────────────────────┐                              │
-│  │  NATS / Kafka eventbus    │  (v6.1 — optional)           │
-│  │  kairo.rupture.{host}     │                              │
-│  │  kairo.actions.tier1      │                              │
-│  └────────��──────────────────┘                              │
-│                                                              │
-│  ┌────────���──────────────────┐                              │
-│  │  BadgerDB (embedded)      │  7d metrics · 30d logs        │
-│  │  400-day KPI retention    │  Tiered compaction           │
-│  └─────────────────────────��─┘                              │
-│                                                              │
-│  ┌─────────────────���─────────┐                              │
-│  │  K8s Operator (v6.1)      │  KairoInstance CRD           │
-│  │  controller-runtime       │  Deployment + Service + PVC  │
-│  └────────────────────────���──┘                              │
-└──────────────────────���───────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Ingest
+        A1[gRPC :9090]
+        A2[OTLP/HTTP]
+        A3[Prom remote_write]
+        A4[DogStatsD]
+    end
+
+    subgraph Pipelines
+        B[Metric / Log / Trace pipelines]
+    end
+
+    subgraph Fusion["Fusion Engine"]
+        C1[8 Composite signals]
+        C2[Adaptive Ensemble v6.1]
+        C3[Rupture Detector CA-ILR]
+    end
+
+    subgraph Outputs
+        D1[REST API v2\n44 endpoints / XAI]
+        D2[Action Engine\nK8s · Webhook · AM · PD]
+    end
+
+    subgraph Infra
+        E1[NATS / Kafka eventbus\noptional v6.1]
+        E2[BadgerDB embedded\n7d metrics · 400d KPIs]
+        E3[K8s Operator\nKairoInstance CRD]
+    end
+
+    Ingest --> Pipelines
+    Pipelines --> Fusion
+    Fusion --> Outputs
+    D2 --> E1
+    Fusion --> E2
+    E3 -.manages.-> D1
 ```
 
 ## Packages
