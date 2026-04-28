@@ -43,17 +43,23 @@ func Open(path string) (*Store, error) {
 	return &Store{db: db, snapshots: make(map[string]models.KPISnapshot)}, nil
 }
 
-// StoreSnapshot saves the latest KPISnapshot for a host (in-memory, fast lookup).
+// StoreSnapshot saves the latest KPISnapshot indexed by host name AND WorkloadRef.Key().
+// Both keys are stored so both /rupture/{host} and /rupture/{ns}/{workload} resolve correctly.
 func (s *Store) StoreSnapshot(snap models.KPISnapshot) {
 	s.snapshotsMu.Lock()
-	s.snapshots[snap.Host] = snap
+	if snap.Host != "" {
+		s.snapshots[snap.Host] = snap
+	}
+	if key := snap.Workload.Key(); key != "" && key != snap.Host {
+		s.snapshots[key] = snap
+	}
 	s.snapshotsMu.Unlock()
 }
 
-// LatestSnapshot returns the most recent KPISnapshot for a host, if any.
-func (s *Store) LatestSnapshot(host string) (models.KPISnapshot, bool) {
+// LatestSnapshot returns the most recent KPISnapshot for a host name or WorkloadRef.Key().
+func (s *Store) LatestSnapshot(key string) (models.KPISnapshot, bool) {
 	s.snapshotsMu.RLock()
-	snap, ok := s.snapshots[host]
+	snap, ok := s.snapshots[key]
 	s.snapshotsMu.RUnlock()
 	return snap, ok
 }

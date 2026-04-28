@@ -95,6 +95,44 @@ func (e *Engine) Confidence(host, metric string) (float64, error) {
 	return result.Confidence, nil
 }
 
+// AllHosts returns the distinct host names that have ingested at least one metric.
+func (e *Engine) AllHosts() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	seen := make(map[string]struct{})
+	for k := range e.ensemble {
+		if idx := len(k) - 1; idx >= 0 {
+			for i, c := range k {
+				if c == ':' {
+					seen[k[:i]] = struct{}{}
+					break
+				}
+			}
+		}
+	}
+	hosts := make([]string, 0, len(seen))
+	for h := range seen {
+		hosts = append(hosts, h)
+	}
+	return hosts
+}
+
+// LatestByHost returns the most recent observed value for every metric known for host.
+func (e *Engine) LatestByHost(host string) map[string]float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	prefix := host + ":"
+	result := make(map[string]float64)
+	for k, ens := range e.ensemble {
+		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
+			if ens.hasValue {
+				result[k[len(prefix):]] = ens.lastValue
+			}
+		}
+	}
+	return result
+}
+
 // SurgeProfile returns the surge classification for the given host:metric.
 func (e *Engine) SurgeProfile(host, metric string) (string, error) {
 	k := e.key(host, metric)

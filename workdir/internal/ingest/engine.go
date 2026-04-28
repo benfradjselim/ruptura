@@ -208,7 +208,7 @@ func (e *Engine) handleRemoteWrite(w http.ResponseWriter, r *http.Request) {
 func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 	var req models.OTLPMetricsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		fmt.Println("otlp metrics decode failed", err)
+		logger.Default.Error("otlp metrics decode failed", "error", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

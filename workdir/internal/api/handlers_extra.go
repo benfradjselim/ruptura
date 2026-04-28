@@ -51,10 +51,21 @@ func (h *Handlers) handleRuptureByWorkload(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	namespace := vars["namespace"]
 	workload := vars["workload"]
-	host := namespace + "/" + workload
-	snap, ok := h.store.LatestSnapshot(host)
+
+	// Try Deployment first (most common), then other kinds, then bare namespace/workload.
+	var snap models.KPISnapshot
+	var ok bool
+	for _, kind := range []string{"Deployment", "StatefulSet", "DaemonSet", "Job", "host"} {
+		snap, ok = h.store.LatestSnapshot(namespace + "/" + kind + "/" + workload)
+		if ok {
+			break
+		}
+	}
 	if !ok {
-		writeError(w, http.StatusNotFound, "no data for workload: "+host)
+		snap, ok = h.store.LatestSnapshot(namespace + "/" + workload)
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "no data for workload: "+namespace+"/"+workload)
 		return
 	}
 	writeJSON(w, http.StatusOK, snap)
@@ -98,6 +109,8 @@ func (h *Handlers) handleKPI(w http.ResponseWriter, r *http.Request) {
 		kpi = snap.Velocity
 	case "health_score":
 		kpi = snap.HealthScore
+	case "throughput":
+		kpi = snap.Throughput
 	default:
 		writeError(w, http.StatusBadRequest, "unknown KPI: "+name)
 		return
@@ -115,11 +128,20 @@ func (h *Handlers) handleKPIByWorkload(w http.ResponseWriter, r *http.Request) {
 	name := vars["name"]
 	namespace := vars["namespace"]
 	workload := vars["workload"]
-	host := namespace + "/" + workload
 
-	snap, ok := h.store.LatestSnapshot(host)
+	var snap models.KPISnapshot
+	var ok bool
+	for _, kind := range []string{"Deployment", "StatefulSet", "DaemonSet", "Job", "host"} {
+		snap, ok = h.store.LatestSnapshot(namespace + "/" + kind + "/" + workload)
+		if ok {
+			break
+		}
+	}
 	if !ok {
-		writeError(w, http.StatusNotFound, "no data for workload: "+host)
+		snap, ok = h.store.LatestSnapshot(namespace + "/" + workload)
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "no data for workload: "+namespace+"/"+workload)
 		return
 	}
 
@@ -145,6 +167,8 @@ func (h *Handlers) handleKPIByWorkload(w http.ResponseWriter, r *http.Request) {
 		kpi = snap.Velocity
 	case "health_score":
 		kpi = snap.HealthScore
+	case "throughput":
+		kpi = snap.Throughput
 	default:
 		writeError(w, http.StatusBadRequest, "unknown KPI: "+name)
 		return

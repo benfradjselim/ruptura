@@ -99,7 +99,7 @@ func (a *Alerter) AddMaintenanceWindow(w MaintenanceWindow) string {
 func (a *Alerter) RemoveMaintenanceWindow(id string) {
 	a.windowsMu.Lock()
 	defer a.windowsMu.Unlock()
-	filtered := a.windows[:0]
+	filtered := make([]MaintenanceWindow, 0, len(a.windows))
 	for _, w := range a.windows {
 		if w.ID != id {
 			filtered = append(filtered, w)
@@ -148,8 +148,7 @@ func (a *Alerter) Evaluate(host string, kpis map[string]float64) {
 
 	now := time.Now()
 
-	workloadKey := "default/host/" + host
-	if a.isSuppressed(workloadKey, now) {
+	if a.isSuppressed(host, now) {
 		return
 	}
 
@@ -219,8 +218,7 @@ func (a *Alerter) Evaluate(host string, kpis map[string]float64) {
 // Deduplicates: fires at most once per minute per host:metric pair.
 func (a *Alerter) FireRupture(ev models.RuptureEvent) {
 	now := time.Now()
-	workloadKey := "default/host/" + ev.Host
-	if a.isSuppressed(workloadKey, now) {
+	if a.isSuppressed(ev.Host, now) {
 		return
 	}
 
