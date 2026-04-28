@@ -3,14 +3,14 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "kairo-client"
+name = "ruptura-client"
 version = "6.0.0"
-description = "Official Python SDK for Kairo Core v6 — autonomous observability"
+description = "Official Python SDK for Ruptura v6 — autonomous observability"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "benfradjselim", email = "benfradjselim@gmail.com" }]
-keywords = ["observability", "monitoring", "mlops", "kairo", "rupture"]
+keywords = ["observability", "monitoring", "mlops", "ruptura", "rupture"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -27,7 +27,7 @@ dev = ["pytest>=7", "pytest-cov>=4", "responses>=0.24"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["kairo*"]
+include = ["ruptura*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

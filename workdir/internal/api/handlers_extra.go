@@ -3,7 +3,7 @@ package api
 import (
     "net/http"
     "github.com/gorilla/mux"
-    apicontext "github.com/benfradjselim/kairo-core/internal/context"
+    apicontext "github.com/benfradjselim/ruptura/internal/context"
 )
 
 func (h *Handlers) handleRupture(w http.ResponseWriter, r *http.Request) { writeJSON(w, http.StatusOK, []interface{}{}) }

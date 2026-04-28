@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/utils"
+	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
 // DynamicThreshold computes adaptive thresholds using mean ± 3σ

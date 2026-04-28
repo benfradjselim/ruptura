@@ -6,11 +6,11 @@ The Kairo Action Engine translates rupture detections into concrete remediation 
 
 | Tier | Mode | Trigger | Who acts |
 |------|------|---------|---------|
-| **Tier-1** | Automatic | R ≥ 5.0 + confidence ≥ 0.85 | Kairo (no human needed) |
+| **Tier-1** | Automatic | R ≥ 5.0 + confidence ≥ 0.85 | Ruptura (no human needed) |
 | **Tier-2** | Suggested | R ≥ 3.0 + confidence ≥ 0.60 | Human approves via API |
 | **Tier-3** | Alert only | R ≥ 1.5 | Human decides |
 
-Configure the execution mode in `kairo.yaml`:
+Configure the execution mode in `ruptura.yaml`:
 
 ```yaml
 actions:
@@ -36,7 +36,7 @@ Send an HTTP POST to any URL with the rupture payload. Useful for triggering CI/
 
 ### Alertmanager
 
-Raise or resolve alerts in Prometheus Alertmanager. Kairo generates compatible alert payloads with labels, annotations, and `generatorURL`.
+Raise or resolve alerts in Prometheus Alertmanager. Ruptura generates compatible alert payloads with labels, annotations, and `generatorURL`.
 
 ### PagerDuty
 
@@ -44,7 +44,7 @@ Create or update PagerDuty incidents with severity, rupture context, and XAI exp
 
 ## Safety gates
 
-Kairo enforces multiple safety gates before executing any Tier-1 action:
+Ruptura enforces multiple safety gates before executing any Tier-1 action:
 
 | Gate | Default | Description |
 |------|---------|-------------|
@@ -85,8 +85,8 @@ execution_mode?
    └── auto    → Execute immediately (Tier-1) or queue (Tier-2)
         │
         ▼
-Emit event: kairo.actions.tier1 (eventbus)
-Emit metric: kairo_actions_total{tier="1",result="ok"}
+Emit event: ruptura.actions.tier1 (eventbus)
+Emit metric: rpt_actions_total{tier="1",result="ok"}
 ```
 
 ## Approving a suggested action
@@ -107,6 +107,6 @@ POST /api/v2/actions/emergency-stop
 When an eventbus is configured (`nats` or `kafka`), every Tier-1 action publishes:
 
 ```
-kairo.actions.tier1   → { action_id, host, type, params, rupture_id, timestamp }
-kairo.rupture.{host}  → on every rupture state change
+ruptura.actions.tier1   → { action_id, host, type, params, rupture_id, timestamp }
+ruptura.rupture.{host}  → on every rupture state change
 ```

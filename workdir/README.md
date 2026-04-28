@@ -1,4 +1,4 @@
-# Kairo Core
+# Ruptura
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-6.1.1-0069ff?style=for-the-badge" alt="v6.1.1">
@@ -10,16 +10,16 @@
 
 <p align="center">
   <b>The Predictive Action Layer for Cloud-Native Infrastructure.</b><br>
-  Kairo detects infrastructure ruptures before they cause outages — and acts on them automatically.
+  Ruptura detects infrastructure ruptures before they cause outages — and acts on them automatically.
 </p>
 
 ---
 
-## What Kairo Does
+## What Ruptura Does
 
-Traditional observability tells you what broke. Kairo tells you **what is about to break** — and triggers the right action before users feel it.
+Traditional observability tells you what broke. Ruptura tells you **what is about to break** — and triggers the right action before users feel it.
 
-| Traditional Observability | Kairo Core |
+| Traditional Observability | Ruptura |
 |--------------------------|-----------|
 | Threshold alerts fire after the fact | Rupture Index™ detects divergence **hours early** |
 | You define rules per metric | Adaptive ensemble learns your baseline automatically |
@@ -65,7 +65,7 @@ Each maps multiple raw metrics to a single interpretable signal. `healthscore` i
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                      kairo-core                          │
+│                      ruptura                          │
 │                                                          │
 │  Ingest ──► Metric/Log/Trace pipelines ──► Fusion        │
 │     │              │                         │           │
@@ -77,7 +77,7 @@ Each maps multiple raw metrics to a single interpretable signal. `healthscore` i
 │  NATS/Kafka eventbus ◄──────────────── XAI Explain       │
 │                                              │           │
 │              REST API v2 (44 endpoints) ─────┘           │
-│              K8s Operator (KairoInstance CRD)            │
+│              K8s Operator (RupturaInstance CRD)            │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -90,17 +90,17 @@ Each maps multiple raw metrics to a single interpretable signal. `healthscore` i
 ### Kubernetes (recommended)
 
 ```bash
-git clone https://github.com/benfradjselim/kairo-core.git
-cd kairo-core
+git clone https://github.com/benfradjselim/ruptura.git
+cd ruptura
 
 # Build
-docker build -t kairo-core:6.1.1 .
+docker build -t ruptura:6.1.1 .
 
 # Deploy
 kubectl apply -f deploy/
 
 # Port-forward
-kubectl port-forward svc/kairo-core 8080:8080 -n kairo-system
+kubectl port-forward svc/ruptura 8080:8080 -n ruptura-system
 
 # Health check
 curl http://localhost:8080/api/v2/health
@@ -111,9 +111,9 @@ curl http://localhost:8080/api/v2/health
 ```bash
 docker run -d \
   -p 8080:8080 \
-  -v kairo-data:/var/lib/kairo \
-  -e KAIRO_JWT_SECRET=$(openssl rand -hex 32) \
-  kairo-core:6.1.1
+  -v ruptura-data:/var/lib/ruptura \
+  -e RUPTURA_JWT_SECRET=$(openssl rand -hex 32) \
+  ruptura:6.1.1
 
 curl http://localhost:8080/api/v2/health
 ```
@@ -121,15 +121,15 @@ curl http://localhost:8080/api/v2/health
 ### Helm
 
 ```bash
-helm install kairo-core ./helm \
-  --namespace kairo-system \
+helm install ruptura ./helm \
+  --namespace ruptura-system \
   --create-namespace \
   --set auth.jwtSecret=$(openssl rand -hex 32)
 ```
 
 ---
 
-## Configuration (`kairo.yaml`)
+## Configuration (`ruptura.yaml`)
 
 ```yaml
 mode: connected          # connected | stateless | shadow
@@ -162,7 +162,7 @@ auth:
   api_keys: []
 
 storage:
-  path: /var/lib/kairo
+  path: /var/lib/ruptura
 ```
 
 ---
@@ -209,18 +209,18 @@ Full API reference: [docs/v6.0.0/SPECS.md §8](docs/v6.0.0/SPECS.md)
 
 **Go**
 ```go
-import "github.com/benfradjselim/kairo-core/sdk/go"
+import "github.com/benfradjselim/ruptura/sdk/go"
 
-client := kairo.New("http://kairo-core:8080", "ohe_your_api_key")
+client := ruptura.New("http://ruptura:8080", "ohe_your_api_key")
 rupture, _ := client.RuptureIndex("web-01")
 weights, _ := client.EnsembleWeights("web-01")  // v6.1
 ```
 
 **Python**
 ```python
-from kairo import Client
+from ruptura import Client
 
-client = Client("http://kairo-core:8080", api_key="ohe_your_api_key")
+client = Client("http://ruptura:8080", api_key="ohe_your_api_key")
 rupture = client.rupture_index("web-01")
 ```
 
@@ -242,32 +242,32 @@ Safety gates: 6 Tier-1 actions/target/hour · cooldown · rollback trigger · em
 ### Events (when eventbus configured)
 
 ```
-kairo.rupture.{host}      on every rupture state change
-kairo.actions.tier1       on every Tier-1 automated action
+ruptura.rupture.{host}      on every rupture state change
+ruptura.actions.tier1       on every Tier-1 automated action
 ```
 
 ### Prometheus Self-Metrics
 
-`kairo_rupture_index` · `kairo_time_to_failure_seconds` · `kairo_kpi_healthscore` · `kairo_actions_total` · `kairo_ingest_samples_total` · `kairo_uptime_seconds` + 8 more.
+`rpt_rupture_index` · `rpt_time_to_failure_seconds` · `rpt_kpi_healthscore` · `rpt_actions_total` · `rpt_ingest_samples_total` · `rpt_uptime_seconds` + 8 more.
 
 ---
 
 ## Kubernetes Operator (v6.1)
 
 ```yaml
-apiVersion: kairo.io/v1alpha1
-kind: KairoInstance
+apiVersion: ruptura.io/v1alpha1
+kind: RupturaInstance
 metadata:
   name: production
 spec:
-  image: kairo-core:6.1.1
+  image: ruptura:6.1.1
   port: 8080
   storageSize: 10Gi
   apiKey:
-    secretRef: kairo-api-key
+    secretRef: ruptura-api-key
 ```
 
-The operator reconciles Deployment + Service + PVC per `KairoInstance`.
+The operator reconciles Deployment + Service + PVC per `RupturaInstance`.
 
 ---
 
@@ -304,11 +304,11 @@ See [docs/v6.0.0/DEV-GUIDE.md](docs/v6.0.0/DEV-GUIDE.md) for the full dev guide.
 - **§23** Real gRPC ingest server (google.golang.org/grpc, 4MB max, back-pressure)
 - **§24** NATS/Kafka eventbus — JetStream at-least-once + franz-go exactly-once
 - **§25** Adaptive ensemble weighting — online MAE-based, 1-hour sliding window, 60s update
-- **§26** Kubernetes operator — KairoInstance CRD, controller-runtime reconcile loop
-- Go SDK `kairo-client-go` — full v2 API coverage
+- **§26** Kubernetes operator — RupturaInstance CRD, controller-runtime reconcile loop
+- Go SDK `ruptura-go` — full v2 API coverage
 
 ### v6.0.0 — 2026-04-25
-- Complete clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/kairo-core`
+- Complete clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/ruptura`
 - CA-ILR dual-scale ELS engine, ensemble of 5 models, 8 composite signals
 - 44-endpoint REST API v2, XAI explainability, single-tenant BadgerDB storage
 - Action engine (K8s/Webhook/Alertmanager/PagerDuty) with safety gates
@@ -325,7 +325,7 @@ See [docs/v6.0.0/DEV-GUIDE.md](docs/v6.0.0/DEV-GUIDE.md) for the full dev guide.
 | Version | Target | Focus |
 |---------|--------|-------|
 | **v6.1.0** | ✅ Released | gRPC, eventbus, adaptive ensemble, K8s operator |
-| v6.2.0 | Q2 2026 | kairoctl CLI, web dashboard v2, multi-tenant opt-in |
+| v6.2.0 | Q2 2026 | ruptura-ctl CLI, web dashboard v2, multi-tenant opt-in |
 | v6.3.0 | Q3 2026 | SaaS self-serve, billing, managed cloud |
 
 ---

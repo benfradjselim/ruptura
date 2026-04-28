@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Reconciler drives the control loop for KairoInstance objects.
+// Reconciler drives the control loop for RupturaInstance objects.
 type Reconciler struct {
 	client KubeClient
 }
@@ -15,9 +15,9 @@ func NewReconciler(client KubeClient) *Reconciler {
 	return &Reconciler{client: client}
 }
 
-// Reconcile ensures the cluster state matches the desired KairoInstance spec.
+// Reconcile ensures the cluster state matches the desired RupturaInstance spec.
 // It is idempotent: calling it multiple times has the same effect as once.
-func (r *Reconciler) Reconcile(ctx context.Context, inst KairoInstance) error {
+func (r *Reconciler) Reconcile(ctx context.Context, inst RupturaInstance) error {
 	spec := toDeploymentSpec(inst)
 
 	exists, err := r.client.DeploymentExists(ctx, spec.Namespace, spec.Name)
@@ -42,8 +42,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, inst KairoInstance) error {
 	return nil
 }
 
-// Delete removes all resources owned by the given KairoInstance.
-func (r *Reconciler) Delete(ctx context.Context, inst KairoInstance) error {
+// Delete removes all resources owned by the given RupturaInstance.
+func (r *Reconciler) Delete(ctx context.Context, inst RupturaInstance) error {
 	spec := toDeploymentSpec(inst)
 	if err := r.client.DeleteDeployment(ctx, spec.Namespace, spec.Name); err != nil {
 		return fmt.Errorf("delete deployment: %w", err)
@@ -51,7 +51,7 @@ func (r *Reconciler) Delete(ctx context.Context, inst KairoInstance) error {
 	return r.client.DeleteService(ctx, spec.Namespace, spec.Name)
 }
 
-func toDeploymentSpec(inst KairoInstance) DeploymentSpec {
+func toDeploymentSpec(inst RupturaInstance) DeploymentSpec {
 	replicas := inst.Spec.Replicas
 	if replicas < 1 {
 		replicas = 1

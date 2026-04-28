@@ -2,10 +2,10 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "kairo-core.fullname" . }}-data
+  name: {{ include "ruptura.fullname" . }}-data
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "kairo-core.labels" . | nindent 4 }}
+    {{- include "ruptura.labels" . | nindent 4 }}
 spec:
   accessModes:
     - {{ .Values.persistence.accessMode }}

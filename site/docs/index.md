@@ -1,14 +1,14 @@
-# Kairo Core
+# Ruptura
 
 **The Predictive Action Layer for Cloud-Native Infrastructure.**
 
-Kairo Core detects infrastructure ruptures before they cause outages — and acts on them automatically via Kubernetes, webhooks, and alerting integrations. A single Go binary, no external database required.
+Ruptura detects infrastructure ruptures before they cause outages — and acts on them automatically via Kubernetes, webhooks, and alerting integrations. A single Go binary, no external database required.
 
 ---
 
-## Why Kairo?
+## Why Ruptura?
 
-| Traditional Observability | Kairo Core |
+| Traditional Observability | Ruptura |
 |--------------------------|-----------|
 | Threshold alerts fire *after* the fact | Rupture Index™ detects divergence **hours early** |
 | Rules defined per metric | Adaptive ensemble learns your baseline automatically |
@@ -26,7 +26,7 @@ Kairo Core detects infrastructure ruptures before they cause outages — and act
 R(t) = |α_burst(t)| / max(|α_stable(t)|, ε)
 ```
 
-| R Range | State | Kairo Action |
+| R Range | State | Ruptura Action |
 |---------|-------|-------------|
 | < 1.5 | Stable / Elevated | None |
 | 1.5 – 3.0 | Warning | Tier-3 (human) |
@@ -46,11 +46,11 @@ Each maps raw metrics to a single interpretable 0–1 index with published formu
 === "Kubernetes"
 
     ```bash
-    git clone https://github.com/benfradjselim/kairo-core.git
-    cd kairo-core
-    docker build -t kairo-core:6.1.0 .
+    git clone https://github.com/benfradjselim/ruptura.git
+    cd ruptura
+    docker build -t ruptura:6.1.0 .
     kubectl apply -f deploy/
-    kubectl port-forward svc/kairo-core 8080:8080 -n kairo-system
+    kubectl port-forward svc/ruptura 8080:8080 -n ruptura-system
     curl http://localhost:8080/api/v2/health
     ```
 
@@ -59,9 +59,9 @@ Each maps raw metrics to a single interpretable 0–1 index with published formu
     ```bash
     docker run -d \
       -p 8080:8080 \
-      -v kairo-data:/var/lib/kairo \
-      -e KAIRO_JWT_SECRET=$(openssl rand -hex 32) \
-      kairo-core:6.1.0
+      -v ruptura-data:/var/lib/ruptura \
+      -e RUPTURA_JWT_SECRET=$(openssl rand -hex 32) \
+      ruptura:6.1.0
 
     curl http://localhost:8080/api/v2/health
     ```
@@ -69,8 +69,8 @@ Each maps raw metrics to a single interpretable 0–1 index with published formu
 === "Helm"
 
     ```bash
-    helm install kairo-core ./helm \
-      --namespace kairo-system \
+    helm install ruptura ./helm \
+      --namespace ruptura-system \
       --create-namespace \
       --set auth.jwtSecret=$(openssl rand -hex 32)
     ```

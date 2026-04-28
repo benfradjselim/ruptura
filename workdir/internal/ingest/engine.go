@@ -13,9 +13,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/pipeline/metrics"
-	"github.com/benfradjselim/kairo-core/pkg/logger"
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/internal/pipeline/metrics"
+	"github.com/benfradjselim/ruptura/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 type LogSink interface {

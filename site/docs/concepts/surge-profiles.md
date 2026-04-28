@@ -1,6 +1,6 @@
 # Adaptive Ensemble (Surge Profiles)
 
-Kairo v6.1 introduces **adaptive ensemble weighting** — the engine continuously learns which prediction model fits your infrastructure's traffic patterns best, and shifts weight toward it automatically.
+Ruptura v6.1 introduces **adaptive ensemble weighting** — the engine continuously learns which prediction model fits your infrastructure's traffic patterns best, and shifts weight toward it automatically.
 
 ## The five models
 
@@ -14,7 +14,7 @@ Kairo v6.1 introduces **adaptive ensemble weighting** — the engine continuousl
 
 ## Weight adaptation algorithm
 
-Every 60 seconds, Kairo evaluates prediction accuracy over the past 1-hour sliding window:
+Every 60 seconds, Ruptura evaluates prediction accuracy over the past 1-hour sliding window:
 
 ```
 error_model_i = MAE(predicted_i, actual) over last 1 hour
@@ -33,7 +33,7 @@ prediction(t) = Σ_i weight_i(t) × prediction_i(t)
 ## Enable adaptive weighting
 
 ```yaml
-# kairo.yaml
+# ruptura.yaml
 ensemble:
   adaptive: true
 ```
@@ -60,9 +60,9 @@ GET /api/v2/ensemble/{host}
 }
 ```
 
-## Surge profiles — how Kairo handles load spikes
+## Surge profiles — how Ruptura handles load spikes
 
-Kairo does not require you to pre-define "surge profiles" or maintenance windows. The dissipative fatigue formula (`λ` healing) and the adaptive ensemble work together to avoid false alarms during planned load events:
+Ruptura does not require you to pre-define "surge profiles" or maintenance windows. The dissipative fatigue formula (`λ` healing) and the adaptive ensemble work together to avoid false alarms during planned load events:
 
 1. **At spike onset** — `ILR_burst` slope increases, R rises.
 2. **If the spike is brief** — fatigue dissipates (λ recovery), R falls back.
@@ -74,9 +74,9 @@ This means a nightly backup job gradually "teaches" the ensemble that high CPU a
 ## Prometheus self-metrics for ensemble
 
 ```
-kairo_ensemble_weight{host="web-01",model="ca_ilr"}       0.35
-kairo_ensemble_weight{host="web-01",model="arima"}         0.22
-kairo_ensemble_weight{host="web-01",model="holt_winters"}  0.18
-kairo_ensemble_weight{host="web-01",model="mad"}           0.14
-kairo_ensemble_weight{host="web-01",model="ewma"}          0.11
+rpt_ensemble_weight{host="web-01",model="ca_ilr"}       0.35
+rpt_ensemble_weight{host="web-01",model="arima"}         0.22
+rpt_ensemble_weight{host="web-01",model="holt_winters"}  0.18
+rpt_ensemble_weight{host="web-01",model="mad"}           0.14
+rpt_ensemble_weight{host="web-01",model="ewma"}          0.11
 ```

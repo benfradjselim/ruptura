@@ -1,4 +1,4 @@
-# SPECS.md — Kairo Core v6.1.0 Technical Specifications
+# SPECS.md — Ruptura v6.1.0 Technical Specifications
 
 Document ID: KC-SPECS-002
 Date: 2026-04-27
@@ -27,9 +27,9 @@ The BRAVO phase shipped a stub gRPC push endpoint. v6.1 completes the implementa
 
 ### §24 — Event Streaming (NATS/Kafka)
 
-- Configurable via `kairo.yaml`: `eventbus.driver: nats | kafka | none` (default: `none`)
-- Publish on every rupture state change: topic `kairo.rupture.{host}`
-- Publish on every Tier-1 action: topic `kairo.actions.tier1`
+- Configurable via `ruptura.yaml`: `eventbus.driver: nats | kafka | none` (default: `none`)
+- Publish on every rupture state change: topic `ruptura.rupture.{host}`
+- Publish on every Tier-1 action: topic `ruptura.actions.tier1`
 - NATS: `nats.go` driver — JetStream, at-least-once delivery
 - Kafka: `kafka.go` driver — `franz-go` library, exactly-once via idempotent producer
 - `internal/eventbus/` — extend existing package; add `Driver` interface + two implementations
@@ -48,9 +48,9 @@ v6.1 adds online weight adaptation:
 ### §26 — Operator / Multi-Cluster
 
 Wire the existing `ohe/operator/` skeleton:
-- CRD: `KairoInstance` — spec: `{image, port, storageSize, apiKey (secretRef)}`
-- Controller: reconcile loop — create Deployment + Service + PVC per KairoInstance
-- Multi-cluster: each cluster runs its own kairo-core; operator manages lifecycle only
+- CRD: `RupturaInstance` — spec: `{image, port, storageSize, apiKey (secretRef)}`
+- Controller: reconcile loop — create Deployment + Service + PVC per RupturaInstance
+- Multi-cluster: each cluster runs its own ruptura; operator manages lifecycle only
 - Package: `ohe/operator/` — implement controller using `controller-runtime`
 
 ---
@@ -59,8 +59,8 @@ Wire the existing `ohe/operator/` skeleton:
 
 | Item | Value |
 |------|-------|
-| Go module | `github.com/benfradjselim/kairo-core` |
-| Binary name | `kairo-core` |
+| Go module | `github.com/benfradjselim/ruptura` |
+| Binary name | `ruptura` |
 | Go version | 1.18 (minimum; no 1.21+ features) |
 | License | Apache 2.0 |
 | Binary size target | <= 25 MB |
@@ -73,7 +73,7 @@ Wire the existing `ohe/operator/` skeleton:
 
 ```
 cmd/
-  kairo-core/              # Main binary entry point
+  ruptura/              # Main binary entry point
 
 internal/
   ingest/                  # Prom remote_write, OTLP, DogStatsD, gRPC receivers
@@ -105,8 +105,8 @@ pkg/
   utils/                   # Shared utilities
 
 sdk/
-  go/                      # kairo-client-go
-  python/                  # kairo-client
+  go/                      # ruptura-go
+  python/                  # ruptura-client
 ```
 
 ---
@@ -394,20 +394,20 @@ GET /timeline              # HTML prediction timeline
 
 | Metric | Labels | Type |
 |--------|--------|------|
-| kairo_rupture_index | host, metric, severity | Gauge |
-| kairo_time_to_failure_seconds | host, metric | Gauge |
-| kairo_predicted_value | host, metric, horizon | Gauge |
-| kairo_confidence | host | Gauge |
-| kairo_fused_rupture_probability | host | Gauge |
-| kairo_kpi_stress | host | Gauge |
-| kairo_kpi_fatigue | host | Gauge |
-| kairo_kpi_healthscore | host | Gauge |
-| kairo_actions_total | type, tier, outcome | Counter |
-| kairo_tracker_count | type, state | Gauge |
-| kairo_ingest_samples_total | source | Counter |
-| kairo_memory_bytes | — | Gauge |
-| kairo_uptime_seconds | — | Counter |
-| kairo_version_info | version | Gauge (value=1) |
+| rpt_rupture_index | host, metric, severity | Gauge |
+| rpt_time_to_failure_seconds | host, metric | Gauge |
+| rpt_predicted_value | host, metric, horizon | Gauge |
+| rpt_confidence | host | Gauge |
+| rpt_fused_rupture_probability | host | Gauge |
+| rpt_kpi_stress | host | Gauge |
+| rpt_kpi_fatigue | host | Gauge |
+| rpt_kpi_healthscore | host | Gauge |
+| rpt_actions_total | type, tier, outcome | Counter |
+| rpt_tracker_count | type, state | Gauge |
+| rpt_ingest_samples_total | source | Counter |
+| rpt_memory_bytes | — | Gauge |
+| rpt_uptime_seconds | — | Counter |
+| rpt_version_info | version | Gauge (value=1) |
 
 ---
 

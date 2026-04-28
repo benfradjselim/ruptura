@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/models"
-	"github.com/benfradjselim/kairo-core/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 // Channel defines a notification destination persisted in storage.

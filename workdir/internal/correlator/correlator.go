@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/models"
-	"github.com/benfradjselim/kairo-core/pkg/utils"
+	"github.com/benfradjselim/ruptura/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
 const (

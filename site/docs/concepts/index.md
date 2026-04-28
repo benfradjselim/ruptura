@@ -1,6 +1,6 @@
 # Concepts
 
-Kairo Core is built around three layered ideas: **predict**, **explain**, **act**.
+Ruptura is built around three layered ideas: **predict**, **explain**, **act**.
 
 ## Core model
 

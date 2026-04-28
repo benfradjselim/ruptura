@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // --- CorrelationStore tests ---

@@ -3,8 +3,8 @@
 ## Kubernetes with Helm (recommended)
 
 ```bash
-helm install kairo-core ./helm \
-  --namespace kairo-system \
+helm install ruptura ./helm \
+  --namespace ruptura-system \
   --create-namespace \
   --set auth.jwtSecret=$(openssl rand -hex 32) \
   --set storage.size=50Gi \
@@ -19,7 +19,7 @@ helm install kairo-core ./helm \
 replicaCount: 1
 
 image:
-  repository: kairo-core
+  repository: ruptura
   tag: "6.1.0"
   pullPolicy: IfNotPresent
 
@@ -33,7 +33,7 @@ storage:
   storageClass: "standard"
 
 auth:
-  jwtSecret: ""  # set via --set or KAIRO_JWT_SECRET env var
+  jwtSecret: ""  # set via --set or RUPTURA_JWT_SECRET env var
 
 actions:
   executionMode: suggest
@@ -56,32 +56,32 @@ resources:
     cpu: "1000m"
 ```
 
-## KairoInstance Operator
+## RupturaInstance Operator
 
 If you prefer a declarative CRD-based approach:
 
 ```yaml
-apiVersion: kairo.io/v1alpha1
-kind: KairoInstance
+apiVersion: ruptura.io/v1alpha1
+kind: RupturaInstance
 metadata:
   name: production
-  namespace: kairo-system
+  namespace: ruptura-system
 spec:
-  image: kairo-core:6.1.0
+  image: ruptura:6.1.0
   port: 8080
   storageSize: 50Gi
   apiKey:
-    secretRef: kairo-api-key
+    secretRef: ruptura-api-key
   replicas: 1
 ```
 
 ```bash
 # Create the API key secret first
-kubectl create secret generic kairo-api-key \
+kubectl create secret generic ruptura-api-key \
   --from-literal=key=$(openssl rand -hex 32) \
-  -n kairo-system
+  -n ruptura-system
 
-kubectl apply -f kairo-instance.yaml
+kubectl apply -f ruptura-instance.yaml
 ```
 
 ## Docker Compose (single-host production)
@@ -90,16 +90,16 @@ kubectl apply -f kairo-instance.yaml
 # docker-compose.prod.yml
 version: "3.8"
 services:
-  kairo:
-    image: kairo-core:6.1.0
+  ruptura:
+    image: ruptura:6.1.0
     ports:
       - "8080:8080"
       - "9090:9090"
     volumes:
-      - kairo-data:/var/lib/kairo
-      - ./kairo.yaml:/etc/kairo/kairo.yaml:ro
+      - ruptura-data:/var/lib/ruptura
+      - ./ruptura.yaml:/etc/kairo/ruptura.yaml:ro
     environment:
-      KAIRO_JWT_SECRET: "${KAIRO_JWT_SECRET}"
+      RUPTURA_JWT_SECRET: "${RUPTURA_JWT_SECRET}"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/health"]
@@ -108,28 +108,28 @@ services:
       retries: 3
 
 volumes:
-  kairo-data:
+  ruptura-data:
 ```
 
 ```bash
-KAIRO_JWT_SECRET=$(openssl rand -hex 32) docker compose -f docker-compose.prod.yml up -d
+RUPTURA_JWT_SECRET=$(openssl rand -hex 32) docker compose -f docker-compose.prod.yml up -d
 ```
 
 ## Prometheus integration
 
-Add Kairo as a scrape target:
+Add Ruptura as a scrape target:
 
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: kairo-core
+  - job_name: ruptura
     static_configs:
-      - targets: ["kairo-core:8080"]
+      - targets: ["ruptura:8080"]
     metrics_path: /api/v2/metrics
     bearer_token: "<api-key>"
 
 remote_write:
-  - url: http://kairo-core:8080/api/v2/write
+  - url: http://ruptura:8080/api/v2/write
     authorization:
       credentials: "<api-key>"
 ```
@@ -137,12 +137,12 @@ remote_write:
 ## Alertmanager rules
 
 ```yaml
-# kairo-alerts.yml
+# ruptura-alerts.yml
 groups:
-  - name: kairo
+  - name: ruptura
     rules:
-      - alert: KairoRuptureCritical
-        expr: kairo_rupture_index > 3.0
+      - alert: RupturaRuptureCritical
+        expr: rpt_rupture_index > 3.0
         for: 2m
         labels:
           severity: critical
@@ -150,8 +150,8 @@ groups:
           summary: "Rupture Index critical on {{ $labels.host }}"
           description: "R={{ $value | printf \"%.1f\" }} — check /api/v2/explain"
 
-      - alert: KairoHealthScoreLow
-        expr: kairo_kpi_healthscore < 40
+      - alert: RupturaHealthScoreLow
+        expr: rpt_kpi_healthscore < 40
         for: 5m
         labels:
           severity: warning
@@ -168,4 +168,4 @@ groups:
 | Medium (50–500 hosts) | 256 MB | 0.5 core | 30 GB |
 | Large (500+ hosts) | 512 MB | 1 core | 100 GB |
 
-Kairo uses BadgerDB embedded — storage scales with the number of hosts and retention settings.
+Ruptura uses BadgerDB embedded — storage scales with the number of hosts and retention settings.

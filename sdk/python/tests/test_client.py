@@ -1,15 +1,15 @@
-"""Tests for KairoClient using the responses library to mock HTTP calls."""
+"""Tests for RupturaClient using the responses library to mock HTTP calls."""
 
 import pytest
 import responses as resp_lib
 
-from kairo import KairoClient, KairoError
+from ruptura import RupturaClient, RupturaError
 
-BASE = "https://kairo.test"
+BASE = "https://ruptura.test"
 
 
 def client(**kwargs):
-    return KairoClient(BASE, api_key="kairo_test_key", **kwargs)
+    return RupturaClient(BASE, api_key="rpt_test_key", **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +38,7 @@ def test_ready_succeeds():
 @resp_lib.activate
 def test_ready_unavailable_raises():
     resp_lib.add(resp_lib.GET, f"{BASE}/api/v2/ready", status=503, body=b"")
-    with pytest.raises(KairoError) as exc_info:
+    with pytest.raises(RupturaError) as exc_info:
         client().ready()
     assert exc_info.value.status_code == 503
 
@@ -50,10 +50,10 @@ def test_ready_unavailable_raises():
 
 @resp_lib.activate
 def test_metrics_prometheus_returns_text():
-    prom_text = "# HELP kairo_uptime_seconds\nkairo_uptime_seconds 42.0\n"
+    prom_text = "# HELP rpt_uptime_seconds\nrpt_uptime_seconds 42.0\n"
     resp_lib.add(resp_lib.GET, f"{BASE}/api/v2/metrics", body=prom_text, content_type="text/plain")
     result = client().metrics_prometheus()
-    assert "kairo_uptime_seconds" in result
+    assert "rpt_uptime_seconds" in result
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ def test_delete_context():
 @resp_lib.activate
 def test_explain_not_found_raises():
     resp_lib.add(resp_lib.GET, f"{BASE}/api/v2/explain/r-999", status=404, json={"error": "not found"})
-    with pytest.raises(KairoError) as exc_info:
+    with pytest.raises(RupturaError) as exc_info:
         client().explain("r-999")
     assert exc_info.value.status_code == 404
 
@@ -164,7 +164,7 @@ def test_explain_formula_not_found_raises():
         status=404,
         json={"error": "not found"},
     )
-    with pytest.raises(KairoError) as exc_info:
+    with pytest.raises(RupturaError) as exc_info:
         client().explain_formula("r-999")
     assert exc_info.value.status_code == 404
 
@@ -177,15 +177,15 @@ def test_explain_formula_not_found_raises():
 @resp_lib.activate
 def test_api_key_sets_bearer_header():
     resp_lib.add(resp_lib.GET, f"{BASE}/api/v2/health", json={"status": "ok"})
-    c = KairoClient(BASE, api_key="kairo_mykey")
+    c = RupturaClient(BASE, api_key="rpt_mykey")
     c.health()
-    assert resp_lib.calls[0].request.headers["Authorization"] == "Bearer kairo_mykey"
+    assert resp_lib.calls[0].request.headers["Authorization"] == "Bearer rpt_mykey"
 
 
 @resp_lib.activate
 def test_no_auth_header_when_no_key():
     resp_lib.add(resp_lib.GET, f"{BASE}/api/v2/health", json={"status": "ok"})
-    c = KairoClient(BASE)
+    c = RupturaClient(BASE)
     c.health()
     assert "Authorization" not in resp_lib.calls[0].request.headers
 
@@ -196,22 +196,22 @@ def test_no_auth_header_when_no_key():
 
 
 @resp_lib.activate
-def test_server_error_raises_kairo_error():
+def test_server_error_raises_rpt_error():
     resp_lib.add(
         resp_lib.GET,
         f"{BASE}/api/v2/health",
         status=503,
         json={"error": "storage down"},
     )
-    with pytest.raises(KairoError) as exc_info:
+    with pytest.raises(RupturaError) as exc_info:
         client().health()
     assert exc_info.value.status_code == 503
     assert "storage down" in exc_info.value.message
 
 
 @resp_lib.activate
-def test_kairo_error_str():
+def test_rpt_error_str():
     resp_lib.add(resp_lib.GET, f"{BASE}/api/v2/health", status=503, json={"error": "down"})
-    with pytest.raises(KairoError) as exc_info:
+    with pytest.raises(RupturaError) as exc_info:
         client().health()
     assert "503" in str(exc_info.value)

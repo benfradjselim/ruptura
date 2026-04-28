@@ -1,6 +1,6 @@
 # Architecture
 
-Kairo Core ships as a **single Go binary** with BadgerDB embedded — no external database, no sidecar, no agent fleet required.
+Ruptura ships as a **single Go binary** with BadgerDB embedded — no external database, no sidecar, no agent fleet required.
 
 ## System diagram
 
@@ -31,7 +31,7 @@ graph TD
     subgraph Infra
         E1[NATS / Kafka eventbus\noptional v6.1]
         E2[BadgerDB embedded\n7d metrics · 400d KPIs]
-        E3[K8s Operator\nKairoInstance CRD]
+        E3[K8s Operator\nRupturaInstance CRD]
     end
 
     Ingest --> Pipelines
@@ -46,7 +46,7 @@ graph TD
 
 | Package | Responsibility |
 |---------|---------------|
-| `cmd/kairo-core` | Binary entry point, flag parsing |
+| `cmd/ruptura` | Binary entry point, flag parsing |
 | `internal/ingest` | OTLP, gRPC, DogStatsD receivers |
 | `internal/pipeline` | Metric / log / trace pipelines |
 | `internal/fusion` | Signal fusion, composites, rupture detection |
@@ -56,12 +56,12 @@ graph TD
 | `internal/storage` | BadgerDB wrapper, tiered compaction |
 | `internal/eventbus` | NATS / Kafka driver (v6.1) |
 | `internal/grpcserver` | gRPC ingest server (v6.1) |
-| `internal/operator` | KairoInstance CRD reconciler (v6.1) |
+| `internal/operator` | RupturaInstance CRD reconciler (v6.1) |
 | `internal/explain` | XAI trace generation |
 | `pkg/rupture` | Rupture Index™ core maths |
 | `pkg/composites` | Composite signal formulas |
 | `sdk/go` | Official Go client (`ohe` package) |
-| `sdk/python` | Official Python client (`kairo-client`) |
+| `sdk/python` | Official Python client (`ruptura-client`) |
 
 ## Detailed pages
 

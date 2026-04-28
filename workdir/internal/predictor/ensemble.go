@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // z-score constants for confidence intervals

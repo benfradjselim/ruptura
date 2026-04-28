@@ -3,7 +3,7 @@ package traces
 import (
 	"testing"
 
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 func TestCascadeIndex_noData(t *testing.T) {

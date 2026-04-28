@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/benfradjselim/kairo-core/internal/actions/engine"
+	"github.com/benfradjselim/ruptura/internal/actions/engine"
 )
 
 func TestWebhookProvider_success(t *testing.T) {

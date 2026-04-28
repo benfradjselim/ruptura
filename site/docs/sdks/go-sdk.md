@@ -1,40 +1,40 @@
 # Go SDK
 
-The Go SDK is part of the `kairo-core` module at `sdk/go`.
+The Go SDK is part of the `ruptura` module at `sdk/go`.
 
 ## Install
 
 ```bash
-go get github.com/benfradjselim/kairo-core/sdk/go@v6.1.1
+go get github.com/benfradjselim/ruptura/sdk/go@v6.1.1
 ```
 
 ## Import
 
-The package name is `kairo`:
+The package name is `ruptura`:
 
 ```go
-import kairo "github.com/benfradjselim/kairo-core/sdk/go"
+import "github.com/benfradjselim/ruptura/sdk/go"
 ```
 
 ## Create a client
 
 ```go
 // API key auth (recommended for services)
-c := kairo.New("http://kairo-core:8080", kairo.WithAPIKey("kairo_abc123"))
+c := ruptura.New("http://ruptura:8080", ruptura.WithAPIKey("rpt_abc123"))
 
 // JWT auth (for interactive / user sessions)
-c := kairo.New("http://kairo-core:8080", kairo.WithToken("eyJ..."))
+c := ruptura.New("http://ruptura:8080", ruptura.WithToken("eyJ..."))
 
 // Custom timeout
-c := kairo.New("http://kairo-core:8080",
-    kairo.WithAPIKey("kairo_abc123"),
-    kairo.WithTimeout(10*time.Second),
+c := ruptura.New("http://ruptura:8080",
+    ruptura.WithAPIKey("rpt_abc123"),
+    ruptura.WithTimeout(10*time.Second),
 )
 
 // Multi-tenant
-c := kairo.New("http://kairo-core:8080",
-    kairo.WithAPIKey("kairo_abc123"),
-    kairo.WithOrgID("org_xyz"),
+c := ruptura.New("http://ruptura:8080",
+    ruptura.WithAPIKey("rpt_abc123"),
+    ruptura.WithOrgID("org_xyz"),
 )
 ```
 
@@ -84,7 +84,7 @@ for model, w := range weights.Weights {
 ## Ingest metrics
 
 ```go
-err := c.IngestMetrics(ctx, []kairo.Metric{
+err := c.IngestMetrics(ctx, []ruptura.Metric{
     {Name: "cpu_usage", Value: 0.72, Host: "web-01", Timestamp: time.Now()},
     {Name: "mem_usage", Value: 0.45, Host: "web-01", Timestamp: time.Now()},
 })
@@ -105,12 +105,12 @@ err = c.EmergencyStop(ctx)
 
 ## Error handling
 
-The SDK returns `*kairo.Error` for non-2xx responses:
+The SDK returns `*ruptura.Error` for non-2xx responses:
 
 ```go
 rupture, err := c.RuptureIndex(ctx, "unknown-host")
 if err != nil {
-    var apiErr *kairo.Error
+    var apiErr *ruptura.Error
     if errors.As(err, &apiErr) {
         fmt.Printf("HTTP %d: %s\n", apiErr.StatusCode, apiErr.Message)
     }
@@ -121,7 +121,7 @@ if err != nil {
 
 | Option | Description |
 |--------|-------------|
-| `WithAPIKey(key string)` | Set API key (`kairo_*` format) |
+| `WithAPIKey(key string)` | Set API key (`rpt_*` format) |
 | `WithToken(token string)` | Set JWT bearer token |
 | `WithOrgID(id string)` | Set `X-Org-ID` header for multi-tenancy |
 | `WithTimeout(d time.Duration)` | HTTP request timeout (default 30s) |

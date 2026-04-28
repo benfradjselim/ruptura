@@ -18,7 +18,7 @@ func TestParseFlags_Defaults(t *testing.T) {
 	if cfg.Port != 8080 {
 		t.Errorf("want 8080 got %d", cfg.Port)
 	}
-	if cfg.StoragePath != "/var/lib/kairo/data" {
+	if cfg.StoragePath != "/var/lib/ruptura/data" {
 		t.Errorf("wrong default storage")
 	}
 	if cfg.APIKey != "" {

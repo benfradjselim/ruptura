@@ -261,17 +261,17 @@ Revoke an API key.
 
 ### `GET /metrics`
 
-Returns Kairo's own Prometheus metrics (no auth required).
+Returns Ruptura's own Prometheus metrics (no auth required).
 
 Key series:
 
 ```
-kairo_rupture_index{host="web-01"}                  4.2
-kairo_time_to_failure_seconds{host="web-01"}        1800
-kairo_kpi_healthscore{host="web-01"}                43.2
-kairo_kpi_stress{host="web-01"}                     0.72
-kairo_actions_total{tier="1",result="ok"}           12
-kairo_ingest_samples_total{source="prometheus"}     840200
-kairo_ensemble_weight{host="web-01",model="ca_ilr"} 0.35
-kairo_uptime_seconds                                3842
+rpt_rupture_index{host="web-01"}                  4.2
+rpt_time_to_failure_seconds{host="web-01"}        1800
+rpt_kpi_healthscore{host="web-01"}                43.2
+rpt_kpi_stress{host="web-01"}                     0.72
+rpt_actions_total{tier="1",result="ok"}           12
+rpt_ingest_samples_total{source="prometheus"}     840200
+rpt_ensemble_weight{host="web-01",model="ca_ilr"} 0.35
+rpt_uptime_seconds                                3842
 ```

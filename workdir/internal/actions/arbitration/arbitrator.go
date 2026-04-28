@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/actions/engine"
+	"github.com/benfradjselim/ruptura/internal/actions/engine"
 )
 
 type Arbitrator interface {

@@ -1,6 +1,6 @@
 # API
 
-Kairo Core exposes a REST API v2 with 44 endpoints. All endpoints are under `/api/v2/`.
+Ruptura exposes a REST API v2 with 44 endpoints. All endpoints are under `/api/v2/`.
 
 ## Authentication
 

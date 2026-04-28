@@ -1,6 +1,6 @@
 # License
 
-Kairo Core is released under the **Apache License, Version 2.0**.
+Ruptura is released under the **Apache License, Version 2.0**.
 
 ```
 Copyright 2026 Selim Benfradj
@@ -22,7 +22,7 @@ limitations under the License.
 
 | You can | You cannot |
 |---------|-----------|
-| Use commercially | Trademark Kairo Core |
+| Use commercially | Trademark Ruptura |
 | Modify the source | Hold author liable |
 | Distribute | Remove the license notice |
 | Sublicense | — |

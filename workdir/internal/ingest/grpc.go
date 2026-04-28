@@ -40,7 +40,7 @@ type MetricIngest_PushMetricsServer interface {
 
 // MetricIngestServiceDesc registers the hand-written service (no protoc).
 var MetricIngestServiceDesc = grpc.ServiceDesc{
-	ServiceName: "kairo.v1.MetricIngest",
+	ServiceName: "ruptura.v1.MetricIngest",
 	HandlerType: (*MetricIngestServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/benfradjselim/kairo-core/internal/collector"
+	"github.com/benfradjselim/ruptura/internal/collector"
 )
 
 // --- LogCollector tests ---

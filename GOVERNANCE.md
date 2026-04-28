@@ -1,4 +1,4 @@
-# Kairo Core Governance
+# Ruptura Governance
 
 ## Maintainers
 

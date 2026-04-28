@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/pipeline/metrics"
+	"github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 )
 
 type mockPipeline struct {

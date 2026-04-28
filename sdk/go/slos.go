@@ -1,4 +1,4 @@
-package kairo
+package ruptura
 
 import (
 	"context"

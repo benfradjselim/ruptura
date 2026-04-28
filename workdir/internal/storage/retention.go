@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v3"
-	"github.com/benfradjselim/kairo-core/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 const (

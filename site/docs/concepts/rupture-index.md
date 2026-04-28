@@ -24,7 +24,7 @@ When a metric is accelerating far faster than its baseline — a hallmark of mem
 | 3.0 – 5.0 | Critical | Tier-2 (suggested action) |
 | ≥ 5.0 | Emergency | Tier-1 (automated action) |
 
-Thresholds are configurable via `predictor.rupture_threshold` in `kairo.yaml`.
+Thresholds are configurable via `predictor.rupture_threshold` in `ruptura.yaml`.
 
 ## Dual-scale CA-ILR engine
 

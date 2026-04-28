@@ -13,8 +13,8 @@ Contributions are welcome — bug reports, features, documentation improvements,
 ## Development setup
 
 ```bash
-git clone https://github.com/benfradjselim/kairo-core.git
-cd kairo-core/workdir
+git clone https://github.com/benfradjselim/ruptura.git
+cd ruptura/workdir
 
 # Build
 go build ./...
@@ -55,8 +55,8 @@ go tool cover -func=coverage.out
 
 Open an issue on GitHub with:
 
-1. Kairo version (`kairo-core --version`)
-2. `kairo.yaml` (sanitised — remove secrets)
+1. Kairo version (`ruptura --version`)
+2. `ruptura.yaml` (sanitised — remove secrets)
 3. Relevant logs
 4. Steps to reproduce
 
@@ -76,4 +76,4 @@ Large features (new ingest protocol, new composite signal, new action provider) 
 - Immutable data patterns — never mutate a struct in-place, return new copies
 - No comments explaining *what* the code does — only *why* (non-obvious constraints)
 - Files ≤ 800 lines, functions ≤ 50 lines
-- Module path: `github.com/benfradjselim/kairo-core`
+- Module path: `github.com/benfradjselim/ruptura`

@@ -7,11 +7,11 @@
 //
 // All events are JSON-encoded. Topics follow the pattern:
 //
-//	kairo.rupture.{host}   — rupture state change
-//	kairo.action.tier1     — Tier-1 action fired
-//	kairo.ingest.batch     — metric batch ingested
-//	kairo.alert.fire       — alert fired
-//	kairo.alert.resolve    — alert resolved
+//	ruptura.rupture.{host}   — rupture state change
+//	ruptura.action.tier1     — Tier-1 action fired
+//	ruptura.ingest.batch     — metric batch ingested
+//	ruptura.alert.fire       — alert fired
+//	ruptura.alert.resolve    — alert resolved
 package eventbus
 
 import (

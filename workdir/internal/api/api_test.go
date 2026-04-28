@@ -4,7 +4,7 @@ import (
     "net/http"
     "net/http/httptest"
     "testing"
-    "github.com/benfradjselim/kairo-core/internal/telemetry"
+    "github.com/benfradjselim/ruptura/internal/telemetry"
 )
 
 func TestAPI(t *testing.T) {

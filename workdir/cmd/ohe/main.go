@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/orchestrator"
-	"github.com/benfradjselim/kairo-core/pkg/logger"
+	"github.com/benfradjselim/ruptura/internal/orchestrator"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 	"gopkg.in/yaml.v3"
 )
 

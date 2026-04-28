@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // TopologyAnalyzer maintains a live service dependency graph from ingested spans

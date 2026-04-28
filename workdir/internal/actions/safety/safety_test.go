@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/actions/engine"
+	"github.com/benfradjselim/ruptura/internal/actions/engine"
 )
 
 func TestRateLimiter_allow_block(t *testing.T) {

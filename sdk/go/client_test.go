@@ -1,4 +1,4 @@
-package kairo_test
+package ruptura_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	kairo "github.com/benfradjselim/kairo-core/sdk/go"
+	"github.com/benfradjselim/ruptura/sdk/go"
 )
 
 // wrap returns an APIResponse envelope for testing.
@@ -20,11 +20,11 @@ func wrap(data interface{}) interface{} {
 	}
 }
 
-func newTestServer(t *testing.T, mux *http.ServeMux) (*httptest.Server, *kairo.Client) {
+func newTestServer(t *testing.T, mux *http.ServeMux) (*httptest.Server, *ruptura.Client) {
 	t.Helper()
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
-	return srv, kairo.New(srv.URL, kairo.WithToken("test-token"))
+	return srv, ruptura.New(srv.URL, ruptura.WithToken("test-token"))
 }
 
 func writeJSON(w http.ResponseWriter, code int, v interface{}) {
@@ -38,7 +38,7 @@ func writeJSON(w http.ResponseWriter, code int, v interface{}) {
 func TestHealth(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, wrap(kairo.HealthResponse{Status: "ok", Version: "5.0.0"}))
+		writeJSON(w, 200, wrap(ruptura.HealthResponse{Status: "ok", Version: "5.0.0"}))
 	})
 	_, c := newTestServer(t, mux)
 
@@ -87,7 +87,7 @@ func TestLogin(t *testing.T) {
 			writeJSON(w, 401, map[string]interface{}{"error": map[string]string{"code": "UNAUTHORIZED", "message": "bad creds"}})
 			return
 		}
-		writeJSON(w, 200, wrap(kairo.LoginResponse{Token: "jwt-abc", User: kairo.User{Username: "admin", Role: "admin"}}))
+		writeJSON(w, 200, wrap(ruptura.LoginResponse{Token: "jwt-abc", User: ruptura.User{Username: "admin", Role: "admin"}}))
 	})
 	_, c := newTestServer(t, mux)
 
@@ -111,9 +111,9 @@ func TestLoginBadCreds(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for bad credentials")
 	}
-	var apiErr *kairo.Error
+	var apiErr *ruptura.Error
 	if !asError(err, &apiErr) {
-		t.Fatalf("expected *kairo.Error, got %T", err)
+		t.Fatalf("expected *ruptura.Error, got %T", err)
 	}
 	if apiErr.StatusCode != 401 {
 		t.Errorf("got status %d, want 401", apiErr.StatusCode)
@@ -121,8 +121,8 @@ func TestLoginBadCreds(t *testing.T) {
 }
 
 // asError mimics errors.As without importing errors for cleaner test code.
-func asError(err error, target **kairo.Error) bool {
-	if e, ok := err.(*kairo.Error); ok {
+func asError(err error, target **ruptura.Error) bool {
+	if e, ok := err.(*ruptura.Error); ok {
 		*target = e
 		return true
 	}
@@ -155,7 +155,7 @@ func TestMetricRange(t *testing.T) {
 			w.WriteHeader(400)
 			return
 		}
-		pts := []kairo.DataPoint{{Timestamp: now, Value: 42.5}}
+		pts := []ruptura.DataPoint{{Timestamp: now, Value: 42.5}}
 		writeJSON(w, 200, wrap(pts))
 	})
 	_, c := newTestServer(t, mux)
@@ -174,7 +174,7 @@ func TestMetricRange(t *testing.T) {
 func TestAlertList(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/alerts", func(w http.ResponseWriter, _ *http.Request) {
-		alerts := []kairo.Alert{
+		alerts := []ruptura.Alert{
 			{ID: "a1", Name: "high-cpu", Severity: "critical", Status: "active"},
 		}
 		writeJSON(w, 200, wrap(alerts))
@@ -208,21 +208,21 @@ func TestAlertAcknowledge(t *testing.T) {
 // --- SLOs ---
 
 func TestSLOCreateAndGet(t *testing.T) {
-	created := kairo.SLO{ID: "slo-1", Name: "uptime", Target: 99.9, Window: "30d"}
+	created := ruptura.SLO{ID: "slo-1", Name: "uptime", Target: 99.9, Window: "30d"}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/slos", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			writeJSON(w, 200, wrap(created))
 			return
 		}
-		writeJSON(w, 200, wrap([]kairo.SLO{created}))
+		writeJSON(w, 200, wrap([]ruptura.SLO{created}))
 	})
 	mux.HandleFunc("/api/v1/slos/slo-1", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, wrap(created))
 	})
 	_, c := newTestServer(t, mux)
 
-	out, err := c.SLOCreate(context.Background(), kairo.SLO{Name: "uptime", Target: 99.9, Window: "30d"})
+	out, err := c.SLOCreate(context.Background(), ruptura.SLO{Name: "uptime", Target: 99.9, Window: "30d"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +244,7 @@ func TestSLOCreateAndGet(t *testing.T) {
 func TestIngest(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/ingest", func(w http.ResponseWriter, r *http.Request) {
-		var req kairo.IngestRequest
+		var req ruptura.IngestRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Host == "" {
 			w.WriteHeader(400)
 			return
@@ -253,10 +253,10 @@ func TestIngest(t *testing.T) {
 	})
 	_, c := newTestServer(t, mux)
 
-	err := c.Ingest(context.Background(), kairo.IngestRequest{
+	err := c.Ingest(context.Background(), ruptura.IngestRequest{
 		AgentID: "agent-1",
 		Host:    "web-01",
-		Metrics: []kairo.Metric{{Name: "cpu", Value: 55.0, Host: "web-01", Timestamp: time.Now()}},
+		Metrics: []ruptura.Metric{{Name: "cpu", Value: 55.0, Host: "web-01", Timestamp: time.Now()}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -269,14 +269,14 @@ func TestAPIKeyCreateAndDelete(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/api-keys", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
-			resp := kairo.APIKeyCreateResponse{
-				APIKey:       kairo.APIKey{ID: "k1", Name: "ci", Role: "operator", Active: true},
-				PlaintextKey: "kairo_abc123secretkey",
+			resp := ruptura.APIKeyCreateResponse{
+				APIKey:       ruptura.APIKey{ID: "k1", Name: "ci", Role: "operator", Active: true},
+				PlaintextKey: "rpt_abc123secretkey",
 			}
 			writeJSON(w, 200, wrap(resp))
 			return
 		}
-		writeJSON(w, 200, wrap([]kairo.APIKey{{ID: "k1", Name: "ci", Active: true}}))
+		writeJSON(w, 200, wrap([]ruptura.APIKey{{ID: "k1", Name: "ci", Active: true}}))
 	})
 	mux.HandleFunc("/api/v1/api-keys/k1", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
@@ -285,7 +285,7 @@ func TestAPIKeyCreateAndDelete(t *testing.T) {
 	})
 	_, c := newTestServer(t, mux)
 
-	key, err := c.APIKeyCreate(context.Background(), kairo.APIKeyCreateRequest{Name: "ci", Role: "operator"})
+	key, err := c.APIKeyCreate(context.Background(), ruptura.APIKeyCreateRequest{Name: "ci", Role: "operator"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,9 +309,9 @@ func TestClientError(t *testing.T) {
 	_, c := newTestServer(t, mux)
 
 	_, err := c.Health(context.Background())
-	var apiErr *kairo.Error
+	var apiErr *ruptura.Error
 	if !asError(err, &apiErr) {
-		t.Fatalf("expected *kairo.Error, got %T: %v", err, err)
+		t.Fatalf("expected *ruptura.Error, got %T: %v", err, err)
 	}
 	if apiErr.StatusCode != 503 {
 		t.Errorf("got %d, want 503", apiErr.StatusCode)
@@ -326,16 +326,16 @@ func TestClientError(t *testing.T) {
 func TestWithAPIKey(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer kairo_mykey" {
+		if r.Header.Get("Authorization") != "Bearer rpt_mykey" {
 			w.WriteHeader(403)
 			return
 		}
-		writeJSON(w, 200, wrap(kairo.HealthResponse{Status: "ok"}))
+		writeJSON(w, 200, wrap(ruptura.HealthResponse{Status: "ok"}))
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	c := kairo.New(srv.URL, kairo.WithAPIKey("kairo_mykey"))
+	c := ruptura.New(srv.URL, ruptura.WithAPIKey("rpt_mykey"))
 	if _, err := c.Health(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -348,12 +348,12 @@ func TestWithOrgID(t *testing.T) {
 			w.WriteHeader(400)
 			return
 		}
-		writeJSON(w, 200, wrap(kairo.HealthResponse{Status: "ok"}))
+		writeJSON(w, 200, wrap(ruptura.HealthResponse{Status: "ok"}))
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	c := kairo.New(srv.URL, kairo.WithToken("tok"), kairo.WithOrgID("acme"))
+	c := ruptura.New(srv.URL, ruptura.WithToken("tok"), ruptura.WithOrgID("acme"))
 	if _, err := c.Health(context.Background()); err != nil {
 		t.Fatal(err)
 	}

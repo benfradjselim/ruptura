@@ -7,28 +7,28 @@ The recommended production deployment uses the bundled manifests or Helm chart.
 ### Using `kubectl`
 
 ```bash
-git clone https://github.com/benfradjselim/kairo-core.git
-cd kairo-core
+git clone https://github.com/benfradjselim/ruptura.git
+cd ruptura
 
 # Build the image (or use a pre-built tag)
-docker build -t kairo-core:6.1.0 .
+docker build -t ruptura:6.1.0 .
 
 # Create namespace + deploy
 kubectl apply -f deploy/
 
 # Verify pods are running
-kubectl get pods -n kairo-system
+kubectl get pods -n ruptura-system
 
 # Port-forward to test locally
-kubectl port-forward svc/kairo-core 8080:8080 -n kairo-system
+kubectl port-forward svc/ruptura 8080:8080 -n ruptura-system
 curl http://localhost:8080/api/v2/health
 ```
 
 ### Using Helm
 
 ```bash
-helm install kairo-core ./helm \
-  --namespace kairo-system \
+helm install ruptura ./helm \
+  --namespace ruptura-system \
   --create-namespace \
   --set auth.jwtSecret=$(openssl rand -hex 32) \
   --set storage.size=20Gi
@@ -37,30 +37,30 @@ helm install kairo-core ./helm \
 To upgrade:
 
 ```bash
-helm upgrade kairo-core ./helm --namespace kairo-system
+helm upgrade ruptura ./helm --namespace ruptura-system
 ```
 
-### Using the KairoInstance CRD (Operator)
+### Using the RupturaInstance CRD (Operator)
 
-If you have the Kairo Operator installed, deploy a full instance declaratively:
+If you have the Ruptura Operator installed, deploy a full instance declaratively:
 
 ```yaml
-apiVersion: kairo.io/v1alpha1
-kind: KairoInstance
+apiVersion: ruptura.io/v1alpha1
+kind: RupturaInstance
 metadata:
   name: production
-  namespace: kairo-system
+  namespace: ruptura-system
 spec:
-  image: kairo-core:6.1.0
+  image: ruptura:6.1.0
   port: 8080
   storageSize: 20Gi
   apiKey:
-    secretRef: kairo-api-key
+    secretRef: ruptura-api-key
   replicas: 1
 ```
 
 ```bash
-kubectl apply -f kairo-instance.yaml
+kubectl apply -f ruptura-instance.yaml
 ```
 
 See [Operator →](../architecture/operator.md) for full CRD reference.
@@ -71,12 +71,12 @@ See [Operator →](../architecture/operator.md) for full CRD reference.
 
 ```bash
 docker run -d \
-  --name kairo \
+  --name ruptura \
   -p 8080:8080 \
   -p 9090:9090 \
-  -v kairo-data:/var/lib/kairo \
-  -e KAIRO_JWT_SECRET=$(openssl rand -hex 32) \
-  kairo-core:6.1.0
+  -v ruptura-data:/var/lib/ruptura \
+  -e RUPTURA_JWT_SECRET=$(openssl rand -hex 32) \
+  ruptura:6.1.0
 ```
 
 | Port | Protocol | Purpose |
@@ -99,14 +99,14 @@ Download the latest release binary and run it directly:
 
 ```bash
 # Linux amd64
-curl -fsSL https://github.com/benfradjselim/kairo-core/releases/latest/download/kairo-linux-amd64 \
-  -o /usr/local/bin/kairo-core
-chmod +x /usr/local/bin/kairo-core
+curl -fsSL https://github.com/benfradjselim/ruptura/releases/latest/download/kairo-linux-amd64 \
+  -o /usr/local/bin/ruptura
+chmod +x /usr/local/bin/ruptura
 
-kairo-core --config=/etc/kairo/kairo.yaml
+ruptura --config=/etc/kairo/ruptura.yaml
 ```
 
-Kairo ships as a **single static binary** — no runtime dependencies, no external database.
+Ruptura ships as a **single static binary** — no runtime dependencies, no external database.
 
 ---
 
@@ -115,10 +115,10 @@ Kairo ships as a **single static binary** — no runtime dependencies, no extern
 Requires Go 1.18+:
 
 ```bash
-git clone https://github.com/benfradjselim/kairo-core.git
-cd kairo-core/workdir
-go build -o kairo-core ./cmd/kairo-core
-./kairo-core --config=configs/kairo.yaml
+git clone https://github.com/benfradjselim/ruptura.git
+cd ruptura/workdir
+go build -o ruptura ./cmd/ruptura
+./ruptura --config=configs/ruptura.yaml
 ```
 
 Run tests:

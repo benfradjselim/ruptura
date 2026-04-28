@@ -1,6 +1,6 @@
 # Getting Started
 
-Get Kairo Core up and running in minutes.
+Get Ruptura up and running in minutes.
 
 ## Installation paths
 
@@ -14,7 +14,7 @@ Get Kairo Core up and running in minutes.
 
 1. **[Install →](installation.md)** — choose Docker, Kubernetes, or binary
 2. **[Quickstart →](quickstart.md)** — ingest your first metrics and see the Rupture Index in 5 minutes
-3. **[Configuration →](configuration.md)** — tune `kairo.yaml` for your environment
+3. **[Configuration →](configuration.md)** — tune `ruptura.yaml` for your environment
 
 ## Minimum requirements
 

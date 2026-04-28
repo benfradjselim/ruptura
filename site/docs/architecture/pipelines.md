@@ -1,6 +1,6 @@
 # Pipelines
 
-Kairo runs three independent ingestion pipelines — metrics, logs, and traces — that feed a shared fusion engine.
+Ruptura runs three independent ingestion pipelines — metrics, logs, and traces — that feed a shared fusion engine.
 
 ## Pipeline flow
 
@@ -66,16 +66,16 @@ This prevents a metrics storm from overwhelming the fusion engine.
 When `eventbus.driver` is set to `nats` or `kafka`, every processed rupture event is published in addition to being stored:
 
 ```
-kairo.rupture.{host}  →  published on every R state change
-kairo.actions.tier1   →  published when a Tier-1 action fires
+ruptura.rupture.{host}  →  published on every R state change
+ruptura.actions.tier1   →  published when a Tier-1 action fires
 ```
 
-Configure in `kairo.yaml`:
+Configure in `ruptura.yaml`:
 
 ```yaml
 eventbus:
   driver: kafka
   kafka:
     brokers: ["kafka:9092"]
-    topic: kairo.events
+    topic: ruptura.events
 ```

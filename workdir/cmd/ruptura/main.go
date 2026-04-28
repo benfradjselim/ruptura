@@ -10,14 +10,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/actions/engine"
-	"github.com/benfradjselim/kairo-core/internal/api"
-	apicontext "github.com/benfradjselim/kairo-core/internal/context"
-	"github.com/benfradjselim/kairo-core/internal/eventbus"
-	"github.com/benfradjselim/kairo-core/internal/explain"
-	"github.com/benfradjselim/kairo-core/internal/storage"
-	"github.com/benfradjselim/kairo-core/internal/telemetry"
-	"github.com/benfradjselim/kairo-core/pkg/logger"
+	"github.com/benfradjselim/ruptura/internal/actions/engine"
+	"github.com/benfradjselim/ruptura/internal/api"
+	apicontext "github.com/benfradjselim/ruptura/internal/context"
+	"github.com/benfradjselim/ruptura/internal/eventbus"
+	"github.com/benfradjselim/ruptura/internal/explain"
+	"github.com/benfradjselim/ruptura/internal/storage"
+	"github.com/benfradjselim/ruptura/internal/telemetry"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 const version = "6.0.0"
@@ -31,10 +31,10 @@ type Config struct {
 }
 
 func parseFlags(args []string) (Config, error) {
-	fs := flag.NewFlagSet("kairo-core", flag.ContinueOnError)
+	fs := flag.NewFlagSet("ruptura", flag.ContinueOnError)
 	cfg := Config{}
 	fs.IntVar(&cfg.Port, "port", 8080, "HTTP port")
-	fs.StringVar(&cfg.StoragePath, "storage", "/var/lib/kairo/data", "storage directory")
+	fs.StringVar(&cfg.StoragePath, "storage", "/var/lib/ruptura/data", "storage directory")
 	fs.StringVar(&cfg.APIKey, "api-key", "", "API bearer token")
 	fs.BoolVar(&cfg.ShowVersion, "version", false, "print version and exit")
 	err := fs.Parse(args)
@@ -49,7 +49,7 @@ func main() {
 	}
 
 	if cfg.ShowVersion {
-		fmt.Printf("kairo-core v%s\n", version)
+		fmt.Printf("ruptura v%s\n", version)
 		os.Exit(0)
 	}
 
@@ -71,7 +71,7 @@ func run(cfg Config) error {
 
 // runWithContext is the testable entrypoint — it uses the provided context for shutdown.
 func runWithContext(ctx context.Context, cfg Config) error {
-	logger.Default.Info("kairo-core starting", "version", version, "port", cfg.Port)
+	logger.Default.Info("ruptura starting", "version", version, "port", cfg.Port)
 
 	store, err := storage.Open(cfg.StoragePath)
 	if err != nil {

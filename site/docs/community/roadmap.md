@@ -11,14 +11,14 @@ Bug fixes, documentation site launch, all 8 composite signal formulas published.
 | § | Feature | Detail |
 |---|---------|--------|
 | §23 | gRPC ingest | Real gRPC server (:9090), 4 MB max, back-pressure via RESOURCE_EXHAUSTED |
-| §24 | NATS / Kafka eventbus | JetStream at-least-once + franz-go exactly-once; topics: `kairo.rupture.*`, `kairo.actions.tier1` |
+| §24 | NATS / Kafka eventbus | JetStream at-least-once + franz-go exactly-once; topics: `ruptura.rupture.*`, `ruptura.actions.tier1` |
 | §25 | Adaptive ensemble weighting | Online MAE-based weights, 1-hour sliding window, 60 s update cycle |
-| §26 | Kubernetes operator | `KairoInstance` CRD, controller-runtime reconcile, creates Deployment + Service + PVC |
+| §26 | Kubernetes operator | `RupturaInstance` CRD, controller-runtime reconcile, creates Deployment + Service + PVC |
 | — | Go SDK (`sdk/go`) | Full v2 API coverage, typed client, `ohe.WithAPIKey` / `ohe.WithToken` |
 
 ### v6.0.0 — 2026-04-25 ✅
 
-Clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/kairo-core`:
+Clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/ruptura`:
 
 - CA-ILR dual-scale ELS engine
 - 5-model ensemble (CA-ILR, ARIMA, Holt-Winters, MAD, EWMA)
@@ -46,7 +46,7 @@ Clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/kairo-core`:
 
 | Feature | Detail |
 |---------|--------|
-| SaaS self-serve | Hosted Kairo at `kairo.io` — managed instance, usage billing |
+| SaaS self-serve | Hosted Kairo at `ruptura.io` — managed instance, usage billing |
 | Cluster mode (WAL + S3) | Raft-based replication, S3-compatible snapshot target (MinIO / AWS / GCS) |
 | Median pre-filter for ILR | Outlier robustness before slope computation |
 
@@ -56,13 +56,13 @@ Clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/kairo-core`:
 |---------|--------|
 | FFT cycle detection | Replace manual seasonality buckets with frequency-domain analysis |
 | Confidence intervals | Residual-based uncertainty quantification on predictions |
-| Auto-remediation webhooks | Closed-loop healing: Kairo triggers and verifies its own remediation |
+| Auto-remediation webhooks | Closed-loop healing: Ruptura triggers and verifies its own remediation |
 
 ---
 
 ## CNCF
 
-Kairo Core is an independent open-source project targeting alignment with CNCF sandbox criteria. The project follows CNCF principles: Apache 2.0 license, open governance (`GOVERNANCE.md`), documented security policy (`SECURITY.md`), and a public roadmap.
+Ruptura is an independent open-source project targeting alignment with CNCF sandbox criteria. The project follows CNCF principles: Apache 2.0 license, open governance (`GOVERNANCE.md`), documented security policy (`SECURITY.md`), and a public roadmap.
 
 A CNCF sandbox application requires demonstrable production adoption and a committed maintainer community. Achieving that is a **long-term goal**, not a current status. Contributions and production feedback from the community are the path there.
 

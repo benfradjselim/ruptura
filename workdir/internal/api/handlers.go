@@ -6,11 +6,11 @@ import (
     "sync/atomic"
     "time"
 
-    "github.com/benfradjselim/kairo-core/internal/actions/engine"
-    apicontext "github.com/benfradjselim/kairo-core/internal/context"
-    "github.com/benfradjselim/kairo-core/internal/explain"
-    "github.com/benfradjselim/kairo-core/internal/storage"
-    "github.com/benfradjselim/kairo-core/internal/telemetry"
+    "github.com/benfradjselim/ruptura/internal/actions/engine"
+    apicontext "github.com/benfradjselim/ruptura/internal/context"
+    "github.com/benfradjselim/ruptura/internal/explain"
+    "github.com/benfradjselim/ruptura/internal/storage"
+    "github.com/benfradjselim/ruptura/internal/telemetry"
 )
 
 type Handlers struct {

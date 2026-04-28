@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/models"
-	"github.com/benfradjselim/kairo-core/pkg/utils"
-	"github.com/benfradjselim/kairo-core/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/utils"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 // Processor normalizes and aggregates raw metrics

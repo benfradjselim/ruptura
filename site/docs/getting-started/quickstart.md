@@ -2,15 +2,15 @@
 
 Get Kairo running and see the Rupture Index in under 5 minutes.
 
-## Step 1 — Start Kairo
+## Step 1 — Start Ruptura
 
 ```bash
 docker run -d \
-  --name kairo \
+  --name ruptura \
   -p 8080:8080 \
-  -v kairo-data:/var/lib/kairo \
-  -e KAIRO_JWT_SECRET=dev-secret-change-in-prod \
-  kairo-core:6.1.0
+  -v ruptura-data:/var/lib/ruptura \
+  -e RUPTURA_JWT_SECRET=dev-secret-change-in-prod \
+  ruptura:6.1.0
 ```
 
 ## Step 2 — Verify health
@@ -46,12 +46,12 @@ curl -s -X POST http://localhost:8080/api/v2/write \
   --data-binary @sample.prw
 ```
 
-Or configure your Prometheus to remote_write to Kairo:
+Or configure your Prometheus to remote_write to Ruptura:
 
 ```yaml
 # prometheus.yml
 remote_write:
-  - url: http://kairo-core:8080/api/v2/write
+  - url: http://ruptura:8080/api/v2/write
     basic_auth:
       password: <your-api-key>
 ```

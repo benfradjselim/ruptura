@@ -1,11 +1,11 @@
 # Configuration
 
-Kairo is configured via `kairo.yaml`. Pass the path with `--config`.
+Kairo is configured via `ruptura.yaml`. Pass the path with `--config`.
 
 ## Full reference
 
 ```yaml
-# kairo.yaml
+# ruptura.yaml
 
 mode: connected          # connected | stateless | shadow
 
@@ -17,10 +17,10 @@ eventbus:
   driver: none           # none | nats | kafka
   # nats:
   #   url: "nats://localhost:4222"
-  #   stream: kairo-events
+  #   stream: ruptura-events
   # kafka:
   #   brokers: ["localhost:9092"]
-  #   topic: kairo.events
+  #   topic: ruptura.events
 
 ensemble:
   adaptive: false        # true = online MAE-based weight adaptation (v6.1)
@@ -42,11 +42,11 @@ actions:
       - staging
 
 auth:
-  jwt_secret: ""                  # required — set via env KAIRO_JWT_SECRET
+  jwt_secret: ""                  # required — set via env RUPTURA_JWT_SECRET
   api_keys: []                    # pre-provisioned keys (ohe_* format)
 
 storage:
-  path: /var/lib/kairo            # BadgerDB data directory
+  path: /var/lib/ruptura            # BadgerDB data directory
   retention:
     raw_metrics_days: 7
     logs_days: 30
@@ -73,29 +73,29 @@ storage:
 
 ### `ensemble.adaptive`
 
-When `true`, Kairo computes per-model MAE over a 1-hour sliding window and normalises weights every 60 seconds. Models with lower error receive more weight. The five models are: CA-ILR, ARIMA, Holt-Winters, MAD, EWMA.
+When `true`, Ruptura computes per-model MAE over a 1-hour sliding window and normalises weights every 60 seconds. Models with lower error receive more weight. The five models are: CA-ILR, ARIMA, Holt-Winters, MAD, EWMA.
 
 When `false`, equal weights are used (default: 0.20 each).
 
 ## Environment variables
 
-Every YAML key can be overridden with an environment variable using `KAIRO_` prefix and `_`-separated key path:
+Every YAML key can be overridden with an environment variable using `RUPTURA_` prefix and `_`-separated key path:
 
 | Env var | Equivalent YAML |
 |---------|----------------|
-| `KAIRO_JWT_SECRET` | `auth.jwt_secret` |
-| `KAIRO_INGEST_HTTP_PORT` | `ingest.http_port` |
-| `KAIRO_INGEST_GRPC_PORT` | `ingest.grpc_port` |
-| `KAIRO_ACTIONS_EXECUTION_MODE` | `actions.execution_mode` |
-| `KAIRO_ENSEMBLE_ADAPTIVE` | `ensemble.adaptive` |
-| `KAIRO_STORAGE_PATH` | `storage.path` |
+| `RUPTURA_JWT_SECRET` | `auth.jwt_secret` |
+| `RUPTURA_INGEST_HTTP_PORT` | `ingest.http_port` |
+| `RUPTURA_INGEST_GRPC_PORT` | `ingest.grpc_port` |
+| `RUPTURA_ACTIONS_EXECUTION_MODE` | `actions.execution_mode` |
+| `RUPTURA_ENSEMBLE_ADAPTIVE` | `ensemble.adaptive` |
+| `RUPTURA_STORAGE_PATH` | `storage.path` |
 
 ## Minimal production config
 
 ```yaml
 mode: connected
 auth:
-  jwt_secret: "${KAIRO_JWT_SECRET}"
+  jwt_secret: "${RUPTURA_JWT_SECRET}"
 actions:
   execution_mode: suggest
   safety:
@@ -103,5 +103,5 @@ actions:
     namespace_allowlist:
       - production
 storage:
-  path: /var/lib/kairo
+  path: /var/lib/ruptura
 ```

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/benfradjselim/kairo-core/internal/pipeline/metrics"
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/internal/pipeline/metrics"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 type Edge struct {

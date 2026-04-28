@@ -13,7 +13,7 @@ func TestTelemetry(t *testing.T) {
     reg.IncIngestTotal("prom")
 
     rendered := reg.Render()
-    if !strings.Contains(rendered, "kairo_rupture_index") {
+    if !strings.Contains(rendered, "rpt_rupture_index") {
         t.Errorf("missing rupture_index. Got:\n%s", rendered)
     }
 

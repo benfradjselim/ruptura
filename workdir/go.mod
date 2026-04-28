@@ -1,4 +1,4 @@
-module github.com/benfradjselim/kairo-core
+module github.com/benfradjselim/ruptura
 
 go 1.18
 

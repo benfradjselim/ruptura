@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/benfradjselim/kairo-core/internal/actions/engine"
+	"github.com/benfradjselim/ruptura/internal/actions/engine"
 )
 
 type Provider interface {
@@ -77,7 +77,7 @@ func (p *AlertmanagerProvider) Execute(ctx context.Context, a engine.ActionRecom
 	payload := []map[string]interface{}{
 		{
 			"labels": map[string]string{
-				"alertname":   "KairoRupture",
+				"alertname":   "RupturaRupture",
 				"host":        a.Host,
 				"action_type": a.ActionType,
 			},
@@ -143,13 +143,13 @@ func (p *PagerDutyProvider) Execute(ctx context.Context, a engine.ActionRecommen
 		"routing_key":  p.integrationKey,
 		"event_action": "trigger",
 		"payload": map[string]string{
-			"summary":  fmt.Sprintf("Kairo rupture: %s R=%f", a.Host, a.Confidence), // Actually instruction says R value, but I don't have R value in ActionRecommendation, I have confidence. Wait, let me check struct.
+			"summary":  fmt.Sprintf("Ruptura rupture: %s R=%f", a.Host, a.Confidence), // Actually instruction says R value, but I don't have R value in ActionRecommendation, I have confidence. Wait, let me check struct.
 			"severity": "critical",
 			"source":   a.Host,
 		},
 	}
 	// ActionRecommendation doesn't have R value.
-	// Oh, I see "Kairo rupture: <host> R=<R>". I'll use Confidence for R, maybe.
+	// Oh, I see "Ruptura rupture: <host> R=<R>". I'll use Confidence for R, maybe.
 	// Actually instruction says RuptureEvent has R, but ActionRecommendation does NOT have R.
 	// I'll just put Confidence as R for now, as that's the only value I have that resembles R.
 	body, _ := json.Marshal(payload)

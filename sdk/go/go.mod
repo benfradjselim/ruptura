@@ -1,3 +1,3 @@
-module github.com/benfradjselim/kairo-core/sdk/go
+module github.com/benfradjselim/ruptura/sdk/go
 
 go 1.22

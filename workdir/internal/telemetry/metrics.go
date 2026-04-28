@@ -97,31 +97,31 @@ func (r *Registry) Render() string {
         })
     }
     
-    renderGauge("kairo_rupture_index", "Current rupture index per host/metric", &r.ruptureIndex, "host", "metric", "severity")
-    renderGauge("kairo_time_to_failure_seconds", "Time to failure", &r.timeToFailure, "host", "metric")
-    renderGauge("kairo_predicted_value", "Predicted value", &r.predictedValue, "host", "metric", "horizon")
-    renderGauge("kairo_confidence", "Confidence", &r.confidence, "host")
-    renderGauge("kairo_fused_rupture_probability", "Fused rupture probability", &r.fusedProbability, "host")
-    renderGauge("kairo_kpi_stress", "KPI stress", &r.kpiStress, "host")
-    renderGauge("kairo_kpi_fatigue", "KPI fatigue", &r.kpiFatigue, "host")
-    renderGauge("kairo_kpi_healthscore", "KPI healthscore", &r.kpiHealthscore, "host")
+    renderGauge("rpt_rupture_index", "Current rupture index per host/metric", &r.ruptureIndex, "host", "metric", "severity")
+    renderGauge("rpt_time_to_failure_seconds", "Time to failure", &r.timeToFailure, "host", "metric")
+    renderGauge("rpt_predicted_value", "Predicted value", &r.predictedValue, "host", "metric", "horizon")
+    renderGauge("rpt_confidence", "Confidence", &r.confidence, "host")
+    renderGauge("rpt_fused_rupture_probability", "Fused rupture probability", &r.fusedProbability, "host")
+    renderGauge("rpt_kpi_stress", "KPI stress", &r.kpiStress, "host")
+    renderGauge("rpt_kpi_fatigue", "KPI fatigue", &r.kpiFatigue, "host")
+    renderGauge("rpt_kpi_healthscore", "KPI healthscore", &r.kpiHealthscore, "host")
     
     // Counters (rudimentary)
-    b.WriteString("# HELP kairo_actions_total Actions total\n# TYPE kairo_actions_total counter\n")
+    b.WriteString("# HELP rpt_actions_total Actions total\n# TYPE rpt_actions_total counter\n")
     r.actionsTotal.Range(func(key, val interface{}) bool {
-        b.WriteString(fmt.Sprintf("kairo_actions_total{%s} %d\n", key.(string), atomic.LoadInt64(val.(*int64))))
+        b.WriteString(fmt.Sprintf("rpt_actions_total{%s} %d\n", key.(string), atomic.LoadInt64(val.(*int64))))
         return true
     })
     
-    b.WriteString("# HELP kairo_ingest_samples_total Ingest total\n# TYPE kairo_ingest_samples_total counter\n")
+    b.WriteString("# HELP rpt_ingest_samples_total Ingest total\n# TYPE rpt_ingest_samples_total counter\n")
     r.ingestTotal.Range(func(key, val interface{}) bool {
-        b.WriteString(fmt.Sprintf("kairo_ingest_samples_total{source=\"%s\"} %d\n", key.(string), atomic.LoadInt64(val.(*int64))))
+        b.WriteString(fmt.Sprintf("rpt_ingest_samples_total{source=\"%s\"} %d\n", key.(string), atomic.LoadInt64(val.(*int64))))
         return true
     })
     
-    b.WriteString(fmt.Sprintf("kairo_memory_bytes %d\n", atomic.LoadInt64(&r.memoryBytes)))
-    b.WriteString(fmt.Sprintf("kairo_uptime_seconds %f\n", time.Since(r.startTime).Seconds()))
-    b.WriteString(fmt.Sprintf("kairo_version_info{version=\"%s\"} 1\n", r.version))
+    b.WriteString(fmt.Sprintf("rpt_memory_bytes %d\n", atomic.LoadInt64(&r.memoryBytes)))
+    b.WriteString(fmt.Sprintf("rpt_uptime_seconds %f\n", time.Since(r.startTime).Seconds()))
+    b.WriteString(fmt.Sprintf("rpt_version_info{version=\"%s\"} 1\n", r.version))
     
     return b.String()
 }

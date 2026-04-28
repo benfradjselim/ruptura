@@ -9,9 +9,9 @@ Current observability solutions split along two failing axes:
 
 Neither predicts. Neither explains.
 
-## The Kairo Approach
+## The Ruptura Approach
 
-Kairo treats infrastructure as a **living organism** — measuring vital signs, behaviours, stress responses, and social dynamics through 8 auditable composite signals, an adaptive ensemble of 5 prediction models, and a dual-scale acceleration detector.
+Ruptura treats infrastructure as a **living organism** — measuring vital signs, behaviours, stress responses, and social dynamics through 8 auditable composite signals, an adaptive ensemble of 5 prediction models, and a dual-scale acceleration detector.
 
 ---
 
@@ -28,7 +28,7 @@ Two ILR windows run in parallel per metric:
 | `ILR_stable` | 60 min | Long-term baseline — what is normal? |
 | `ILR_burst` | 5 min | Short-term acceleration — is something diverging? |
 
-When R > 3, a metric accelerates 3× faster than its own baseline — Kairo raises a warning **before** the metric reaches 80% saturation.
+When R > 3, a metric accelerates 3× faster than its own baseline — Ruptura raises a warning **before** the metric reaches 80% saturation.
 
 ### Why ILR over LSTM?
 
@@ -36,7 +36,7 @@ When R > 3, a metric accelerates 3× faster than its own baseline — Kairo rais
 |-------|-----|-----|-----------|-----------|
 | LSTM | 2.0% | 200+ MB | 500 ms | < 0.0001 |
 | ARIMA | 4.1% | 85 MB | 210 ms | 0.0001 |
-| **ILR (Kairo)** | **6.2%** | **0.5 MB** | **0.8 ms** | **1,550×** |
+| **ILR (Ruptura)** | **6.2%** | **0.5 MB** | **0.8 ms** | **1,550×** |
 
 ILR trades +2.1% MAE for 170× less RAM and 262× faster inference. **1,550× more efficient than ARIMA** — validated on a Raspberry Pi 4 over 40,320 samples.
 
@@ -181,7 +181,7 @@ Weights update every 60 s: `weight_i = (1/MAE_i) / Σ(1/MAE_j)`. No manual tunin
 
 ## Production Benchmarks
 
-| Criterion | Prom/Grafana/Loki | Datadog | **Kairo Core v6.1** |
+| Criterion | Prom/Grafana/Loki | Datadog | **Ruptura v6.1** |
 |-----------|-------------------|---------|-------------------|
 | RAM idle | ~450 MB | ~180 MB | **22 MB** |
 | Setup time | ~30 min | ~5 min | **< 1 min** |
@@ -209,6 +209,6 @@ The v5.0 whitepaper contains the complete mathematical formalization and canonic
 
 [Read OHE v5.0 Whitepaper (GitHub) →](https://github.com/benfradjselim/Mlops_crew_automation/blob/v6.1/workdir/docs/v5.0.0/WHITEPAPER-v5.0.0.md)
 
-> "Stop staring at dashboards hoping for the best. Sleep. Kairo watches."
+> "Stop staring at dashboards hoping for the best. Sleep. Ruptura watches."
 >
 > — Selim Benfradj, Architect & Founder

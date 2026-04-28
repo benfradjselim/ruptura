@@ -1,4 +1,4 @@
-"""KairoClient — typed Python client for the Kairo Core v6 REST API."""
+"""RupturaClient — typed Python client for the Ruptura v6 REST API."""
 
 from __future__ import annotations
 
@@ -6,15 +6,15 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from .exceptions import KairoError
+from .exceptions import RupturaError
 
 
-class KairoClient:
-    """Thread-safe Kairo Core v6 API client.
+class RupturaClient:
+    """Thread-safe Ruptura v6 API client.
 
     Quick start::
 
-        c = KairoClient("http://localhost:8080", api_key="kairo_abc123")
+        c = RupturaClient("http://localhost:8080", api_key="rpt_abc123")
         health = c.health()
     """
 
@@ -47,7 +47,7 @@ class KairoClient:
                 msg = resp.json().get("error", resp.text[:200])
             except Exception:
                 msg = resp.text[:200]
-            raise KairoError(resp.status_code, msg)
+            raise RupturaError(resp.status_code, msg)
         if resp.status_code == 204 or not resp.content:
             return None
         return resp.json()
@@ -85,7 +85,7 @@ class KairoClient:
             h["Authorization"] = f"Bearer {self._api_key}"
         resp = self._session.get(url, headers=h, timeout=self._timeout)
         if resp.status_code >= 400:
-            raise KairoError(resp.status_code, resp.text[:200])
+            raise RupturaError(resp.status_code, resp.text[:200])
         return resp.text
 
     # ------------------------------------------------------------------

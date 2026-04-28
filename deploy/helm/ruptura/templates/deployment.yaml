@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kairo-core.fullname" . }}
+  name: {{ include "ruptura.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "kairo-core.labels" . | nindent 4 }}
+    {{- include "ruptura.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   # Badger (embedded KV) is single-writer; Recreate avoids two pods fighting over the PVC.
@@ -12,21 +12,21 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "kairo-core.selectorLabels" . | nindent 6 }}
+      {{- include "ruptura.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "kairo-core.selectorLabels" . | nindent 8 }}
+        {{- include "ruptura.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "kairo-core.serviceAccountName" . }}
+      serviceAccountName: {{ include "ruptura.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: kairo-core
+        - name: ruptura
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
@@ -35,17 +35,17 @@ spec:
             - "--port"
             - "8080"
             - "--storage"
-            - "/var/lib/kairo/data"
+            - "/var/lib/ruptura/data"
             {{- if or .Values.apiKey .Values.existingSecret }}
             - "--api-key"
-            - "$(KAIRO_API_KEY)"
+            - "$(RUPTURA_API_KEY)"
             {{- end }}
           {{- if or .Values.apiKey .Values.existingSecret }}
           env:
-            - name: KAIRO_API_KEY
+            - name: RUPTURA_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kairo-core.secretName" . }}
+                  name: {{ include "ruptura.secretName" . }}
                   key: api-key
           {{- end }}
           ports:
@@ -63,7 +63,7 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: data
-              mountPath: /var/lib/kairo/data
+              mountPath: /var/lib/ruptura/data
             # distroless nonroot needs a writable /tmp for Badger temp files
             - name: tmp
               mountPath: /tmp
@@ -71,7 +71,7 @@ spec:
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "kairo-core.fullname" . }}-data
+            claimName: {{ include "ruptura.fullname" . }}-data
           {{- else }}
           emptyDir: {}
           {{- end }}

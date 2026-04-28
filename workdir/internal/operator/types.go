@@ -2,8 +2,8 @@ package operator
 
 import "time"
 
-// KairoInstanceSpec defines the desired state of a KairoInstance.
-type KairoInstanceSpec struct {
+// RupturaInstanceSpec defines the desired state of a RupturaInstance.
+type RupturaInstanceSpec struct {
 	Image       string `json:"image"`
 	Port        int    `json:"port"`
 	StorageSize string `json:"storageSize"`
@@ -11,20 +11,20 @@ type KairoInstanceSpec struct {
 	Replicas    int    `json:"replicas"`
 }
 
-// KairoInstanceStatus reflects the observed state.
-type KairoInstanceStatus struct {
+// RupturaInstanceStatus reflects the observed state.
+type RupturaInstanceStatus struct {
 	Ready   bool      `json:"ready"`
 	Message string    `json:"message"`
 	Updated time.Time `json:"updated"`
 }
 
-// KairoInstance is the CRD object.
-type KairoInstance struct {
+// RupturaInstance is the CRD object.
+type RupturaInstance struct {
 	APIVersion string              `json:"apiVersion"`
 	Kind       string              `json:"kind"`
 	Metadata   ObjectMeta          `json:"metadata"`
-	Spec       KairoInstanceSpec   `json:"spec"`
-	Status     KairoInstanceStatus `json:"status,omitempty"`
+	Spec       RupturaInstanceSpec   `json:"spec"`
+	Status     RupturaInstanceStatus `json:"status,omitempty"`
 }
 
 // ObjectMeta mirrors k8s ObjectMeta (minimal).
@@ -34,7 +34,7 @@ type ObjectMeta struct {
 	Labels    map[string]string `json:"labels,omitempty"`
 }
 
-// DeploymentSpec is what the operator creates for each KairoInstance.
+// DeploymentSpec is what the operator creates for each RupturaInstance.
 type DeploymentSpec struct {
 	Name        string
 	Namespace   string

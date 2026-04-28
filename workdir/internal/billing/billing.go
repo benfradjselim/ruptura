@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 // EventType classifies what was metered.

@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/actions/engine"
-	"github.com/benfradjselim/kairo-core/internal/actions/providers"
+	"github.com/benfradjselim/ruptura/internal/actions/engine"
+	"github.com/benfradjselim/ruptura/internal/actions/providers"
 )
 
 type RateLimiter interface {

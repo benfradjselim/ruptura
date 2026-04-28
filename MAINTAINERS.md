@@ -1,4 +1,4 @@
-# Kairo Core Maintainers
+# Ruptura Maintainers
 
 | Name | GitHub | Email | Role | Scope |
 |------|--------|-------|------|-------|

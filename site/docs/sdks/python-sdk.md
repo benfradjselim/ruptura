@@ -1,11 +1,11 @@
 # Python SDK
 
-The Python SDK is published as `kairo-client` on PyPI.
+The Python SDK is published as `ruptura-client` on PyPI.
 
 ## Install
 
 ```bash
-pip install kairo-client
+pip install ruptura-client
 ```
 
 Requires Python 3.9+. The only runtime dependency is `requests>=2.28`.
@@ -13,13 +13,13 @@ Requires Python 3.9+. The only runtime dependency is `requests>=2.28`.
 ## Create a client
 
 ```python
-from kairo import KairoClient
+from ruptura import KairoClient
 
 # API key auth (recommended for services)
-c = KairoClient("http://kairo-core:8080", api_key="ohe_abc123")
+c = KairoClient("http://ruptura:8080", api_key="ohe_abc123")
 
 # Custom timeout
-c = KairoClient("http://kairo-core:8080", api_key="ohe_abc123", timeout=10.0)
+c = KairoClient("http://ruptura:8080", api_key="ohe_abc123", timeout=10.0)
 ```
 
 ## Health check
@@ -81,11 +81,11 @@ c.emergency_stop()
 ## Error handling
 
 ```python
-from kairo.exceptions import KairoError
+from ruptura.exceptions import KairoError
 
 try:
     rupture = c.rupture_index("unknown-host")
-except KairoError as e:
+except RupturaError as e:
     print(f"HTTP {e.status_code}: {e}")
 ```
 
@@ -95,9 +95,9 @@ The client is synchronous (`requests`-based). For async usage, wrap calls with `
 
 ```python
 import asyncio
-from kairo import KairoClient
+from ruptura import KairoClient
 
-c = KairoClient("http://kairo-core:8080", api_key="ohe_abc123")
+c = KairoClient("http://ruptura:8080", api_key="ohe_abc123")
 
 async def get_rupture(host: str):
     return await asyncio.to_thread(c.rupture_index, host)

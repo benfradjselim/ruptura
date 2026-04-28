@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/eventbus"
+	"github.com/benfradjselim/ruptura/internal/eventbus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -81,7 +81,7 @@ func New(rulesYAML []byte, bus eventbus.Bus) (*Engine, error) {
 
 func (e *Engine) Recommend(event RuptureEvent) ([]ActionRecommendation, error) {
 	if e.bus != nil {
-		topic := fmt.Sprintf("kairo.rupture.%s", event.Host)
+		topic := fmt.Sprintf("ruptura.rupture.%s", event.Host)
 		_ = e.bus.Publish(context.Background(), topic, "system", event)
 	}
 

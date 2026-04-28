@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/storage"
-	"github.com/benfradjselim/kairo-core/pkg/logger"
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/internal/storage"
+	"github.com/benfradjselim/ruptura/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
-// Config holds all runtime configuration for Kairo Core.
+// Config holds all runtime configuration for Ruptura.
 type Config struct {
 	Mode            string        `yaml:"mode"`
 	Host            string        `yaml:"host"`
@@ -49,7 +49,7 @@ func DefaultConfig() Config {
 		Mode:            "central",
 		Host:            h,
 		Port:            8080,
-		StoragePath:     "/var/lib/kairo/data",
+		StoragePath:     "/var/lib/ruptura/data",
 		CentralURL:      "http://localhost:8080",
 		JWTSecret:       secret,
 		CollectInterval: 15 * time.Second,
@@ -58,7 +58,7 @@ func DefaultConfig() Config {
 	}
 }
 
-// Engine is the v6 Kairo Core runtime.
+// Engine is the v6 Ruptura runtime.
 type Engine struct {
 	store *storage.Store
 	cfg   Config
@@ -76,7 +76,7 @@ func New(cfg Config) (*Engine, error) {
 	}
 
 	if cfg.StoragePath == "" {
-		cfg.StoragePath = "/var/lib/kairo/data"
+		cfg.StoragePath = "/var/lib/ruptura/data"
 	}
 
 	store, err := storage.Open(cfg.StoragePath)
@@ -92,7 +92,7 @@ func New(cfg Config) (*Engine, error) {
 	return &Engine{store: store, cfg: cfg}, nil
 }
 
-// Run starts the Kairo Core server. It blocks until ctx is cancelled.
+// Run starts the Ruptura server. It blocks until ctx is cancelled.
 func (e *Engine) Run(ctx context.Context) error {
 	defer e.store.Close()
 
@@ -110,7 +110,7 @@ func (e *Engine) runCentral(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v2/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"ready","message":"kairo-core v6"}`)
+		fmt.Fprintf(w, `{"status":"ready","message":"ruptura v6"}`)
 	})
 
 	addr := fmt.Sprintf(":%d", e.cfg.Port)
@@ -120,7 +120,7 @@ func (e *Engine) runCentral(ctx context.Context) error {
 	}
 
 	srv := &http.Server{Handler: mux}
-	logger.Default.Info("kairo-core central listening", "addr", ln.Addr().String())
+	logger.Default.Info("ruptura central listening", "addr", ln.Addr().String())
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.Serve(ln) }()

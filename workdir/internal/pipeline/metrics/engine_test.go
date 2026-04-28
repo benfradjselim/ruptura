@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/pipeline/metrics"
+	"github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 )
 
 func seedEngine(t *testing.T) *metrics.Engine {

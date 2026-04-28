@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/rupture"
+	"github.com/benfradjselim/ruptura/pkg/rupture"
 )
 
 // Engine implements MetricPipeline backed by dual-scale CAILR + ensemble.

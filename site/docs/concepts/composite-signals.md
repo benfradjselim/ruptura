@@ -1,6 +1,6 @@
 # Composite Signals
 
-Kairo computes 8 composite signals from raw telemetry. Each maps multiple input metrics to a single 0–1 interpretable index with a published formula. No black boxes.
+Ruptura computes 8 composite signals from raw telemetry. Each maps multiple input metrics to a single 0–1 interpretable index with a published formula. No black boxes.
 
 ## Signal overview
 
@@ -124,12 +124,12 @@ Example response:
 
 ## Prometheus self-metrics
 
-Kairo exports all 8 signals as Prometheus metrics:
+Ruptura exports all 8 signals as Prometheus metrics:
 
 ```
-kairo_kpi_healthscore{host="web-01"} 61.4
-kairo_kpi_stress{host="web-01"} 0.72
-kairo_kpi_fatigue{host="web-01"} 0.41
+rpt_kpi_healthscore{host="web-01"} 61.4
+rpt_kpi_stress{host="web-01"} 0.72
+rpt_kpi_fatigue{host="web-01"} 0.41
 # ... (one series per signal per host)
 ```
 

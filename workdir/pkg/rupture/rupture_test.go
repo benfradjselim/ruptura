@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/rupture"
+	"github.com/benfradjselim/ruptura/pkg/rupture"
 )
 
 func TestIndex_stable(t *testing.T) {

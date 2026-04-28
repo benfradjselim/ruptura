@@ -1,12 +1,12 @@
 # About
 
-**Kairo Core** is a predictive failure detection engine for cloud-native infrastructure, built by Selim Benfradj.
+**Ruptura** is a predictive failure detection engine for cloud-native infrastructure, built by Selim Benfradj.
 
 ## Origins
 
-Kairo Core is the v6.0 clean-room rewrite of the **Observability Holistic Engine (OHE)**, a project that began in 2025 with a core insight: existing observability tools answer *"What is broken?"* — none answer *"When will it break, and why?"*
+Ruptura is the v6.0 clean-room rewrite of the **Observability Holistic Engine (OHE)**, a project that began in 2025 with a core insight: existing observability tools answer *"What is broken?"* — none answer *"When will it break, and why?"*
 
-OHE v5.0 proved the thesis with a single Go binary delivering dual-scale CA-ILR predictions, dissipative fatigue formulas, and the METRICS.md explainability standard. Kairo Core (v6.0+) extends this into a production-grade platform with a Kubernetes operator, gRPC ingest, eventbus integration, and official SDKs.
+OHE v5.0 proved the thesis with a single Go binary delivering dual-scale CA-ILR predictions, dissipative fatigue formulas, and the METRICS.md explainability standard. Ruptura (v6.0+) extends this into a production-grade platform with a Kubernetes operator, gRPC ingest, eventbus integration, and official SDKs.
 
 ## Philosophy
 

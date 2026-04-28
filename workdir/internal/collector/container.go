@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // ContainerCollector reads cgroup-based metrics for running containers.

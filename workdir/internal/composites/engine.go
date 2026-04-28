@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/composites"
+	"github.com/benfradjselim/ruptura/pkg/composites"
 )
 
 type CompositeEdge struct {

@@ -10,9 +10,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	pb "github.com/benfradjselim/kairo-core/internal/grpcserver/proto"
-	"github.com/benfradjselim/kairo-core/internal/storage"
-	"github.com/benfradjselim/kairo-core/pkg/logger"
+	pb "github.com/benfradjselim/ruptura/internal/grpcserver/proto"
+	"github.com/benfradjselim/ruptura/internal/storage"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 // StorageBackend is the subset of *storage.Store used by the gRPC server.

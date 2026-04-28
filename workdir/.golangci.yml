@@ -22,7 +22,7 @@ issues:
       linters:
         - errcheck
 
-    - path: "cmd/kairo-core/main\\.go"
+    - path: "cmd/ruptura/main\\.go"
       text: "io.Copy"
       linters:
         - errcheck

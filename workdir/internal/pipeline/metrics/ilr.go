@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // ILR implements Incremental Linear Regression using Recursive Least Squares

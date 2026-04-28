@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Client is a typed HTTP client for the Kairo Core v6 REST API.
+// Client is a typed HTTP client for the Ruptura v6 REST API.
 type Client struct {
 	baseURL    string
 	apiKey     string
@@ -103,7 +103,7 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("kairo: %s %s: status %d", method, path, resp.StatusCode)
+		return fmt.Errorf("ruptura: %s %s: status %d", method, path, resp.StatusCode)
 	}
 
 	if response != nil {
@@ -183,7 +183,7 @@ func (c *Client) Metrics(ctx context.Context) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("kairo: GET /api/v2/metrics: status %d", resp.StatusCode)
+		return "", fmt.Errorf("ruptura: GET /api/v2/metrics: status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)

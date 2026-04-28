@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## Kairo won't start
+## Ruptura won't start
 
 **Symptom:** Container exits immediately or logs show a startup error.
 
@@ -8,17 +8,17 @@
 
 ```bash
 # Docker
-docker logs kairo
+docker logs ruptura
 
 # Kubernetes
-kubectl logs -n kairo-system -l app=kairo-core --previous
+kubectl logs -n ruptura-system -l app=ruptura --previous
 ```
 
 **Common causes:**
 
 | Error message | Fix |
 |--------------|-----|
-| `jwt_secret is required` | Set `KAIRO_JWT_SECRET` env var or `auth.jwt_secret` in config |
+| `jwt_secret is required` | Set `RUPTURA_JWT_SECRET` env var or `auth.jwt_secret` in config |
 | `failed to open BadgerDB` | Storage path not writable — check PVC/volume permissions |
 | `bind: address already in use` | Port 8080 or 9090 already in use — change `ingest.http_port` or `ingest.grpc_port` |
 
@@ -28,14 +28,14 @@ kubectl logs -n kairo-system -l app=kairo-core --previous
 
 **Symptom:** `GET /api/v2/rupture/{host}` returns `rupture_index: 0` for all hosts.
 
-**Cause:** Kairo needs at least 20 samples (5 minutes at 15 s intervals) before the burst ILR window is populated.
+**Cause:** Ruptura needs at least 20 samples (5 minutes at 15 s intervals) before the burst ILR window is populated.
 
 **Fix:** Wait 5–10 minutes after starting ingest, then check again.
 
 **Also check:** Confirm metrics are actually being ingested:
 
 ```bash
-curl http://localhost:8080/api/v2/metrics | grep kairo_ingest_samples_total
+curl http://localhost:8080/api/v2/metrics | grep rpt_ingest_samples_total
 # Should be > 0
 ```
 
@@ -63,7 +63,7 @@ curl -H "Authorization: Bearer $KEY" http://localhost:8080/api/v2/ruptures | pyt
 1. **`execution_mode`** — must be `auto`, not `shadow` or `suggest`
 2. **`confidence_thresholds.auto_action`** — ensemble confidence must be ≥ 0.85
 3. **`namespace_allowlist`** — target namespace must be in the allowlist
-4. **Rate limit** — check `kairo_actions_total{tier="1"}` — if it's at `rate_limit_per_hour`, actions are gated
+4. **Rate limit** — check `rpt_actions_total{tier="1"}` — if it's at `rate_limit_per_hour`, actions are gated
 5. **Emergency stop** — check if `POST /api/v2/actions/emergency-stop` was called
 
 ```bash
@@ -74,20 +74,20 @@ curl -H "Authorization: Bearer $KEY" http://localhost:8080/api/v2/actions
 
 ## Kafka / NATS eventbus not receiving events
 
-**Symptom:** `kairo.rupture.*` topic is empty.
+**Symptom:** `ruptura.rupture.*` topic is empty.
 
 **Check config:**
 
 ```bash
 # Verify eventbus driver is set
-grep -A5 eventbus /etc/kairo/kairo.yaml
+grep -A5 eventbus /etc/kairo/ruptura.yaml
 ```
 
 **Check connectivity:**
 
 ```bash
 # NATS
-nats pub kairo.test "hello" --server nats://localhost:4222
+nats pub ruptura.test "hello" --server nats://localhost:4222
 
 # Kafka
 kafka-topics.sh --list --bootstrap-server localhost:9092
@@ -96,16 +96,16 @@ kafka-topics.sh --list --bootstrap-server localhost:9092
 **Logs:**
 
 ```bash
-kubectl logs -n kairo-system -l app=kairo-core | grep eventbus
+kubectl logs -n ruptura-system -l app=ruptura | grep eventbus
 ```
 
 ---
 
 ## High memory usage
 
-**Symptom:** Kairo uses much more than expected memory.
+**Symptom:** Ruptura uses much more than expected memory.
 
-Kairo typical usage: **22 MB** idle, up to ~256 MB at scale.
+Ruptura typical usage: **22 MB** idle, up to ~256 MB at scale.
 
 **Causes:**
 
@@ -129,7 +129,7 @@ curl -X POST -H "Authorization: Bearer $KEY" http://localhost:8080/api/v2/admin/
 
 1. Reduce scrape interval on the sending side
 2. Increase `ingest.grpc_queue_size` in config (default: 10,000)
-3. Check if fusion engine is slow — look at `kairo_api_requests_total` latency
+3. Check if fusion engine is slow — look at `rpt_api_requests_total` latency
 
 ---
 
@@ -137,12 +137,12 @@ curl -X POST -H "Authorization: Bearer $KEY" http://localhost:8080/api/v2/admin/
 
 ```bash
 # Kubernetes
-kubectl logs -n kairo-system deployment/kairo-core --follow
+kubectl logs -n ruptura-system deployment/ruptura --follow
 
 # Docker
-docker logs -f kairo
+docker logs -f ruptura
 
 # Set log level to debug in config
-# kairo.yaml: log_level: debug
-# or env: KAIRO_LOG_LEVEL=debug
+# ruptura.yaml: log_level: debug
+# or env: RUPTURA_LOG_LEVEL=debug
 ```

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/storage"
-	"github.com/benfradjselim/kairo-core/pkg/models"
+	"github.com/benfradjselim/ruptura/internal/storage"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // --- mock sinks ---

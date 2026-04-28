@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/kairo-core/internal/eventbus"
+	"github.com/benfradjselim/ruptura/internal/eventbus"
 )
 
 func TestMemBusPublishSubscribe(t *testing.T) {
