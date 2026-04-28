@@ -48,3 +48,16 @@ generated_*.yaml
 *.env
 .env*
 secrets/
+
+# Build artifacts
+*.egg-info/
+*.dist-info/
+__pycache__/
+*.pyc
+*.pyo
+coverage.out
+coverage.html
+.coverage
+build/
+dist/
+site/site/
