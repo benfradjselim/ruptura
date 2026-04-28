@@ -84,3 +84,4 @@ Each maps raw metrics to a single interpretable 0–1 index with published formu
 [Full changelog →](community/roadmap.md) · [Getting Started →](getting-started/installation.md) · [API Reference →](api/reference.md)
 
  
+
