@@ -6,11 +6,11 @@ Kairo runs three independent ingestion pipelines — metrics, logs, and traces �
 
 ```mermaid
 graph LR
-    A[Ingest<br/>gRPC · OTLP · Prom rw · DogSD] --> B[Normalise<br/>downsample · [0,1] scale]
-    B --> C[Aggregate<br/>per-host windows]
-    C --> D[Fusion Engine<br/>composites + ensemble]
-    D --> E[Rupture Detector]
-    E --> F[Actions + API]
+    A["Ingest\ngRPC / OTLP / Prom rw / DogSD"] --> B["Normalise\ndownsample, 0-1 scale"]
+    B --> C["Aggregate\nper-host windows"]
+    C --> D["Fusion Engine\ncomposites + ensemble"]
+    D --> E["Rupture Detector"]
+    E --> F["Actions + API"]
 ```
 
 ## Metric pipeline
