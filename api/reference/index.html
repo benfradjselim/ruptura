@@ -1,0 +1,2631 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Predictive failure detection engine for cloud-native infrastructure">
+      
+      
+      
+        <link rel="canonical" href="https://docs.kairo-core.io/api/reference/">
+      
+      
+        <link rel="prev" href="../..">
+      
+      
+        <link rel="next" href="../..">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Reference - Kairo Core</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Kairo Core" class="md-header__button md-logo" aria-label="Kairo Core" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Kairo Core
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/benfradjselim/Mlops_crew_automation" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Kairo Core" class="md-nav__button md-logo" aria-label="Kairo Core" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Kairo Core
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/benfradjselim/Mlops_crew_automation" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/rupture-index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rupture Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/composite-signals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Composite Signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/surge-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Surge Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/action-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Action Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/fusion-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fusion Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/operator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Health">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-ready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /ready
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ingest
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ingest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /write
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1traces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/traces
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rupture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rupture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rupture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-rupturehost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /rupture/{host}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-ruptures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /ruptures
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composite-kpis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composite KPIs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Composite KPIs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-kpisignalhost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /kpi/{signal}/{host}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adaptive-ensemble" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adaptive Ensemble
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Adaptive Ensemble">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-ensemblehost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /ensemble/{host}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /actions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-actionsidapprove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /actions/{id}/approve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-actionsemergency-stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /actions/emergency-stop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Explainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-explainrupture_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /explain/{rupture_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-explainrupture_idformula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /explain/{rupture_id}/formula
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auth
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Auth">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-authlogin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /auth/login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-authrefresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /auth/refresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apikeys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /apikeys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apikeys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /apikeys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apikeysid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /apikeys/{id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-metrics-prometheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Metrics (Prometheus)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Self-Metrics (Prometheus)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDKs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SDKs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdks/go-sdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdks/python-sdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/deploy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/self-monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Community
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Community
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../community/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../community/roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/whitepaper/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Whitepaper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Health">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-ready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /ready
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ingest
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ingest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /write
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1traces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/traces
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rupture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rupture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rupture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-rupturehost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /rupture/{host}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-ruptures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /ruptures
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composite-kpis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composite KPIs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Composite KPIs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-kpisignalhost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /kpi/{signal}/{host}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adaptive-ensemble" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adaptive Ensemble
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Adaptive Ensemble">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-ensemblehost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /ensemble/{host}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /actions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-actionsidapprove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /actions/{id}/approve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-actionsemergency-stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /actions/emergency-stop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Explainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-explainrupture_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /explain/{rupture_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-explainrupture_idformula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /explain/{rupture_id}/formula
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auth
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Auth">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-authlogin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /auth/login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-authrefresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /auth/refresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apikeys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /apikeys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apikeys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /apikeys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apikeysid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /apikeys/{id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-metrics-prometheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Metrics (Prometheus)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Self-Metrics (Prometheus)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="api-reference">API Reference</h1>
+<p>Base URL: <code>http://&lt;host&gt;:8080/api/v2</code></p>
+<p>All requests require <code>Authorization: Bearer &lt;jwt_or_api_key&gt;</code> unless noted.</p>
+<hr />
+<h2 id="health">Health</h2>
+<h3 id="get-health"><code>GET /health</code></h3>
+<p>Returns server health. No auth required.</p>
+<pre><code class="language-bash">curl http://localhost:8080/api/v2/health
+</code></pre>
+<pre><code class="language-json">{&quot;status&quot;:&quot;ok&quot;,&quot;rupture_detection&quot;:&quot;active&quot;,&quot;uptime_seconds&quot;:3842}
+</code></pre>
+<h3 id="get-ready"><code>GET /ready</code></h3>
+<p>Kubernetes readiness probe. Returns <code>204</code> when ready, <code>503</code> during startup.</p>
+<hr />
+<h2 id="ingest">Ingest</h2>
+<h3 id="post-write"><code>POST /write</code></h3>
+<p>Prometheus remote_write (protobuf). Used by Prometheus <code>remote_write</code> config.</p>
+<h3 id="post-v1metrics"><code>POST /v1/metrics</code></h3>
+<p>OTLP/HTTP metrics (protobuf or JSON).</p>
+<h3 id="post-v1logs"><code>POST /v1/logs</code></h3>
+<p>OTLP/HTTP logs.</p>
+<h3 id="post-v1traces"><code>POST /v1/traces</code></h3>
+<p>OTLP/HTTP traces.</p>
+<hr />
+<h2 id="rupture">Rupture</h2>
+<h3 id="get-rupturehost"><code>GET /rupture/{host}</code></h3>
+<p>Get the current Rupture Index for a host.</p>
+<pre><code class="language-bash">curl -H &quot;Authorization: Bearer $KEY&quot; \
+  http://localhost:8080/api/v2/rupture/web-01
+</code></pre>
+<pre><code class="language-json">{
+  &quot;host&quot;: &quot;web-01&quot;,
+  &quot;rupture_index&quot;: 4.2,
+  &quot;state&quot;: &quot;critical&quot;,
+  &quot;time_to_failure_seconds&quot;: 1800,
+  &quot;dominant_signal&quot;: &quot;stress&quot;,
+  &quot;alpha_burst&quot;: 0.042,
+  &quot;alpha_stable&quot;: 0.010,
+  &quot;timestamp&quot;: &quot;2026-04-28T10:00:00Z&quot;
+}
+</code></pre>
+<p>States: <code>stable</code> · <code>elevated</code> · <code>warning</code> · <code>critical</code> · <code>emergency</code></p>
+<h3 id="get-ruptures"><code>GET /ruptures</code></h3>
+<p>List all active ruptures across all hosts.</p>
+<pre><code class="language-json">{
+  &quot;ruptures&quot;: [
+    { &quot;host&quot;: &quot;web-01&quot;, &quot;rupture_index&quot;: 4.2, &quot;state&quot;: &quot;critical&quot; },
+    { &quot;host&quot;: &quot;db-01&quot;,  &quot;rupture_index&quot;: 1.8, &quot;state&quot;: &quot;warning&quot; }
+  ]
+}
+</code></pre>
+<hr />
+<h2 id="composite-kpis">Composite KPIs</h2>
+<h3 id="get-kpisignalhost"><code>GET /kpi/{signal}/{host}</code></h3>
+<p>Query a composite signal for a host.</p>
+<p><strong>Signals:</strong> <code>stress</code> · <code>fatigue</code> · <code>pressure</code> · <code>contagion</code> · <code>resilience</code> · <code>entropy</code> · <code>sentiment</code> · <code>healthscore</code></p>
+<pre><code class="language-bash">curl -H &quot;Authorization: Bearer $KEY&quot; \
+  http://localhost:8080/api/v2/kpi/stress/web-01
+</code></pre>
+<pre><code class="language-json">{
+  &quot;signal&quot;: &quot;stress&quot;,
+  &quot;host&quot;: &quot;web-01&quot;,
+  &quot;value&quot;: 0.72,
+  &quot;state&quot;: &quot;Stressed&quot;,
+  &quot;trend&quot;: &quot;up&quot;,
+  &quot;timestamp&quot;: &quot;2026-04-28T10:00:00Z&quot;
+}
+</code></pre>
+<hr />
+<h2 id="adaptive-ensemble">Adaptive Ensemble</h2>
+<h3 id="get-ensemblehost"><code>GET /ensemble/{host}</code></h3>
+<p>Get current model weights for a host.</p>
+<pre><code class="language-bash">curl -H &quot;Authorization: Bearer $KEY&quot; \
+  http://localhost:8080/api/v2/ensemble/web-01
+</code></pre>
+<pre><code class="language-json">{
+  &quot;host&quot;: &quot;web-01&quot;,
+  &quot;updated_at&quot;: &quot;2026-04-28T10:00:00Z&quot;,
+  &quot;adaptive&quot;: true,
+  &quot;weights&quot;: {
+    &quot;ca_ilr&quot;:       0.35,
+    &quot;arima&quot;:        0.22,
+    &quot;holt_winters&quot;: 0.18,
+    &quot;mad&quot;:          0.14,
+    &quot;ewma&quot;:         0.11
+  }
+}
+</code></pre>
+<hr />
+<h2 id="actions">Actions</h2>
+<h3 id="get-actions"><code>GET /actions</code></h3>
+<p>List all pending / recent actions.</p>
+<pre><code class="language-json">{
+  &quot;actions&quot;: [
+    {
+      &quot;id&quot;: &quot;act_abc&quot;,
+      &quot;host&quot;: &quot;web-01&quot;,
+      &quot;type&quot;: &quot;scale&quot;,
+      &quot;params&quot;: {&quot;replicas&quot;: 5},
+      &quot;tier&quot;: 2,
+      &quot;status&quot;: &quot;pending&quot;,
+      &quot;rupture_id&quot;: &quot;r_abc123&quot;,
+      &quot;created_at&quot;: &quot;2026-04-28T10:00:00Z&quot;
+    }
+  ]
+}
+</code></pre>
+<h3 id="post-actionsidapprove"><code>POST /actions/{id}/approve</code></h3>
+<p>Approve a Tier-2 pending action.</p>
+<pre><code class="language-bash">curl -X POST -H &quot;Authorization: Bearer $KEY&quot; \
+  http://localhost:8080/api/v2/actions/act_abc/approve
+</code></pre>
+<h3 id="post-actionsemergency-stop"><code>POST /actions/emergency-stop</code></h3>
+<p>Immediately halt all Tier-1 automated actions globally.</p>
+<pre><code class="language-bash">curl -X POST -H &quot;Authorization: Bearer $KEY&quot; \
+  http://localhost:8080/api/v2/actions/emergency-stop
+</code></pre>
+<hr />
+<h2 id="explainability">Explainability</h2>
+<h3 id="get-explainrupture_id"><code>GET /explain/{rupture_id}</code></h3>
+<p>Full XAI trace for a rupture.</p>
+<pre><code class="language-json">{
+  &quot;rupture_id&quot;: &quot;r_abc123&quot;,
+  &quot;host&quot;: &quot;web-01&quot;,
+  &quot;rupture_index&quot;: 4.2,
+  &quot;formula&quot;: &quot;R = |α_burst| / |α_stable| = 0.042 / 0.010 = 4.2&quot;,
+  &quot;model_contributions&quot;: {
+    &quot;ca_ilr&quot;: {&quot;weight&quot;: 0.35, &quot;prediction&quot;: 4.4}
+  },
+  &quot;dominant_signal&quot;: &quot;stress&quot;,
+  &quot;recommendation&quot;: &quot;CPU stress is the primary driver — consider horizontal scaling&quot;
+}
+</code></pre>
+<h3 id="get-explainrupture_idformula"><code>GET /explain/{rupture_id}/formula</code></h3>
+<p>Returns just the formula and coefficients (lighter response for dashboards).</p>
+<hr />
+<h2 id="auth">Auth</h2>
+<h3 id="post-authlogin"><code>POST /auth/login</code></h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/api/v2/auth/login \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;username&quot;:&quot;admin&quot;,&quot;password&quot;:&quot;&lt;jwt_secret&gt;&quot;}'
+</code></pre>
+<p>Returns <code>{"token":"eyJ...","expires_at":"..."}</code>.</p>
+<h3 id="post-authrefresh"><code>POST /auth/refresh</code></h3>
+<p>Exchange a valid JWT for a fresh one. Pass existing token in <code>Authorization</code> header.</p>
+<hr />
+<h2 id="api-keys">API Keys</h2>
+<h3 id="get-apikeys"><code>GET /apikeys</code></h3>
+<p>List all API keys for the current user.</p>
+<h3 id="post-apikeys"><code>POST /apikeys</code></h3>
+<p>Create a new API key.</p>
+<pre><code class="language-bash">curl -X POST -H &quot;Authorization: Bearer $JWT&quot; \
+  http://localhost:8080/api/v2/apikeys \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;name&quot;:&quot;ci-pipeline&quot;,&quot;scopes&quot;:[&quot;read&quot;,&quot;write&quot;]}'
+</code></pre>
+<pre><code class="language-json">{&quot;id&quot;:&quot;key_abc&quot;,&quot;name&quot;:&quot;ci-pipeline&quot;,&quot;key&quot;:&quot;ohe_abc123...&quot;,&quot;created_at&quot;:&quot;...&quot;}
+</code></pre>
+<p>The raw key value is only returned once.</p>
+<h3 id="delete-apikeysid"><code>DELETE /apikeys/{id}</code></h3>
+<p>Revoke an API key.</p>
+<hr />
+<h2 id="self-metrics-prometheus">Self-Metrics (Prometheus)</h2>
+<h3 id="get-metrics"><code>GET /metrics</code></h3>
+<p>Returns Kairo's own Prometheus metrics (no auth required).</p>
+<p>Key series:</p>
+<pre><code>kairo_rupture_index{host=&quot;web-01&quot;}                  4.2
+kairo_time_to_failure_seconds{host=&quot;web-01&quot;}        1800
+kairo_kpi_healthscore{host=&quot;web-01&quot;}                43.2
+kairo_kpi_stress{host=&quot;web-01&quot;}                     0.72
+kairo_actions_total{tier=&quot;1&quot;,result=&quot;ok&quot;}           12
+kairo_ingest_samples_total{source=&quot;prometheus&quot;}     840200
+kairo_ensemble_weight{host=&quot;web-01&quot;,model=&quot;ca_ilr&quot;} 0.35
+kairo_uptime_seconds                                3842
+</code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      © 2026 Selim Benfradj — Apache 2.0
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
