@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -57,10 +58,16 @@ type Rule struct {
 	ActionType string  `yaml:"action_type"`
 }
 
+const maxQueueSize = 256
+
 type Engine struct {
-	rules           []Rule
+	rules            []Rule
 	emergencyStopped int32
-	bus             eventbus.Bus
+	bus              eventbus.Bus
+
+	queueMu  sync.RWMutex
+	queue    []ActionRecommendation
+	rejected map[string]bool
 }
 
 var defaultRules = []Rule{
@@ -70,7 +77,7 @@ var defaultRules = []Rule{
 }
 
 func New(rulesYAML []byte, bus eventbus.Bus) (*Engine, error) {
-	e := &Engine{bus: bus}
+	e := &Engine{bus: bus, rejected: make(map[string]bool)}
 	if len(rulesYAML) == 0 {
 		e.rules = defaultRules
 		return e, nil
@@ -111,6 +118,7 @@ func (e *Engine) Recommend(event RuptureEvent) ([]ActionRecommendation, error) {
 		}
 	}
 
+	e.enqueue(recs)
 	return recs, nil
 }
 
@@ -120,6 +128,49 @@ func (e *Engine) EmergencyStop() {
 
 func (e *Engine) IsEmergencyStopped() bool {
 	return atomic.LoadInt32(&e.emergencyStopped) == 1
+}
+
+// enqueue adds recommendations to the bounded queue (oldest evicted when full).
+func (e *Engine) enqueue(recs []ActionRecommendation) {
+	e.queueMu.Lock()
+	e.queue = append(e.queue, recs...)
+	if len(e.queue) > maxQueueSize {
+		e.queue = e.queue[len(e.queue)-maxQueueSize:]
+	}
+	e.queueMu.Unlock()
+}
+
+// PendingActions returns all non-rejected actions in the queue.
+func (e *Engine) PendingActions() []ActionRecommendation {
+	e.queueMu.RLock()
+	defer e.queueMu.RUnlock()
+	out := make([]ActionRecommendation, 0, len(e.queue))
+	for _, rec := range e.queue {
+		if !e.rejected[rec.ID] {
+			out = append(out, rec)
+		}
+	}
+	return out
+}
+
+// Approve marks an action recommendation as approved.
+func (e *Engine) Approve(id string) bool {
+	e.queueMu.Lock()
+	defer e.queueMu.Unlock()
+	for i := range e.queue {
+		if e.queue[i].ID == id {
+			e.queue[i].Approved = true
+			return true
+		}
+	}
+	return false
+}
+
+// Reject removes an action recommendation from the pending queue.
+func (e *Engine) Reject(id string) {
+	e.queueMu.Lock()
+	e.rejected[id] = true
+	e.queueMu.Unlock()
 }
 
 // RecommendFromAnomaly translates a critical anomaly event into a RuptureEvent

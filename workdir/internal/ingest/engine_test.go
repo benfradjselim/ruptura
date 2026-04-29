@@ -48,7 +48,7 @@ func (m *mockSpans) IngestSpan(span models.Span) error {
 
 func TestRemoteWrite_valid(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil)
+	e := New(mp, nil, nil, nil, nil)
 	
 	body := `{"timeseries": [{"labels": [{"name":"__name__","value":"cpu"}, {"name":"host","value":"h1"}], "samples": [{"value":1.0,"timestamp":1700000000000}]}]}`
 	req := httptest.NewRequest("POST", "/api/v2/write", strings.NewReader(body))
@@ -65,7 +65,7 @@ func TestRemoteWrite_valid(t *testing.T) {
 }
 
 func TestRemoteWrite_wrongMethod(t *testing.T) {
-	e := New(nil, nil, nil)
+	e := New(nil, nil, nil, nil, nil)
 	req := httptest.NewRequest("GET", "/api/v2/write", nil)
 	w := httptest.NewRecorder()
 	
@@ -77,7 +77,7 @@ func TestRemoteWrite_wrongMethod(t *testing.T) {
 }
 
 func TestRemoteWrite_badJSON(t *testing.T) {
-	e := New(nil, nil, nil)
+	e := New(nil, nil, nil, nil, nil)
 	req := httptest.NewRequest("POST", "/api/v2/write", strings.NewReader("{invalid"))
 	w := httptest.NewRecorder()
 	
@@ -90,7 +90,7 @@ func TestRemoteWrite_badJSON(t *testing.T) {
 
 func TestRemoteWrite_missingName(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil)
+	e := New(mp, nil, nil, nil, nil)
 	
 	body := `{"timeseries": [{"labels": [{"name":"host","value":"h1"}], "samples": [{"value":1.0,"timestamp":1700000000000}]}]}`
 	req := httptest.NewRequest("POST", "/api/v2/write", strings.NewReader(body))
@@ -105,7 +105,7 @@ func TestRemoteWrite_missingName(t *testing.T) {
 
 func TestOTLPMetrics_gauge(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil)
+	e := New(mp, nil, nil, nil, nil)
 	
 	body := `{"resourceMetrics":[{"resource":{"attributes":[{"key":"host.name","value":{"stringValue":"h1"}}]},"scopeMetrics":[{"metrics":[{"name":"cpu","gauge":{"dataPoints":[{"asDouble":1.0,"timeUnixNano":"1000000000"}]}}]}]}]}`
 	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
@@ -123,7 +123,7 @@ func TestOTLPMetrics_gauge(t *testing.T) {
 
 func TestOTLPMetrics_sum(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil)
+	e := New(mp, nil, nil, nil, nil)
 	
 	body := `{"resourceMetrics":[{"resource":{"attributes":[{"key":"host.name","value":{"stringValue":"h1"}}]},"scopeMetrics":[{"metrics":[{"name":"mem","sum":{"dataPoints":[{"asInt":10,"timeUnixNano":"1000000000"}]}}]}]}]}`
 	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
@@ -141,7 +141,7 @@ func TestOTLPMetrics_sum(t *testing.T) {
 
 func TestOTLPLogs(t *testing.T) {
 	logs := &mockLogs{}
-	e := New(nil, logs, nil)
+	e := New(nil, logs, nil, nil, nil)
 	
 	body := `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"svc1"}}]},"scopeLogs":[{"logRecords":[{"body":{"stringValue":"err"},"timeUnixNano":"1000000000"}]}]}]}`
 	req := httptest.NewRequest("POST", "/otlp/v1/logs", strings.NewReader(body))
@@ -156,7 +156,7 @@ func TestOTLPLogs(t *testing.T) {
 
 func TestOTLPTraces_ok(t *testing.T) {
 	spans := &mockSpans{}
-	e := New(nil, nil, spans)
+	e := New(nil, nil, spans, nil, nil)
 	
 	body := `{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"t1","spanId":"s1","name":"span1","status":{"code":1}}]}]}]}`
 	req := httptest.NewRequest("POST", "/otlp/v1/traces", strings.NewReader(body))
@@ -171,7 +171,7 @@ func TestOTLPTraces_ok(t *testing.T) {
 
 func TestOTLPTraces_error(t *testing.T) {
 	spans := &mockSpans{}
-	e := New(nil, nil, spans)
+	e := New(nil, nil, spans, nil, nil)
 	
 	body := `{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"t1","spanId":"s1","name":"span1","status":{"code":2}}]}]}]}`
 	req := httptest.NewRequest("POST", "/otlp/v1/traces", strings.NewReader(body))
@@ -186,7 +186,7 @@ func TestOTLPTraces_error(t *testing.T) {
 
 func TestDogStatsD_gauge(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil)
+	e := New(mp, nil, nil, nil, nil)
 	
 	e.SendDogStatsDPacket([]byte("cpu:88|g|#host:db-01"))
 	
@@ -197,7 +197,7 @@ func TestDogStatsD_gauge(t *testing.T) {
 
 func TestDogStatsD_counter(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil)
+	e := New(mp, nil, nil, nil, nil)
 	
 	e.SendDogStatsDPacket([]byte("req:10|c"))
 	
@@ -208,7 +208,7 @@ func TestDogStatsD_counter(t *testing.T) {
 
 func TestDogStatsD_multiline(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil)
+	e := New(mp, nil, nil, nil, nil)
 	
 	e.SendDogStatsDPacket([]byte("m1:1|c\nm2:2|c"))
 	
@@ -219,7 +219,7 @@ func TestDogStatsD_multiline(t *testing.T) {
 
 func TestDogStatsD_invalid(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil)
+	e := New(mp, nil, nil, nil, nil)
 	
 	e.SendDogStatsDPacket([]byte("invalid"))
 	
@@ -230,7 +230,7 @@ func TestDogStatsD_invalid(t *testing.T) {
 
 
 func TestStartHTTP(t *testing.T) {
-	e := New(nil, nil, nil)
+	e := New(nil, nil, nil, nil, nil)
 	if err := e.StartHTTP(":0"); err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
@@ -238,14 +238,14 @@ func TestStartHTTP(t *testing.T) {
 }
 
 func TestStartGRPC(t *testing.T) {
-	e := New(nil, nil, nil)
+	e := New(nil, nil, nil, nil, nil)
 	if err := e.StartGRPC(":0"); err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
 }
 
 func TestStartDogStatsD(t *testing.T) {
-	e := New(nil, nil, nil)
+	e := New(nil, nil, nil, nil, nil)
 	// Use a random port
 	if err := e.StartDogStatsD("127.0.0.1:0"); err != nil {
 		t.Errorf("expected nil, got %v", err)
@@ -255,19 +255,19 @@ func TestStartDogStatsD(t *testing.T) {
 
 func TestRegisterHandlers(t *testing.T) {
 	mux := http.NewServeMux()
-	e := New(nil, nil, nil)
+	e := New(nil, nil, nil, nil, nil)
 	RegisterHandlers(mux, e)
 }
 
 func TestStop_NilServers(t *testing.T) {
-	e := New(nil, nil, nil)
+	e := New(nil, nil, nil, nil, nil)
 	if err := e.Stop(context.Background()); err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
 }
 
 func TestStop_WithServers(t *testing.T) {
-	e := New(nil, nil, nil)
+	e := New(nil, nil, nil, nil, nil)
 	e.StartHTTP(":0")
 	e.StartDogStatsD("127.0.0.1:0")
 	if err := e.Stop(context.Background()); err != nil {
@@ -277,7 +277,7 @@ func TestStop_WithServers(t *testing.T) {
 
 func TestCardinality_limit(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil)
+	e := New(mp, nil, nil, nil, nil)
 	
 	for i := 0; i < 50005; i++ {
 		e.checkCardinality("h1", "m"+fmt.Sprint(i))

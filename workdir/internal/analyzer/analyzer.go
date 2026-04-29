@@ -11,6 +11,11 @@ import (
 
 const epsilon = 1e-10
 
+// TopologySource provides live service dependency edges from trace data.
+type TopologySource interface {
+	Edges() []models.ServiceEdge
+}
+
 // Analyzer computes holistic KPIs from normalized metrics
 type Analyzer struct {
 	mu sync.RWMutex
@@ -22,6 +27,15 @@ type Analyzer struct {
 	// Default fatigue config applied to new workloads; overridable per-workload via SetFatigueConfig.
 	defaultFatigueRThreshold float64
 	defaultFatigueLambda     float64
+
+	topology TopologySource
+}
+
+// SetTopology injects a live topology source for graph-based contagion computation.
+func (a *Analyzer) SetTopology(t TopologySource) {
+	a.mu.Lock()
+	a.topology = t
+	a.mu.Unlock()
 }
 
 type workloadState struct {
@@ -211,8 +225,26 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 	humidity = utils.Clamp(humidity, 0, 1)
 
 	// --- Contagion Index ---
-	// C = Σ(E_ij × D_ij) — simplified: use average error × load as proxy
-	contagion := utils.Clamp(errors*cpu, 0, 1)
+	// If topology is available: max incoming error propagation across upstream callers.
+	// Fallback: errors×cpu proxy when no trace edges exist for this workload.
+	var contagion float64
+	if a.topology != nil {
+		edges := a.topology.Edges()
+		for _, e := range edges {
+			if e.To == ws.ref.Name && e.Calls > 0 {
+				errRate := float64(e.Errors) / float64(e.Calls)
+				weight := utils.Clamp(float64(e.Calls)/1000.0, 0, 1) // edge weight by call volume
+				prop := errRate * weight
+				if prop > contagion {
+					contagion = prop
+				}
+			}
+		}
+	}
+	if contagion == 0 {
+		contagion = errors * cpu
+	}
+	contagion = utils.Clamp(contagion, 0, 1)
 
 	// --- Throughput collapse signal (v6.1) ---
 	reqRate := getMetric(metrics, "request_rate")
@@ -230,19 +262,11 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 	// R = mood × (1 - fatigue) × (1 - contagion)
 	resilience := utils.Clamp(mood*(1-ws.fatigue)*(1-contagion), 0, 1)
 
-	// HealthScore: single executive composite [0, 1] (mapped to [0,100] in API)
-	// Weighted average: stress inverted (calm is healthy), mood positive, fatigue inverted,
-	// pressure inverted, humidity inverted, contagion inverted, throughput inverted
-	// Weights sum to 1.0: 0.23+0.18+0.18+0.13+0.09+0.09+0.10 = 1.00
-	healthScore := utils.Clamp(
-		0.23*(1-stress)+
-			0.18*mood+
-			0.18*(1-ws.fatigue)+
-			0.13*(1-pressureNorm)+
-			0.09*(1-humidity)+
-			0.09*(1-contagion)+
-			0.10*(1-throughputDrop),
-		0, 1)
+	// HealthScore: additive weighted penalty (avoids multiplicative collapse).
+	// penalty = weighted sum of bad signals; healthScore = 1 - penalty, clamped [0,1].
+	// Weights: stress=0.25, fatigue=0.20, mood-inv=0.20, pressure=0.15, humidity=0.10, contagion=0.10
+	penalty := 0.25*stress + 0.20*ws.fatigue + 0.20*(1-mood) + 0.15*pressureNorm + 0.10*humidity + 0.10*contagion
+	healthScore := utils.Clamp(1-penalty, 0, 1)
 
 	// Entropy: system disorder — how much KPI values deviate from their rolling mean
 	// Computed as mean absolute deviation of health history (normalized)
@@ -287,6 +311,19 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 		"health_score":    healthScore,
 	}
 	ws.updateBaseline(signals)
+
+	// After baseline is established, recalculate HealthScore using workload-relative
+	// z-scores so global thresholds don't produce false positives for heavy-load workloads.
+	// Fatigue keeps its absolute threshold — sustained effort is fatigue regardless of "normal".
+	if ws.baselineReady {
+		relStress := adaptiveScore(ws, "stress", stress)
+		relMood := adaptiveScore(ws, "mood", 1-mood) // mood positive: penalize below-baseline mood
+		relPressure := adaptiveScore(ws, "pressure", pressureNorm)
+		relHumidity := adaptiveScore(ws, "humidity", humidity)
+		relContagion := adaptiveScore(ws, "contagion", contagion)
+		penalty = 0.25*relStress + 0.20*ws.fatigue + 0.20*relMood + 0.15*relPressure + 0.10*relHumidity + 0.10*relContagion
+		healthScore = utils.Clamp(1-penalty, 0, 1)
+	}
 
 	// Update last state
 	ws.lastStress = stress
@@ -415,6 +452,29 @@ func (ws *workloadState) updateBaseline(signals map[string]float64) {
 	if ws.observationCount >= 96 { // 24h at 15s intervals
 		ws.baselineReady = true
 	}
+}
+
+// adaptiveScore converts a raw signal value to a workload-relative score in [0,1].
+// When the value equals the workload's baseline mean it returns 0 (healthy).
+// A 3σ deviation above the mean returns 1 (max penalty).
+// Falls back to the raw value when baseline data is insufficient.
+func adaptiveScore(ws *workloadState, signal string, raw float64) float64 {
+	if !ws.baselineReady || ws.observationCount < 2 {
+		return raw
+	}
+	mean, ok := ws.baselineMeans[signal]
+	if !ok {
+		return raw
+	}
+	m2 := ws.baselineM2[signal]
+	variance := m2 / float64(ws.observationCount-1)
+	sigma := math.Sqrt(variance)
+	if sigma < 1e-6 {
+		// Near-zero variance: workload is very stable; any deviation is notable.
+		sigma = 0.05
+	}
+	z := (raw - mean) / sigma
+	return utils.Clamp(z/3.0, 0, 1) // 3σ above normal = max penalty
 }
 
 // BaselineReady returns true if the workload has accumulated enough observations

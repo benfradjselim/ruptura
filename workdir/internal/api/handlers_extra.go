@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/actions/engine"
 	"github.com/benfradjselim/ruptura/internal/alerter"
 	apicontext "github.com/benfradjselim/ruptura/internal/context"
 	"github.com/benfradjselim/ruptura/pkg/models"
@@ -197,7 +198,48 @@ func (h *Handlers) handleForecast(w http.ResponseWriter, r *http.Request) {
 
 // handleActions returns action recommendations or handles action operations.
 func (h *Handlers) handleActions(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, []interface{}{})
+	if h.engine == nil {
+		writeJSON(w, http.StatusOK, []interface{}{})
+		return
+	}
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	switch r.Method {
+	case http.MethodGet:
+		if id == "" {
+			actions := h.engine.PendingActions()
+			if actions == nil {
+				actions = []engine.ActionRecommendation{}
+			}
+			writeJSON(w, http.StatusOK, actions)
+			return
+		}
+		for _, a := range h.engine.PendingActions() {
+			if a.ID == id {
+				writeJSON(w, http.StatusOK, a)
+				return
+			}
+		}
+		writeError(w, http.StatusNotFound, "action not found: "+id)
+
+	case http.MethodPost:
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/approve"):
+			if h.engine.Approve(id) {
+				writeJSON(w, http.StatusOK, map[string]string{"status": "approved", "id": id})
+			} else {
+				writeError(w, http.StatusNotFound, "action not found: "+id)
+			}
+		case strings.HasSuffix(r.URL.Path, "/reject"):
+			h.engine.Reject(id)
+			writeJSON(w, http.StatusOK, map[string]string{"status": "rejected", "id": id})
+		case strings.HasSuffix(r.URL.Path, "/rollback"):
+			writeJSON(w, http.StatusOK, map[string]string{"status": "rollback_queued", "id": id})
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "unsupported action operation")
+		}
+	}
 }
 
 // handleSuppressions handles POST (create window) and GET (list windows).
@@ -296,6 +338,14 @@ func (h *Handlers) handleExplain(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, dbg)
+
+	case strings.HasSuffix(r.URL.Path, "/narrative"):
+		narrative, err := h.explainer.NarrativeExplain(id)
+		if err != nil {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"narrative": narrative})
 
 	default:
 		exp, err := h.explainer.Explain(id)

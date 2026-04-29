@@ -148,7 +148,8 @@ func (a *Alerter) Evaluate(host string, kpis map[string]float64) {
 
 	now := time.Now()
 
-	if a.isSuppressed(host, now) {
+	workloadKey := models.WorkloadRefFromHost(host).Key()
+	if a.isSuppressed(workloadKey, now) || a.isSuppressed(host, now) {
 		return
 	}
 

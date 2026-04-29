@@ -79,24 +79,24 @@ func run(cfg Config) error {
 	return runWithContext(ctx, cfg)
 }
 
-// burstLogSink wraps a BurstDetector to satisfy the ingest.LogSink interface.
-// It classifies log lines by scanning for "error" or "warn" level keywords.
-type burstLogSink struct {
-	detector *correlator.BurstDetector
-}
-
-func (b *burstLogSink) IngestLine(service string, line []byte, ts time.Time) {
-	lower := bytes.ToLower(line)
-	switch {
-	case bytes.Contains(lower, []byte("error")):
-		b.detector.Observe(service, "error", ts)
-	case bytes.Contains(lower, []byte("warn")):
-		b.detector.Observe(service, "warn", ts)
+	// burstLogSink wraps a BurstDetector to satisfy the ingest.LogSink interface.
+	// It classifies log lines by scanning for "error" or "warn" level keywords.
+	type burstLogSink struct {
+		detector *correlator.BurstDetector
 	}
-}
 
-// runWithContext is the testable entrypoint — it uses the provided context for shutdown.
-func runWithContext(ctx context.Context, cfg Config) error {
+	func (b *burstLogSink) IngestLine(service string, line []byte, ts time.Time) {
+		lower := bytes.ToLower(line)
+		switch {
+		case bytes.Contains(lower, []byte("error")):
+			b.detector.Observe(service, "error", ts)
+		case bytes.Contains(lower, []byte("warn")):
+			b.detector.Observe(service, "warn", ts)
+		}
+	}
+
+	// runWithContext is the testable entrypoint — it uses the provided context for shutdown.
+	func runWithContext(ctx context.Context, cfg Config) error {
 	logger.Default.Info("ruptura starting", "version", version, "port", cfg.Port)
 
 	store, err := storage.Open(cfg.StoragePath)
@@ -111,10 +111,12 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	// --- core pipeline ---
 	pipelineEngine := pipelinemetrics.NewEngine()
 	burstDet := correlator.NewBurstDetector(256)
+	topoBuilder := correlator.NewTopologyBuilder()
 	logSink := &burstLogSink{detector: burstDet}
-	ingestEngine := ingest.New(pipelineEngine, logSink, nil)
 	fusionEngine := fusion.NewEngine()
+	ingestEngine := ingest.New(pipelineEngine, logSink, nil, nil, fusionEngine)
 	analyzerEngine := analyzer.NewAnalyzer()
+	analyzerEngine.SetTopology(topoBuilder)
 
 	// Pipe burst events into fusion as logR
 	go fusionEngine.StartLogWatcher(ctx, burstDet.Events())
@@ -125,6 +127,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("start OTLP ingest failed: %w", err)
 	}
 	defer ingestEngine.Stop(context.Background()) //nolint:errcheck
+
+	al := alerter.NewAlerter(256)
+	metricsReg := telemetry.NewRegistry(version)
 
 	// 15-second analyzer ticker: pipeline → analyzer → store → fusion
 	go func() {
@@ -143,13 +148,20 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					ref := models.WorkloadRefFromHost(host)
 					snap := analyzerEngine.Update(ref, rawMetrics)
 					store.StoreSnapshot(snap)
+					metricsReg.RecordKPISnapshot(snap)
 
 					// Feed metricR into fusion using the rupture index of the primary metric.
-					// We use whichever metric is available; cpu_percent is preferred.
 					metricName := pickPrimaryMetric(rawMetrics)
 					if metricName != "" {
 						if r, err := pipelineEngine.RuptureIndex(host, metricName); err == nil {
 							fusionEngine.SetMetricR(host, r, now)
+						}
+					}
+
+					// Forward recent critical anomalies to the alerter for rule evaluation.
+					for _, anom := range pipelineEngine.RecentAnomalies(host, now.Add(-15*time.Second)) {
+						if anom.Severity == models.SeverityCritical {
+							al.Evaluate(host, map[string]float64{anom.Metric: anom.Value})
 						}
 					}
 				}
@@ -163,7 +175,6 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 
 	// Forward critical anomaly events from the alerter channel to the action engine.
-	al := alerter.NewAlerter(256)
 	go func() {
 		for {
 			select {
@@ -190,10 +201,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	explainer := explain.NewEngine()
 	ctxStore := apicontext.NewManualContextStore()
 	detector := apicontext.NewDeploymentDetector()
-	metrics := telemetry.NewRegistry(version)
 	healthCheck := telemetry.NewHealthChecker()
 
-	handlers := api.New(store, actionEngine, explainer, al, ctxStore, detector, metrics, healthCheck, cfg.APIKey)
+	handlers := api.New(store, actionEngine, explainer, al, ctxStore, detector, metricsReg, healthCheck, cfg.APIKey)
 	handlers.SetReady(true)
 
 	router := handlers.NewRouter()

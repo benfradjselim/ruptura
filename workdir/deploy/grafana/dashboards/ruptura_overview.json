@@ -1,0 +1,134 @@
+{
+  "__inputs": [{"name": "DS_PROMETHEUS", "label": "Prometheus", "description": "", "type": "datasource", "pluginId": "prometheus"}],
+  "uid": "ruptura-overview",
+  "title": "Ruptura — Workload Health",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["ruptura"],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data Source",
+        "options": [],
+        "refresh": 1
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": "${datasource}",
+        "query": "label_values(ruptura_kpi{signal=\"health_score\"}, namespace)",
+        "current": {"text": "All", "value": "$__all"},
+        "includeAll": true,
+        "allValue": ".*",
+        "refresh": 2,
+        "label": "Namespace"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "HealthScore per Workload",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+      "datasource": "${datasource}",
+      "targets": [
+        {
+          "expr": "ruptura_kpi{namespace=~\"$namespace\",signal=\"health_score\"}",
+          "legendFormat": "{{namespace}}/{{workload}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100, "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": 0},
+              {"color": "yellow", "value": 40},
+              {"color": "green", "value": 80}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdLabels": false}
+    },
+    {
+      "id": 2,
+      "title": "Stress + Fatigue",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 9, "x": 6, "y": 0},
+      "datasource": "${datasource}",
+      "targets": [
+        {
+          "expr": "ruptura_kpi{namespace=~\"$namespace\",signal=\"stress\"}",
+          "legendFormat": "stress {{workload}}"
+        },
+        {
+          "expr": "ruptura_kpi{namespace=~\"$namespace\",signal=\"fatigue\"}",
+          "legendFormat": "fatigue {{workload}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1}}
+    },
+    {
+      "id": 3,
+      "title": "Rupture Index",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 9, "x": 15, "y": 0},
+      "datasource": "${datasource}",
+      "targets": [
+        {
+          "expr": "rpt_rupture_index{namespace=~\"$namespace\"}",
+          "legendFormat": "{{host}}:{{metric}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": 0},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 3}
+            ]
+          }
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 4,
+      "title": "Anomaly Events",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": "${datasource}",
+      "targets": [
+        {
+          "expr": "rpt_actions_total",
+          "legendFormat": "{{actionType}}:{{tier}}:{{outcome}}",
+          "instant": true
+        }
+      ],
+      "options": {"showHeader": true}
+    },
+    {
+      "id": 5,
+      "title": "Action Queue",
+      "type": "text",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "options": {
+        "mode": "markdown",
+        "content": "## Action Queue\n\nQuery active actions via the Ruptura REST API:\n\n```\nGET /api/v2/actions\n```\n\n**Tiers:**\n- **T1** — Auto-executed (confidence ≥ 0.85)\n- **T2** — Awaiting approval (confidence ≥ 0.60)\n- **T3** — Human-only (low confidence)\n\nApprove or reject T2 actions:\n```\nPOST /api/v2/actions/{id}/approve\nPOST /api/v2/actions/{id}/reject\n```"
+      }
+    }
+  ],
+  "time": {"from": "now-1h", "to": "now"}
+}

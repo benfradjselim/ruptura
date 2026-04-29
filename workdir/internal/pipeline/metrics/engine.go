@@ -5,25 +5,34 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/benfradjselim/ruptura/pkg/rupture"
 )
 
 // Engine implements MetricPipeline backed by dual-scale CAILR + ensemble.
 type Engine struct {
-	mu       sync.RWMutex
-	cailr    *cailrStore
-	ensemble map[string]*seriesEnsemble // key: "host:metric"
-	start    time.Time
-	cfg      EngineConfig
+	mu           sync.RWMutex
+	cailr        *cailrStore
+	ensemble     map[string]*seriesEnsemble // key: "host:metric"
+	start        time.Time
+	cfg          EngineConfig
+	anomalyEng   *AnomalyEngine
+	anomalyStore *AnomalyStore
 }
 
 // NewEngineWithConfig constructs a ready-to-use MetricPipeline engine with custom config.
 func NewEngineWithConfig(cfg EngineConfig) *Engine {
+	cap := cfg.AnomalyStoreCapacity
+	if cap <= 0 {
+		cap = 1000
+	}
 	return &Engine{
-		cailr:    newCAILRStore(),
-		ensemble: make(map[string]*seriesEnsemble),
-		start:    time.Now(),
-		cfg:      cfg,
+		cailr:        newCAILRStore(),
+		ensemble:     make(map[string]*seriesEnsemble),
+		start:        time.Now(),
+		cfg:          cfg,
+		anomalyEng:   NewAnomalyEngine(),
+		anomalyStore: NewAnomalyStore(cap),
 	}
 }
 
@@ -49,6 +58,15 @@ func (e *Engine) Ingest(host, metric string, value float64, ts time.Time) {
 	}
 	e.ensemble[k].Update(x, value)
 	e.mu.Unlock()
+
+	for _, ev := range e.anomalyEng.Observe(host, metric, value, ts) {
+		e.anomalyStore.Push(ev)
+	}
+}
+
+// RecentAnomalies returns anomaly events for the given host since the given time.
+func (e *Engine) RecentAnomalies(host string, since time.Time) []models.AnomalyEvent {
+	return e.anomalyStore.Query(host, "", nil, since)
 }
 
 // RuptureIndex returns R(t) for the given host:metric.

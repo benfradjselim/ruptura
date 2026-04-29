@@ -699,6 +699,42 @@ Building the dashboard before items 1–6 produces a UI that looks impressive an
 
 ---
 
+### v6.2.0-dev (2026-04-29 — pre-release sprint)
+
+**What shipped**:
+- GAP-01: Dual composite engine retired — `internal/composites` deleted, analyzer is now the sole canonical KPI engine.
+- GAP-03: Full fusion wiring — metric R (15s ticker), log R (burst detector → logR → fusion), trace R (OTLP span error rate → traceR → fusion). All three pipelines contribute to FusedR.
+- GAP-05: Throughput collapse signal added to analyzer (rate-of-change of `request_rate`).
+- GAP-07: Grafana dashboard JSON provisioned at `deploy/grafana/dashboards/ruptura_overview.json`.
+- GAP-08: OTLP route disconnect fixed — `/api/v2/v1/*` now returns 421 Misdirected with port guidance instead of silent 204.
+- GAP-09: Sentiment signal wired — ingest log path counts pos/neg lines and calls `sentiment.UpdateSentiment` per resource log.
+- GAP-10: WorkloadRef is now the treatment unit. OTLP extractor reads `k8s.namespace.name`, `k8s.deployment.name`, etc. API routes at `/api/v2/rupture/{namespace}/{workload}` and `/api/v2/kpi/{name}/{namespace}/{workload}` are live and returning real data. Backward-compatible `/api/v2/rupture/{host}` preserved.
+- GAP-02 (partial): `handleRupture`, `handleRuptures`, `handleKPI`, `handleKPIByWorkload`, `handleSuppressions`, `handleExplain` all return real data. `handleActions` returns actual pending action queue with approve/reject. `handleForecast` remains documented-stub (predictor injection deferred to v6.2 final).
+- MISSING-01: Adaptive per-workload baselines wired. After 96 observations (~24h at 15s intervals), HealthScore recalculates using z-score deviations from the workload's own Welford baseline. Fatigue threshold remains absolute (intentional: sustained effort IS fatigue regardless of baseline).
+- MISSING-02: `NarrativeExplain` implemented. Returns structured English narrative from rupture record — host, severity label, primary pipeline, top contributing factor, TTF, contagion note. Exposed at `GET /api/v2/explain/{id}/narrative`.
+- MISSING-03: Topology-based contagion wired. `TopologyBuilder` from `internal/correlator` injected into analyzer via `SetTopology()`. When trace edges exist for a workload, contagion uses real edge error rates weighted by call volume. Falls back to `errors×cpu` proxy when no edges exist.
+- MISSING-04: Maintenance windows (suppressions) fully implemented — `handleSuppressions` supports POST/GET/DELETE. `Alerter.Evaluate()` normalizes host to `WorkloadRef.Key()` before checking suppression window.
+- HealthScore formula: switched from multiplicative (collapses aggressively) to additive penalty model: `1 − (0.25·stress + 0.20·fatigue + 0.20·(1−mood) + 0.15·pressure + 0.10·humidity + 0.10·contagion)`.
+- Action engine: added bounded pending queue (256 entries) with `PendingActions()`, `Approve()`, `Reject()`. Recommendations are automatically enqueued when `Recommend()` or `RecommendFromAnomaly()` is called.
+- Build: three test regressions fixed (version constant, maintenance window suppression key normalization, AllSnapshots double-counting from empty WorkloadRef).
+- traceR sink added to ingest engine — `fusionEngine` implements `TraceRSink` and receives span error rates directly.
+
+**Still not done (deferred to v6.2 final)**:
+- `handleForecast`: predictor not injected into Handlers — needs wiring in `cmd/ruptura/main.go`.
+- Per-tenant isolation via X-Org-ID (MISSING FR-10) — v6.2 target, requires namespace-level auth.
+- In-memory only storage (GAP-06) — BoltDB/SQLite persistence not yet added.
+- Web dashboard v2 (Svelte) and `ruptura-ctl` CLI — surface layer, deferred until API is fully stable.
+- NFR-07 rate limiting on ingest endpoints — not yet implemented.
+- GAP-04: Anomaly → action pipeline partial (anomalies from ticker evaluated by alerter → action engine), but AnomalyStore not wired.
+
+**Judgment before v6.2 ships**:
+1. `handleForecast` must return real predictions — wire the predictor engine into Handlers.
+2. At least one end-to-end integration test: `POST /otlp/v1/metrics` → `GET /api/v2/rupture/{ns}/{workload}` returns non-empty KPISnapshot.
+3. NFR-07 rate limiting: add a simple token bucket on the ingest HTTP handler.
+4. Baseline adaptive thresholds should lower the light-workload fatigue threshold (currently only HealthScore adapts — fatigue threshold remains fixed for all workloads including light ones).
+
+---
+
 ## Pre-Version Checklist
 
 Before cutting any release tag, verify:

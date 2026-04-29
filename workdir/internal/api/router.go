@@ -52,6 +52,7 @@ func (h *Handlers) NewRouter() http.Handler {
 	r.HandleFunc("/api/v2/explain/{rupture_id}", h.handleExplain).Methods("GET")
 	r.HandleFunc("/api/v2/explain/{rupture_id}/formula", h.handleExplain).Methods("GET")
 	r.HandleFunc("/api/v2/explain/{rupture_id}/pipeline", h.handleExplain).Methods("GET")
+	r.HandleFunc("/api/v2/explain/{rupture_id}/narrative", h.handleExplain).Methods("GET")
 
 	r.HandleFunc("/api/v2/v1/{signal:metrics|logs|traces}", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMisdirectedRequest, map[string]string{

@@ -26,6 +26,15 @@ type SpanSink interface {
 	IngestSpan(span models.Span) error
 }
 
+// TraceRSink receives per-workload rupture indices derived from trace error rates.
+type TraceRSink interface {
+	SetTraceR(key string, r float64, ts time.Time)
+}
+
+type SentimentSink interface {
+	UpdateSentiment(service string, positive, negative int)
+}
+
 type Ingestor interface {
 	StartHTTP(addr string) error
 	StartGRPC(addr string) error
@@ -34,9 +43,11 @@ type Ingestor interface {
 }
 
 type Engine struct {
-	pipeline metrics.MetricPipeline
-	logs     LogSink
-	spans    SpanSink
+	pipeline  metrics.MetricPipeline
+	logs      LogSink
+	spans     SpanSink
+	sentiment SentimentSink
+	traceR    TraceRSink
 
 	activeSeries sync.Map
 	seriesCount  int32
@@ -47,11 +58,13 @@ type Engine struct {
 	grpcSamples chan *GRPCMetricPoint
 }
 
-func New(pipeline metrics.MetricPipeline, logs LogSink, spans SpanSink) *Engine {
+func New(pipeline metrics.MetricPipeline, logs LogSink, spans SpanSink, sentiment SentimentSink, traceR TraceRSink) *Engine {
 	return &Engine{
-		pipeline: pipeline,
-		logs:     logs,
-		spans:    spans,
+		pipeline:    pipeline,
+		logs:        logs,
+		spans:       spans,
+		sentiment:   sentiment,
+		traceR:      traceR,
 		grpcSamples: make(chan *GRPCMetricPoint, 1024),
 	}
 }
@@ -263,22 +276,32 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if e.logs != nil {
-		for _, rl := range req.ResourceLogs {
-			ref := extractWorkloadRef(rl.Resource)
-			service := rl.Resource.GetAttr("service.name")
-			if service == "" {
-				service = ref.Name
-			}
-			if service == "" {
-				service = "unknown"
-			}
-			for _, sl := range rl.ScopeLogs {
-				for _, lr := range sl.LogRecords {
+	for _, rl := range req.ResourceLogs {
+		ref := extractWorkloadRef(rl.Resource)
+		service := rl.Resource.GetAttr("service.name")
+		if service == "" {
+			service = ref.Name
+		}
+		if service == "" {
+			service = "unknown"
+		}
+		var pos, neg int
+		for _, sl := range rl.ScopeLogs {
+			for _, lr := range sl.LogRecords {
+				if e.logs != nil {
 					nanos, _ := strconv.ParseInt(lr.TimeUnixNano, 10, 64)
 					e.logs.IngestLine(service, []byte(lr.Body.GetString()), time.Unix(0, nanos))
 				}
+				if strings.Contains(strings.ToLower(lr.Body.GetString()), "error") ||
+					strings.Contains(strings.ToLower(lr.Body.GetString()), "warn") {
+					neg++
+				} else {
+					pos++
+				}
 			}
+		}
+		if e.sentiment != nil && (pos > 0 || neg > 0) {
+			e.sentiment.UpdateSentiment(service, pos, neg)
 		}
 	}
 	w.WriteHeader(http.StatusOK)
@@ -290,27 +313,36 @@ func (e *Engine) handleOTLPTraces(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if e.spans != nil {
-		for _, rs := range req.ResourceSpans {
-			ref := extractWorkloadRef(rs.Resource)
-			for _, ss := range rs.ScopeSpans {
-				for _, span := range ss.Spans {
-					s := models.Span{
-						TraceID:   span.TraceID,
-						SpanID:    span.SpanID,
-						Operation: span.Name,
-					}
-					if span.Status.Code == 2 {
-						s.Status = "error"
-					} else if span.Status.Code == 1 {
-						s.Status = "ok"
-					} else {
-						s.Status = "unset"
-					}
-					_ = ref // WorkloadRef available for future enrichment
+	now := time.Now()
+	for _, rs := range req.ResourceSpans {
+		ref := extractWorkloadRef(rs.Resource)
+		var total, errors int
+		for _, ss := range rs.ScopeSpans {
+			for _, span := range ss.Spans {
+				total++
+				s := models.Span{
+					TraceID:   span.TraceID,
+					SpanID:    span.SpanID,
+					Operation: span.Name,
+				}
+				if span.Status.Code == 2 {
+					s.Status = "error"
+					errors++
+				} else if span.Status.Code == 1 {
+					s.Status = "ok"
+				} else {
+					s.Status = "unset"
+				}
+				if e.spans != nil {
 					e.spans.IngestSpan(s)
 				}
 			}
+		}
+		// Derive traceR from span error rate: 100% error rate → R≈5, 20% → R≈1.
+		if e.traceR != nil && total > 0 {
+			errRate := float64(errors) / float64(total)
+			traceR := errRate * 5.0
+			e.traceR.SetTraceR(ref.Key(), traceR, now)
 		}
 	}
 	w.WriteHeader(http.StatusOK)

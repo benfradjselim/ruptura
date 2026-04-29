@@ -50,8 +50,10 @@ func (s *Store) StoreSnapshot(snap models.KPISnapshot) {
 	if snap.Host != "" {
 		s.snapshots[snap.Host] = snap
 	}
-	if key := snap.Workload.Key(); key != "" && key != snap.Host {
-		s.snapshots[key] = snap
+	if !snap.Workload.IsEmpty() {
+		if key := snap.Workload.Key(); key != snap.Host {
+			s.snapshots[key] = snap
+		}
 	}
 	s.snapshotsMu.Unlock()
 }

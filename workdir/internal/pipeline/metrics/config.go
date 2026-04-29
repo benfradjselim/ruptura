@@ -21,9 +21,10 @@ const (
 type EngineConfig struct {
     // EnsembleMode selects adaptive (default) or fixed-weight ensemble.
     EnsembleMode EnsembleMode
+    AnomalyStoreCapacity int
 }
 
 // DefaultEngineConfig returns production defaults.
 func DefaultEngineConfig() EngineConfig {
-    return EngineConfig{EnsembleMode: EnsembleModeAdaptive}
+    return EngineConfig{EnsembleMode: EnsembleModeAdaptive, AnomalyStoreCapacity: 1000}
 }

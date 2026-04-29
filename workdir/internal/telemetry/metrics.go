@@ -7,6 +7,8 @@ import (
     "sync"
     "sync/atomic"
     "time"
+
+    "github.com/benfradjselim/ruptura/pkg/models"
 )
 
 type Registry struct {
@@ -22,6 +24,8 @@ type Registry struct {
     kpiFatigue       sync.Map // key="host" -> uint64 (bits)
     kpiHealthscore   sync.Map // key="host" -> uint64 (bits)
     trackerCount     sync.Map // key="type:state" -> *int64
+
+    kpiSignals sync.Map // key="namespace/kind/workload/signal" -> uint64 (float64 bits)
 
     actionsTotal sync.Map // key="type:tier:outcome" -> *int64
     ingestTotal  sync.Map // key="source" -> *int64
@@ -60,6 +64,36 @@ func (r *Registry) SetKPIFatigue(host string, v float64) {
 }
 func (r *Registry) SetKPIHealthscore(host string, v float64) {
     r.setFloat(&r.kpiHealthscore, host, v)
+}
+
+// RecordKPISnapshot records all KPI signals for a workload with namespace/kind/workload labels.
+func (r *Registry) RecordKPISnapshot(snap models.KPISnapshot) {
+    ns := snap.Workload.Namespace
+    kind := snap.Workload.Kind
+    name := snap.Workload.Name
+    if name == "" {
+        name = snap.Host
+    }
+    if ns == "" {
+        ns = "default"
+    }
+    if kind == "" {
+        kind = "host"
+    }
+    set := func(signal string, v float64) {
+        r.setFloat(&r.kpiSignals, ns+"/"+kind+"/"+name+"/"+signal, v)
+    }
+    set("stress", snap.Stress.Value)
+    set("fatigue", snap.Fatigue.Value)
+    set("mood", snap.Mood.Value)
+    set("pressure", snap.Pressure.Value)
+    set("humidity", snap.Humidity.Value)
+    set("contagion", snap.Contagion.Value)
+    set("resilience", snap.Resilience.Value)
+    set("entropy", snap.Entropy.Value)
+    set("velocity", snap.Velocity.Value)
+    set("health_score", snap.HealthScore.Value)
+    set("throughput", snap.Throughput.Value)
 }
 func (r *Registry) SetTrackerCount(trackerType, state string, v int64) {
     key := trackerType + ":" + state
@@ -105,6 +139,18 @@ func (r *Registry) Render() string {
     renderGauge("rpt_kpi_stress", "KPI stress", &r.kpiStress, "host")
     renderGauge("rpt_kpi_fatigue", "KPI fatigue", &r.kpiFatigue, "host")
     renderGauge("rpt_kpi_healthscore", "KPI healthscore", &r.kpiHealthscore, "host")
+
+    // Workload-labelled KPI signals (namespace/kind/workload/signal)
+    b.WriteString("# HELP ruptura_kpi KPI signal value per workload\n# TYPE ruptura_kpi gauge\n")
+    r.kpiSignals.Range(func(key, val interface{}) bool {
+        parts := strings.SplitN(key.(string), "/", 4)
+        if len(parts) == 4 {
+            v := math.Float64frombits(val.(uint64))
+            b.WriteString(fmt.Sprintf("ruptura_kpi{namespace=%q,kind=%q,workload=%q,signal=%q} %f\n",
+                parts[0], parts[1], parts[2], parts[3], v))
+        }
+        return true
+    })
     
     // Counters (rudimentary)
     b.WriteString("# HELP rpt_actions_total Actions total\n# TYPE rpt_actions_total counter\n")
