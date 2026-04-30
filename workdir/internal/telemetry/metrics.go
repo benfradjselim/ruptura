@@ -94,6 +94,9 @@ func (r *Registry) RecordKPISnapshot(snap models.KPISnapshot) {
     set("velocity", snap.Velocity.Value)
     set("health_score", snap.HealthScore.Value)
     set("throughput", snap.Throughput.Value)
+    if snap.FusedRuptureIndex > 0 {
+        set("fused_rupture_index", snap.FusedRuptureIndex)
+    }
 }
 func (r *Registry) SetTrackerCount(trackerType, state string, v int64) {
     key := trackerType + ":" + state

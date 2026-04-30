@@ -165,6 +165,19 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					}
 					ref := models.WorkloadRefFromHost(host)
 					snap := analyzerEngine.Update(ref, rawMetrics)
+
+					// Feed metricR into fusion BEFORE storing snapshot so FusedR is current.
+					metricName := pickPrimaryMetric(rawMetrics)
+					if metricName != "" {
+						if r, err := pipelineEngine.RuptureIndex(host, metricName); err == nil {
+							fusionEngine.SetMetricR(host, r, now)
+						}
+					}
+					// Annotate snapshot with current FusedR before persisting.
+					if fusedR, _, err := fusionEngine.FusedR(host); err == nil {
+						snap.FusedRuptureIndex = fusedR
+					}
+
 					store.StoreSnapshot(snap)
 					metricsReg.RecordKPISnapshot(snap)
 
@@ -176,14 +189,6 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					predictorEngine.Feed(host, "health_score", snap.HealthScore.Value, now)
 					predictorEngine.Feed(host, "stress", snap.Stress.Value, now)
 					predictorEngine.Feed(host, "fatigue", snap.Fatigue.Value, now)
-
-					// Feed metricR into fusion using the rupture index of the primary metric.
-					metricName := pickPrimaryMetric(rawMetrics)
-					if metricName != "" {
-						if r, err := pipelineEngine.RuptureIndex(host, metricName); err == nil {
-							fusionEngine.SetMetricR(host, r, now)
-						}
-					}
 
 					// Forward recent critical anomalies to the alerter for rule evaluation.
 					for _, anom := range pipelineEngine.RecentAnomalies(host, now.Add(-15*time.Second)) {

@@ -56,6 +56,8 @@ type KPISnapshot struct {
 	HealthScore KPI `json:"health_score"` // single composite executive KPI [0-100]
 	// v6.1: throughput collapse signal
 	Throughput KPI `json:"throughput"`
+	// v6.2: fused rupture index (metric R + log R + trace R combined)
+	FusedRuptureIndex float64 `json:"fused_rupture_index,omitempty"`
 	// v5.0: dual-scale CA-ILR rupture events (omitted when none detected)
 	RuptureEvents []RuptureEvent `json:"rupture_events,omitempty"`
 }
