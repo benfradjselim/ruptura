@@ -3,57 +3,47 @@
 ## Kubernetes with Helm (recommended)
 
 ```bash
-helm install ruptura ./helm \
+git clone https://github.com/benfradjselim/ruptura.git
+cd ruptura
+
+helm install ruptura helm \
   --namespace ruptura-system \
   --create-namespace \
-  --set auth.jwtSecret=$(openssl rand -hex 32) \
-  --set storage.size=50Gi \
-  --set actions.executionMode=suggest \
-  --set actions.safety.namespaceAllowlist="{production,staging}"
+  --set apiKey=$(openssl rand -hex 32) \
+  --set persistence.size=20Gi \
+  --set actions.executionMode=suggest
 ```
 
-### Production `values.yaml`
+Key Helm values for production:
 
 ```yaml
-# helm/values.yaml (production overrides)
-replicaCount: 1
+# helm/values.yaml overrides
+apiKey: ""                   # required: set via --set apiKey=... or existing secret
+autodiscovery:
+  enabled: true              # auto-discovers all Deployments/StatefulSets
 
-image:
-  repository: ruptura
-  tag: "6.1.0"
-  pullPolicy: IfNotPresent
+persistence:
+  size: 20Gi                 # BadgerDB storage
 
-service:
-  type: ClusterIP
-  port: 8080
-  grpcPort: 9090
+ingestRPS: 1000              # token-bucket rate limit on ingest
 
-storage:
-  size: 50Gi
-  storageClass: "standard"
-
-auth:
-  jwtSecret: ""  # set via --set or RUPTURA_JWT_SECRET env var
-
-actions:
-  executionMode: suggest
-  safety:
-    rateLimitPerHour: 6
-    cooldownSeconds: 300
-    namespaceAllowlist:
-      - production
-      - staging
-
-ensemble:
-  adaptive: true
+serviceMonitor:
+  enabled: true              # for Prometheus Operator scraping
+  interval: 15s
 
 resources:
   requests:
-    memory: "128Mi"
-    cpu: "250m"
+    cpu: 100m
+    memory: 128Mi
   limits:
-    memory: "512Mi"
-    cpu: "1000m"
+    cpu: 1000m
+    memory: 512Mi
+```
+
+Upgrade:
+
+```bash
+helm upgrade ruptura helm --namespace ruptura-system --set apiKey=<your-key>
 ```
 
 ## RupturaInstance Operator
@@ -67,9 +57,9 @@ metadata:
   name: production
   namespace: ruptura-system
 spec:
-  image: ruptura:6.1.0
+  image: ghcr.io/benfradjselim/ruptura:6.2.2
   port: 8080
-  storageSize: 50Gi
+  storageSize: 20Gi
   apiKey:
     secretRef: ruptura-api-key
   replicas: 1
@@ -78,28 +68,45 @@ spec:
 ```bash
 # Create the API key secret first
 kubectl create secret generic ruptura-api-key \
-  --from-literal=key=$(openssl rand -hex 32) \
+  --from-literal=api-key=$(openssl rand -hex 32) \
   -n ruptura-system
 
 kubectl apply -f ruptura-instance.yaml
 ```
 
-## Docker Compose (single-host production)
+## kubectl (kustomize manifests)
+
+```bash
+# Create namespace and API key secret first
+kubectl create namespace ruptura-system
+kubectl create secret generic ruptura-secrets \
+  -n ruptura-system \
+  --from-literal=api-key=$(openssl rand -hex 32)
+
+# Apply all manifests
+kubectl apply -f workdir/deploy/
+
+# Verify
+kubectl get pods -n ruptura-system
+kubectl port-forward svc/ruptura 8080:80 -n ruptura-system
+curl http://localhost:8080/api/v2/health
+```
+
+## Docker Compose (single-host)
 
 ```yaml
-# docker-compose.prod.yml
-version: "3.8"
+# docker-compose.yml
 services:
   ruptura:
-    image: ruptura:6.1.0
+    image: ghcr.io/benfradjselim/ruptura:6.2.2
     ports:
       - "8080:8080"
-      - "9090:9090"
+      - "4317:4317"
     volumes:
-      - ruptura-data:/var/lib/ruptura
-      - ./ruptura.yaml:/etc/ruptura/ruptura.yaml:ro
+      - ruptura-data:/var/lib/ruptura/data
     environment:
-      RUPTURA_JWT_SECRET: "${RUPTURA_JWT_SECRET}"
+      RUPTURA_API_KEY: "${RUPTURA_API_KEY}"
+      RUPTURA_INGEST_RPS: "1000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/health"]
@@ -112,12 +119,12 @@ volumes:
 ```
 
 ```bash
-RUPTURA_JWT_SECRET=$(openssl rand -hex 32) docker compose -f docker-compose.prod.yml up -d
+RUPTURA_API_KEY=$(openssl rand -hex 32) docker compose up -d
 ```
 
 ## Prometheus integration
 
-Add Ruptura as a scrape target:
+Add Ruptura as a scrape target and configure remote_write:
 
 ```yaml
 # prometheus.yml
@@ -126,12 +133,11 @@ scrape_configs:
     static_configs:
       - targets: ["ruptura:8080"]
     metrics_path: /api/v2/metrics
-    bearer_token: "<api-key>"
 
 remote_write:
   - url: http://ruptura:8080/api/v2/write
     authorization:
-      credentials: "<api-key>"
+      credentials: "<your-api-key>"
 ```
 
 ## Alertmanager rules
@@ -141,31 +147,54 @@ remote_write:
 groups:
   - name: ruptura
     rules:
-      - alert: RupturaRuptureCritical
-        expr: rpt_rupture_index > 3.0
+      - alert: RupturaCritical
+        expr: |
+          ruptura_kpi{signal="fused_rupture_index"} > 3.0
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "Rupture Index critical on {{ $labels.host }}"
-          description: "R={{ $value | printf \"%.1f\" }} — check /api/v2/explain"
+          summary: "Rupture Index critical on {{ $labels.workload }}"
+          description: "FusedR={{ $value | printf \"%.1f\" }} — check /api/v2/explain"
 
       - alert: RupturaHealthScoreLow
-        expr: rpt_kpi_healthscore < 40
+        expr: |
+          ruptura_kpi{signal="health_score"} < 40
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Health score below 40 on {{ $labels.host }}"
+          summary: "Health score below 40 on {{ $labels.workload }}"
+
+      - alert: RupturaDown
+        expr: up{job="ruptura"} == 0
+        for: 1m
+        labels:
+          severity: critical
 ```
+
+## Grafana
+
+Enable the bundled dashboard:
+
+```bash
+# Via Helm
+helm upgrade ruptura helm -n ruptura-system \
+  --set grafana.dashboards.enabled=true
+
+# Or import manually
+# File: workdir/deploy/grafana/dashboards/ruptura_overview.json
+```
+
+Point a Prometheus datasource at `http://ruptura:8080/api/v2/metrics`.
 
 ## Resource sizing
 
-| Deployment size | RAM | CPU | Storage |
-|-----------------|-----|-----|---------|
-| Edge / dev | 64 MB | 0.1 core | 1 GB |
-| Small (< 50 hosts) | 128 MB | 0.25 core | 10 GB |
-| Medium (50–500 hosts) | 256 MB | 0.5 core | 30 GB |
-| Large (500+ hosts) | 512 MB | 1 core | 100 GB |
+| Deployment size | Workloads | RAM | CPU | Storage |
+|-----------------|-----------|-----|-----|---------|
+| Dev / edge | < 10 | 64 MB | 0.1 core | 1 GB |
+| Small | < 50 | 128 MB | 0.25 core | 10 GB |
+| Medium | 50–300 | 256 MB | 0.5 core | 30 GB |
+| Large | 300+ | 512 MB | 1 core | 100 GB |
 
-Ruptura uses BadgerDB embedded — storage scales with the number of hosts and retention settings.
+Ruptura uses BadgerDB embedded — storage scales with the number of workloads and retention settings (`kpis_days: 400` default).

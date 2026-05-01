@@ -1,26 +1,40 @@
 # Fusion Engine
 
-The Fusion Engine is the analytical core of Kairo. It combines normalised telemetry from all three pipelines into 8 composite signals, runs the adaptive ensemble, and produces the Rupture Index™ for every tracked host.
+The Fusion Engine is the analytical core of Ruptura. It combines normalised telemetry from all three signal sources (metrics, logs, traces) into 10 composite KPI signals, runs the adaptive ensemble, and produces the Fused Rupture Index™ for every tracked workload.
 
 ## Responsibilities
 
-1. **Composite signal computation** — recalculate all 8 signals on every new data point
-2. **Adaptive ensemble** — maintain per-host model weights and update them every 60 s
-3. **Rupture detection** — compute R = |α_burst| / |α_stable| and compare against thresholds
-4. **XAI trace** — record which signals and models contributed to each prediction
+1. **Composite signal computation** — recalculate all 10 signals on every new data point
+2. **Adaptive per-workload baselines** — after 24h of observation, thresholds become relative to each workload's Welford baseline
+3. **Rupture detection** — compute `metricR`, `logR`, `traceR` and fuse into `FusedR`
+4. **Topology-based contagion** — build real service dependency graph from OTLP trace spans
+5. **XAI trace** — record which signals and pipelines contributed to each prediction
 
 ## Signal computation order
 
 ```
-Raw metrics → stress → fatigue → pressure
-Raw errors  → contagion
-stress + uptime + throughput → sentiment
+Raw metrics → stress → fatigue → pressure → humidity → velocity
+Raw errors  → mood
+Trace spans → contagion (topology-based; falls back to errors×cpu)
+Log lines   → sentiment → (informs contagion)
 stress + variance → entropy
-historical slope → resilience
-all 4 primary signals → healthscore
+all signals → health_score (additive-penalty model)
 ```
 
 Signals are computed in dependency order: `stress` must be ready before `fatigue` and `pressure`.
+
+## Three-source fusion
+
+```
+metricR  = CA-ILR ratio (5-min burst / 60-min stable slope)
+logR     = burst_rate / log_baseline  (fires when error/warn > 3σ)
+traceR   = span_error_rate × (p99_latency / latency_baseline)
+
+FusedR   = weighted combination of available signals
+           (each source contributes independently — FusedR requires ≥2 sources)
+```
+
+The Fused Rupture Index is more resistant to false positives than any single-source index. A metric spike alone won't push FusedR to critical if logs and traces are healthy.
 
 ## Adaptive ensemble inside the fusion engine
 
@@ -45,56 +59,74 @@ The final prediction passed to the rupture detector is the weighted sum:
 prediction(t) = Σ_i weight_i(t) × prediction_i(t)
 ```
 
-## Rupture detector
+## Rupture detector (CA-ILR)
 
 ```go
 type RuptureDetector struct {
-    stableILR *ILR   // 60-min window
-    burstILR  *ILR   // 5-min window
+    stableILR *ILR   // 60-min window — long-term baseline
+    burstILR  *ILR   // 5-min window  — micro-acceleration
 }
 
 func (d *RuptureDetector) R() float64 {
     denom := math.Abs(d.stableILR.Alpha)
-    if denom < 1e-6 {
-        denom = 1e-6
-    }
+    if denom < 1e-6 { denom = 1e-6 }
     return math.Abs(d.burstILR.Alpha) / denom
 }
 ```
 
+Each ILR runs Welford-style O(1) incremental updates — no history stored, constant memory per workload.
+
+## WorkloadRef — treatment unit
+
+All signals are keyed by `WorkloadRef` (namespace/kind/name), not by host. When multiple pods from the same Deployment send metrics, they are merged using these aggregation rules:
+
+| Signal | Aggregation | Rationale |
+|--------|-------------|-----------|
+| Stress | max | worst pod defines workload stress |
+| Fatigue | max | accumulated burden follows the most fatigued pod |
+| Mood | min | workload mood is as low as the saddest pod |
+| Pressure | max | highest pressure pod sets the alarm |
+| Humidity | mean | spread errors across all pods |
+| Contagion | max | if any pod is contagious, the workload is |
+| Resilience | min | weakest pod limits overall resilience |
+| Entropy | mean | disorder is a workload-wide property |
+| Velocity | mean | aggregate rate of change |
+| HealthScore | min | weakest pod governs workload health |
+
 ## Storage
 
-The fusion engine writes composite signal values to BadgerDB with tiered compaction:
+BadgerDB embedded — no external database:
 
 | Granularity | Retention | Use |
 |-------------|---------|-----|
 | 15 s | 7 days | Raw metrics |
 | 1 min | 30 days | Aggregated metrics + logs |
-| 5 min | 1 year | KPI history |
+| 5 min | 1 year | KPI snapshot history |
 | 1 h | 400 days | Long-term compliance |
+
+`FlushSnapshots()` is called on SIGTERM — no data loss on graceful shutdown.
 
 ## XAI — explainability trace
 
-For every rupture, the fusion engine records:
+For every rupture, the fusion engine records a full explain trace:
 
 ```json
 {
   "rupture_id": "r_abc123",
-  "host": "web-01",
-  "rupture_index": 4.2,
+  "workload": { "namespace": "default", "kind": "Deployment", "name": "payment-api" },
+  "fused_rupture_index": 4.2,
   "model_contributions": {
     "ca_ilr":       { "weight": 0.35, "prediction": 4.4 },
     "arima":        { "weight": 0.22, "prediction": 4.0 },
-    "holt_winters": { "weight": 0.18, "prediction": 3.9 },
-    "mad":          { "weight": 0.14, "prediction": 4.5 },
-    "ewma":         { "weight": 0.11, "prediction": 4.1 }
+    "holt_winters": { "weight": 0.18, "prediction": 3.9 }
   },
-  "dominant_signal": "stress",
+  "top_factor": "fatigue",
   "signal_values": {
-    "stress": 0.72, "fatigue": 0.41, "pressure": 0.35,
-    "contagion": 0.12, "healthscore": 43.2
-  }
+    "stress": 0.72, "fatigue": 0.81, "mood": 0.31,
+    "pressure": 0.65, "contagion": 0.58, "health_score": 43.0
+  },
+  "primary_pipeline": "metric"
 }
 ```
 
-Retrieve it at `GET /api/v2/explain/{rupture_id}`.
+Retrieve the human-readable narrative at `GET /api/v2/explain/{rupture_id}/narrative`.

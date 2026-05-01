@@ -109,10 +109,10 @@ When OTLP trace spans are ingested, Ruptura builds a real service dependency gra
 
 ```bash
 # Option 1: Helm (recommended)
-helm install ruptura deploy/helm/ruptura \
+helm install ruptura helm \
   --namespace ruptura-system \
   --create-namespace \
-  --set auth.apiKey=$(openssl rand -hex 32)
+  --set apiKey=$(openssl rand -hex 32)
 
 # Option 2: kustomize manifests
 kubectl apply -f deploy/
@@ -309,7 +309,7 @@ The operator reconciles Deployment + Service + PVC per `RupturaInstance`. See `o
 go build ./...
 go test -race -timeout=120s ./...
 go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out | grep total
-helm lint deploy/helm/ruptura/
+helm lint helm/
 ```
 
 ---

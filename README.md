@@ -52,10 +52,10 @@ docs/
 ## Install in 60 seconds
 
 ```bash
-helm install ruptura workdir/deploy/helm/ruptura \
+helm install ruptura helm \
   --namespace ruptura-system \
   --create-namespace \
-  --set auth.apiKey=$(openssl rand -hex 32)
+  --set apiKey=$(openssl rand -hex 32)
 
 kubectl port-forward svc/ruptura 8080:80 -n ruptura-system
 curl http://localhost:8080/api/v2/health

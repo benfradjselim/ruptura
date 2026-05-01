@@ -10,10 +10,10 @@ The recommended production deployment uses the Helm chart. It deploys a single R
 git clone https://github.com/benfradjselim/ruptura.git
 cd ruptura
 
-helm install ruptura workdir/deploy/helm/ruptura \
+helm install ruptura helm \
   --namespace ruptura-system \
   --create-namespace \
-  --set auth.apiKey=$(openssl rand -hex 32)
+  --set apiKey=$(openssl rand -hex 32)
 ```
 
 Verify:
@@ -28,8 +28,8 @@ curl http://localhost:8080/api/v2/health
 Common Helm options:
 
 ```bash
---set auth.apiKey=<your-key>          # API bearer token (required for prod)
---set storage.size=20Gi               # PVC size (default: 10Gi)
+--set apiKey=<your-key>          # API bearer token (required for prod)
+--set persistence.size=20Gi               # PVC size (default: 10Gi)
 --set image.tag=6.2.2                 # Pin to a specific version
 --set serviceMonitor.enabled=true     # Prometheus Operator scrape
 --set grafana.dashboards.enabled=true # Grafana dashboard ConfigMap
@@ -38,7 +38,7 @@ Common Helm options:
 Upgrade:
 
 ```bash
-helm upgrade ruptura workdir/deploy/helm/ruptura --namespace ruptura-system
+helm upgrade ruptura helm --namespace ruptura-system
 ```
 
 ### Using `kubectl`
@@ -141,7 +141,7 @@ go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out | g
 Lint Helm chart:
 
 ```bash
-helm lint deploy/helm/ruptura/
+helm lint helm/
 ```
 
 ---

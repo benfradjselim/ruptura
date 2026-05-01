@@ -5,36 +5,21 @@ The Go SDK is part of the `ruptura` module at `sdk/go`.
 ## Install
 
 ```bash
-go get github.com/benfradjselim/ruptura/sdk/go@v6.1.1
-```
-
-## Import
-
-The package name is `ruptura`:
-
-```go
-import "github.com/benfradjselim/ruptura/sdk/go"
+go get github.com/benfradjselim/ruptura/sdk/go@v6.2.2
 ```
 
 ## Create a client
 
 ```go
-// API key auth (recommended for services)
-c := ruptura.New("http://ruptura:8080", ruptura.WithAPIKey("rpt_abc123"))
+import ruptura "github.com/benfradjselim/ruptura/sdk/go"
 
-// JWT auth (for interactive / user sessions)
-c := ruptura.New("http://ruptura:8080", ruptura.WithToken("eyJ..."))
+// API key auth (recommended)
+c := ruptura.New("http://ruptura:8080", ruptura.WithAPIKey("your-api-key"))
 
 // Custom timeout
 c := ruptura.New("http://ruptura:8080",
-    ruptura.WithAPIKey("rpt_abc123"),
+    ruptura.WithAPIKey("your-api-key"),
     ruptura.WithTimeout(10*time.Second),
-)
-
-// Multi-tenant
-c := ruptura.New("http://ruptura:8080",
-    ruptura.WithAPIKey("rpt_abc123"),
-    ruptura.WithOrgID("org_xyz"),
 )
 ```
 
@@ -50,44 +35,67 @@ if err != nil {
 fmt.Println(health.Status)  // "ok"
 ```
 
-## Rupture Index
+## Rupture Index (WorkloadRef — primary)
 
 ```go
-rupture, err := c.RuptureIndex(ctx, "web-01")
+// Kubernetes workload: namespace + name
+rupture, err := c.RuptureIndex(ctx, "default", "payment-api")
 if err != nil {
     log.Fatal(err)
 }
-fmt.Printf("R=%.2f  state=%s\n", rupture.RuptureIndex, rupture.State)
+fmt.Printf("FusedR=%.2f  state=%s  health=%d\n",
+    rupture.FusedRuptureIndex, rupture.State, rupture.HealthScore)
 ```
 
-## Composite signals
+## All ruptures
 
 ```go
-// Single signal
-kpi, err := c.KPI(ctx, "stress", "web-01")
-fmt.Printf("stress=%.2f  state=%s\n", kpi.Value, kpi.State)
-
-// Health score (0–100)
-hs, err := c.KPI(ctx, "healthscore", "web-01")
-fmt.Printf("healthscore=%.1f\n", hs.Value)
-```
-
-## Adaptive ensemble weights (v6.1)
-
-```go
-weights, err := c.EnsembleWeights(ctx, "web-01")
-for model, w := range weights.Weights {
-    fmt.Printf("  %s: %.2f\n", model, w)
+ruptures, err := c.Ruptures(ctx)
+for _, r := range ruptures {
+    fmt.Printf("%s/%s: FusedR=%.2f  state=%s\n",
+        r.Workload.Namespace, r.Workload.Name,
+        r.FusedRuptureIndex, r.State)
 }
 ```
 
-## Ingest metrics
+## KPI signals
 
 ```go
-err := c.IngestMetrics(ctx, []ruptura.Metric{
-    {Name: "cpu_usage", Value: 0.72, Host: "web-01", Timestamp: time.Now()},
-    {Name: "mem_usage", Value: 0.45, Host: "web-01", Timestamp: time.Now()},
-})
+// Any of: stress, fatigue, mood, pressure, humidity, contagion,
+//         resilience, entropy, velocity, health_score
+kpi, err := c.KPI(ctx, "fatigue", "default", "payment-api")
+fmt.Printf("fatigue=%.2f  state=%s\n", kpi.Value, kpi.State)
+
+// Health score (0–100)
+hs, err := c.KPI(ctx, "health_score", "default", "payment-api")
+fmt.Printf("health_score=%.1f\n", hs.Value)
+```
+
+## Narrative explain
+
+```go
+narrative, err := c.ExplainNarrative(ctx, "r_abc123")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(narrative.Narrative)
+// "payment-api has been accumulating fatigue for 72h..."
+fmt.Printf("severity=%s  top_factor=%s  ttf=%ds\n",
+    narrative.Severity, narrative.TopFactor, narrative.TTFSeconds)
+```
+
+## Anomalies
+
+```go
+// All anomalies
+anomalies, err := c.Anomalies(ctx, "")
+
+// For a specific workload
+anomalies, err := c.Anomalies(ctx, "payment-api")
+for _, a := range anomalies {
+    fmt.Printf("host=%s  method=%s  severity=%s  consensus=%v\n",
+        a.Host, a.Method, a.Severity, a.Consensus)
+}
 ```
 
 ## Actions
@@ -99,16 +107,28 @@ actions, err := c.ListActions(ctx)
 // Approve a suggested action
 err = c.ApproveAction(ctx, "act_abc")
 
-// Emergency stop
+// Reject
+err = c.RejectAction(ctx, "act_abc")
+
+// Emergency stop all Tier-1 auto-actions
 err = c.EmergencyStop(ctx)
+```
+
+## Maintenance windows
+
+```go
+err := c.CreateSuppression(ctx, ruptura.Suppression{
+    Workload: "default/Deployment/order-processor",
+    Start:    time.Now(),
+    End:      time.Now().Add(30 * time.Minute),
+    Reason:   "rolling deploy v2.4.1",
+})
 ```
 
 ## Error handling
 
-The SDK returns `*ruptura.Error` for non-2xx responses:
-
 ```go
-rupture, err := c.RuptureIndex(ctx, "unknown-host")
+rupture, err := c.RuptureIndex(ctx, "default", "unknown-svc")
 if err != nil {
     var apiErr *ruptura.Error
     if errors.As(err, &apiErr) {
@@ -121,8 +141,6 @@ if err != nil {
 
 | Option | Description |
 |--------|-------------|
-| `WithAPIKey(key string)` | Set API key (`rpt_*` format) |
-| `WithToken(token string)` | Set JWT bearer token |
-| `WithOrgID(id string)` | Set `X-Org-ID` header for multi-tenancy |
+| `WithAPIKey(key string)` | Set API key |
 | `WithTimeout(d time.Duration)` | HTTP request timeout (default 30s) |
 | `WithHTTPClient(hc *http.Client)` | Replace the default HTTP client |

@@ -2,15 +2,15 @@
 
 Base URL: `http://<host>:8080/api/v2`
 
-All requests require `Authorization: Bearer <jwt_or_api_key>` unless noted.
+All requests require `Authorization: Bearer <api-key>` unless noted. Set the key via `RUPTURA_API_KEY` when starting Ruptura.
 
 ---
 
-## Health
+## Health & Readiness
 
 ### `GET /health`
 
-Returns server health. No auth required.
+Returns server health. **No auth required.**
 
 ```bash
 curl http://localhost:8080/api/v2/health
@@ -22,7 +22,11 @@ curl http://localhost:8080/api/v2/health
 
 ### `GET /ready`
 
-Kubernetes readiness probe. Returns `204` when ready, `503` during startup.
+Kubernetes readiness probe. Returns `200` when ready, `503` during startup. **No auth required.**
+
+### `GET /metrics`
+
+Prometheus scrape endpoint — Ruptura's own self-metrics. **No auth required.**
 
 ---
 
@@ -32,112 +36,161 @@ Kubernetes readiness probe. Returns `204` when ready, `503` during startup.
 
 Prometheus remote_write (protobuf). Used by Prometheus `remote_write` config.
 
-### `POST /v1/metrics`
+```yaml
+# prometheus.yml
+remote_write:
+  - url: http://ruptura:8080/api/v2/write
+    authorization:
+      credentials: <your-api-key>
+```
 
-OTLP/HTTP metrics (protobuf or JSON).
+### OTLP (metrics, logs, traces)
 
-### `POST /v1/logs`
+!!! important "OTLP goes to port 4317, not 8080"
+    Send OTLP to `http://ruptura:4317` (separate OTLP HTTP server). Posting to `/api/v2/v1/{metrics,logs,traces}` on port 8080 returns `421 Misdirected Request` with port guidance — this is intentional.
 
-OTLP/HTTP logs.
-
-### `POST /v1/traces`
-
-OTLP/HTTP traces.
+```yaml
+# otel-collector exporters section
+exporters:
+  otlphttp:
+    endpoint: http://ruptura:4317
+    headers:
+      Authorization: "Bearer <your-api-key>"
+```
 
 ---
 
-## Rupture
+## Rupture Index
 
-### `GET /rupture/{host}`
+### `GET /rupture/{namespace}/{workload}` _(primary — WorkloadRef)_
 
-Get the current Rupture Index for a host.
+Get the Fused Rupture Index for a Kubernetes workload.
 
 ```bash
-curl -H "Authorization: Bearer $KEY" \
-  http://localhost:8080/api/v2/rupture/web-01
+curl -H "Authorization: Bearer $API_KEY" \
+  http://localhost:8080/api/v2/rupture/default/payment-api
 ```
 
 ```json
 {
-  "host": "web-01",
-  "rupture_index": 4.2,
+  "workload": {
+    "namespace": "default",
+    "kind": "Deployment",
+    "name": "payment-api"
+  },
+  "fused_rupture_index": 4.2,
+  "health_score": 43,
   "state": "critical",
-  "time_to_failure_seconds": 1800,
-  "dominant_signal": "stress",
-  "alpha_burst": 0.042,
-  "alpha_stable": 0.010,
-  "timestamp": "2026-04-28T10:00:00Z"
+  "stress":    { "value": 0.72, "state": "stressed" },
+  "fatigue":   { "value": 0.81, "state": "burnout_imminent" },
+  "mood":      { "value": 0.31, "state": "sad" },
+  "pressure":  { "value": 0.65, "state": "storm_approaching" },
+  "humidity":  { "value": 0.48, "state": "very_humid" },
+  "contagion": { "value": 0.58, "state": "spreading" },
+  "timestamp": "2026-05-01T09:00:00Z"
 }
 ```
 
 States: `stable` · `elevated` · `warning` · `critical` · `emergency`
 
+### `GET /rupture/{host}` _(legacy — host-based)_
+
+Backward-compatible host-level view. Works for non-Kubernetes ingest or when `k8s.*` OTLP attributes are absent.
+
 ### `GET /ruptures`
 
-List all active ruptures across all hosts.
+List the current Fused Rupture Index for every known workload.
 
 ```json
 {
   "ruptures": [
-    { "host": "web-01", "rupture_index": 4.2, "state": "critical" },
-    { "host": "db-01",  "rupture_index": 1.8, "state": "warning" }
+    { "workload": { "namespace": "default", "kind": "Deployment", "name": "payment-api" }, "fused_rupture_index": 4.2, "state": "critical" },
+    { "workload": { "namespace": "default", "kind": "Deployment", "name": "order-svc"  }, "fused_rupture_index": 1.1, "state": "elevated" }
   ]
 }
 ```
 
 ---
 
-## Composite KPIs
+## KPI Signals
 
-### `GET /kpi/{signal}/{host}`
+10 signals available: `stress` · `fatigue` · `mood` · `pressure` · `humidity` · `contagion` · `resilience` · `entropy` · `velocity` · `health_score`
 
-Query a composite signal for a host.
-
-**Signals:** `stress` · `fatigue` · `pressure` · `contagion` · `resilience` · `entropy` · `sentiment` · `healthscore`
+### `GET /kpi/{signal}/{namespace}/{workload}` _(primary)_
 
 ```bash
-curl -H "Authorization: Bearer $KEY" \
-  http://localhost:8080/api/v2/kpi/stress/web-01
+curl -H "Authorization: Bearer $API_KEY" \
+  http://localhost:8080/api/v2/kpi/fatigue/default/payment-api
 ```
 
 ```json
 {
-  "signal": "stress",
-  "host": "web-01",
-  "value": 0.72,
-  "state": "Stressed",
-  "trend": "up",
-  "timestamp": "2026-04-28T10:00:00Z"
+  "signal": "fatigue",
+  "workload": {
+    "namespace": "default",
+    "kind": "Deployment",
+    "name": "payment-api"
+  },
+  "value": 0.81,
+  "state": "burnout_imminent",
+  "timestamp": "2026-05-01T09:00:00Z"
 }
 ```
+
+### `GET /kpi/{signal}/{host}` _(legacy)_
+
+Host-based variant. Same response shape with `host` field instead of `workload`.
 
 ---
 
-## Adaptive Ensemble
+## Forecast
 
-### `GET /ensemble/{host}`
+### `POST /forecast`
 
-Get current model weights for a host.
+Request a forecast for a metric. Body: `{"metric": "cpu_usage", "workload": "default/payment-api", "horizon": 3600}`.
+
+### `GET /forecast/{metric}/{namespace}/{workload}`
+
+Get the cached forecast for a workload's metric.
+
+### `GET /forecast/{metric}/{host}`
+
+Legacy host-based forecast.
+
+---
+
+## Anomalies
+
+### `GET /anomalies`
+
+List anomaly events across all workloads. Optional query: `?since=<RFC3339>`.
 
 ```bash
-curl -H "Authorization: Bearer $KEY" \
-  http://localhost:8080/api/v2/ensemble/web-01
+curl -H "Authorization: Bearer $API_KEY" \
+  "http://localhost:8080/api/v2/anomalies?since=2026-05-01T00:00:00Z"
 ```
 
 ```json
 {
-  "host": "web-01",
-  "updated_at": "2026-04-28T10:00:00Z",
-  "adaptive": true,
-  "weights": {
-    "ca_ilr":       0.35,
-    "arima":        0.22,
-    "holt_winters": 0.18,
-    "mad":          0.14,
-    "ewma":         0.11
-  }
+  "anomalies": [
+    {
+      "id": "anm_abc",
+      "host": "payment-api",
+      "method": "ca_ilr",
+      "severity": "critical",
+      "value": 4.8,
+      "consensus": true,
+      "timestamp": "2026-05-01T08:45:00Z"
+    }
+  ]
 }
 ```
+
+`consensus: true` means ≥2 detection methods agreed — high-confidence event.
+
+### `GET /anomalies/{host}`
+
+Anomalies for a specific host/workload.
 
 ---
 
@@ -145,42 +198,85 @@ curl -H "Authorization: Bearer $KEY" \
 
 ### `GET /actions`
 
-List all pending / recent actions.
+List pending and recently executed actions.
 
 ```json
 {
   "actions": [
     {
       "id": "act_abc",
-      "host": "web-01",
+      "workload": "default/Deployment/payment-api",
       "type": "scale",
       "params": {"replicas": 5},
       "tier": 2,
       "status": "pending",
       "rupture_id": "r_abc123",
-      "created_at": "2026-04-28T10:00:00Z"
+      "created_at": "2026-05-01T08:45:00Z"
     }
   ]
 }
 ```
+
+### `GET /actions/{id}`
+
+Get a single action by ID.
 
 ### `POST /actions/{id}/approve`
 
 Approve a Tier-2 pending action.
 
 ```bash
-curl -X POST -H "Authorization: Bearer $KEY" \
+curl -X POST -H "Authorization: Bearer $API_KEY" \
   http://localhost:8080/api/v2/actions/act_abc/approve
 ```
+
+### `POST /actions/{id}/reject`
+
+Reject a pending action (removes it from the queue).
+
+### `POST /actions/{id}/rollback`
+
+Request a rollback of a previously executed action.
 
 ### `POST /actions/emergency-stop`
 
 Immediately halt all Tier-1 automated actions globally.
 
 ```bash
-curl -X POST -H "Authorization: Bearer $KEY" \
+curl -X POST -H "Authorization: Bearer $API_KEY" \
   http://localhost:8080/api/v2/actions/emergency-stop
 ```
+
+---
+
+## Suppressions (Maintenance Windows)
+
+Create time-bounded windows where rupture alerts are recorded but not dispatched to the action engine — use during planned deploys to avoid alert fatigue.
+
+### `POST /suppressions`
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workload": "default/Deployment/payment-api",
+    "start": "2026-05-01T14:00:00Z",
+    "end": "2026-05-01T14:30:00Z",
+    "reason": "rolling deploy v2.4.1"
+  }' \
+  http://localhost:8080/api/v2/suppressions
+```
+
+Optional `signals` array to suppress only specific signals (e.g. `["pressure","contagion"]`).
+
+### `GET /suppressions`
+
+List all active and upcoming suppression windows.
+
+### `DELETE /suppressions/{id}`
+
+Remove a suppression window early.
 
 ---
 
@@ -190,70 +286,61 @@ curl -X POST -H "Authorization: Bearer $KEY" \
 
 Full XAI trace for a rupture.
 
+### `GET /explain/{rupture_id}/formula`
+
+Formula and coefficient breakdown (lighter response for dashboards).
+
+### `GET /explain/{rupture_id}/pipeline`
+
+Which pipeline (metric / log / trace) contributed most to the rupture.
+
+### `GET /explain/{rupture_id}/narrative`
+
+**Human-readable causal narrative.** Returns a structured English explanation — the primary differentiator.
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" \
+  http://localhost:8080/api/v2/explain/r_abc123/narrative
+```
+
 ```json
 {
-  "rupture_id": "r_abc123",
-  "host": "web-01",
-  "rupture_index": 4.2,
-  "formula": "R = |α_burst| / |α_stable| = 0.042 / 0.010 = 4.2",
-  "model_contributions": {
-    "ca_ilr": {"weight": 0.35, "prediction": 4.4}
-  },
-  "dominant_signal": "stress",
-  "recommendation": "CPU stress is the primary driver — consider horizontal scaling"
+  "narrative": "payment-api has been accumulating fatigue for 72h (fatigue 0.81, burnout threshold 0.80). The Tuesday 14:30 deploy increased pressure to 0.74. At 16:45, a contagion wave from payment-db propagated via the payment-api→payment-db call edge and pushed FusedR from 1.8 to 4.2 in 18 minutes. This is a cascade rupture, not an isolated spike. Recommended action: scale payment-api by 2 replicas.",
+  "severity": "critical",
+  "primary_pipeline": "metric",
+  "top_factor": "fatigue",
+  "ttf_seconds": 1800
 }
 ```
 
-### `GET /explain/{rupture_id}/formula`
-
-Returns just the formula and coefficients (lighter response for dashboards).
-
 ---
 
-## Auth
+## Context Events
 
-### `POST /auth/login`
+Context entries inform Ruptura of deploy events, maintenance, or configuration changes. They suppress false alarms and anchor the timeline for explain narratives.
 
-```bash
-curl -X POST http://localhost:8080/api/v2/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"<jwt_secret>"}'
-```
-
-Returns `{"token":"eyJ...","expires_at":"..."}`.
-
-### `POST /auth/refresh`
-
-Exchange a valid JWT for a fresh one. Pass existing token in `Authorization` header.
-
----
-
-## API Keys
-
-### `GET /apikeys`
-
-List all API keys for the current user.
-
-### `POST /apikeys`
-
-Create a new API key.
+### `POST /context`
 
 ```bash
-curl -X POST -H "Authorization: Bearer $JWT" \
-  http://localhost:8080/api/v2/apikeys \
+curl -X POST \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name":"ci-pipeline","scopes":["read","write"]}'
+  -d '{
+    "workload": "default/Deployment/order-processor",
+    "event": "deploy",
+    "description": "v2.4.1 rolling deploy",
+    "timestamp": "2026-05-01T14:30:00Z"
+  }' \
+  http://localhost:8080/api/v2/context
 ```
 
-```json
-{"id":"key_abc","name":"ci-pipeline","key":"ohe_abc123...","created_at":"..."}
-```
+### `GET /context`
 
-The raw key value is only returned once.
+List recent context events.
 
-### `DELETE /apikeys/{id}`
+### `DELETE /context/{id}`
 
-Revoke an API key.
+Remove a context event.
 
 ---
 
@@ -261,17 +348,39 @@ Revoke an API key.
 
 ### `GET /metrics`
 
-Returns Ruptura's own Prometheus metrics (no auth required).
+Ruptura's own metrics in Prometheus format. **No auth required.**
 
-Key series:
+Primary series (all workloads, all signals):
 
 ```
-rpt_rupture_index{host="web-01"}                  4.2
-rpt_time_to_failure_seconds{host="web-01"}        1800
-rpt_kpi_healthscore{host="web-01"}                43.2
-rpt_kpi_stress{host="web-01"}                     0.72
-rpt_actions_total{tier="1",result="ok"}           12
-rpt_ingest_samples_total{source="prometheus"}     840200
-rpt_ensemble_weight{host="web-01",model="ca_ilr"} 0.35
-rpt_uptime_seconds                                3842
+ruptura_kpi{namespace="default",kind="Deployment",workload="payment-api",signal="fatigue"} 0.81
+ruptura_kpi{namespace="default",kind="Deployment",workload="payment-api",signal="stress"}  0.72
+ruptura_kpi{namespace="default",kind="Deployment",workload="payment-api",signal="health_score"} 43.0
+ruptura_kpi{namespace="default",kind="Deployment",workload="payment-api",signal="fused_rupture_index"} 4.2
+```
+
+Legacy host-labelled series (still emitted for backward compatibility):
+
+```
+rpt_rupture_index{host="payment-api",metric="cpu_usage",severity="critical"} 4.2
+rpt_time_to_failure_seconds{host="payment-api",metric="cpu_usage"}           1800
+rpt_kpi_healthscore{host="payment-api"}                                       43.0
+rpt_kpi_stress{host="payment-api"}                                            0.72
+rpt_kpi_fatigue{host="payment-api"}                                           0.81
+rpt_actions_total{type="scale",tier="2",outcome="approved"}                   3
+rpt_ingest_samples_total{source="prometheus"}                                 840200
+rpt_memory_bytes                                                               45678900
+rpt_uptime_seconds                                                             3842
+rpt_version_info{version="6.2.2"}                                             1
+```
+
+Prometheus scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: ruptura
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["ruptura:8080"]
+    metrics_path: /api/v2/metrics
 ```

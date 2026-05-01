@@ -23,10 +23,10 @@ Get Ruptura running and observing your workloads in under 5 minutes.
     ```bash
     export RUPTURA_API_KEY=$(openssl rand -hex 32)
 
-    helm install ruptura workdir/deploy/helm/ruptura \
+    helm install ruptura helm \
       --namespace ruptura-system \
       --create-namespace \
-      --set auth.apiKey=$RUPTURA_API_KEY
+      --set apiKey=$RUPTURA_API_KEY
 
     kubectl port-forward svc/ruptura 8080:80 -n ruptura-system &
     ```

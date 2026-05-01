@@ -105,11 +105,11 @@ When `true`, Ruptura computes per-model MAE over a 1-hour sliding window and nor
 ## Minimal production setup (Helm)
 
 ```bash
-helm install ruptura workdir/deploy/helm/ruptura \
+helm install ruptura helm \
   --namespace ruptura-system \
   --create-namespace \
-  --set auth.apiKey=$(openssl rand -hex 32) \
-  --set storage.size=20Gi \
+  --set apiKey=$(openssl rand -hex 32) \
+  --set persistence.size=20Gi \
   --set serviceMonitor.enabled=true
 ```
 
