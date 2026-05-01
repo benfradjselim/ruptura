@@ -1,0 +1,23 @@
+Ruptura {{ .Chart.AppVersion }} has been deployed.
+
+API endpoint:
+  kubectl port-forward svc/{{ include "ruptura.fullname" . }} 8080:80 -n {{ .Release.Namespace }}
+  curl http://localhost:8080/api/v2/health
+
+OTLP ingest endpoint (metrics, logs, traces):
+  kubectl port-forward svc/{{ include "ruptura.fullname" . }}-otlp 4317:4317 -n {{ .Release.Namespace }}
+
+{{- if not .Values.auth.apiKey }}
+
+WARNING: No API key configured. Set --set auth.apiKey=$(openssl rand -hex 32) for production use.
+{{- end }}
+
+Quick verification:
+  export API_KEY={{ if .Values.auth.apiKey }}<your-api-key>{{ else }}""{{ end }}
+  curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v2/ruptures
+
+Grafana dashboard:
+  Enable with --set grafana.dashboards.enabled=true
+  Scrape target: http://{{ include "ruptura.fullname" . }}.{{ .Release.Namespace }}:80/api/v2/metrics
+
+Docs: https://benfradjselim.github.io/ruptura/

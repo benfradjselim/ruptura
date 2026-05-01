@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ruptura.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ruptura.labels" . | nindent 4 }}
+  {{- with .Values.podAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # BadgerDB is single-writer — Recreate prevents split-brain with ReadWriteOnce PVC.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "ruptura.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ruptura.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "ruptura.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: ruptura
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --port=8080
+            - --otlp-port=4317
+            - --storage=/var/lib/ruptura/data
+          ports:
+            - name: api
+              containerPort: 8080
+              protocol: TCP
+            - name: otlp
+              containerPort: 4317
+              protocol: TCP
+          env:
+            {{- if or .Values.auth.apiKey .Values.auth.existingSecret }}
+            - name: RUPTURA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ruptura.secretName" . }}
+                  key: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecretKey }}{{ else }}api-key{{ end }}
+            {{- end }}
+            - name: RUPTURA_INGEST_RPS
+              value: {{ .Values.config.ingestRPS | quote }}
+            - name: RUPTURA_LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/ruptura/data
+          livenessProbe:
+            httpGet:
+              path: /api/v2/health
+              port: api
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v2/ready
+              port: api
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 2
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "ruptura.fullname" . }}-data

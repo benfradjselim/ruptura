@@ -8,7 +8,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/component: server
-    app.kubernetes.io/version: "6.2.0"
+    app.kubernetes.io/version: "6.2.2"
 spec:
   replicas: 1
   # BadgerDB is single-writer; use Recreate with ReadWriteOnce PVC.
@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ruptura
-          image: ghcr.io/benfradjselim/ruptura:6.2.0
+          image: ghcr.io/benfradjselim/ruptura:6.2.2
           imagePullPolicy: IfNotPresent
           args:
             - --port=8080

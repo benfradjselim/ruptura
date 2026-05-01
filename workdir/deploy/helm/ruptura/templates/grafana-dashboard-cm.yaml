@@ -1,0 +1,12 @@
+{{- if .Values.grafana.dashboards.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ruptura.fullname" . }}-grafana-dashboard
+  labels:
+    {{- include "ruptura.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  ruptura_overview.json: |-
+    {{ .Files.Get "deploy/grafana/dashboards/ruptura_overview.json" | nindent 4 }}
+{{- end }}
