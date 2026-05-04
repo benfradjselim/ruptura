@@ -8,6 +8,7 @@ import (
 
     "github.com/benfradjselim/ruptura/internal/actions/engine"
     "github.com/benfradjselim/ruptura/internal/alerter"
+    "github.com/benfradjselim/ruptura/internal/analyzer"
     apicontext "github.com/benfradjselim/ruptura/internal/context"
     "github.com/benfradjselim/ruptura/internal/explain"
     pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
@@ -30,7 +31,12 @@ type Handlers struct {
     startTime  time.Time
     ready      int32  // atomic: 1=ready
     apiKey     string // expected bearer token; "" disables auth
+    // v6.3: calibration + forecast enrichment
+    analyzer   *analyzer.Analyzer
 }
+
+// SetAnalyzer wires the analyzer for calibration status and HealthScore forecasting.
+func (h *Handlers) SetAnalyzer(a *analyzer.Analyzer) { h.analyzer = a }
 
 func NewHandlers(
     store *storage.Store,

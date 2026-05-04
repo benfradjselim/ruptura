@@ -259,6 +259,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	healthCheck := telemetry.NewHealthChecker()
 
 	handlers := api.New(store, actionEngine, explainer, al, predictorEngine, pipelineEngine, ctxStore, detector, metricsReg, healthCheck, cfg.APIKey)
+	handlers.SetAnalyzer(analyzerEngine)
 	handlers.SetReady(true)
 
 	router := handlers.NewRouter()

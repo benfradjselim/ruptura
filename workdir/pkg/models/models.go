@@ -60,6 +60,20 @@ type KPISnapshot struct {
 	FusedRuptureIndex float64 `json:"fused_rupture_index,omitempty"`
 	// v5.0: dual-scale CA-ILR rupture events (omitted when none detected)
 	RuptureEvents []RuptureEvent `json:"rupture_events,omitempty"`
+	// v6.3: calibration warm-up state
+	WorkloadStatus      string `json:"status"`                                 // "calibrating" | "active"
+	CalibrationProgress int    `json:"calibration_progress"`                    // 0–100
+	CalibrationETA      int    `json:"calibration_eta_minutes,omitempty"`        // minutes until active; 0 when active
+	// v6.3: HealthScore trend forecast (nil when calibrating or insufficient data)
+	HealthForecast *HealthForecast `json:"health_forecast,omitempty"`
+}
+
+// HealthForecast is a lightweight linear projection of HealthScore trend.
+type HealthForecast struct {
+	Trend              string  `json:"trend"`                          // "stable" | "improving" | "degrading"
+	In15Min            float64 `json:"in_15min"`                       // projected HealthScore (0–100) in 15 minutes
+	In30Min            float64 `json:"in_30min"`                       // projected HealthScore (0–100) in 30 minutes
+	CriticalETAMinutes int     `json:"critical_eta_minutes,omitempty"` // minutes until HealthScore < 40; 0 if not degrading to critical
 }
 
 // NotificationChannel is a configured alert delivery target

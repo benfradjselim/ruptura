@@ -53,6 +53,9 @@ func (h *Handlers) NewRouter() http.Handler {
 	r.HandleFunc("/api/v2/anomalies", h.handleAnomalies).Methods("GET")
 	r.HandleFunc("/api/v2/anomalies/{host}", h.handleAnomalies).Methods("GET")
 
+	// Simulator injection endpoint — for ruptura-sim and local demos
+	r.HandleFunc("/api/v2/sim/inject", h.handleSimInject).Methods("POST")
+
 	r.HandleFunc("/api/v2/explain/{rupture_id}", h.handleExplain).Methods("GET")
 	r.HandleFunc("/api/v2/explain/{rupture_id}/formula", h.handleExplain).Methods("GET")
 	r.HandleFunc("/api/v2/explain/{rupture_id}/pipeline", h.handleExplain).Methods("GET")

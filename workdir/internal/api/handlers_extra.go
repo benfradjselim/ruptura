@@ -14,6 +14,23 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// enrichSnapshot attaches calibration status and HealthScore forecast to a snapshot.
+// Safe to call when h.analyzer is nil (no-op).
+func (h *Handlers) enrichSnapshot(snap *models.KPISnapshot) {
+	if h.analyzer == nil {
+		snap.WorkloadStatus = "active"
+		snap.CalibrationProgress = 100
+		return
+	}
+	status, progress, eta := h.analyzer.CalibrationInfo(snap.Workload)
+	snap.WorkloadStatus = status
+	snap.CalibrationProgress = progress
+	snap.CalibrationETA = eta
+	if status == "active" {
+		snap.HealthForecast = h.analyzer.ForecastHealthScore(snap.Workload)
+	}
+}
+
 // handleAnomalies returns recent anomaly events, optionally filtered by host.
 //
 //	GET /api/v2/anomalies                  — all hosts, last 15 min
@@ -63,6 +80,7 @@ func (h *Handlers) handleRupture(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no data for host: "+host)
 		return
 	}
+	h.enrichSnapshot(&snap)
 	writeJSON(w, http.StatusOK, snap)
 }
 
@@ -105,6 +123,7 @@ func (h *Handlers) handleRuptureByWorkload(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusNotFound, "no data for workload: "+namespace+"/"+workload)
 		return
 	}
+	h.enrichSnapshot(&snap)
 	writeJSON(w, http.StatusOK, snap)
 }
 

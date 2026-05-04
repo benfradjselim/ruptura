@@ -718,6 +718,96 @@ func healthScoreState(h float64) string {
 	}
 }
 
+// CalibrationInfo returns the calibration status, progress (0–100), and ETA in minutes
+// for the given workload. A workload is "active" once it has >= 96 observations (~24h).
+func (a *Analyzer) CalibrationInfo(ref models.WorkloadRef) (status string, progress int, etaMinutes int) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	ws, ok := a.workloads[ref.Key()]
+	if !ok {
+		return "calibrating", 0, 24*60
+	}
+	const required = 96
+	if ws.baselineReady {
+		return "active", 100, 0
+	}
+	pct := ws.observationCount * 100 / required
+	if pct > 99 {
+		pct = 99
+	}
+	remaining := required - ws.observationCount
+	if remaining < 0 {
+		remaining = 0
+	}
+	etaMinutes = remaining * 15 / 60
+	return "calibrating", pct, etaMinutes
+}
+
+// ForecastHealthScore computes a linear trend projection over the rolling health history.
+// Returns nil when fewer than 10 observations are available or the workload is still calibrating.
+func (a *Analyzer) ForecastHealthScore(ref models.WorkloadRef) *models.HealthForecast {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	ws, ok := a.workloads[ref.Key()]
+	if !ok || !ws.baselineReady {
+		return nil
+	}
+	vals := ws.healthHistory.Values()
+	n := len(vals)
+	if n < 10 {
+		return nil
+	}
+
+	// Ordinary least squares: y = m*x + b over indices 0..n-1
+	fn := float64(n)
+	var sumX, sumY, sumXY, sumX2 float64
+	for i, v := range vals {
+		x := float64(i)
+		sumX += x
+		sumY += v
+		sumXY += x * v
+		sumX2 += x * x
+	}
+	denom := fn*sumX2 - sumX*sumX
+	if math.Abs(denom) < 1e-12 {
+		return &models.HealthForecast{Trend: "stable", In15Min: vals[n-1] * 100, In30Min: vals[n-1] * 100}
+	}
+	slope := (fn*sumXY - sumX*sumY) / denom
+	intercept := (sumY - slope*sumX) / fn
+
+	// Project: each tick ≈ 15s. 15min = 60 ticks, 30min = 120 ticks from index 0.
+	project := func(ticks float64) float64 {
+		raw := slope*(float64(n-1)+ticks) + intercept
+		return utils.Clamp(raw*100, 0, 100)
+	}
+	in15 := project(60)
+	in30 := project(120)
+
+	trend := "stable"
+	switch {
+	case slope > 0.001:
+		trend = "improving"
+	case slope < -0.001:
+		trend = "degrading"
+	}
+
+	var critETA int
+	if slope < -1e-6 {
+		// Solve slope*(n-1+k) + intercept = 0.40 (poor threshold in raw [0,1])
+		k := (0.40 - intercept - slope*float64(n-1)) / slope
+		if k > 0 {
+			critETA = int(k * 15 / 60) // ticks × 15s / 60 = minutes
+		}
+	}
+
+	return &models.HealthForecast{
+		Trend:              trend,
+		In15Min:            math.Round(in15*10) / 10,
+		In30Min:            math.Round(in30*10) / 10,
+		CriticalETAMinutes: critETA,
+	}
+}
+
 // AllHosts returns all known host names (backward-compat: returns workload keys)
 func (a *Analyzer) AllHosts() []string {
 	a.mu.RLock()

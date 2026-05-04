@@ -816,3 +816,230 @@ The engine is now honest, wired end-to-end, and stable. The next meaningful addi
 1. FR-10 X-Org-ID multi-tenant isolation.
 2. Web dashboard v2 (Svelte).
 3. `ruptura-ctl` CLI.
+
+---
+
+## Improvements & Fixes — Pre-Share Sprint (v6.3 target)
+
+> These tasks emerged from a product post-mortem analysis of why Ruptura would fail in the wild.
+> They are ordered by priority. P0 must ship before showing the tool to any external engineer.
+> P1 makes Ruptura genuinely predictive. P2 lays the commercial foundation.
+
+---
+
+### P0 — Must ship before showing anyone (dropout prevention)
+
+#### IMPROVE-01 — Calibration Window & Warm-up State
+**Status**: [ ] Not started
+
+**Problem**: A fresh install shows `fatigue: 0.91` on a perfectly healthy workload within the first hour because the baseline hasn't been learned yet. An engineer reads this as a broken tool, not a learning one, and uninstalls within 48h.
+
+**What to build**: During the first 48h on any new workload, Ruptura enters `calibrating` state. It collects signal data but suppresses rupture predictions and action recommendations.
+
+API response gains three new fields:
+```json
+{
+  "workload": "payments/deployment/checkout",
+  "status": "calibrating",
+  "calibration_progress": 67,
+  "calibration_eta_minutes": 94,
+  "signals": { ... }
+}
+```
+Once `calibration_progress` reaches 100 (after 96 observations at 15s intervals = 24h), status switches to `active` and predictions are enabled.
+
+**Files to touch**: `internal/analyzer/analyzer.go`, `internal/api/handlers_rupture.go`, `pkg/models/models.go`
+
+**Effort**: ~2 days
+
+---
+
+#### IMPROVE-02 — HealthScore Trend Forecast + Rupture ETA
+**Status**: [ ] Not started
+
+**Problem**: Ruptura currently tells you the current HealthScore. That is a present-tense number. The differentiation — and the sentence that makes an engineer stop — is a future-tense number: "you have 38 minutes."
+
+**What to build**: Add a `forecast` block to the rupture API response. Fit a linear regression over the last 20 HealthScore snapshots per workload. Project forward at 15min and 30min. Compute `critical_eta_minutes` as the time until the projected line crosses the `poor` threshold (40).
+
+```json
+{
+  "health_score": 61,
+  "trend": "degrading",
+  "forecast": {
+    "15min": 54,
+    "30min": 47,
+    "critical_eta_minutes": 38
+  }
+}
+```
+
+When HealthScore is stable or improving, `forecast` returns `"trend": "stable"` and no ETA.
+
+**Scope**: Simple ordinary least squares on the rolling snapshot window — no ML infrastructure. The predictor ensemble already exists for metric forecasting; this is a lighter, dedicated HealthScore projection.
+
+**Files to touch**: `internal/analyzer/analyzer.go` (rolling snapshot history), `internal/api/handlers_rupture.go` (forecast block in response), `pkg/models/models.go` (new `Forecast` struct)
+
+**Effort**: ~3 days
+
+---
+
+#### IMPROVE-03 — Ruptura Simulator (`ruptura-sim`)
+**Status**: [ ] Not started
+
+**Problem**: You cannot wait for a real production incident to demo the tool. Without a controlled demo, every conversation requires explaining the concept in the abstract. A 2-minute screen recording of Ruptura catching a simulated memory leak is worth more than any README.
+
+**What to build**: A CLI binary `ruptura-sim` that injects synthetic degradation patterns directly into the analyzer state machine via the existing ingest API.
+
+```bash
+# inject a slow memory leak pattern over 30 minutes
+ruptura-sim inject --pattern memory-leak --workload demo/deployment/api --duration 30m --target http://localhost:8080
+
+# inject a cascade failure starting from a dependency
+ruptura-sim inject --pattern cascade-failure --origin demo/deployment/payment-db --downstream demo/deployment/payment-api --duration 15m
+
+# list available patterns
+ruptura-sim patterns
+```
+
+**Patterns to implement** (4):
+- `memory-leak`: RAM climbs 2% per minute, latency rises, fatigue accumulates. HealthScore reaches `poor` at ~25min.
+- `cascade-failure`: Origin workload enters `epidemic` contagion. Downstream workload receives contagion propagation 3min later. FusedR spikes.
+- `traffic-surge`: Request rate doubles over 5min. Stress and pressure spike. Tests suppression + autopilot response.
+- `slow-burn`: Tiny stress increase each tick. Tests whether Ruptura catches gradual degradation that Prometheus misses.
+
+**Location**: `cmd/ruptura-sim/main.go` + `internal/sim/` package
+
+**Effort**: ~4 days
+
+---
+
+### P1 — Makes it genuinely predictive (not just reactive)
+
+#### IMPROVE-04 — Rupture Fingerprinting
+**Status**: [ ] Not started
+
+**Problem**: Ruptura detects that a workload is degrading. It does not know if this pattern looks like anything it has seen before. Pattern recognition over historical ruptures is the moat — it grows in value the longer the tool runs.
+
+**What to build**: Store the signal vector (10 KPI values + FusedR) from the 30 minutes before every confirmed rupture. On each new snapshot, compute cosine similarity against all stored fingerprints. If similarity > 0.85, include a `pattern_match` in the rupture response.
+
+```json
+"pattern_match": {
+  "similarity": 0.87,
+  "matched_rupture_id": "r-2026-04-15-checkout",
+  "matched_at": "2026-04-15T14:32:00Z",
+  "resolution": "scaled payment-db replicas by +2"
+}
+```
+
+**Storage**: Fingerprints persisted to BadgerDB (already in use). Keyed by rupture ID.
+
+**Files to touch**: `internal/analyzer/`, `internal/storage/`, `pkg/models/models.go`, `internal/api/handlers_rupture.go`
+
+**Effort**: ~1 week
+
+---
+
+#### IMPROVE-05 — Business Signal Layer (3 new signals)
+**Status**: [ ] Not started
+
+**Problem**: The current 10 signals are all infrastructure-level. An SRE understands them. A manager does not. Adding business-aware signals makes the tool legible at multiple levels of the org and creates a natural upsell conversation.
+
+**3 new signals**:
+
+| Signal | Formula | Value |
+|--------|---------|-------|
+| `slo_burn_velocity` | Rate at which error budget is consumed (requires SLO config: target + window). If no SLO defined, signal is absent. | Shows how fast you're burning your reliability budget |
+| `blast_radius` | Count of downstream workloads that would be affected if this workload ruptures — derived from the existing topology graph. | Turns a technical signal into a business impact number |
+| `recovery_debt` | Count of near-misses (FusedR crossed 2.0 but recovered without rupture) in the last 7 days. | A workload that keeps nearly rupturing is a ticking risk even when currently healthy |
+
+**SLO config** (optional, in `values.yaml`):
+```yaml
+slos:
+  - workload: payments/deployment/checkout
+    target: 99.9
+    window: 30d
+    error_budget_minutes: 43
+```
+
+**Files to touch**: `internal/analyzer/analyzer.go`, `pkg/models/models.go`, `internal/api/handlers_rupture.go`, `deploy/helm/ruptura/values.yaml`
+
+**Effort**: ~1 week
+
+---
+
+### P2 — Commercial foundation
+
+#### IMPROVE-06 — Feature Gate: Action Engine Behind Edition Flag
+**Status**: [ ] Not started
+
+**Problem**: Without a hard ceiling between free and paid, there is no commercial path. The action engine (autopilot) is the most valuable feature — it should be the thing you pay for.
+
+**What to build**: Add a `RUPTURA_EDITION` env var (`community` | `autopilot`). In `community` mode:
+- Action recommendations are visible in the API response (read-only).
+- `POST /api/v2/actions/{id}/approve` returns `402 Payment Required` with a message pointing to the paid edition.
+- T1 auto-execution is disabled.
+
+In `autopilot` mode: full execution, no change to existing behavior.
+
+**Files to touch**: `internal/api/handlers_actions.go`, `internal/actions/engine.go`, `cmd/ruptura/main.go`, `deploy/helm/ruptura/values.yaml`
+
+**Effort**: ~2 days
+
+---
+
+#### IMPROVE-07 — Per-Workload Signal Weight Tuning
+**Status**: [ ] Not started
+
+**Problem**: The fixed HealthScore weights (`0.25·stress + 0.20·fatigue + ...`) are calibrated for a generic workload profile. A batch job, a latency-sensitive API, and a message queue have completely different risk profiles. Enterprise buyers will not trust a tool with global constants.
+
+**What to build**: Allow `values.yaml` (and `POST /api/v2/config/weights`) to override HealthScore weights per workload or namespace. Fall back to global defaults when no override is defined.
+
+```yaml
+workloadWeights:
+  - selector: "payments/*"
+    stress: 0.35
+    fatigue: 0.15
+    mood: 0.20
+    pressure: 0.20
+    humidity: 0.05
+    contagion: 0.05
+  - selector: "batch/*"
+    stress: 0.10
+    fatigue: 0.30
+    mood: 0.10
+    pressure: 0.10
+    humidity: 0.20
+    contagion: 0.20
+```
+
+**Files to touch**: `internal/analyzer/analyzer.go`, `pkg/config/config.go`, `deploy/helm/ruptura/values.yaml`, `internal/api/` (new config endpoint)
+
+**Effort**: ~3 days
+
+---
+
+### Priority Summary
+
+| ID | Task | Tier | Effort | Status |
+|----|------|------|--------|--------|
+| IMPROVE-01 | Calibration window + warm-up state | P0 | ~2 days | [x] shipped v6.3.0 |
+| IMPROVE-02 | HealthScore trend forecast + ETA | P0 | ~3 days | [x] shipped v6.3.0 |
+| IMPROVE-03 | Ruptura simulator (`ruptura-sim`) | P0 | ~4 days | [x] shipped v6.3.0 |
+| IMPROVE-04 | Rupture fingerprinting | P1 | ~1 week | [ ] |
+| IMPROVE-05 | Business signal layer (3 signals) | P1 | ~1 week | [ ] |
+| IMPROVE-06 | Feature gate / edition flag | P2 | ~2 days | [ ] |
+| IMPROVE-07 | Per-workload weight tuning | P2 | ~3 days | [ ] |
+
+---
+
+### v6.3.0 (shipped — P0 pre-share sprint)
+
+**What shipped**:
+- **IMPROVE-01 — Calibration warm-up state**: `KPISnapshot` gains `status` ("calibrating" | "active"), `calibration_progress` (0–100), `calibration_eta_minutes`. New `Analyzer.CalibrationInfo()` method. All rupture handlers enriched via `enrichSnapshot()`. Engineers now see a clear warm-up state instead of confusing false signals in hour one.
+- **IMPROVE-02 — HealthScore trend forecast + ETA**: `KPISnapshot` gains `health_forecast` block with `trend`, `in_15min`, `in_30min`, `critical_eta_minutes`. New `Analyzer.ForecastHealthScore()` method — OLS linear regression over the rolling 60-point health history. Only surfaced when `status = active`. Turns "your score is 61" into "you have 38 minutes."
+- **IMPROVE-03 — `ruptura-sim` binary**: New `cmd/ruptura-sim/` CLI binary and `internal/sim/` package. Four patterns: `memory-leak`, `cascade-failure`, `traffic-surge`, `slow-burn`. Injects via new `POST /api/v2/sim/inject` handler. New `internal/api/handlers_sim.go`. Route registered in router. Enables controlled demo without waiting for a real incident.
+- **`go test -race ./...`**: all 38 packages pass clean.
+
+**Remaining P0**: none — tool is ready to show to engineers.
+
+**P0 total: ~9 days. Ship these before sharing with anyone.**
