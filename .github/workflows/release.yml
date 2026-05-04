@@ -213,12 +213,21 @@ jobs:
           echo "${{ secrets.K3S_KUBECONFIG }}" | base64 -d > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
 
+      - name: Log in to GHCR (Helm OCI)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+          helm registry login ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} \
+            --password-stdin
+
       - name: Helm upgrade/install ruptura
         env:
           TAG: ${{ needs.docker.outputs.image-tag }}
           RUPTURA_API_KEY: ${{ secrets.RUPTURA_API_KEY }}
         run: |
-          helm upgrade --install ruptura ${{ env.HELM_CHART }} \
+          helm upgrade --install ruptura \
+            oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/ruptura \
+            --version 0.6.3 \
             --namespace ruptura \
             --create-namespace \
             --set image.tag="${TAG}" \
@@ -243,7 +252,7 @@ jobs:
             get svc ruptura \
             -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
           echo "ruptura endpoint: http://${EXTERNAL_IP}/api/v2/health"
-          echo "ruptura metrics:  http://${EXTERNAL_IP}:9090/api/v2/metrics"
+          echo "ruptura metrics:  http://${EXTERNAL_IP}/api/v2/metrics"
 
       - name: Smoke test — health check
         run: |
