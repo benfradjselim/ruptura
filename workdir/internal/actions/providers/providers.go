@@ -103,19 +103,6 @@ func (p *AlertmanagerProvider) Execute(ctx context.Context, a engine.ActionRecom
 
 func (p *AlertmanagerProvider) Name() string { return "alertmanager" }
 
-// KubernetesProvider
-
-type KubernetesProvider struct{}
-
-func NewKubernetesProvider() *KubernetesProvider { return &KubernetesProvider{} }
-
-func (p *KubernetesProvider) Execute(ctx context.Context, a engine.ActionRecommendation) error {
-	// full impl is v6.1 scope, requires k8s client-go
-	return nil
-}
-
-func (p *KubernetesProvider) Name() string { return "kubernetes" }
-
 // PagerDutyProvider
 
 type PagerDutyProvider struct {
@@ -143,7 +130,7 @@ func (p *PagerDutyProvider) Execute(ctx context.Context, a engine.ActionRecommen
 		"routing_key":  p.integrationKey,
 		"event_action": "trigger",
 		"payload": map[string]string{
-			"summary":  fmt.Sprintf("Ruptura rupture: %s R=%f", a.Host, a.Confidence), // Actually instruction says R value, but I don't have R value in ActionRecommendation, I have confidence. Wait, let me check struct.
+			"summary":  fmt.Sprintf("Ruptura: %s FusedR=%.2f confidence=%.2f", a.Host, a.R, a.Confidence),
 			"severity": "critical",
 			"source":   a.Host,
 		},

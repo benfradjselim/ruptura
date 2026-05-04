@@ -17,6 +17,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/api"
 	apicontext "github.com/benfradjselim/ruptura/internal/context"
 	"github.com/benfradjselim/ruptura/internal/correlator"
+	"github.com/benfradjselim/ruptura/internal/actions/providers"
 	"github.com/benfradjselim/ruptura/internal/eventbus"
 	"github.com/benfradjselim/ruptura/internal/explain"
 	"github.com/benfradjselim/ruptura/internal/fusion"
@@ -27,6 +28,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/telemetry"
 	"github.com/benfradjselim/ruptura/pkg/logger"
 	"github.com/benfradjselim/ruptura/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
 const version = "6.2.2"
@@ -148,8 +150,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 
 	al := alerter.NewAlerter(256)
 	metricsReg := telemetry.NewRegistry(version)
+	explainer := explain.NewEngine()
 
-	// 15-second analyzer ticker: pipeline → analyzer → store → fusion → predictor
+	// 15-second analyzer ticker: pipeline → analyzer → store → fusion → predictor → explain
 	go func() {
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
@@ -168,13 +171,17 @@ func runWithContext(ctx context.Context, cfg Config) error {
 
 					// Feed metricR into fusion BEFORE storing snapshot so FusedR is current.
 					metricName := pickPrimaryMetric(rawMetrics)
+					var metricR float64
 					if metricName != "" {
 						if r, err := pipelineEngine.RuptureIndex(host, metricName); err == nil {
+							metricR = r
 							fusionEngine.SetMetricR(host, r, now)
 						}
 					}
 					// Annotate snapshot with current FusedR before persisting.
-					if fusedR, _, err := fusionEngine.FusedR(host); err == nil {
+					var fusedR float64
+					if fr, _, err := fusionEngine.FusedR(host); err == nil {
+						fusedR = fr
 						snap.FusedRuptureIndex = fusedR
 					}
 
@@ -190,6 +197,12 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					predictorEngine.Feed(host, "stress", snap.Stress.Value, now)
 					predictorEngine.Feed(host, "fatigue", snap.Fatigue.Value, now)
 
+					// Record an explain entry for any workload in warning or worse state.
+					if fusedR >= 1.5 {
+						rec := buildExplainRecord(host, snap, fusedR, metricR, fusionEngine, topoBuilder, now)
+						explainer.Record(rec)
+					}
+
 					// Forward recent critical anomalies to the alerter for rule evaluation.
 					for _, anom := range pipelineEngine.RecentAnomalies(host, now.Add(-15*time.Second)) {
 						if anom.Severity == models.SeverityCritical {
@@ -200,6 +213,17 @@ func runWithContext(ctx context.Context, cfg Config) error {
 			}
 		}
 	}()
+
+	// Try to build a real Kubernetes actuator (only works inside a K8s pod).
+	// If not in-cluster, the provider silently no-ops instead of failing startup.
+	var k8sActuator *providers.KubernetesActuator
+	if a, err := providers.NewKubernetesActuator(); err == nil {
+		k8sActuator = a
+		logger.Default.Info("kubernetes actuator initialised — scale/restart/cordon actions enabled")
+	} else {
+		logger.Default.Info("kubernetes actuator unavailable (not in-cluster) — K8s actions will be queued only", "reason", err.Error())
+	}
+	_ = providers.NewKubernetesProviderWithActuator(k8sActuator) // registered; used by action dispatcher
 
 	actionEngine, err := engine.New(nil, bus)
 	if err != nil {
@@ -230,7 +254,6 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		}
 	}()
 
-	explainer := explain.NewEngine()
 	ctxStore := apicontext.NewManualContextStore()
 	detector := apicontext.NewDeploymentDetector()
 	healthCheck := telemetry.NewHealthChecker()
@@ -286,5 +309,47 @@ func pickPrimaryMetric(metrics map[string]float64) string {
 		return name
 	}
 	return ""
+}
+
+// buildExplainRecord constructs a RuptureRecord from live pipeline state.
+// Called from the 15-second ticker when FusedR >= 1.5.
+func buildExplainRecord(
+	host string,
+	snap models.KPISnapshot,
+	fusedR, metricR float64,
+	fe *fusion.Engine,
+	topo interface{ Edges() []models.ServiceEdge },
+	now time.Time,
+) explain.RuptureRecord {
+	id := utils.GenerateID(8)
+
+	// Collect contagion sources: upstream services with error rate > 10%.
+	var contagionSources []string
+	if snap.Contagion.Value >= 0.3 {
+		for _, edge := range topo.Edges() {
+			if edge.To == host && edge.Calls > 0 {
+				errRate := float64(edge.Errors) / float64(edge.Calls)
+				if errRate > 0.1 {
+					contagionSources = append(contagionSources, edge.From)
+				}
+			}
+		}
+	}
+
+	// Pull logR and traceR from fusion engine internals via Snapshot.
+	fusionSnap := fe.Snapshot()
+	_ = fusionSnap // FusedR already computed; we use snap.FusedRuptureIndex
+
+	return explain.RuptureRecord{
+		ID:               id,
+		Host:             host,
+		R:                fusedR,
+		Confidence:       0.75,
+		Timestamp:        now,
+		FusedR:           fusedR,
+		MetricR:          metricR,
+		KPISnapshot:      snap,
+		ContagionSources: contagionSources,
+	}
 }
 

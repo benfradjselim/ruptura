@@ -46,14 +46,16 @@ func TestNarrativeExplain_containsHost(t *testing.T) {
 func TestNarrativeExplain_severityLabels(t *testing.T) {
 	e := NewEngine()
 
+	// Threshold table (from docs): FusedR >= 5.0 → emergency, >= 3.0 → critical,
+	// >= 1.5 → warning, else → elevated.
 	tests := []struct {
 		id       string
 		r        float64
 		wantWord string
 	}{
-		{"r1", 6.0, "critical"},
-		{"r2", 3.5, "elevated"},
-		{"r3", 1.0, "warning"},
+		{"r1", 6.0, "emergency"},
+		{"r2", 3.5, "critical"},
+		{"r3", 2.0, "warning"},
 	}
 
 	for _, tt := range tests {

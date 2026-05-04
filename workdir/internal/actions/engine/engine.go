@@ -24,6 +24,8 @@ const (
 type RuptureEvent struct {
 	ID         string
 	Host       string
+	Namespace  string // K8s namespace, empty for non-K8s hosts
+	Kind       string // Deployment|StatefulSet|DaemonSet, empty for non-K8s hosts
 	Metric     string
 	R          float64
 	Confidence float64
@@ -35,9 +37,14 @@ type ActionRecommendation struct {
 	ID         string
 	EventID    string
 	Host       string
-	ActionType string // "scale"|"restart"|"cordon"|"alert"|"notify"|"page"|"custom"
+	Namespace  string     // K8s namespace for kubernetes provider
+	Kind       string     // Deployment|StatefulSet|DaemonSet
+	NodeName   string     // Node name for cordon actions
+	ActionType string     // "scale"|"restart"|"cordon"|"alert"|"notify"|"page"|"custom"
 	Tier       ActionTier
 	Confidence float64
+	R          float64 // rupture index at time of recommendation
+	ScaleDelta int     // replica delta for "scale" action; defaults to +1 when zero
 	Approved   bool
 	Timestamp  time.Time
 }
@@ -109,9 +116,13 @@ func (e *Engine) Recommend(event RuptureEvent) ([]ActionRecommendation, error) {
 				ID:         fmt.Sprintf("%s-%s", event.ID, rule.ActionType),
 				EventID:    event.ID,
 				Host:       event.Host,
+				Namespace:  event.Namespace,
+				Kind:       event.Kind,
 				ActionType: rule.ActionType,
 				Tier:       tier,
 				Confidence: event.Confidence,
+				R:          event.R,
+				ScaleDelta: 1,
 				Approved:   false,
 				Timestamp:  time.Now(),
 			})
