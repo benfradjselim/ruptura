@@ -66,6 +66,47 @@ type KPISnapshot struct {
 	CalibrationETA      int    `json:"calibration_eta_minutes,omitempty"`        // minutes until active; 0 when active
 	// v6.3: HealthScore trend forecast (nil when calibrating or insufficient data)
 	HealthForecast *HealthForecast `json:"health_forecast,omitempty"`
+	// v6.4: rupture fingerprint pattern match (nil when no historical match found)
+	PatternMatch *PatternMatch `json:"pattern_match,omitempty"`
+	// v6.4: business-layer signals
+	Business *BusinessSignals `json:"business,omitempty"`
+}
+
+// RuptureFingerprint is the 11-dimensional KPI signal vector captured at a confirmed
+// rupture (FusedR > 3.0). Used by the fingerprint engine for cosine similarity matching.
+type RuptureFingerprint struct {
+	ID          string      `json:"id"`
+	WorkloadKey string      `json:"workload_key"`
+	CapturedAt  time.Time   `json:"captured_at"`
+	Vector      [11]float64 `json:"vector"` // [stress, fatigue, 1-mood, pressure, humidity, contagion, 1-resilience, entropy, velocity, throughput, fusedR/10]
+	FusedR      float64     `json:"fused_r"`
+	Resolution  string      `json:"resolution,omitempty"` // how the rupture was resolved
+}
+
+// PatternMatch indicates the current snapshot resembles a past rupture fingerprint.
+type PatternMatch struct {
+	Similarity       float64   `json:"similarity"`
+	MatchedRuptureID string    `json:"matched_rupture_id"`
+	MatchedAt        time.Time `json:"matched_at"`
+	Resolution       string    `json:"resolution,omitempty"`
+}
+
+// SLOConfig defines the error budget contract for a workload.
+type SLOConfig struct {
+	TargetPercent      float64 `json:"target_percent"`       // e.g. 99.9
+	WindowDays         int     `json:"window_days"`          // e.g. 30
+	ErrorBudgetMinutes float64 `json:"error_budget_minutes"` // e.g. 43.2
+}
+
+// BusinessSignals holds P1 business-layer KPIs (v6.4).
+type BusinessSignals struct {
+	// SLOBurnVelocity is the ratio of current error rate to the allowed error rate.
+	// 1.0 = exactly on budget, > 1.0 = burning too fast. 0 = no SLO configured.
+	SLOBurnVelocity float64 `json:"slo_burn_velocity,omitempty"`
+	// BlastRadius is the count of unique downstream workloads that depend on this one.
+	BlastRadius int `json:"blast_radius"`
+	// RecoveryDebt is the count of near-misses (FusedR 2–3, recovered without rupture) in the last 7 days.
+	RecoveryDebt int `json:"recovery_debt"`
 }
 
 // HealthForecast is a lightweight linear projection of HealthScore trend.

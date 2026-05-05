@@ -103,3 +103,20 @@ serviceMonitor:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# -- SLO contracts for computing slo_burn_velocity (business signal).
+# Each entry maps a workload to its SLO target and error budget.
+# slo_burn_velocity = current_error_rate / (1 - target_percent/100)
+# Values > 1.0 mean you are burning the error budget faster than allowed.
+#
+# Example:
+# slos:
+#   - workload: payments/deployment/checkout
+#     targetPercent: 99.9
+#     windowDays: 30
+#     errorBudgetMinutes: 43.2
+#   - workload: orders/deployment/api
+#     targetPercent: 99.5
+#     windowDays: 30
+#     errorBudgetMinutes: 216
+slos: []

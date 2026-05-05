@@ -14,8 +14,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// enrichSnapshot attaches calibration status and HealthScore forecast to a snapshot.
-// Safe to call when h.analyzer is nil (no-op).
+// enrichSnapshot attaches calibration status, HealthScore forecast, fingerprint match,
+// and business signals to a snapshot. Safe to call when h.analyzer is nil (no-op).
 func (h *Handlers) enrichSnapshot(snap *models.KPISnapshot) {
 	if h.analyzer == nil {
 		snap.WorkloadStatus = "active"
@@ -28,7 +28,15 @@ func (h *Handlers) enrichSnapshot(snap *models.KPISnapshot) {
 	snap.CalibrationETA = eta
 	if status == "active" {
 		snap.HealthForecast = h.analyzer.ForecastHealthScore(snap.Workload)
+		// Pattern match: warn if current signal vector resembles a past rupture.
+		if pm := h.analyzer.MatchFingerprint(*snap, snap.FusedRuptureIndex); pm != nil {
+			snap.PatternMatch = pm
+		}
 	}
+	// Business signals are always computed (blast_radius and recovery_debt are useful
+	// even during calibration; slo_burn_velocity requires no baseline).
+	biz := h.analyzer.ComputeBusinessSignals(snap.Workload, snap.FusedRuptureIndex)
+	snap.Business = &biz
 }
 
 // handleAnomalies returns recent anomaly events, optionally filtered by host.

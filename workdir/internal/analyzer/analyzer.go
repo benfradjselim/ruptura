@@ -28,7 +28,8 @@ type Analyzer struct {
 	defaultFatigueRThreshold float64
 	defaultFatigueLambda     float64
 
-	topology TopologySource
+	topology    TopologySource
+	fingerprints *fingerprintEngine
 }
 
 // SetTopology injects a live topology source for graph-based contagion computation.
@@ -83,6 +84,11 @@ type workloadState struct {
 	baselineReady    bool
 	baselineMeans    map[string]float64 // per-signal rolling mean
 	baselineM2       map[string]float64 // Welford M2 for stddev
+
+	// v6.4: business signals
+	sloConfig     *models.SLOConfig
+	nearMissTimes []time.Time
+	inNearMiss    bool
 }
 
 // NewAnalyzer creates a new holistic analyzer
@@ -92,6 +98,7 @@ func NewAnalyzer() *Analyzer {
 		snapshots:                make(map[string]models.KPISnapshot),
 		defaultFatigueRThreshold: 0.3,
 		defaultFatigueLambda:     0.05,
+		fingerprints:             newFingerprintEngine(),
 	}
 }
 

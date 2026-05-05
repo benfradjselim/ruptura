@@ -31,7 +31,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "6.2.2"
+const version = "6.4.0"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -187,6 +187,10 @@ func runWithContext(ctx context.Context, cfg Config) error {
 
 					store.StoreSnapshot(snap)
 					metricsReg.RecordKPISnapshot(snap)
+
+					// v6.4: near-miss tracking + fingerprint recording (requires FusedR).
+					analyzerEngine.UpdateFusedR(ref, fusedR)
+					analyzerEngine.MaybeRecordFingerprint(snap, fusedR)
 
 					// Feed each raw metric into the predictor ensemble.
 					for metric, val := range rawMetrics {

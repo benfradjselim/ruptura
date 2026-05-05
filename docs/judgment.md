@@ -1025,8 +1025,8 @@ workloadWeights:
 | IMPROVE-01 | Calibration window + warm-up state | P0 | ~2 days | [x] shipped v6.3.0 |
 | IMPROVE-02 | HealthScore trend forecast + ETA | P0 | ~3 days | [x] shipped v6.3.0 |
 | IMPROVE-03 | Ruptura simulator (`ruptura-sim`) | P0 | ~4 days | [x] shipped v6.3.0 |
-| IMPROVE-04 | Rupture fingerprinting | P1 | ~1 week | [ ] |
-| IMPROVE-05 | Business signal layer (3 signals) | P1 | ~1 week | [ ] |
+| IMPROVE-04 | Rupture fingerprinting | P1 | ~1 week | [x] shipped v6.4.0 |
+| IMPROVE-05 | Business signal layer (3 signals) | P1 | ~1 week | [x] shipped v6.4.0 |
 | IMPROVE-06 | Feature gate / edition flag | P2 | ~2 days | [ ] |
 | IMPROVE-07 | Per-workload weight tuning | P2 | ~3 days | [ ] |
 
@@ -1043,3 +1043,16 @@ workloadWeights:
 **Remaining P0**: none — tool is ready to show to engineers.
 
 **P0 total: ~9 days. Ship these before sharing with anyone.**
+
+---
+
+### v6.4.0 (shipped — P1 intelligence layer)
+
+**What shipped**:
+- **IMPROVE-04 — Rupture fingerprinting**: `KPISnapshot` gains `pattern_match` block. New `internal/analyzer/fingerprint.go` — `fingerprintEngine` records 11-dimensional KPI signal vectors (stress, fatigue, 1−mood, pressure, humidity, contagion, 1−resilience, entropy, velocity, throughput, fusedR/10) at confirmed ruptures (FusedR > 3.0, 1h debounce per workload). On every GET /api/v2/rupture request, cosine similarity is computed against all historical fingerprints for the same workload; matches ≥ 0.85 are surfaced as `pattern_match` with similarity score, matched rupture ID, timestamp, and resolution note. Fingerprint recording is wired in the 15s ticker in main.go via `analyzerEngine.MaybeRecordFingerprint(snap, fusedR)`.
+- **IMPROVE-05 — Business signal layer**: `KPISnapshot` gains `business` block with three signals: (1) `slo_burn_velocity` — ratio of current error rate to the allowed error rate for configured SLOs; > 1.0 means burning budget faster than allowed. (2) `blast_radius` — count of unique downstream workloads in the trace topology that depend on this workload. (3) `recovery_debt` — count of near-misses (FusedR crossed 2.0 but recovered below 1.0 without rupturing) in the last 7 days. New `internal/analyzer/business.go` handles SLO config, near-miss tracking via `UpdateFusedR()`, and `ComputeBusinessSignals()`. SLO contracts configurable in `helm/values.yaml` under `slos:`. Near-miss tracking wired in 15s ticker via `analyzerEngine.UpdateFusedR(ref, fusedR)`.
+- **`go test -race ./...`**: all 38 packages pass clean.
+
+**Remaining P1**: none.
+
+**Next: P2** — IMPROVE-06 (edition gate) and IMPROVE-07 (per-workload weight tuning).
