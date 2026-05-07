@@ -3,7 +3,7 @@ name: ruptura
 description: Predictive workload health platform for Kubernetes — detect ruptures before they happen
 type: application
 version: 0.6.8
-appVersion: "6.6.3"
+appVersion: "6.7.0"
 keywords:
   - observability
   - kubernetes
