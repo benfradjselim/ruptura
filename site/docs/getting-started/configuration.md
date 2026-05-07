@@ -124,5 +124,5 @@ docker run -d \
   -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
   -e RUPTURA_INGEST_RPS=5000 \
   -e RUPTURA_LOG_LEVEL=info \
-  ghcr.io/benfradjselim/ruptura:6.6.3
+  ghcr.io/benfradjselim/ruptura:6.7.0
 ```

@@ -18,7 +18,7 @@
 ```bash
 # Run sim against a local Ruptura container
 docker run --rm --network host \
-  ghcr.io/benfradjselim/ruptura:6.6.3 \
+  ghcr.io/benfradjselim/ruptura:6.7.0 \
   /ruptura-sim --help
 ```
 
@@ -85,7 +85,7 @@ This is the recommended first demo for anyone evaluating Ruptura.
 docker run -d --name ruptura \
   -p 8080:8080 -p 4317:4317 \
   -e RUPTURA_API_KEY=demo \
-  ghcr.io/benfradjselim/ruptura:6.6.3
+  ghcr.io/benfradjselim/ruptura:6.7.0
 ```
 
 **2. Inject a cascade failure:**

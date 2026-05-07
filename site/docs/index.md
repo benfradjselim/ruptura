@@ -123,6 +123,38 @@ gRPC ingest ──────────────┘
 
 ## Quick Start
 
+=== "OperatorHub (OLM)"
+
+    Install from [OperatorHub](https://operatorhub.io/operator/ruptura-operator) on any OLM-enabled cluster:
+
+    ```bash
+    # Subscribe to the operator
+    kubectl apply -f - <<EOF
+    apiVersion: operators.coreos.com/v1alpha1
+    kind: Subscription
+    metadata:
+      name: ruptura-operator
+      namespace: operators
+    spec:
+      channel: stable
+      name: ruptura-operator
+      source: operatorhubio-catalog
+      sourceNamespace: olm
+    EOF
+
+    # Create an instance
+    kubectl apply -f - <<EOF
+    apiVersion: ruptura.io/v1alpha1
+    kind: RupturaInstance
+    metadata:
+      name: ruptura
+      namespace: ruptura-system
+    spec:
+      edition: community
+      storageSize: 10Gi
+    EOF
+    ```
+
 === "Helm (recommended)"
 
     ```bash
@@ -147,7 +179,7 @@ gRPC ingest ──────────────┘
       -p 4317:4317 \
       -v ruptura-data:/var/lib/ruptura/data \
       -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-      ghcr.io/benfradjselim/ruptura:6.6.3
+      ghcr.io/benfradjselim/ruptura:6.7.0
 
     curl http://localhost:8080/api/v2/health
     ```
@@ -208,13 +240,19 @@ gRPC ingest ──────────────┘
 
 ## Current Release
 
-**v6.6.3** — pre-v7 security & correctness hardening. Production-ready for Kubernetes evaluation.
+**v6.7.0** — embedded web dashboard, air-gap safe. Production-ready for Kubernetes evaluation.
 
-- Timing-safe Bearer token auth (`crypto/subtle.ConstantTimeCompare`)
-- Emergency stop now wired to the action engine
-- Forecast warm-up returns correct per-signal values
-- Slowloris protection (`ReadHeaderTimeout: 5s`), horizon + limit caps
-- `RUPTURA_API_KEY` env var supported in addition to `--api-key` flag
+- Self-contained Svelte UI served by the binary — open `http://localhost:8080`, no Grafana required
+- Chart.js and Alpine.js vendored locally — no CDN calls, works in air-gapped environments
+- Brand logo embedded in the dashboard topbar
+- All security hardening from v6.6.3: timing-safe auth, emergency stop wired, Slowloris protection
 - All 37 packages pass `go test -race ./...`
 
-[Full changelog →](community/roadmap.md) · [Getting Started →](getting-started/installation.md) · [API Reference →](api/reference.md)
+**ruptura-operator v0.6.8** — now live on [OperatorHub](https://operatorhub.io/operator/ruptura-operator).
+
+- Installs via OLM `Subscription` on any Kubernetes or OpenShift cluster
+- Manages `RupturaInstance` CRD → Deployment + Service + PVC + ServiceAccount
+- ServiceAccount bug fixed, RBAC corrected, Prometheus metrics on `:9090`
+- Upgrades cleanly from v0.6.7 via semver-mode OLM graph
+
+[Full changelog →](community/roadmap.md) · [Getting Started →](getting-started/installation.md) · [Dashboard Tour →](getting-started/dashboard-tour.md) · [Operator →](architecture/operator.md)

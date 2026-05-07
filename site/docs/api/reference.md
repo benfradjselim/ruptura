@@ -411,7 +411,7 @@ rpt_actions_total{type="scale",tier="2",outcome="approved"}                   3
 rpt_ingest_samples_total{source="prometheus"}                                 840200
 rpt_memory_bytes                                                               45678900
 rpt_uptime_seconds                                                             3842
-rpt_version_info{version="6.6.3"}                                             1
+rpt_version_info{version="6.7.0"}                                             1
 ```
 
 Prometheus scrape config:

@@ -5,7 +5,7 @@ The Go SDK is part of the `ruptura` module at `sdk/go`.
 ## Install
 
 ```bash
-go get github.com/benfradjselim/ruptura/sdk/go@v6.6.3
+go get github.com/benfradjselim/ruptura/sdk/go@v6.7.0
 ```
 
 ## Create a client
