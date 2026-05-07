@@ -20,8 +20,17 @@ RUN CGO_ENABLED=0 GOOS=linux \
       ./cmd/ruptura
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-# distroless/static: no shell, minimal attack surface, non-root by default.
-FROM gcr.io/distroless/static-debian12:nonroot
+# ubi-micro: minimal Red Hat UBI — required for Red Hat OperatorHub preflight certification.
+FROM registry.access.redhat.com/ubi9/ubi-micro
+
+ARG VERSION=6.7.0
+
+LABEL name="ruptura" \
+      vendor="Ruptura" \
+      version="${VERSION}" \
+      release="1" \
+      summary="Predictive workload health platform for Kubernetes" \
+      description="Ruptura detects workload ruptures before they happen by modeling composite health signals from OTLP metrics, logs, and traces."
 
 COPY --from=builder /ruptura /ruptura
 
@@ -34,6 +43,8 @@ EXPOSE 9090
 
 # Mount a PVC here for BadgerDB persistence.
 VOLUME ["/var/lib/ruptura/data"]
+
+USER 65532:65532
 
 # Liveness:  GET /api/v2/health → 200
 # Readiness: GET /api/v2/ready  → 200
