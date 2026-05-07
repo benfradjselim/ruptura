@@ -123,6 +123,40 @@ gRPC ingest ──────────────┘
 
 ## Quick Start
 
+=== "Red Hat OperatorHub (OpenShift)"
+
+    Install on OpenShift 4.12+ from the embedded OperatorHub in the OpenShift web console, or via CLI:
+
+    ```bash
+    # Create a Subscription in the openshift-operators namespace
+    kubectl apply -f - <<EOF
+    apiVersion: operators.coreos.com/v1alpha1
+    kind: Subscription
+    metadata:
+      name: ruptura-operator
+      namespace: openshift-operators
+    spec:
+      channel: stable
+      name: ruptura-operator
+      source: redhat-marketplace
+      sourceNamespace: openshift-marketplace
+    EOF
+
+    # Create an instance
+    kubectl apply -f - <<EOF
+    apiVersion: ruptura.io/v1alpha1
+    kind: RupturaInstance
+    metadata:
+      name: ruptura
+      namespace: ruptura-system
+    spec:
+      edition: community
+      storageSize: 10Gi
+    EOF
+    ```
+
+    The operator automatically creates an OpenShift `Route` with edge TLS — no additional ingress config required.
+
 === "OperatorHub (OLM)"
 
     Install from [OperatorHub](https://operatorhub.io/operator/ruptura-operator) on any OLM-enabled cluster:
@@ -248,11 +282,17 @@ gRPC ingest ──────────────┘
 - All security hardening from v6.6.3: timing-safe auth, emergency stop wired, Slowloris protection
 - All 37 packages pass `go test -race ./...`
 
-**ruptura-operator v0.6.8** — now live on [OperatorHub](https://operatorhub.io/operator/ruptura-operator).
+**ruptura-operator v0.6.9** — submitted to [Red Hat OperatorHub](https://catalog.redhat.com/software/operators) for OpenShift certification.
+
+- UBI9 micro base image — satisfies Red Hat preflight `BasedOnUBI` certification check
+- Required Red Hat container labels (`name`, `vendor`, `version`, `release`, `summary`, `description`) added to both images
+- Default app image bumped to `ruptura:v6.7.0`
+- Available on [OperatorHub](https://operatorhub.io/operator/ruptura-operator) (community) · Red Hat OperatorHub certification in progress
+
+**ruptura-operator v0.6.8** — live on [OperatorHub](https://operatorhub.io/operator/ruptura-operator).
 
 - Installs via OLM `Subscription` on any Kubernetes or OpenShift cluster
 - Manages `RupturaInstance` CRD → Deployment + Service + PVC + ServiceAccount
 - ServiceAccount bug fixed, RBAC corrected, Prometheus metrics on `:9090`
-- Upgrades cleanly from v0.6.7 via semver-mode OLM graph
 
 [Full changelog →](community/roadmap.md) · [Getting Started →](getting-started/installation.md) · [Dashboard Tour →](getting-started/dashboard-tour.md) · [Operator →](architecture/operator.md)

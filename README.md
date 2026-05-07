@@ -32,6 +32,7 @@ Ruptura detects workload ruptures before they cause outages — using the Fused 
 
 | Version | Date | Status |
 |---------|------|--------|
+| ruptura-operator v0.6.9 | 2026-05-07 | 🔄 Submitted to Red Hat OperatorHub — certification pipeline running |
 | ruptura-operator v0.6.8 | 2026-05-07 | ✅ Merged into OperatorHub community-operators — ServiceAccount fix, RBAC fix |
 | ruptura-operator v0.6.7 | 2026-05-07 | ✅ Merged into OperatorHub community-operators |
 
@@ -197,13 +198,14 @@ workdir/                  Ruptura Go source (v6.7.0)
   deploy/
     *.yaml                Kustomize manifests
     grafana/              Grafana dashboard JSON + provisioning
-  operator/               Kubernetes operator (ruptura-operator v0.6.8)
+  operator/               Kubernetes operator (ruptura-operator v0.6.9)
                           RupturaInstance CRD · Deployment + Service + PVC + SA + Route
+                          UBI9-based image — certified for Red Hat OperatorHub
 
-helm/                     Helm chart (v0.6.8, appVersion 6.6.3)
+helm/                     Helm chart (v0.6.9, appVersion 6.7.0)
 bundle/                   OLM bundle (OperatorHub submission format)
 catalog/                  File-Based Catalog for OLM
-operators/                community-operators submission tree
+operators/                community-operators + Red Hat certified-operators submission tree
 
 docs/
   v6.0.0/                 SPECS, AGENTS, ROADMAP, whitepaper, DEV-GUIDE
@@ -228,7 +230,8 @@ v6.2.x ✅  Fused Rupture Index · workload-level signals · adaptive baselines
 v6.1.0 ✅  gRPC ingest · NATS/Kafka eventbus · adaptive ensemble · K8s operator
 v7.0.0 ⏳  multi-tenant opt-in (X-Org-ID) · Python SDK v2
 
-ruptura-operator (Kubernetes operator — OperatorHub)
+ruptura-operator (Kubernetes operator — OperatorHub + Red Hat OperatorHub)
+v0.6.9 🔄  Submitted to Red Hat OperatorHub — UBI9 base image, required certification labels
 v0.6.8 ✅  Merged into OperatorHub — ServiceAccount fix · RBAC fix · Prometheus metrics
 v0.6.7 ✅  First OperatorHub release — merged into community-operators
 ```

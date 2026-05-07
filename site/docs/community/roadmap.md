@@ -10,6 +10,17 @@
 | **Dashboard panels** | Fused Rupture Index heatmap, per-workload signal timelines, action log with approve/reject/emergency-stop, narrative explain panel, SLO widget, health forecast. |
 | **Air-gap safe** | All assets (`vendor/alpine.min.js`, `vendor/chart.min.js`, embedded PNG logo) served from the binary via `go:embed`. No CDN required. |
 
+### ruptura-operator v0.6.9 — 2026-05-07 🔄
+
+Red Hat OperatorHub certification pipeline running.
+
+| Item | Detail |
+|------|--------|
+| **UBI9 base image** | Both `ruptura` and `ruptura-operator` images switched from `gcr.io/distroless/static-debian12:nonroot` to `registry.access.redhat.com/ubi9/ubi-micro` — satisfies Red Hat preflight `BasedOnUBI` check. |
+| **Required Red Hat labels** | `name`, `vendor`, `version`, `release`, `summary`, `description` labels added to both images — satisfies `HasRequiredLabel` preflight checks. |
+| **Default app image bump** | CSV default app image updated to `ruptura:v6.7.0`. |
+| **Build arg wiring** | CI workflows now pass `VERSION` build-arg so the `version` label reflects the actual image tag at build time. |
+
 ### ruptura-operator v0.6.8 — 2026-05-07 ✅
 
 OperatorHub PR merged: https://github.com/k8s-operatorhub/community-operators/pull/8070

@@ -2,7 +2,7 @@
 
 Ruptura ships a Kubernetes operator (`ruptura-operator`) that manages `RupturaInstance` custom resources. The operator polls the API server every 30 seconds, reconciles each instance to the desired state using server-side apply, and handles deletion via a finalizer.
 
-The operator is available on [OperatorHub](https://operatorhub.io/) and the community-operators catalog.
+The operator is available on [OperatorHub](https://operatorhub.io/) (community) and is being certified for the [Red Hat OperatorHub](https://catalog.redhat.com/software/operators) (OpenShift catalog).
 
 ## CRD: RupturaInstance
 
@@ -54,6 +54,55 @@ For each `RupturaInstance`, the operator creates and reconciles:
 | `Route` _(OpenShift only)_ | `{name}` | Edge-TLS terminated public route |
 
 All resources carry finalizer `ruptura.io/cleanup`. On deletion, the operator deletes all owned resources before removing the finalizer.
+
+## Install via Red Hat OperatorHub (OpenShift)
+
+On OpenShift 4.12+, install directly from the embedded OperatorHub in the web console, or via CLI:
+
+```bash
+# Subscribe via the Red Hat marketplace source
+kubectl apply -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: ruptura-operator
+  namespace: openshift-operators
+spec:
+  channel: stable
+  name: ruptura-operator
+  source: redhat-marketplace
+  sourceNamespace: openshift-marketplace
+EOF
+
+# Wait for the operator CSV to become ready
+kubectl wait csv -n openshift-operators \
+  -l operators.coreos.com/ruptura-operator.openshift-operators \
+  --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s
+```
+
+Then create a `RupturaInstance` — on OpenShift the operator will also create a `Route` with edge TLS:
+
+```bash
+kubectl create namespace ruptura-system
+kubectl apply -f - <<EOF
+apiVersion: ruptura.io/v1alpha1
+kind: RupturaInstance
+metadata:
+  name: ruptura
+  namespace: ruptura-system
+spec:
+  edition: community
+  storageSize: 10Gi
+EOF
+
+# Check the Route
+oc get route ruptura -n ruptura-system
+```
+
+!!! note "Image certification"
+    Both `ghcr.io/benfradjselim/ruptura` and `ghcr.io/benfradjselim/ruptura-operator` are built on
+    `registry.access.redhat.com/ubi9/ubi-micro` and carry all required Red Hat container labels.
+    This satisfies the `BasedOnUBI` and `HasRequiredLabel` preflight checks in the Red Hat certification pipeline.
 
 ## Install via OLM / OperatorHub (recommended)
 

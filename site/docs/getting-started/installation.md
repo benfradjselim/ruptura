@@ -66,7 +66,7 @@ curl http://localhost:8080/api/v2/health
 
 ### Using the RupturaInstance CRD (Operator)
 
-If you have the Ruptura Operator installed (via OLM / OperatorHub or manually), deploy a full instance declaratively:
+If you have the Ruptura Operator installed (via OLM / OperatorHub, Red Hat OperatorHub, or manually), deploy a full instance declaratively:
 
 ```yaml
 apiVersion: ruptura.io/v1alpha1
@@ -90,7 +90,7 @@ kubectl get rupturainstance -n ruptura-system -w
 
 The operator creates: ServiceAccount `ruptura-instance`, PVC `{name}-data`, Deployment `{name}`, Service `{name}`. On OpenShift it also creates a Route with edge TLS.
 
-See [Operator →](../architecture/operator.md) for full CRD reference and OLM install instructions.
+See [Operator →](../architecture/operator.md) for full CRD reference, OLM install instructions, and Red Hat OperatorHub (OpenShift) setup.
 
 ---
 
