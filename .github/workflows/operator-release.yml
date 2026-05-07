@@ -9,7 +9,7 @@ on:
       tag:
         description: "Operator version tag (e.g. v0.6.8)"
         required: true
-        default: "v0.6.8"
+        default: "v0.6.9"
 
 env:
   REGISTRY: ghcr.io
@@ -190,6 +190,6 @@ jobs:
 
       - name: Validate community-operators submission tree
         run: |
-          operator-sdk bundle validate ./operators/ruptura-operator/0.6.7 \
+          operator-sdk bundle validate ./operators/ruptura-operator/0.6.9 \
             --select-optional suite=operatorframework \
             --select-optional name=community
