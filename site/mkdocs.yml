@@ -30,6 +30,7 @@ nav:
     - index.md
     - Installation: getting-started/installation.md
     - Quickstart: getting-started/quickstart.md
+    - Dashboard Tour: getting-started/dashboard-tour.md
     - Configuration: getting-started/configuration.md
   - Concepts:
     - index.md
