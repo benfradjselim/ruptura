@@ -12,7 +12,7 @@ resources:
 # Override image tag for a specific release
 images:
   - name: ghcr.io/benfradjselim/ruptura
-    newTag: "6.2.0"
+    newTag: "6.7.0"
 
 # Generate the API key secret (override with your own value before deploying)
 secretGenerator:

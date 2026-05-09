@@ -1,0 +1,39 @@
+{
+  "name": "Ruptura Lab",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.22"
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "helm": "latest",
+      "minikube": "none"
+    }
+  },
+  "onCreateCommand": "bash .devcontainer/on-create.sh",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "forwardPorts": [8080, 4317, 9090, 3000],
+  "portsAttributes": {
+    "8080": { "label": "Ruptura API",    "onAutoForward": "notify" },
+    "4317": { "label": "Ruptura OTLP",   "onAutoForward": "silent" },
+    "9090": { "label": "Prometheus",     "onAutoForward": "notify" },
+    "3000": { "label": "Grafana",        "onAutoForward": "notify" }
+  },
+  "remoteEnv": {
+    "KUBECONFIG": "/etc/rancher/k3s/k3s.yaml"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "golang.go"
+      ],
+      "settings": {
+        "vs-kubernetes": {
+          "vs-kubernetes.kubeconfig": "/etc/rancher/k3s/k3s.yaml"
+        }
+      }
+    }
+  }
+}
