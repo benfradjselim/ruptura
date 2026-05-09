@@ -158,12 +158,13 @@ spec:
               cpu: 300m
               memory: 64Mi
 ---
-# ── load-generator: sends OTLP traces+metrics to the OTel Collector ───────────
+# ── load-generator: in ruptura-system so k8s injects ruptura-otlp ClusterIP ──
+# Avoids DNS: k8s auto-injects RUPTURA_OTLP_SERVICE_HOST for same-namespace svcs
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: load-gen-script
-  namespace: test-workloads
+  namespace: ruptura-system
 data:
   run.sh: |
     #!/bin/sh
@@ -252,7 +253,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: load-generator
-  namespace: test-workloads
+  namespace: ruptura-system
   labels:
     app: load-generator
 spec:
@@ -270,8 +271,10 @@ spec:
           image: curlimages/curl:8.7.1
           command: [sh, /scripts/run.sh]
           env:
+            # k8s auto-injects RUPTURA_OTLP_SERVICE_HOST for same-namespace services
+            # so the script reaches Ruptura without relying on CoreDNS
             - name: RUPTURA_ENDPOINT
-              value: http://ruptura-otlp.ruptura-system.svc.cluster.local:4317
+              value: "http://$(RUPTURA_OTLP_SERVICE_HOST):$(RUPTURA_OTLP_SERVICE_PORT)"
           volumeMounts:
             - name: script
               mountPath: /scripts
