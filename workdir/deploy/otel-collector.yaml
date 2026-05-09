@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: otel-collector
-  namespace: monitoring
+  namespace: ruptura-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -50,13 +50,13 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: otel-collector
-    namespace: monitoring
+    namespace: ruptura-system
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: otel-collector-config
-  namespace: monitoring
+  namespace: ruptura-system
 data:
   config.yaml: |
     receivers:
@@ -84,11 +84,12 @@ data:
             action: upsert
 
     exporters:
-      # Forward to Ruptura OTLP/HTTP endpoint (note the /otlp prefix)
+      # k8s injects RUPTURA_OTLP_SERVICE_HOST/PORT for same-namespace services,
+      # so these endpoints resolve without CoreDNS.
       otlphttp/ruptura:
-        metrics_endpoint: http://ruptura.ruptura-system.svc.cluster.local:4317/otlp/v1/metrics
-        traces_endpoint:  http://ruptura.ruptura-system.svc.cluster.local:4317/otlp/v1/traces
-        logs_endpoint:    http://ruptura.ruptura-system.svc.cluster.local:4317/otlp/v1/logs
+        metrics_endpoint: http://${env:RUPTURA_OTLP_SERVICE_HOST}:${env:RUPTURA_OTLP_SERVICE_PORT}/otlp/v1/metrics
+        traces_endpoint:  http://${env:RUPTURA_OTLP_SERVICE_HOST}:${env:RUPTURA_OTLP_SERVICE_PORT}/otlp/v1/traces
+        logs_endpoint:    http://${env:RUPTURA_OTLP_SERVICE_HOST}:${env:RUPTURA_OTLP_SERVICE_PORT}/otlp/v1/logs
         tls:
           insecure: true
         retry_on_failure:
@@ -127,7 +128,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: otel-collector
-  namespace: monitoring
+  namespace: ruptura-system
   labels:
     app: otel-collector
 spec:
@@ -187,7 +188,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: otel-collector
-  namespace: monitoring
+  namespace: ruptura-system
   labels:
     app: otel-collector
 spec:

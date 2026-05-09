@@ -23,6 +23,10 @@ spec:
         app: ruptura
         app.kubernetes.io/name: ruptura
         app.kubernetes.io/component: server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/api/v2/metrics"
     spec:
       serviceAccountName: ruptura
       securityContext:
