@@ -182,14 +182,14 @@ data:
       S=$(date +%s)
       TS="${S}000000000"
 
-      # Deterministic pseudo-random via seconds + service index — no awk needed
-      CPU=$(( (S + IDX * 17 + 7) % 71 + 10 ))           # 10–80 (cpu_percent)
-      MEM=$(( (S + IDX * 31 + 3) % 56 + 20 ))           # 20–75 (memory_percent)
-      ERR="0.$(printf '%03d' $(( (S + IDX * 13 + 5) % 115 + 5 )))"   # 0.005–0.119
-      LAT="0.$(printf '%03d' $(( (S + IDX * 7  + 11) % 650 + 50 )))" # 0.050–0.699
-      REQ="0.$(printf '%03d' $(( (S + IDX * 11 + 2) % 600 + 300 )))" # 0.300–0.899
-      TOUT="0.$(printf '%03d' $(( (S + IDX * 3  + 1) % 38  + 2  )))" # 0.002–0.039
-      LOAD="0.$(printf '%03d' $(( (S + IDX * 5  + 9) % 600 + 100 )))"# 0.100–0.699
+      # Pseudo-random via seconds + service index (no awk needed)
+      CPU=$(( (S + IDX * 17 + 7) % 71 + 10 ))
+      MEM=$(( (S + IDX * 31 + 3) % 56 + 20 ))
+      ERR="0.$(printf '%03d' $(( (S + IDX * 13 + 5) % 115 + 5 )))"
+      LAT="0.$(printf '%03d' $(( (S + IDX * 7  + 11) % 650 + 50 )))"
+      REQ="0.$(printf '%03d' $(( (S + IDX * 11 + 2) % 600 + 300 )))"
+      TOUT="0.$(printf '%03d' $(( (S + IDX * 3  + 1) % 38  + 2  )))"
+      LOAD="0.$(printf '%03d' $(( (S + IDX * 5  + 9) % 600 + 100 )))"
       UPTIME=$(( S - 7200 + IDX * 1800 ))
 
       curl -sf -X POST "$RUPTURA/otlp/v1/metrics" \
