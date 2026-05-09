@@ -60,11 +60,8 @@ for i in $(seq 1 12); do
   [ "$PVC_STATUS" = "Bound" ] && break
   if [ "$i" -eq 12 ]; then
     log "PVC still not Bound after 60s — patching to EmptyDir (data lost on pod restart)"
-    kubectl -n ruptura-system patch deployment ruptura --type=json -p='[
-      {"op":"replace","path":"/spec/template/spec/volumes/0","value":{"name":"data","emptyDir":{}}},
-      {"op":"remove","path":"/spec/template/spec/volumes/0/persistentVolumeClaim"}
-    ]' 2>/dev/null || \
-    kubectl -n ruptura-system patch deployment ruptura --type=strategic -p '{"spec":{"template":{"spec":{"volumes":[{"name":"data","emptyDir":{}}]}}}}'
+    kubectl -n ruptura-system patch deployment ruptura --type=json \
+      -p='[{"op":"replace","path":"/spec/template/spec/volumes/0","value":{"name":"data","emptyDir":{}}}]'
   fi
   sleep 5
 done
