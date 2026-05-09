@@ -32,10 +32,6 @@ for NS in ruptura-system monitoring test-workloads; do
   kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
 done
 
-# ── 3. Ruptura API-key secret (lab value — not secret) ───────────────────────
-kubectl -n ruptura-system create secret generic ruptura-secrets \
-  --from-literal=api-key=ruptura-lab-key \
-  --dry-run=client -o yaml | kubectl apply -f -
 
 # ── 4. Build Ruptura image from source and import into k3s ───────────────────
 log "Building Ruptura image from source..."
@@ -194,9 +190,7 @@ else
 fi
 
 echo ""
-echo " API key: ruptura-lab-key"
-echo " Example: curl -H 'Authorization: Bearer ruptura-lab-key' \\"
-echo "          http://localhost:8080/api/v2/workloads"
+echo " Example: curl http://localhost:8080/api/v2/ruptures"
 echo ""
 echo " Full diagnostic: bash scripts/lab-verify.sh"
 echo " Watch live data: bash scripts/lab-verify.sh --otlp"
