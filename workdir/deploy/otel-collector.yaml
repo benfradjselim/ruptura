@@ -1,5 +1,5 @@
 ---
-# ServiceAccount + RBAC for the k8s_cluster receiver
+# ServiceAccount + RBAC (retained for future k8s_cluster receiver use)
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -60,18 +60,11 @@ metadata:
 data:
   config.yaml: |
     receivers:
-      # Receive OTLP/HTTP from the load generator
+      # Receive OTLP/HTTP — primary ingest point for load generators and SDKs
       otlp:
         protocols:
           http:
             endpoint: 0.0.0.0:4318
-
-      # Poll k8s API for real cluster metrics (pods, deployments, nodes)
-      k8s_cluster:
-        auth_type: serviceAccount
-        collection_interval: 30s
-        node_conditions_to_report: [Ready, MemoryPressure, DiskPressure, PIDPressure]
-        allocatable_types_to_report: [cpu, memory, pods]
 
     processors:
       memory_limiter:
@@ -112,7 +105,7 @@ data:
     service:
       pipelines:
         metrics:
-          receivers:  [otlp, k8s_cluster]
+          receivers:  [otlp]
           processors: [memory_limiter, resource, batch]
           exporters:  [otlphttp/ruptura, debug]
 
@@ -175,14 +168,14 @@ spec:
               memory: 384Mi
           livenessProbe:
             httpGet:
-              path: /
-              port: 13133
+              path: /metrics
+              port: 8888
             initialDelaySeconds: 10
             periodSeconds: 15
           readinessProbe:
             httpGet:
-              path: /
-              port: 13133
+              path: /metrics
+              port: 8888
             initialDelaySeconds: 5
             periodSeconds: 10
       volumes:

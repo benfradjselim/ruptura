@@ -82,7 +82,7 @@ spec:
     spec:
       containers:
         - name: podinfo
-          image: ghcr.io/stefanprodan/podinfo:6.7.0
+          image: stefanprodan/podinfo:6.7.0
           ports:
             - name: http
               containerPort: 9898
@@ -167,95 +167,90 @@ metadata:
 data:
   run.sh: |
     #!/bin/sh
+    # Sends OTLP metrics + traces directly to Ruptura using metric names that
+    # match analyzer.go: cpu_percent, memory_percent, error_rate, latency,
+    # request_rate, timeout_rate, uptime_seconds, load_avg_1.
+    # Pure sh + curl — no awk, no apk installs required.
     set -eu
-    OTEL="${OTEL_ENDPOINT:-http://otel-collector.monitoring.svc.cluster.local:4318}"
+    RUPTURA="${RUPTURA_ENDPOINT:-http://ruptura-otlp.ruptura-system.svc.cluster.local:4317}"
     SERVICES="nginx podinfo stress-app"
 
-    echo "Load generator starting. Target: $OTEL"
+    echo "Load generator starting. Target: $RUPTURA"
 
     send_metrics() {
-      SVC=$1
-      TS=$(date +%s)000000000
+      SVC=$1; IDX=$2
+      S=$(date +%s)
+      TS="${S}000000000"
 
-      # Vary values slightly each cycle so Ruptura sees changing signals
-      CPU=$(awk "BEGIN{srand($TS+0);printf \"%.4f\",rand()*0.7+0.05}")
-      MEM=$(awk "BEGIN{srand($TS+1);printf \"%.0f\",rand()*400+80}")
-      ERR=$(awk "BEGIN{srand($TS+2);printf \"%.4f\",rand()*0.08}")
-      LAT=$(awk "BEGIN{srand($TS+3);printf \"%.2f\",rand()*500+20}")
+      # Deterministic pseudo-random via seconds + service index — no awk needed
+      CPU=$(( (S + IDX * 17 + 7) % 71 + 10 ))           # 10–80 (cpu_percent)
+      MEM=$(( (S + IDX * 31 + 3) % 56 + 20 ))           # 20–75 (memory_percent)
+      ERR="0.$(printf '%03d' $(( (S + IDX * 13 + 5) % 115 + 5 )))"   # 0.005–0.119
+      LAT="0.$(printf '%03d' $(( (S + IDX * 7  + 11) % 650 + 50 )))" # 0.050–0.699
+      REQ="0.$(printf '%03d' $(( (S + IDX * 11 + 2) % 600 + 300 )))" # 0.300–0.899
+      TOUT="0.$(printf '%03d' $(( (S + IDX * 3  + 1) % 38  + 2  )))" # 0.002–0.039
+      LOAD="0.$(printf '%03d' $(( (S + IDX * 5  + 9) % 600 + 100 )))"# 0.100–0.699
+      UPTIME=$(( S - 7200 + IDX * 1800 ))
 
-      curl -sf -X POST "$OTEL/v1/metrics" \
+      curl -sf -X POST "$RUPTURA/otlp/v1/metrics" \
         -H "Content-Type: application/json" \
-        -d "{
-          \"resourceMetrics\":[{
-            \"resource\":{\"attributes\":[
-              {\"key\":\"service.name\",     \"value\":{\"stringValue\":\"$SVC\"}},
-              {\"key\":\"k8s.namespace.name\",\"value\":{\"stringValue\":\"test-workloads\"}},
-              {\"key\":\"k8s.deployment.name\",\"value\":{\"stringValue\":\"$SVC\"}},
-              {\"key\":\"host.name\",         \"value\":{\"stringValue\":\"lab-node\"}}
-            ]},
-            \"scopeMetrics\":[{
-              \"scope\":{\"name\":\"load-generator\"},
-              \"metrics\":[
-                {\"name\":\"cpu_usage\",
-                 \"gauge\":{\"dataPoints\":[{\"asDouble\":$CPU,\"timeUnixNano\":\"$TS\"}]}},
-                {\"name\":\"memory_usage_mb\",
-                 \"gauge\":{\"dataPoints\":[{\"asDouble\":$MEM,\"timeUnixNano\":\"$TS\"}]}},
-                {\"name\":\"http_error_rate\",
-                 \"gauge\":{\"dataPoints\":[{\"asDouble\":$ERR,\"timeUnixNano\":\"$TS\"}]}},
-                {\"name\":\"http_request_duration_ms\",
-                 \"gauge\":{\"dataPoints\":[{\"asDouble\":$LAT,\"timeUnixNano\":\"$TS\"}]}}
-              ]
-            }]
-          }]
-        }" > /dev/null && echo "  [metrics] $SVC cpu=$CPU mem=${MEM}MB err=$ERR lat=${LAT}ms" \
-          || echo "  [metrics] WARN: could not reach $OTEL"
+        -d "{\"resourceMetrics\":[{\"resource\":{\"attributes\":[
+              {\"key\":\"service.name\",        \"value\":{\"stringValue\":\"$SVC\"}},
+              {\"key\":\"k8s.namespace.name\",  \"value\":{\"stringValue\":\"test-workloads\"}},
+              {\"key\":\"k8s.deployment.name\", \"value\":{\"stringValue\":\"$SVC\"}},
+              {\"key\":\"host.name\",           \"value\":{\"stringValue\":\"$SVC\"}}
+            ]},\"scopeMetrics\":[{\"scope\":{\"name\":\"load-generator\"},\"metrics\":[
+              {\"name\":\"cpu_percent\",    \"gauge\":{\"dataPoints\":[{\"asDouble\":$CPU,    \"timeUnixNano\":\"$TS\"}]}},
+              {\"name\":\"memory_percent\", \"gauge\":{\"dataPoints\":[{\"asDouble\":$MEM,    \"timeUnixNano\":\"$TS\"}]}},
+              {\"name\":\"error_rate\",     \"gauge\":{\"dataPoints\":[{\"asDouble\":$ERR,    \"timeUnixNano\":\"$TS\"}]}},
+              {\"name\":\"latency\",        \"gauge\":{\"dataPoints\":[{\"asDouble\":$LAT,    \"timeUnixNano\":\"$TS\"}]}},
+              {\"name\":\"request_rate\",   \"gauge\":{\"dataPoints\":[{\"asDouble\":$REQ,    \"timeUnixNano\":\"$TS\"}]}},
+              {\"name\":\"timeout_rate\",   \"gauge\":{\"dataPoints\":[{\"asDouble\":$TOUT,   \"timeUnixNano\":\"$TS\"}]}},
+              {\"name\":\"load_avg_1\",     \"gauge\":{\"dataPoints\":[{\"asDouble\":$LOAD,   \"timeUnixNano\":\"$TS\"}]}},
+              {\"name\":\"uptime_seconds\", \"gauge\":{\"dataPoints\":[{\"asDouble\":$UPTIME, \"timeUnixNano\":\"$TS\"}]}}
+            ]}]}]}" > /dev/null \
+          && echo "  [ok] $SVC  cpu=${CPU}%  mem=${MEM}%  err=$ERR  lat=$LAT" \
+          || echo "  [WARN] $SVC metrics failed — is ruptura-otlp reachable?"
     }
 
     send_traces() {
-      SVC=$1
-      TS=$(date +%s)000000000
-      # Randomize span status (mostly ok, occasional errors)
-      STATUS_CODE=$(awk "BEGIN{srand($TS);print (rand()<0.08)?2:1}")
-      # Generate hex IDs
-      TRACE_ID=$(cat /dev/urandom | tr -dc 'a-f0-9' | head -c 32)
-      SPAN_ID=$(cat /dev/urandom | tr -dc 'a-f0-9' | head -c 16)
-      END_TS=$(( $(date +%s) + 1 ))000000000
+      SVC=$1; IDX=$2
+      S=$(date +%s)
+      TS="${S}000000000"
+      END_TS="$(( S + 1 ))000000000"
+      SC=$(( (S + IDX) % 13 == 0 ? 2 : 1 ))   # ~1 in 13 cycles is an error
+      TRACE_ID=$(printf '%016x%016x' $(( S + IDX )) $(( S * 31337 + IDX * 7 )))
+      SPAN_ID=$(printf '%016x' $(( S * 99991 + IDX )))
 
-      curl -sf -X POST "$OTEL/v1/traces" \
+      curl -sf -X POST "$RUPTURA/otlp/v1/traces" \
         -H "Content-Type: application/json" \
-        -d "{
-          \"resourceSpans\":[{
-            \"resource\":{\"attributes\":[
-              {\"key\":\"service.name\",     \"value\":{\"stringValue\":\"$SVC\"}},
-              {\"key\":\"k8s.namespace.name\",\"value\":{\"stringValue\":\"test-workloads\"}}
-            ]},
-            \"scopeSpans\":[{
-              \"scope\":{\"name\":\"load-generator\"},
-              \"spans\":[{
-                \"traceId\":\"$TRACE_ID\",
-                \"spanId\":\"$SPAN_ID\",
-                \"name\":\"HTTP GET /api/endpoint\",
-                \"startTimeUnixNano\":\"$TS\",
-                \"endTimeUnixNano\":\"$END_TS\",
-                \"status\":{\"code\":$STATUS_CODE},
-                \"attributes\":[
-                  {\"key\":\"http.method\",      \"value\":{\"stringValue\":\"GET\"}},
-                  {\"key\":\"http.status_code\",  \"value\":{\"intValue\":\"$([ $STATUS_CODE -eq 2 ] && echo 500 || echo 200)\"}}
-                ]
-              }]
-            }]
-          }]
-        }" > /dev/null && echo "  [traces]  $SVC status_code=$STATUS_CODE" \
-          || echo "  [traces]  WARN: could not reach $OTEL"
+        -d "{\"resourceSpans\":[{\"resource\":{\"attributes\":[
+              {\"key\":\"service.name\",        \"value\":{\"stringValue\":\"$SVC\"}},
+              {\"key\":\"k8s.namespace.name\",  \"value\":{\"stringValue\":\"test-workloads\"}},
+              {\"key\":\"host.name\",           \"value\":{\"stringValue\":\"$SVC\"}}
+            ]},\"scopeSpans\":[{\"scope\":{\"name\":\"load-generator\"},\"spans\":[{
+              \"traceId\":\"$TRACE_ID\",\"spanId\":\"$SPAN_ID\",
+              \"name\":\"HTTP GET /api\",
+              \"startTimeUnixNano\":\"$TS\",\"endTimeUnixNano\":\"$END_TS\",
+              \"status\":{\"code\":$SC}
+            }]}]}]}" > /dev/null || true
     }
+
+    IDX=0
+    for SVC in $SERVICES; do
+      eval "UPTIME_$SVC=$IDX"
+      IDX=$(( IDX + 1 ))
+    done
 
     while true; do
       echo "--- $(date -u '+%H:%M:%S') ---"
+      IDX=0
       for SVC in $SERVICES; do
-        send_metrics "$SVC"
-        send_traces  "$SVC"
+        send_metrics "$SVC" "$IDX"
+        send_traces  "$SVC" "$IDX"
+        IDX=$(( IDX + 1 ))
       done
-      echo "  Sleeping 15s..."
+      echo "  sleeping 15s..."
       sleep 15
     done
 ---
@@ -278,12 +273,11 @@ spec:
     spec:
       containers:
         - name: load-gen
-          image: alpine:3.20
-          # Install curl at startup, then exec the script (stays in same container FS)
-          command: [sh, -c, "apk add --no-cache curl >/dev/null 2>&1 && exec sh /scripts/run.sh"]
+          image: curlimages/curl:8.7.1
+          command: [sh, /scripts/run.sh]
           env:
-            - name: OTEL_ENDPOINT
-              value: http://otel-collector.monitoring.svc.cluster.local:4318
+            - name: RUPTURA_ENDPOINT
+              value: http://ruptura-otlp.ruptura-system.svc.cluster.local:4317
           volumeMounts:
             - name: script
               mountPath: /scripts
