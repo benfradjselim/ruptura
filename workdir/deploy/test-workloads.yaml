@@ -1,0 +1,301 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-workloads
+  labels:
+    app.kubernetes.io/part-of: ruptura-lab
+---
+# ── nginx: simulates a stateless web workload ─────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: test-workloads
+  labels:
+    app: nginx
+    workload-type: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+          livenessProbe:
+            httpGet: {path: /, port: 80}
+            initialDelaySeconds: 5
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: test-workloads
+spec:
+  selector:
+    app: nginx
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# ── podinfo: demo app with built-in /metrics endpoint ─────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podinfo
+  namespace: test-workloads
+  labels:
+    app: podinfo
+    workload-type: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: podinfo
+  template:
+    metadata:
+      labels:
+        app: podinfo
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9898"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.0
+          ports:
+            - name: http
+              containerPort: 9898
+          env:
+            - name: PODINFO_CACHE_SERVER
+              value: ""
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet: {path: /healthz, port: 9898}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /readyz, port: 9898}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: podinfo
+  namespace: test-workloads
+spec:
+  selector:
+    app: podinfo
+  ports:
+    - name: http
+      port: 9898
+      targetPort: 9898
+---
+# ── stress-app: simulates a CPU/memory-intensive workload ─────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stress-app
+  namespace: test-workloads
+  labels:
+    app: stress-app
+    workload-type: batch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stress-app
+  template:
+    metadata:
+      labels:
+        app: stress-app
+    spec:
+      containers:
+        - name: stress
+          image: alpine:3.20
+          # Alternate: sleep vs light CPU burn so the workload shows variable load
+          command: [sh, -c]
+          args:
+            - |
+              while true; do
+                # 30s CPU-light phase
+                sleep 30
+                # 10s CPU-heavy phase (visible in k8s metrics)
+                for i in $(seq 1 10000); do echo $((i*i)) > /dev/null; done
+              done
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 300m
+              memory: 64Mi
+---
+# ── load-generator: sends OTLP traces+metrics to the OTel Collector ───────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: load-gen-script
+  namespace: test-workloads
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eu
+    OTEL="${OTEL_ENDPOINT:-http://otel-collector.monitoring.svc.cluster.local:4318}"
+    SERVICES="nginx podinfo stress-app"
+
+    echo "Load generator starting. Target: $OTEL"
+
+    send_metrics() {
+      SVC=$1
+      TS=$(date +%s)000000000
+
+      # Vary values slightly each cycle so Ruptura sees changing signals
+      CPU=$(awk "BEGIN{srand($TS+0);printf \"%.4f\",rand()*0.7+0.05}")
+      MEM=$(awk "BEGIN{srand($TS+1);printf \"%.0f\",rand()*400+80}")
+      ERR=$(awk "BEGIN{srand($TS+2);printf \"%.4f\",rand()*0.08}")
+      LAT=$(awk "BEGIN{srand($TS+3);printf \"%.2f\",rand()*500+20}")
+
+      curl -sf -X POST "$OTEL/v1/metrics" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"resourceMetrics\":[{
+            \"resource\":{\"attributes\":[
+              {\"key\":\"service.name\",     \"value\":{\"stringValue\":\"$SVC\"}},
+              {\"key\":\"k8s.namespace.name\",\"value\":{\"stringValue\":\"test-workloads\"}},
+              {\"key\":\"k8s.deployment.name\",\"value\":{\"stringValue\":\"$SVC\"}},
+              {\"key\":\"host.name\",         \"value\":{\"stringValue\":\"lab-node\"}}
+            ]},
+            \"scopeMetrics\":[{
+              \"scope\":{\"name\":\"load-generator\"},
+              \"metrics\":[
+                {\"name\":\"cpu_usage\",
+                 \"gauge\":{\"dataPoints\":[{\"asDouble\":$CPU,\"timeUnixNano\":\"$TS\"}]}},
+                {\"name\":\"memory_usage_mb\",
+                 \"gauge\":{\"dataPoints\":[{\"asDouble\":$MEM,\"timeUnixNano\":\"$TS\"}]}},
+                {\"name\":\"http_error_rate\",
+                 \"gauge\":{\"dataPoints\":[{\"asDouble\":$ERR,\"timeUnixNano\":\"$TS\"}]}},
+                {\"name\":\"http_request_duration_ms\",
+                 \"gauge\":{\"dataPoints\":[{\"asDouble\":$LAT,\"timeUnixNano\":\"$TS\"}]}}
+              ]
+            }]
+          }]
+        }" > /dev/null && echo "  [metrics] $SVC cpu=$CPU mem=${MEM}MB err=$ERR lat=${LAT}ms" \
+          || echo "  [metrics] WARN: could not reach $OTEL"
+    }
+
+    send_traces() {
+      SVC=$1
+      TS=$(date +%s)000000000
+      # Randomize span status (mostly ok, occasional errors)
+      STATUS_CODE=$(awk "BEGIN{srand($TS);print (rand()<0.08)?2:1}")
+      # Generate hex IDs
+      TRACE_ID=$(cat /dev/urandom | tr -dc 'a-f0-9' | head -c 32)
+      SPAN_ID=$(cat /dev/urandom | tr -dc 'a-f0-9' | head -c 16)
+      END_TS=$(( $(date +%s) + 1 ))000000000
+
+      curl -sf -X POST "$OTEL/v1/traces" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"resourceSpans\":[{
+            \"resource\":{\"attributes\":[
+              {\"key\":\"service.name\",     \"value\":{\"stringValue\":\"$SVC\"}},
+              {\"key\":\"k8s.namespace.name\",\"value\":{\"stringValue\":\"test-workloads\"}}
+            ]},
+            \"scopeSpans\":[{
+              \"scope\":{\"name\":\"load-generator\"},
+              \"spans\":[{
+                \"traceId\":\"$TRACE_ID\",
+                \"spanId\":\"$SPAN_ID\",
+                \"name\":\"HTTP GET /api/endpoint\",
+                \"startTimeUnixNano\":\"$TS\",
+                \"endTimeUnixNano\":\"$END_TS\",
+                \"status\":{\"code\":$STATUS_CODE},
+                \"attributes\":[
+                  {\"key\":\"http.method\",      \"value\":{\"stringValue\":\"GET\"}},
+                  {\"key\":\"http.status_code\",  \"value\":{\"intValue\":\"$([ $STATUS_CODE -eq 2 ] && echo 500 || echo 200)\"}}
+                ]
+              }]
+            }]
+          }]
+        }" > /dev/null && echo "  [traces]  $SVC status_code=$STATUS_CODE" \
+          || echo "  [traces]  WARN: could not reach $OTEL"
+    }
+
+    while true; do
+      echo "--- $(date -u '+%H:%M:%S') ---"
+      for SVC in $SERVICES; do
+        send_metrics "$SVC"
+        send_traces  "$SVC"
+      done
+      echo "  Sleeping 15s..."
+      sleep 15
+    done
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+  namespace: test-workloads
+  labels:
+    app: load-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-generator
+  template:
+    metadata:
+      labels:
+        app: load-generator
+    spec:
+      containers:
+        - name: load-gen
+          image: alpine:3.20
+          # Install curl at startup, then exec the script (stays in same container FS)
+          command: [sh, -c, "apk add --no-cache curl >/dev/null 2>&1 && exec sh /scripts/run.sh"]
+          env:
+            - name: OTEL_ENDPOINT
+              value: http://otel-collector.monitoring.svc.cluster.local:4318
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: script
+          configMap:
+            name: load-gen-script
+            defaultMode: 0755
