@@ -11,6 +11,7 @@ Ruptura detects workload ruptures before they cause outages — using the Fused 
 → **[Technical documentation & quickstart](workdir/README.md)**
 → **[Website & full docs](https://benfradjselim.github.io/ruptura/)**
 → **[API Specification](docs/openapi.yaml)**
+→ **[Live dashboard (GitHub Codespace)](https://improved-yodel-v69jjx9w754jcj5x-8080.app.github.dev/ui/)**
 
 ---
 
