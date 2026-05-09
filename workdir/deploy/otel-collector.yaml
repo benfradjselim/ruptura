@@ -90,6 +90,7 @@ data:
         metrics_endpoint: http://${env:RUPTURA_OTLP_SERVICE_HOST}:${env:RUPTURA_OTLP_SERVICE_PORT}/otlp/v1/metrics
         traces_endpoint:  http://${env:RUPTURA_OTLP_SERVICE_HOST}:${env:RUPTURA_OTLP_SERVICE_PORT}/otlp/v1/traces
         logs_endpoint:    http://${env:RUPTURA_OTLP_SERVICE_HOST}:${env:RUPTURA_OTLP_SERVICE_PORT}/otlp/v1/logs
+        compression: none
         tls:
           insecure: true
         retry_on_failure:
