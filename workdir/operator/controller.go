@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	defaultImage       = "ghcr.io/benfradjselim/ruptura:v6.7.0"
+	defaultImage       = "ghcr.io/benfradjselim/ruptura:v6.8.0"
 	defaultStorageSize = "10Gi"
 	defaultEdition     = "community"
 	appLabel           = "app.kubernetes.io/name"
