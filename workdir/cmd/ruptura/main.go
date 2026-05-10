@@ -210,6 +210,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 
 					store.StoreSnapshot(snap)
 					metricsReg.RecordKPISnapshot(snap)
+					metricsReg.IncIngestTotal("metrics")
 
 					// v6.4: near-miss tracking + fingerprint recording (requires FusedR).
 					analyzerEngine.UpdateFusedR(ref, fusedR)

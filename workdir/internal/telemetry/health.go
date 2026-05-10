@@ -36,17 +36,17 @@ func (h *HealthChecker) Check(now time.Time) HealthResponse {
         UptimeSeconds: int64(uptime.Seconds()),
     }
     if uptime < 5*time.Minute {
-        res.Status = "warming"
+        res.Status = "starting"
         res.RuptureDetection = "suppressed"
-        res.Message = "warming up"
+        res.Message = "Calibrating workload baselines..."
     } else if uptime < 60*time.Minute {
-        res.Status = "degraded"
-        res.RuptureDetection = "degraded"
-        res.Message = "burst ready, stable warming"
+        res.Status = "online"
+        res.RuptureDetection = "active"
+        res.Message = "Running — building signal history"
     } else {
         res.Status = "ready"
         res.RuptureDetection = "active"
-        res.Message = "full operation"
+        res.Message = "Fully operational"
     }
     return res
 }

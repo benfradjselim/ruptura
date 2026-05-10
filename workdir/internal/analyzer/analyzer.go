@@ -409,7 +409,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 
 	key := ref.Key()
 	snap := models.KPISnapshot{
-		Host:      ref.Node,
+		Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 		Workload:  ref,
 		Timestamp: now,
 		Stress: models.KPI{
@@ -417,7 +417,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(stress, 4),
 			State:     stressState(stress),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		Fatigue: models.KPI{
@@ -425,7 +425,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(ws.fatigue, 4),
 			State:     fatigueState(ws.fatigue),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		Mood: models.KPI{
@@ -433,7 +433,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(mood, 4),
 			State:     moodState(mood),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		Pressure: models.KPI{
@@ -441,7 +441,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(pressureNorm, 4),
 			State:     pressureState(pressureNorm),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		Humidity: models.KPI{
@@ -449,7 +449,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(humidity, 4),
 			State:     humidityState(humidity),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		Contagion: models.KPI{
@@ -457,7 +457,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(contagion, 4),
 			State:     contagionState(contagion),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		Resilience: models.KPI{
@@ -465,7 +465,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(resilience, 4),
 			State:     resilienceState(resilience),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		Entropy: models.KPI{
@@ -473,7 +473,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(entropy, 4),
 			State:     entropyState(entropy),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		Velocity: models.KPI{
@@ -481,7 +481,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(velocity, 4),
 			State:     velocityState(velocity),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		Throughput: models.KPI{
@@ -489,7 +489,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(throughputDrop, 4),
 			State:     throughputState(throughputDrop),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 		HealthScore: models.KPI{
@@ -497,7 +497,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			Value:     utils.RoundTo(healthScore*100, 2), // expose as 0-100
 			State:     healthScoreState(healthScore),
 			Timestamp: now,
-			Host:      ref.Node,
+			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
 			Workload:  ref,
 		},
 	}

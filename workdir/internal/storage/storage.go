@@ -66,12 +66,20 @@ func (s *Store) LatestSnapshot(key string) (models.KPISnapshot, bool) {
 	return snap, ok
 }
 
-// AllSnapshots returns copies of all stored KPISnapshots.
+// AllSnapshots returns one snapshot per unique workload (deduplicates host vs workload-key entries).
 func (s *Store) AllSnapshots() []models.KPISnapshot {
 	s.snapshotsMu.RLock()
-	result := make([]models.KPISnapshot, 0, len(s.snapshots))
+	seen := make(map[string]bool, len(s.snapshots))
+	result := make([]models.KPISnapshot, 0, len(s.snapshots)/2+1)
 	for _, snap := range s.snapshots {
-		result = append(result, snap)
+		canonical := snap.Workload.Key()
+		if canonical == "" || canonical == "default/host/" {
+			canonical = snap.Host
+		}
+		if !seen[canonical] {
+			seen[canonical] = true
+			result = append(result, snap)
+		}
 	}
 	s.snapshotsMu.RUnlock()
 	return result

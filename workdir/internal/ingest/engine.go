@@ -54,8 +54,12 @@ type Engine struct {
 	activeSeries sync.Map
 	seriesCount  int32
 
-	httpServer *http.Server
-	udpConn    *net.UDPConn
+	metricsCount int64
+	logsCount    int64
+	tracesCount  int64
+
+	httpServer  *http.Server
+	udpConn     *net.UDPConn
 	grpcServer  *grpc.Server
 	grpcSamples chan *GRPCMetricPoint
 }
@@ -305,6 +309,7 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 						ts = time.Unix(0, nanos)
 						if e.checkCardinality(host, name) {
 							e.pipeline.Ingest(host, name, value, ts)
+							atomic.AddInt64(&e.metricsCount, 1)
 						}
 					}
 				} else if m.Sum != nil {
@@ -319,6 +324,7 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 						ts = time.Unix(0, nanos)
 						if e.checkCardinality(host, name) {
 							e.pipeline.Ingest(host, name, value, ts)
+							atomic.AddInt64(&e.metricsCount, 1)
 						}
 					}
 				}
@@ -356,6 +362,7 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 				} else {
 					pos++
 				}
+				atomic.AddInt64(&e.logsCount, 1)
 			}
 		}
 		if e.sentiment != nil && (pos > 0 || neg > 0) {
@@ -394,6 +401,7 @@ func (e *Engine) handleOTLPTraces(w http.ResponseWriter, r *http.Request) {
 				if e.spans != nil {
 					e.spans.IngestSpan(s)
 				}
+				atomic.AddInt64(&e.tracesCount, 1)
 			}
 		}
 		// Derive traceR from span error rate: 100% error rate → R≈5, 20% → R≈1.
@@ -463,4 +471,9 @@ func (e *Engine) checkCardinality(host, name string) bool {
 	e.activeSeries.Store(key, true)
 	atomic.AddInt32(&e.seriesCount, 1)
 	return true
+}
+
+// IngestCounts returns the total number of metrics, logs, and traces ingested since startup.
+func (e *Engine) IngestCounts() (metrics, logs, traces int64) {
+	return atomic.LoadInt64(&e.metricsCount), atomic.LoadInt64(&e.logsCount), atomic.LoadInt64(&e.tracesCount)
 }
