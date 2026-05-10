@@ -151,7 +151,7 @@ label{font-size:var(--fs-xs);color:var(--muted);margin-bottom:4px;display:block}
 .tab.disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
 
 /* ── heatmap ── */
-.heatmap-cell{border-radius:3px;transition:opacity .4s;aspect-ratio:1.4}
+.heatmap-cell{border-radius:3px;transition:background .4s;height:18px;min-width:18px}
 
 /* ── event log ── */
 .ev-row{display:flex;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.03);
@@ -662,31 +662,37 @@ label{font-size:var(--fs-xs);color:var(--muted);margin-bottom:4px;display:block}
     </div>
   </div>
 
-  <!-- fleet heatmap -->
-  <div class="card" style="padding:14px" x-show="snapshots.length>0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+  <!-- fleet heatmap — visible only when no workload is selected -->
+  <div class="card" style="padding:14px" x-show="snapshots.length>0 && !selected">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <span class="sec-label">Fleet Signal Heatmap</span>
       <span style="font-size:var(--fs-xs);color:var(--muted)" x-text="'showing '+Math.min(snapshots.length,20)+' of '+snapshots.length+' workloads'"></span>
     </div>
-    <div style="display:grid;margin-bottom:4px;gap:3px" :style="'grid-template-columns:130px repeat(9,1fr)'">
-      <div></div>
+    <!-- header row -->
+    <div style="display:grid;margin-bottom:6px;gap:4px;grid-template-columns:120px repeat(9,1fr)">
+      <div style="font-size:9px;color:var(--muted);font-weight:600">WORKLOAD</div>
       <template x-for="sig in sigNames" :key="sig">
-        <div style="font-size:8px;color:var(--muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="sig.slice(0,4).toUpperCase()"></div>
+        <div style="font-size:9px;color:var(--muted);text-align:center;font-weight:600;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="sig" x-text="sig.slice(0,5)"></div>
       </template>
     </div>
+    <!-- data rows -->
     <template x-for="s in snapshots.slice(0,20)" :key="wlKey(s)">
-      <div style="display:grid;gap:3px;margin-bottom:3px" :style="'grid-template-columns:130px repeat(9,1fr)'">
-        <div class="mono" style="font-size:8px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:center;cursor:pointer;padding-right:4px"
-             @click="selectWorkload(s)" :style="selectedKey===wlKey(s)?'color:var(--cyan)':''" x-text="wlName(s)"></div>
+      <div style="display:grid;gap:4px;margin-bottom:4px;align-items:center;grid-template-columns:120px repeat(9,1fr)">
+        <div class="mono" style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;padding-right:6px"
+             @click="selectWorkload(s)" :style="'color:'+(selectedKey===wlKey(s)?'var(--cyan)':'var(--text)')" x-text="wlName(s)"></div>
         <template x-for="sig in sigNames" :key="sig">
           <div class="heatmap-cell" :style="heatCell(s,sig)" :title="sig+': '+(s[sig]?.value||0).toFixed(3)"></div>
         </template>
       </div>
     </template>
-    <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+    <!-- legend -->
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
       <span style="font-size:var(--fs-2xs);color:var(--muted)">Low</span>
-      <div style="flex:1;height:4px;border-radius:2px;background:linear-gradient(90deg,rgba(0,229,160,.8),rgba(255,217,61,.8),rgba(255,51,102,.9))"></div>
+      <div style="flex:1;height:5px;border-radius:3px;background:linear-gradient(90deg,hsl(145,65%,38%),hsl(50,85%,48%),hsl(0,72%,48%))"></div>
       <span style="font-size:var(--fs-2xs);color:var(--muted)">High</span>
+    </div>
+    <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:6px">
+      mood &amp; resilience are inverted (higher = better). Click a workload name to drill in.
     </div>
   </div>
 
@@ -1268,12 +1274,14 @@ return {
   },
   evDotColor(sev) { const m={info:'var(--cyan)',warning:'var(--yellow)',critical:'var(--red)',emergency:'var(--pink)'}; return 'background:'+(m[sev]||'var(--muted)'); },
   heatCell(s, sig) {
-    const v = s[sig]?.value || 0;
+    const v = Math.max(0, Math.min(1, s[sig]?.value || 0));
     const inv = sig==='mood'||sig==='resilience';
     const heat = inv ? 1-v : v;
-    const r = Math.round(Math.min(255, heat*380));
-    const g = Math.round(Math.min(255, (1-heat)*300));
-    return `background:rgba(${r},${g},80,.75)`;
+    // green (145°) → yellow (50°) → red (0°)
+    const hue = Math.round((1-heat) * 145);
+    const sat = 65;
+    const lit = heat > 0.6 ? 42 : heat > 0.3 ? 46 : 40;
+    return `background:hsl(${hue},${sat}%,${lit}%)`;
   },
   kpiSignals() {
     const s = this.selected; if (!s) return [];
