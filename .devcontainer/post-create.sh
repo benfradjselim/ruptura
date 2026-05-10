@@ -36,10 +36,10 @@ done
 # ── 4. Build Ruptura image from source and import into k3s ───────────────────
 log "Building Ruptura image from source..."
 cd /workspaces/ruptura/workdir
-docker build -t ghcr.io/benfradjselim/ruptura:6.8.0 . 2>&1 | grep -E "^(Step|#|Successfully|ERROR)" || true
+docker build -t ghcr.io/benfradjselim/ruptura:6.8.1 . 2>&1 | grep -E "^(Step|#|Successfully|ERROR)" || true
 log "Importing image into k3s containerd..."
-docker save ghcr.io/benfradjselim/ruptura:6.8.0 | sudo k3s ctr images import -
-docker rmi ghcr.io/benfradjselim/ruptura:6.8.0 2>/dev/null || true  # free Docker layer cache
+docker save ghcr.io/benfradjselim/ruptura:6.8.1 | sudo k3s ctr images import -
+docker rmi ghcr.io/benfradjselim/ruptura:6.8.1 2>/dev/null || true  # free Docker layer cache
 cd /workspaces/ruptura
 
 # ── 5. Deploy Ruptura ─────────────────────────────────────────────────────────
