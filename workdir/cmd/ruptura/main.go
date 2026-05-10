@@ -167,6 +167,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	predictorEngine := predictor.NewPredictor()
 	sentSink := &busSentimentSink{bus: bus, ctx: ctx}
 	ingestEngine := ingest.New(pipelineEngine, logSink, nil, sentSink, fusionEngine)
+	ingestEngine.SetLogStore(store)
 	analyzerEngine := analyzer.NewAnalyzer()
 	analyzerEngine.SetTopology(topoBuilder)
 	if raw := os.Getenv("RUPTURA_WORKLOAD_WEIGHTS"); raw != "" {
@@ -375,7 +376,12 @@ func buildExplainRecord(
 	topo interface{ Edges() []models.ServiceEdge },
 	now time.Time,
 ) explain.RuptureRecord {
-	id := utils.GenerateID(8)
+	// Use workload key as ID so the UI can look up explain by workload reference.
+	// Using a random ID made records unreachable since the UI always queries by key.
+	id := host
+	if id == "" {
+		id = utils.GenerateID(8)
+	}
 
 	// Collect contagion sources: upstream services with error rate > 10%.
 	var contagionSources []string

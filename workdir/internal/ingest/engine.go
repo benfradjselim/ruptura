@@ -24,6 +24,12 @@ type LogSink interface {
 	IngestLine(service string, line []byte, ts time.Time)
 }
 
+// LogStoreSink persists structured log entries to durable storage.
+// storage.Store satisfies this interface via its SaveLog method.
+type LogStoreSink interface {
+	SaveLog(service string, entry interface{}, ts time.Time) error
+}
+
 type SpanSink interface {
 	IngestSpan(span models.Span) error
 }
@@ -47,6 +53,7 @@ type Ingestor interface {
 type Engine struct {
 	pipeline  metrics.MetricPipeline
 	logs      LogSink
+	logStore  LogStoreSink
 	spans     SpanSink
 	sentiment SentimentSink
 	traceR    TraceRSink
@@ -74,6 +81,9 @@ func New(pipeline metrics.MetricPipeline, logs LogSink, spans SpanSink, sentimen
 		grpcSamples: make(chan *GRPCMetricPoint, 1024),
 	}
 }
+
+// SetLogStore wires a durable storage backend for OTLP log persistence.
+func (e *Engine) SetLogStore(s LogStoreSink) { e.logStore = s }
 
 // rateLimiter is a simple token-bucket middleware for the ingest HTTP server.
 // Capacity and refill rate are configurable via RUPTURA_INGEST_RPS env variable.
@@ -352,12 +362,33 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 		var pos, neg int
 		for _, sl := range rl.ScopeLogs {
 			for _, lr := range sl.LogRecords {
-				if e.logs != nil {
-					nanos, _ := strconv.ParseInt(lr.TimeUnixNano, 10, 64)
-					e.logs.IngestLine(service, []byte(lr.Body.GetString()), time.Unix(0, nanos))
+				nanos, _ := strconv.ParseInt(lr.TimeUnixNano, 10, 64)
+				ts := time.Unix(0, nanos)
+				if ts.IsZero() {
+					ts = time.Now()
 				}
-				if strings.Contains(strings.ToLower(lr.Body.GetString()), "error") ||
-					strings.Contains(strings.ToLower(lr.Body.GetString()), "warn") {
+				body := lr.Body.GetString()
+
+				if e.logs != nil {
+					e.logs.IngestLine(service, []byte(body), ts)
+				}
+
+				if e.logStore != nil {
+					entry := map[string]interface{}{
+						"service":    service,
+						"body":       body,
+						"severity":   lr.SeverityText,
+						"timestamp":  ts.UnixNano(),
+						"workload":   ref.Key(),
+						"namespace":  ref.Namespace,
+						"kind":       ref.Kind,
+						"workload_name": ref.Name,
+					}
+					_ = e.logStore.SaveLog(service, entry, ts)
+				}
+
+				lower := strings.ToLower(body)
+				if strings.Contains(lower, "error") || strings.Contains(lower, "warn") {
 					neg++
 				} else {
 					pos++

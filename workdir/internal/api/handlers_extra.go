@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -534,6 +535,11 @@ func (h *Handlers) handleExplain(w http.ResponseWriter, r *http.Request) {
 	}
 	vars := mux.Vars(r)
 	id := vars["rupture_id"]
+	// The UI encodes slashes as %2F via encodeURIComponent. Gorilla/mux may leave
+	// them encoded in the variable; decode so lookups by workload key work correctly.
+	if decoded, err := url.PathUnescape(id); err == nil {
+		id = decoded
+	}
 
 	switch {
 	case strings.HasSuffix(r.URL.Path, "/formula"):
