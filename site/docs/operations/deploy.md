@@ -57,7 +57,7 @@ metadata:
   name: production
   namespace: ruptura-system
 spec:
-  image: ghcr.io/benfradjselim/ruptura:6.7.0
+  image: ghcr.io/benfradjselim/ruptura:6.8.2
   port: 8080
   storageSize: 20Gi
   apiKey:
@@ -98,7 +98,7 @@ curl http://localhost:8080/api/v2/health
 # docker-compose.yml
 services:
   ruptura:
-    image: ghcr.io/benfradjselim/ruptura:6.7.0
+    image: ghcr.io/benfradjselim/ruptura:6.8.2
     ports:
       - "8080:8080"
       - "4317:4317"
@@ -197,4 +197,21 @@ Point a Prometheus datasource at `http://ruptura:8080/api/v2/metrics`.
 | Medium | 50–300 | 256 MB | 0.5 core | 30 GB |
 | Large | 300+ | 512 MB | 1 core | 100 GB |
 
-Ruptura uses BadgerDB embedded — storage scales with the number of workloads and retention settings (`kpis_days: 400` default).
+Ruptura uses BadgerDB embedded — storage scales with the number of workloads and retention settings.
+
+### Memory notes (v6.8.2+)
+
+Ruptura v6.8.2 and later tune BadgerDB's memory footprint to stay well within the container limit:
+
+- **MemTable**: 8 MB × 2 = 16 MB active write buffer (default was 320 MB)
+- **Block cache**: 32 MB read cache (default was 256 MB)
+- **`GOMEMLIMIT`**: set to 400 MB (83% of the 512 Mi limit) so the Go GC runs before the kernel OOMKiller fires
+
+If you increase `resources.limits.memory` (e.g. to 1 Gi for large deployments), also raise `goMemLimit` in your Helm values to 83% of the new limit:
+
+```yaml
+resources:
+  limits:
+    memory: 1Gi
+goMemLimit: "872415232"   # 832 MiB = 83% of 1 GiB
+```

@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/benfradjselim/ruptura/main/assets/logo/ruptura-icon-256.png" alt="Ruptura" width="120" /><br><br>
-  <img src="https://img.shields.io/badge/version-6.7.0-0069ff?style=for-the-badge" alt="v6.7.0">
+  <img src="https://img.shields.io/badge/version-6.8.2-0069ff?style=for-the-badge" alt="v6.8.2">
   <img src="https://img.shields.io/badge/go-1.21+-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go 1.21+">
   <img src="https://img.shields.io/badge/license-Apache%202.0-green?style=for-the-badge" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/kubernetes-native-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" alt="Kubernetes Native">
@@ -171,7 +171,7 @@ docker run -d \
   -p 4317:4317 \
   -v ruptura-data:/var/lib/ruptura/data \
   -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-  ghcr.io/benfradjselim/ruptura:6.7.0
+  ghcr.io/benfradjselim/ruptura:6.8.2
 ```
 
 | Port | Purpose |
@@ -334,7 +334,7 @@ metadata:
   name: production
   namespace: ruptura-system
 spec:
-  image: ghcr.io/benfradjselim/ruptura:6.7.0   # optional — defaults to bundled version
+  image: ghcr.io/benfradjselim/ruptura:6.8.2   # optional — defaults to bundled version
   edition: community                             # community (read-only) | autopilot (full execution)
   storageSize: 20Gi                              # PVC size for BadgerDB (default: 10Gi)
   replicas: 1                                   # must be 1 — BadgerDB is single-writer
@@ -383,6 +383,17 @@ helm lint helm/
 ---
 
 ## Changelog
+
+### v6.8.2 — 2026-05-10
+- **OOMKill prevention**: BadgerDB defaults used 576 MB (MemTable 320 MB + BlockCache 256 MB), exceeding the 512 Mi container limit. Tuned to 8 MB × 2 tables + 32 MB block cache ≈ 60 MB total BadgerDB footprint.
+- **Periodic BadgerDB GC**: `RunValueLogGC` was never called — vlog files accumulated indefinitely. Added a 10-minute ticker goroutine that drains all garbage.
+- **`GOMEMLIMIT` env var**: Set to 400 MiB (83% of the container limit) so the Go GC fires before OOMKill. Configurable via `goMemLimit` in `helm/values.yaml`.
+
+### v6.8.1 — 2026-05-09
+- Fleet heatmap visibility and color rendering fix.
+
+### v6.8.0 — 2026-05-09
+- Stable embedded dashboard — correct workload identity, continuous seed loop on post-create.
 
 ### v6.7.0 — 2026-05-06
 - **Embedded web dashboard**: self-contained Svelte UI served by the Go binary via `go:embed` — open `http://localhost:8080` in any browser, no external tools required.
@@ -471,6 +482,8 @@ helm lint helm/
 
 ```
 ruptura (application)
+v6.8.2 ✅  OOMKill prevention — BadgerDB memory tuning, periodic GC, GOMEMLIMIT
+v6.8.x ✅  Stable dashboard · fleet heatmap · workload identity
 v6.7.0 ✅  Embedded web dashboard — air-gap safe, vendor-local assets
 v6.6.3 ✅  Pre-v7 security & correctness hardening
 v6.6.0 ✅  Per-workload signal weight tuning

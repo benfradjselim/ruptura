@@ -19,9 +19,11 @@ Ruptura detects workload ruptures before they cause outages — using the Fused 
 
 | Version | Date | Status |
 |---------|------|--------|
+| v6.8.2 | 2026-05-10 | ✅ Released — OOMKill prevention: BadgerDB memory tuning, GC loop, GOMEMLIMIT |
+| v6.8.1 | 2026-05-09 | ✅ Released — fleet heatmap visibility and color fix |
+| v6.8.0 | 2026-05-09 | ✅ Released — stable dashboard, correct workload identity |
 | v6.7.0 | 2026-05-06 | ✅ Released — embedded web dashboard, air-gap safe, vendor-local assets |
 | v6.6.3 | 2026-05-06 | ✅ Released — pre-v7 security & correctness hardening |
-| v6.6.1 | 2026-05-06 | ✅ Released — CLI + sim bugfixes |
 | v6.6.0 | 2026-05-05 | ✅ Released — per-workload signal weight tuning |
 | v6.5.0 | 2026-05-05 | ✅ Released — edition gate (community / autopilot) |
 | v6.4.0 | 2026-05-05 | ✅ Released — rupture fingerprinting + business signal layer |
@@ -183,7 +185,7 @@ docker run -d \
   -p 8080:8080 -p 4317:4317 \
   -v ruptura-data:/var/lib/ruptura/data \
   -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-  ghcr.io/benfradjselim/ruptura:6.7.0
+  ghcr.io/benfradjselim/ruptura:6.8.2
 ```
 
 ---
@@ -191,7 +193,7 @@ docker run -d \
 ## What's Inside
 
 ```
-workdir/                  Ruptura Go source (v6.7.0)
+workdir/                  Ruptura Go source (v6.8.2)
   cmd/ruptura/            Main binary
   internal/               Engine, pipelines, API, storage, actions, fusion
   internal/ui/static/     Embedded web dashboard (served at :8080, air-gap safe)
@@ -203,7 +205,7 @@ workdir/                  Ruptura Go source (v6.7.0)
                           RupturaInstance CRD · Deployment + Service + PVC + SA + Route
                           UBI9-based image — certified for Red Hat OperatorHub
 
-helm/                     Helm chart (v0.6.9, appVersion 6.7.0)
+helm/                     Helm chart (v0.6.9, appVersion 6.8.2)
 bundle/                   OLM bundle (OperatorHub submission format)
 catalog/                  File-Based Catalog for OLM
 operators/                community-operators + Red Hat certified-operators submission tree
@@ -220,6 +222,9 @@ docs/
 
 ```
 ruptura (application)
+v6.8.2 ✅  OOMKill prevention — BadgerDB memory tuning, periodic GC, GOMEMLIMIT soft cap
+v6.8.1 ✅  Fleet heatmap visibility and color fix
+v6.8.0 ✅  Stable dashboard · correct workload identity · continuous seed loop
 v6.7.0 ✅  Embedded web dashboard — air-gap safe, vendor-local Chart.js + Alpine.js
 v6.6.3 ✅  Pre-v7 security & correctness hardening (timing-safe auth, emergency stop, forecast fix)
 v6.6.0 ✅  Per-workload signal weight tuning (runtime + env bootstrap)
