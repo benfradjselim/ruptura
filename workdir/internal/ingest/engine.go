@@ -284,7 +284,11 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 		ref := extractWorkloadRef(rm.Resource)
 		host := ref.Node
 		if host == "" {
-			host = "unknown"
+			if !ref.IsEmpty() {
+				host = ref.Key()
+			} else {
+				host = "unknown"
+			}
 		}
 		for _, sm := range rm.ScopeMetrics {
 			for _, m := range sm.Metrics {
@@ -318,7 +322,6 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				}
-				_ = ref // WorkloadRef available for future enrichment
 			}
 		}
 	}

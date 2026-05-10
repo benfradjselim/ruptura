@@ -189,7 +189,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					if len(rawMetrics) == 0 {
 						continue
 					}
-					ref := models.WorkloadRefFromHost(host)
+					ref := models.WorkloadRefFromKey(host)
 					snap := analyzerEngine.Update(ref, rawMetrics)
 
 					// Feed metricR into fusion BEFORE storing snapshot so FusedR is current.

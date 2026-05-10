@@ -1,5 +1,7 @@
 package models
 
+import "strings"
+
 // WorkloadRef identifies the primary treatment unit in Ruptura.
 // In Kubernetes: namespace + kind + name identifies a workload uniquely.
 // For non-K8s (bare-metal, VMs): Namespace="default", Kind="host", Name=hostname.
@@ -33,6 +35,20 @@ func WorkloadRefFromHost(host string) WorkloadRef {
 		Name:      host,
 		Node:      host,
 	}
+}
+
+// WorkloadRefFromKey parses a canonical pipeline key (namespace/kind/name) back into a WorkloadRef.
+// Falls back to WorkloadRefFromHost for bare host strings.
+func WorkloadRefFromKey(key string) WorkloadRef {
+	parts := strings.SplitN(key, "/", 3)
+	if len(parts) == 3 {
+		return WorkloadRef{
+			Namespace: parts[0],
+			Kind:      parts[1],
+			Name:      parts[2],
+		}
+	}
+	return WorkloadRefFromHost(key)
 }
 
 // FirstNonEmpty returns the first non-empty string from the list.
