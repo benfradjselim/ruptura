@@ -117,14 +117,14 @@ kubectl -n test-workloads rollout status deployment/load-generator --timeout=120
 # ── 9. Port-forwards ─────────────────────────────────────────────────────────
 log "Starting port-forwards..."
 # Kill any stale port-forwards from a previous run
+# Ruptura binds hostPort 8080/4317 directly — no port-forward needed.
+# Prometheus and Grafana still use port-forward.
 pkill -f "kubectl.*port-forward" 2>/dev/null || true
 sleep 1
 
-kubectl -n ruptura-system port-forward svc/ruptura       8080:80   --address=0.0.0.0 &
-kubectl -n ruptura-system port-forward svc/ruptura-otlp  4317:4317 --address=0.0.0.0 &
-kubectl -n monitoring     port-forward svc/prometheus     9090:9090 --address=0.0.0.0 &
-kubectl -n monitoring     port-forward svc/grafana        3000:3000 --address=0.0.0.0 &
-sleep 5
+kubectl -n monitoring port-forward svc/prometheus 9090:9090 --address=0.0.0.0 &
+kubectl -n monitoring port-forward svc/grafana    3000:3000 --address=0.0.0.0 &
+sleep 3
 
 # ── 10. Quick smoke test ──────────────────────────────────────────────────────
 echo ""

@@ -46,9 +46,11 @@ spec:
           ports:
             - name: api
               containerPort: 8080
+              hostPort: 8080
               protocol: TCP
             - name: otlp
               containerPort: 4317
+              hostPort: 4317
               protocol: TCP
           env:
             - name: RUPTURA_API_KEY
