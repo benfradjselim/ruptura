@@ -581,6 +581,55 @@ func (h *Handlers) handleExplain(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleLogs returns stored OTLP log entries.
+//
+//	GET /api/v2/logs?service=<svc>&from=<unix-ms>&to=<unix-ms>&limit=<n>
+//
+// All query params are optional. Default limit is 200, max is 1000.
+func (h *Handlers) handleLogs(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	service := q.Get("service")
+
+	limit := 200
+	if s := q.Get("limit"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			if n > 1000 {
+				n = 1000
+			}
+			limit = n
+		}
+	}
+
+	now := time.Now()
+	from := now.Add(-24 * time.Hour)
+	to := now
+
+	if s := q.Get("from"); s != "" {
+		if ms, err := strconv.ParseInt(s, 10, 64); err == nil {
+			from = time.UnixMilli(ms)
+		}
+	}
+	if s := q.Get("to"); s != "" {
+		if ms, err := strconv.ParseInt(s, 10, 64); err == nil {
+			to = time.UnixMilli(ms)
+		}
+	}
+
+	entries, err := h.store.QueryLogs(service, from, to, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "query failed: "+err.Error())
+		return
+	}
+	if entries == nil {
+		entries = []json.RawMessage{}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"logs":    entries,
+		"count":   len(entries),
+		"service": service,
+	})
+}
+
 // handleConfigWeights manages per-workload HealthScore signal weight overrides.
 //
 //	GET  /api/v2/config/weights — list current weight configs

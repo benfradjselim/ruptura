@@ -66,6 +66,8 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/anomalies", h.handleAnomalies).Methods("GET")
 	api.HandleFunc("/anomalies/{host}", h.handleAnomalies).Methods("GET")
 
+	api.HandleFunc("/logs", h.handleLogs).Methods("GET")
+
 	api.HandleFunc("/sim/inject", h.handleSimInject).Methods("POST")
 
 	api.HandleFunc("/config/weights", h.handleConfigWeights).Methods("GET", "POST")
