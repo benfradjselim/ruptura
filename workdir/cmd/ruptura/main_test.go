@@ -63,8 +63,8 @@ func TestParseFlags_UnknownFlag(t *testing.T) {
 }
 
 func TestVersion_Constant(t *testing.T) {
-	if version != "6.7.0" {
-		t.Errorf("want version 6.7.0 got %s", version)
+	if version != "6.8.0" {
+		t.Errorf("want version 6.8.0 got %s", version)
 	}
 }
 
@@ -208,18 +208,19 @@ func TestRunWithContext_WithAPIKey(t *testing.T) {
 		}
 	}
 
-	// Request without auth should return 401
-	resp, err := http.Get(addr + "/api/v2/health")
+	// /api/v2/health is intentionally public (k8s probes carry no auth).
+	// Use a protected endpoint to verify auth enforcement.
+	resp, err := http.Get(addr + "/api/v2/ruptures")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("want 401 without auth, got %d", resp.StatusCode)
+		t.Errorf("want 401 without auth on protected endpoint, got %d", resp.StatusCode)
 	}
 
 	// Request with correct auth should return 200
-	req, _ := http.NewRequest("GET", addr+"/api/v2/health", nil)
+	req, _ := http.NewRequest("GET", addr+"/api/v2/ruptures", nil)
 	req.Header.Set("Authorization", "Bearer test-secret")
 	resp2, err := http.DefaultClient.Do(req)
 	if err != nil {
