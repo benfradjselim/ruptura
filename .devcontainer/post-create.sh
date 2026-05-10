@@ -160,7 +160,38 @@ seed_otlp() {
           {\"name\":\"uptime_seconds\", \"gauge\":{\"dataPoints\":[{\"asDouble\":3600, \"timeUnixNano\":\"$TS\"}]}}
         ]}]}]}" > /dev/null 2>&1 && echo "  seeded: $SVC" || echo "  seed skipped: $SVC (OTLP port-forward not ready yet)"
 }
-for SVC in nginx podinfo stress-app; do seed_otlp "$SVC"; done
+for SVC in nginx podinfo stress-app load-generator; do seed_otlp "$SVC"; done
+
+# Start a background seed loop so calibration progresses even if the k3s
+# load-generator pod isn't available yet (e.g., image pull in progress).
+(while true; do
+  TS=$(date +%s)000000000
+  for SVC in nginx podinfo stress-app load-generator; do
+    CPU=$(python3 -c "import random; print(round(random.uniform(20,60),1))" 2>/dev/null || echo 35)
+    MEM=$(python3 -c "import random; print(round(random.uniform(30,70),1))" 2>/dev/null || echo 42)
+    ERR=$(python3 -c "import random; print(round(random.uniform(0.005,0.05),4))" 2>/dev/null || echo 0.02)
+    LAT=$(python3 -c "import random; print(round(random.uniform(0.1,0.4),3))" 2>/dev/null || echo 0.18)
+    RPS=$(python3 -c "import random; print(round(random.uniform(0.4,0.9),2))" 2>/dev/null || echo 0.65)
+    curl -sf -X POST "http://localhost:4317/otlp/v1/metrics" \
+      -H "Content-Type: application/json" \
+      -d "{\"resourceMetrics\":[{\"resource\":{\"attributes\":[
+            {\"key\":\"service.name\",        \"value\":{\"stringValue\":\"$SVC\"}},
+            {\"key\":\"k8s.namespace.name\",  \"value\":{\"stringValue\":\"test-workloads\"}},
+            {\"key\":\"k8s.deployment.name\", \"value\":{\"stringValue\":\"$SVC\"}},
+            {\"key\":\"host.name\",           \"value\":{\"stringValue\":\"$SVC\"}}
+          ]},\"scopeMetrics\":[{\"scope\":{\"name\":\"lab-seed\"},\"metrics\":[
+            {\"name\":\"cpu_percent\",    \"gauge\":{\"dataPoints\":[{\"asDouble\":$CPU, \"timeUnixNano\":\"$TS\"}]}},
+            {\"name\":\"memory_percent\", \"gauge\":{\"dataPoints\":[{\"asDouble\":$MEM, \"timeUnixNano\":\"$TS\"}]}},
+            {\"name\":\"error_rate\",     \"gauge\":{\"dataPoints\":[{\"asDouble\":$ERR, \"timeUnixNano\":\"$TS\"}]}},
+            {\"name\":\"latency\",        \"gauge\":{\"dataPoints\":[{\"asDouble\":$LAT, \"timeUnixNano\":\"$TS\"}]}},
+            {\"name\":\"request_rate\",   \"gauge\":{\"dataPoints\":[{\"asDouble\":$RPS, \"timeUnixNano\":\"$TS\"}]}},
+            {\"name\":\"timeout_rate\",   \"gauge\":{\"dataPoints\":[{\"asDouble\":0.002,\"timeUnixNano\":\"$TS\"}]}},
+            {\"name\":\"uptime_seconds\", \"gauge\":{\"dataPoints\":[{\"asDouble\":3600, \"timeUnixNano\":\"$TS\"}]}}
+          ]}]}]}" > /dev/null 2>&1
+  done
+  sleep 15
+done) &
+log "Continuous seed loop started (PID $!) — 4 workloads every 15s"
 
 # ── 12. Print access URLs ─────────────────────────────────────────────────────
 echo ""
