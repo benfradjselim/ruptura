@@ -102,20 +102,18 @@ func (h *Handlers) handleRuptures(w http.ResponseWriter, r *http.Request) {
 	if snapshots == nil {
 		snapshots = []models.KPISnapshot{}
 	}
-	// Feed history ring buffer and event bus
-	if h.historyMgr != nil || h.eventBus != nil {
-		now := time.Now()
-		for _, snap := range snapshots {
-			key := snap.Host
-			if snap.Workload.Namespace != "" {
-				key = snap.Workload.Namespace + "/" + snap.Workload.Kind + "/" + snap.Workload.Name
-			}
-			if h.historyMgr != nil {
-				h.historyMgr.MaybePush(key, snap, now, 30*time.Second)
-			}
-			if h.eventBus != nil {
-				h.eventBus.ObserveFusedR(key, snap.FusedRuptureIndex)
-			}
+	now := time.Now()
+	for i := range snapshots {
+		h.enrichSnapshot(&snapshots[i])
+		key := snapshots[i].Host
+		if snapshots[i].Workload.Namespace != "" {
+			key = snapshots[i].Workload.Namespace + "/" + snapshots[i].Workload.Kind + "/" + snapshots[i].Workload.Name
+		}
+		if h.historyMgr != nil {
+			h.historyMgr.MaybePush(key, snapshots[i], now, 30*time.Second)
+		}
+		if h.eventBus != nil {
+			h.eventBus.ObserveFusedR(key, snapshots[i].FusedRuptureIndex)
 		}
 	}
 	writeJSON(w, http.StatusOK, snapshots)

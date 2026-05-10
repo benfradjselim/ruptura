@@ -15,10 +15,10 @@
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "forwardPorts": [8080, 4317, 9090, 3000],
   "portsAttributes": {
-    "8080": { "label": "Ruptura API",    "onAutoForward": "notify" },
-    "4317": { "label": "Ruptura OTLP",   "onAutoForward": "silent" },
-    "9090": { "label": "Prometheus",     "onAutoForward": "notify" },
-    "3000": { "label": "Grafana",        "onAutoForward": "notify" }
+    "8080": { "label": "Ruptura Dashboard", "onAutoForward": "openBrowser", "visibility": "public" },
+    "4317": { "label": "Ruptura OTLP",      "onAutoForward": "silent",      "visibility": "public" },
+    "9090": { "label": "Prometheus",        "onAutoForward": "notify",      "visibility": "public" },
+    "3000": { "label": "Grafana",           "onAutoForward": "notify",      "visibility": "public" }
   },
   "remoteEnv": {
     "KUBECONFIG": "/etc/rancher/k3s/k3s.yaml"

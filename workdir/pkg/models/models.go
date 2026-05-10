@@ -57,7 +57,7 @@ type KPISnapshot struct {
 	// v6.1: throughput collapse signal
 	Throughput KPI `json:"throughput"`
 	// v6.2: fused rupture index (metric R + log R + trace R combined)
-	FusedRuptureIndex float64 `json:"fused_rupture_index,omitempty"`
+	FusedRuptureIndex float64 `json:"fused_rupture_index"`
 	// v5.0: dual-scale CA-ILR rupture events (omitted when none detected)
 	RuptureEvents []RuptureEvent `json:"rupture_events,omitempty"`
 	// v6.3: calibration warm-up state
