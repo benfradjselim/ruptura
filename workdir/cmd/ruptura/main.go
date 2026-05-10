@@ -137,6 +137,24 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	defer store.Close()
 
+	// Periodic BadgerDB value-log GC — prevents vlog files from accumulating and
+	// reclaims space from TTL-expired entries. Runs every 10 minutes; each pass
+	// discards at most one vlog file with ≥50% garbage.
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				for store.RunGC() == nil {
+					// keep GC-ing until no more garbage remains
+				}
+			}
+		}
+	}()
+
 	bus := eventbus.NewWithKafka(ctx, os.Getenv("KAFKA_BROKERS"), "ruptura")
 	defer bus.Close()
 

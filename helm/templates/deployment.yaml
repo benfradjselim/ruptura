@@ -73,6 +73,8 @@ spec:
             - name: RUPTURA_WORKLOAD_WEIGHTS
               value: {{ .Values.workloadWeights | toJson | quote }}
             {{- end }}
+            - name: GOMEMLIMIT
+              value: {{ .Values.goMemLimit | default "419430400" | quote }}
           livenessProbe:
             httpGet:
               path: /api/v2/health

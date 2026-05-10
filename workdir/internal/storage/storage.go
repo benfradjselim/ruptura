@@ -29,12 +29,22 @@ type Store struct {
 	snapshots     map[string]models.KPISnapshot // host → latest snapshot (in-memory)
 }
 
-// Open opens (or creates) the Badger database at path
+// Open opens (or creates) the Badger database at path.
+// Memory is tuned to stay well within a 512Mi container limit:
+//   - MemTableSize 8MB × NumMemtables 2 = 16MB active writes
+//   - BlockCacheSize 32MB for read amplification
+//   - ValueLogFileSize 64MB per vlog file (rotates frequently, enables GC)
 func Open(path string) (*Store, error) {
 	opts := badger.DefaultOptions(path).
-		WithLogger(nil). // silence Badger internal logs
+		WithLogger(nil).
 		WithNumVersionsToKeep(1).
-		WithCompactL0OnClose(true)
+		WithCompactL0OnClose(true).
+		WithMemTableSize(8 << 20).        // 8 MB (default 64 MB)
+		WithNumMemtables(2).              // 2 (default 5) → max 16 MB active
+		WithBlockCacheSize(32 << 20).     // 32 MB (default 256 MB)
+		WithIndexCacheSize(8 << 20).      // 8 MB (default 0, uses block cache)
+		WithValueLogFileSize(64 << 20).   // 64 MB per vlog (default 1 GB)
+		WithValueThreshold(1 << 10)       // 1 KB: inline small values, vlog only for large
 
 	db, err := badger.Open(opts)
 	if err != nil {
