@@ -63,3 +63,7 @@ dist/
 site/site/
 workdir/ruptura
 workdir/operator/ruptura-operator
+
+# local build artifacts
+workdir/ruptura
+workdir/ruptura_*
