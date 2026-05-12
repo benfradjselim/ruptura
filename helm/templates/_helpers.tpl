@@ -63,5 +63,6 @@ ServiceAccount name.
 Image reference.
 */}}
 {{- define "ruptura.image" -}}
-{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+{{- $tag := .Values.image.tag | default (printf "v%s" .Chart.AppVersion) -}}
+{{ .Values.image.repository }}:{{ $tag }}
 {{- end }}
