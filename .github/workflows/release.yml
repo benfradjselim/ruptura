@@ -231,11 +231,12 @@ jobs:
           helm upgrade --install ruptura \
             oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/ruptura \
             --version "${CHART_VERSION}" \
-            --namespace ruptura \
+            --namespace ruptura-system \
             --create-namespace \
             --set image.tag="${TAG}" \
             --set apiKey="${RUPTURA_API_KEY}" \
-            --set service.type=LoadBalancer \
+            --set service.type=NodePort \
+            --set persistence.size=5Gi \
             --kubeconfig /tmp/kubeconfig \
             --wait \
             --timeout 5m
@@ -243,29 +244,32 @@ jobs:
       - name: Show deployment status
         run: |
           echo "=== Pods ==="
-          kubectl --kubeconfig /tmp/kubeconfig -n ruptura get pods -o wide
+          kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system get pods -o wide
 
           echo ""
           echo "=== Service ==="
-          kubectl --kubeconfig /tmp/kubeconfig -n ruptura get svc ruptura
+          kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system get svc ruptura
 
           echo ""
-          echo "=== External IP / Access ==="
-          EXTERNAL_IP=$(kubectl --kubeconfig /tmp/kubeconfig -n ruptura \
+          echo "=== Node IP / Access ==="
+          NODE_IP=$(kubectl --kubeconfig /tmp/kubeconfig get nodes \
+            -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}' 2>/dev/null || echo "pending")
+          NODE_PORT=$(kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system \
             get svc ruptura \
-            -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
-          echo "ruptura endpoint: http://${EXTERNAL_IP}/api/v2/health"
-          echo "ruptura metrics:  http://${EXTERNAL_IP}/api/v2/metrics"
+            -o jsonpath='{.spec.ports[?(@.name=="api")].nodePort}' 2>/dev/null || echo "")
+          echo "ruptura endpoint: http://${NODE_IP}:${NODE_PORT}/api/v2/health"
 
       - name: Smoke test — health check
         run: |
-          EXTERNAL_IP=$(kubectl --kubeconfig /tmp/kubeconfig -n ruptura \
+          NODE_IP=$(kubectl --kubeconfig /tmp/kubeconfig get nodes \
+            -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+          NODE_PORT=$(kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system \
             get svc ruptura \
-            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            -o jsonpath='{.spec.ports[?(@.name=="api")].nodePort}')
 
           for i in $(seq 1 10); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              "http://${EXTERNAL_IP}/api/v2/health" || echo "000")
+              "http://${NODE_IP}:${NODE_PORT}/api/v2/health" || echo "000")
             echo "Attempt $i: HTTP $STATUS"
             [ "$STATUS" = "200" ] && exit 0
             sleep 6
