@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -134,8 +135,34 @@ type OTLPSpan struct {
 }
 
 type OTLPSpanStatus struct {
-	Code    int    `json:"code"`    // 0=unset, 1=ok, 2=error
-	Message string `json:"message,omitempty"`
+	Code    OTLPStatusCode `json:"code"`
+	Message string         `json:"message,omitempty"`
+}
+
+// OTLPStatusCode accepts both proto3 JSON string enums and integer values.
+// Proto3 JSON from the OTel Collector sends "STATUS_CODE_ERROR"; the REST API
+// and raw JSON senders may use integers (0=unset, 1=ok, 2=error).
+type OTLPStatusCode int
+
+func (c *OTLPStatusCode) UnmarshalJSON(b []byte) error {
+	var n int
+	if err := json.Unmarshal(b, &n); err == nil {
+		*c = OTLPStatusCode(n)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch s {
+	case "STATUS_CODE_OK":
+		*c = 1
+	case "STATUS_CODE_ERROR":
+		*c = 2
+	default:
+		*c = 0
+	}
+	return nil
 }
 
 // --- OTLP Metrics JSON structures ---
