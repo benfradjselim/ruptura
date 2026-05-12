@@ -33,6 +33,7 @@ spec:
       serviceAccountName: {{ include "ruptura.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
       containers:
         - name: ruptura
           image: {{ include "ruptura.image" . }}
@@ -75,18 +76,25 @@ spec:
             {{- end }}
             - name: GOMEMLIMIT
               value: {{ .Values.goMemLimit | default "419430400" | quote }}
-          livenessProbe:
+          startupProbe:
             httpGet:
               path: /api/v2/health
               port: api
             initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /api/v2/health
+              port: api
+            initialDelaySeconds: 0
             periodSeconds: 15
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /api/v2/ready
               port: api
-            initialDelaySeconds: 3
+            initialDelaySeconds: 0
             periodSeconds: 5
             failureThreshold: 2
           resources:

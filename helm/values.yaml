@@ -80,6 +80,18 @@ serviceAccount:
 rbac:
   create: true
 
+# -- Seconds to wait after SIGTERM before force-killing the pod.
+# Must be > the server's 10 s graceful shutdown so snapshots can flush to disk.
+terminationGracePeriodSeconds: 30
+
+# -- PodDisruptionBudget prevents too many pods from being evicted at once.
+# With replicaCount=1 + Recreate strategy, maxUnavailable=1 is the safe default.
+# Set minAvailable: 1 only if you run replicaCount >= 2.
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+  # minAvailable: 1
+
 podAnnotations: {}
 
 podSecurityContext:
