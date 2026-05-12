@@ -227,9 +227,10 @@ jobs:
           TAG: ${{ needs.docker.outputs.image-tag }}
           RUPTURA_API_KEY: ${{ secrets.RUPTURA_API_KEY }}
         run: |
+          CHART_VERSION=$(grep '^version:' helm/Chart.yaml | awk '{print $2}')
           helm upgrade --install ruptura \
             oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/ruptura \
-            --version 0.6.6 \
+            --version "${CHART_VERSION}" \
             --namespace ruptura \
             --create-namespace \
             --set image.tag="${TAG}" \

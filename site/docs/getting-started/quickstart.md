@@ -15,7 +15,7 @@ Get Ruptura running and observing your workloads in under 5 minutes.
       -p 4317:4317 \
       -v ruptura-data:/var/lib/ruptura/data \
       -e RUPTURA_API_KEY=$RUPTURA_API_KEY \
-      ghcr.io/benfradjselim/ruptura:6.7.0
+      ghcr.io/benfradjselim/ruptura:6.8.4
     ```
 
 === "Kubernetes / Helm"
@@ -51,6 +51,23 @@ export API_KEY=$RUPTURA_API_KEY
 ```
 
 All subsequent requests need: `Authorization: Bearer $API_KEY`
+
+## Step 3b — Install ruptura-ctl (optional)
+
+`ruptura-ctl` is the CLI companion. It runs on your workstation and talks to the Ruptura API:
+
+```bash
+# Linux amd64
+curl -Lo ruptura-ctl \
+  https://github.com/benfradjselim/ruptura/releases/latest/download/ruptura-ctl-linux-amd64
+chmod +x ruptura-ctl && sudo mv ruptura-ctl /usr/local/bin/
+
+export RUPTURA_URL=http://localhost:8080
+export RUPTURA_API_KEY=$API_KEY
+ruptura-ctl status
+```
+
+See [CLI Reference →](../cli/rupturactl.md) for Kubernetes, OpenShift, and in-cluster Job patterns.
 
 ## Step 4 — Send metrics
 

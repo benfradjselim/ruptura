@@ -44,6 +44,8 @@ nav:
     - Fusion Engine: architecture/fusion-engine.md
     - Embedded Dashboard: architecture/dashboard.md
     - Operator: architecture/operator.md
+  - CLI:
+    - Reference: cli/rupturactl.md
   - API:
     - index.md
     - Reference: api/reference.md

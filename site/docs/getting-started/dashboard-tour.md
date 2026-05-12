@@ -84,7 +84,7 @@ Start a local Ruptura instance and inject a simulation pattern in under a minute
 ```bash
 # Start Ruptura
 docker run -d --name ruptura -p 8080:8080 \
-  ghcr.io/benfradjselim/ruptura:6.7.0
+  ghcr.io/benfradjselim/ruptura:6.8.4
 
 # Open the dashboard
 open http://localhost:8080

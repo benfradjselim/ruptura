@@ -1,5 +1,25 @@
 # Installation
 
+## ruptura-ctl (CLI)
+
+`ruptura-ctl` is the command-line interface for Ruptura. It connects to the Ruptura API from **outside the pod** — from your workstation, a CI pipeline, or a Kubernetes Job.
+
+```bash
+# Quick install (Linux amd64)
+curl -Lo ruptura-ctl \
+  https://github.com/benfradjselim/ruptura/releases/latest/download/ruptura-ctl-linux-amd64
+chmod +x ruptura-ctl && sudo mv ruptura-ctl /usr/local/bin/
+
+# Point it at your instance
+export RUPTURA_URL=http://localhost:8080
+export RUPTURA_API_KEY=<your-api-key>
+ruptura-ctl status
+```
+
+For full install options (macOS, arm64, Go install, kubectl plugin, in-cluster Job, OpenShift) see the [CLI Reference →](../cli/rupturactl.md).
+
+---
+
 ## Kubernetes
 
 The recommended production deployment uses the Helm chart. It deploys a single Ruptura binary with BadgerDB embedded storage — no external database.
@@ -30,7 +50,7 @@ Common Helm options:
 ```bash
 --set apiKey=<your-key>          # API bearer token (required for prod)
 --set persistence.size=20Gi               # PVC size (default: 10Gi)
---set image.tag=6.8.2                 # Pin to a specific version
+--set image.tag=6.8.4                 # Pin to a specific version
 --set serviceMonitor.enabled=true     # Prometheus Operator scrape
 --set grafana.dashboards.enabled=true # Grafana dashboard ConfigMap
 ```
@@ -103,7 +123,7 @@ docker run -d \
   -p 4317:4317 \
   -v ruptura-data:/var/lib/ruptura/data \
   -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-  ghcr.io/benfradjselim/ruptura:6.8.2
+  ghcr.io/benfradjselim/ruptura:6.8.4
 ```
 
 | Port | Protocol | Purpose |
