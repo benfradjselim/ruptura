@@ -235,7 +235,7 @@ func TestOTLPReceiver_MetricsHandler_Gauge(t *testing.T) {
 
 func TestOTLPReceiver_MetricsHandler_SumWithIntDataPoint(t *testing.T) {
 	recv, ms, _, _ := newOTLPReceiver()
-	intPtr := func(i int64) *int64 { return &i }
+	intPtr := func(i int64) *models.OTLPInt64 { v := models.OTLPInt64(i); return &v }
 
 	metricsReq := models.OTLPMetricsRequest{
 		ResourceMetrics: []models.OTLPResourceMetrics{{
@@ -418,7 +418,7 @@ func TestCollectDataPoints_GaugeDouble(t *testing.T) {
 }
 
 func TestCollectDataPoints_SumInt(t *testing.T) {
-	var i int64 = 99
+	i := models.OTLPInt64(99)
 	m := models.OTLPMetric{
 		Name: "count",
 		Sum:  &models.OTLPSum{DataPoints: []models.OTLPNumberDataPoint{{AsInt: &i, TimeUnixNano: "0"}}},

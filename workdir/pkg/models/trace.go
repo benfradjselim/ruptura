@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -195,11 +196,33 @@ type OTLPSum struct {
 	DataPoints []OTLPNumberDataPoint `json:"dataPoints"`
 }
 
+// OTLPInt64 accepts both JSON numbers and proto3 JSON quoted strings (e.g. "12345").
+// Proto3 JSON encodes int64 as strings to preserve JavaScript precision.
+type OTLPInt64 int64
+
+func (v *OTLPInt64) UnmarshalJSON(b []byte) error {
+	var n int64
+	if err := json.Unmarshal(b, &n); err == nil {
+		*v = OTLPInt64(n)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	parsed, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return err
+	}
+	*v = OTLPInt64(parsed)
+	return nil
+}
+
 type OTLPNumberDataPoint struct {
-	Attributes     []OTLPAttribute `json:"attributes,omitempty"`
-	TimeUnixNano   string          `json:"timeUnixNano"`
-	AsDouble       *float64        `json:"asDouble,omitempty"`
-	AsInt          *int64          `json:"asInt,omitempty"`
+	Attributes   []OTLPAttribute `json:"attributes,omitempty"`
+	TimeUnixNano string          `json:"timeUnixNano"`
+	AsDouble     *float64        `json:"asDouble,omitempty"`
+	AsInt        *OTLPInt64      `json:"asInt,omitempty"`
 }
 
 // --- OTLP Logs JSON structures ---
