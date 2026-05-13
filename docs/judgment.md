@@ -1153,142 +1153,181 @@ workloadWeights:
 
 ## v7.0 Judgment — "Deviser pour réunir" (May 2026)
 
-> This section captures the judgment from a structured product/architecture discussion.
-> It supersedes the informal v7.0 entries in the Planned section of the roadmap.
-> Every gap below must be resolved or explicitly deferred before v7.0 ships.
+> This section is the v7 sprint authority.
+> Read it before touching any file. Update the checkboxes as work lands.
+> Every gap must be resolved or explicitly deferred before the v7 tag is cut.
+
+---
+
+### Component Version Manifest (v7 — independent versioning)
+
+Each component is versioned and released independently starting with v7. A change in one does not force a release in another.
+
+| Component | v6 last | v7 starts at | Binary / Image |
+|-----------|---------|-------------|----------------|
+| **ruptura** (core engine) | v6.8.13 | **v7.0.0** | `ghcr.io/benfradjselim/ruptura:v7.0.0` |
+| **ruptura-ui** (dashboard) | embedded in core | **v1.0.0** | `ghcr.io/benfradjselim/ruptura-ui:v1.0.0` |
+| **ruptura-ctl** (CLI) | v1.0.0 | **v1.1.0** | binary `ruptura-ctl-*` |
+| **ruptura-operator** | v0.6.9 | **v0.7.0** | `ghcr.io/benfradjselim/ruptura-operator:v0.7.0` |
+| **Helm chart** | 0.7.6 (appVersion 6.8.13) | **0.8.0** (appVersion 7.0.0) | OCI `oci://ghcr.io/benfradjselim/charts/ruptura` |
+
+Version bumps per component follow semver independently:
+- Core engine and ruptura-ui: minor bump per sprint, patch for hotfixes
+- CLI: minor bump when new commands or flags are added
+- Operator: minor bump per OperatorHub submission
+- Helm chart: minor bump when new values or templates change
+
+---
 
 ### Architecture Decision: Frontend / Backend Separation
 
-**Decision**: Split the monolithic binary into two independently deployable components under the same Helm chart, namespace, and Operator.
+**Decision**: Split the monolithic binary into two independently deployable pods under the same Helm chart, namespace, and Operator.
 
-- `ruptura` (core engine): pure API server — no embedded UI assets, no JavaScript
-- `ruptura-ui` (new): dedicated pod serving the Svelte dashboard, talks to the core REST API
-
-**Why**: The embedded 71KB single-file dashboard is the root cause of almost all UX gaps. It cannot support forms, multi-window navigation, topology visualization, or complex state management without becoming unmaintainable. Separating it removes every constraint.
-
-**Principle**: "Deviser pour réunir" — split to unite. Two components that are independently deployable, independently versioned, and independently scalable — but work as one product under the same operator/chart/namespace.
-
----
-
-### v7 Gap Registry
-
-The following gaps were identified in the judgment discussion of 2026-05-13.
-
-#### MISSING-05 — Dashboard is read-only / no CRUD (CRITICAL for user story completeness)
-
-**Problem**: The dashboard is a pure observer. Users cannot:
-- Create/delete suppression windows (maintenance windows) from the UI
-- Adjust signal weights per workload from the UI
-- Post context events (deploys) from the UI
-- Approve/reject pending actions from the UI (the approve button exists but only in the community edition paywall path)
-- Add or remove monitored workloads manually
-
-**Honest state**: The API has ALL the mutation endpoints already — `POST /suppressions`, `POST /config/weights`, `POST /context`, `POST /actions/{id}/approve`. The dashboard simply never surfaced them as interactive forms because the embedded single-file architecture made form state management too costly.
-
-**What to build in v7**: In `ruptura-ui`, every API mutation endpoint gets a corresponding UI interaction:
-- Suppression: click a workload → "Suppress for..." dialog with duration + reason
-- Weights: per-namespace or per-workload signal weight editor panel
-- Context events: "Mark deploy" button on workload detail
-- Actions: approve/reject buttons on action queue (Tier-2 actions)
-
-**Effort**: ~1 week of frontend work once `ruptura-ui` is a proper Svelte app.
-
----
-
-#### MISSING-06 — HealthScore vs FusedR contradiction in UI (HIGH — erodes trust)
-
-**Problem**: Users see a green HealthScore (72) alongside an active rupture warning (FusedR=2.8). This looks like a broken tool, not an early warning system.
-
-**What is actually happening**:
 ```
-HealthScore = f(stress, fatigue, mood, ...)  ← LAGGING indicator (integrates KPIs over 15s ticks)
-FusedR      = f(metricR, logR, traceR)       ← LEADING indicator (reacts within one window)
+ruptura-system namespace
+┌────────────────────────────────────────────────┐
+│                                                │
+│  ┌──────────────────┐   ┌──────────────────┐  │
+│  │  ruptura v7.0.0  │   │ ruptura-ui v1.0.0│  │
+│  │  (core engine)   │◄──│  (Svelte / nginx) │  │
+│  │  :8080 REST API  │   │  :3000 dashboard  │  │
+│  │  :4317 OTLP      │   │                  │  │
+│  │  :8125 StatsD    │   │                  │  │
+│  └──────────────────┘   └──────────────────┘  │
+│           ▲                       ▲            │
+│      telemetry              browser / user     │
+└────────────────────────────────────────────────┘
 ```
-A burst of FATAL logs pushes `logR` above threshold instantly. FusedR fires. HealthScore won't degrade for another 3–5 ticks because fatigue and stress accumulate gradually. This is correct and valuable behavior — the rupture is detected *before* health visibly degrades. But the UI presents these as contradictory without explanation.
 
-**What to build**: The UI must explain the relationship explicitly when this state occurs:
-> "Rupture detected (FusedR=2.8 · WARNING). HealthScore is still 72 because KPI signals are lagging indicators. If this signal persists, expect HealthScore to decline to ~55 in the next 15–20 minutes."
+- `ruptura` core: pure API server, no JavaScript, no embedded assets
+- `ruptura-ui`: Svelte SPA served by nginx, calls core REST API
+- Same Helm chart, same Operator, same namespace
+- `ui.enabled: true` toggle in values.yaml — can deploy core without UI
 
-Also: the forecast model should acknowledge its own confidence window. When the OLS regression has fewer than 60 observations (~15 minutes of data), the forecast should not project beyond 30 minutes and should display "early data — low confidence."
-
-**Effort**: 2–3 days frontend + a `confidence_window` field added to the forecast API response.
-
----
-
-#### GAP-V7-01 — Topology map never visualized (HIGH — most valuable signal hidden)
-
-**Problem**: The trace topology graph (service edges built from OTLP spans) exists fully in the backend — `TopologyBuilder` in `internal/correlator` produces real directed edges with error rates and call volumes. The contagion signal uses these edges. The blast radius business signal uses these edges. But **no user has ever seen this graph** because there is no visualization.
-
-**What the user needs**: A dedicated "Workload Map" view showing:
-- Nodes = workloads (colored by HealthScore)
-- Edges = call relationships (thickness = call volume, color = error rate)
-- Hover on edge → latency P50/P99, error rate
-- Click workload node → jump to workload detail
-- Highlight contagion propagation path when a rupture is active
-
-**Data available**: `GET /api/v2/topology` needs to be added — the data already exists in `TopologyBuilder`. This is purely a new API endpoint + frontend rendering (D3 force-directed graph or Cytoscape.js).
-
-**Effort**: 1 day for API endpoint, 3–4 days for D3/Cytoscape visualization in `ruptura-ui`.
+**Principle**: "Deviser pour réunir" — split to unite.
 
 ---
 
-#### GAP-V7-02 — No Kubernetes workload metadata (MEDIUM — required for CRD view)
+### Development Toolkit
 
-**Problem**: Ruptura knows workloads from telemetry attributes (`k8s.namespace.name`, `k8s.deployment.name`). It does not know:
-- Current replica count vs desired replica count
-- Container image and version
-- Resource limits/requests
-- Pod status (Pending/Running/CrashLoopBackOff)
-- Labels and annotations
+Activate the correct agent for each class of work. Do not skip:
 
-A user clicking into a workload detail page expects to see this. Currently Ruptura cannot provide it.
+| Work type | Agent | When |
+|-----------|-------|------|
+| New feature planning | `planner` | Before writing a single line |
+| Architecture decisions | `architect` | Before new packages or interfaces |
+| Writing new code | `tdd-guide` | Write test first, then implement |
+| After any code change | `code-reviewer` | Mandatory, every PR |
+| Go-specific review | `go-reviewer` | All `.go` file changes |
+| Build failures | `build-error-resolver` | Immediately when `go build` fails |
+| Security-sensitive code | `security-reviewer` | Auth, ingest, API key handling |
+| Documentation | `doc-updater` | After each sprint block |
+| Library API questions | `docs-lookup` (Context7) | Before implementing against any library |
 
-**What to build**: A Kubernetes API informer running inside the core engine, watching `Deployment`, `StatefulSet`, `DaemonSet`, `Pod` objects cluster-wide. Cache them. Expose via `GET /api/v2/workloads/{namespace}/{kind}/{name}/k8s`. The rupture API response gains an optional `k8s_metadata` block when this informer is active.
-
-**Constraint**: Requires `in-cluster` service account permissions (`get/list/watch` on workloads). Helm chart must provision the RBAC. Already done for the operator — reuse the pattern.
-
-**Effort**: ~4 days core engine + 2 days UI.
+Context7 libraries to pre-load for v7:
+- `k8s.io/client-go` — Kubernetes informer/watch for auto-discovery (GAP-V7-04)
+- `nhooyr.io/websocket` or `net/http` SSE — event streaming (MISSING-09)
+- `svelte` — ruptura-ui frontend framework
+- `badger/v4` — any BadgerDB stat APIs for MISSING-08
 
 ---
 
-#### GAP-V7-03 — No cluster node health view (MEDIUM)
+### v7 Sprint Backlog — Ordered Checklist
 
-**Problem**: The analyzer tracks `host.name` (node) as a secondary dimension alongside WorkloadRef. Node-level signals (node CPU, node memory pressure) flow through the ingest pipeline. But there is no API endpoint or UI view for node health.
+> Tick each box as the work lands on the v7 branch.
+> Do not reorder. Priority is load-bearing — later items depend on earlier ones.
+> Each item lists: component owner, effort estimate, agents to activate.
 
-SREs managing infrastructure-heavy workloads (DaemonSets, node-local services) need to see which nodes are under pressure and which workloads are running on them.
+---
+
+#### SPRINT 1 — Unblock Day 1 (core engine + ruptura-ui scaffold)
+
+**Goal**: Fresh install → workloads visible within 15 minutes, UI can mutate state, green+rupture contradiction explained.
+
+---
+
+##### [ ] S1-1 · GAP-V7-04 — Auto-discovery (k8s informer)
+**Component**: `ruptura` core engine · **Effort**: ~1 week · **Agents**: `planner` → `tdd-guide` → `go-reviewer`
+
+**What is broken**: Workloads appear only when telemetry arrives. The Day 1 promise ("within 15 minutes, without manual config, see every Deployment and StatefulSet") is unmet. If OTel Collector is not pre-configured, Ruptura shows nothing.
 
 **What to build**:
-- `GET /api/v2/nodes` — list all known nodes with aggregated health
-- `GET /api/v2/nodes/{node}` — node detail: all workloads running on it + their FusedR
-- A "Nodes" section in the UI (separate from workloads) showing the cluster infrastructure layer
+- `internal/discovery/informer.go` — k8s `client-go` informer watching `Deployment`, `StatefulSet`, `DaemonSet` cluster-wide. Runs as a goroutine started in `main.go` when `RUPTURA_AUTODISCOVERY=true` (default true in-cluster).
+- Pre-registers `WorkloadRef` in the analyzer registry with `status: "pending_telemetry"` — a third state distinct from `calibrating` and `active`.
+- Watch events: new workload → register; deleted workload → mark `removed` (keep history).
+- Helm: `autodiscovery.enabled: true` (default), provisions `get/list/watch` RBAC on `apps` resources.
+- New workload state: `"pending_telemetry"` — "Ruptura knows this workload exists but has received no metrics yet. Verify your OTel Collector is configured."
 
-**Effort**: ~3 days API + 2 days UI.
+**Key files**:
+- `internal/discovery/informer.go` (new)
+- `internal/analyzer/analyzer.go` — add `RegisterWorkload(ref WorkloadRef)`, handle `pending_telemetry` status
+- `cmd/ruptura/main.go` — start informer goroutine
+- `helm/templates/rbac.yaml` — add autodiscovery RBAC
+- `helm/values.yaml` — `autodiscovery.enabled: true`
 
----
-
-#### GAP-V7-04 — Auto-discovery is a promise not yet kept (CRITICAL — Day 1 user contract)
-
-**The promise** (from the user contract in this file, written at v6.0):
-> Within 15 minutes, without configuring a single workload manually, they should see a list of every Deployment and StatefulSet in their cluster.
-
-**The reality**: Workloads appear in Ruptura only when telemetry arrives. If the OTel Collector is already configured and running, workloads appear within a few scrape intervals. If it is not configured, Ruptura shows nothing. There is no proactive Kubernetes API watch, no pre-population of known workloads, no "this workload is known but has no telemetry yet" state.
-
-**What is missing**:
-1. A `k8s.informer` component in the core engine that watches `Deployment`, `StatefulSet`, `DaemonSet` via the Kubernetes API. At startup, it populates the workload registry with all known workloads — even if no telemetry has arrived yet.
-2. A "no data yet" state per workload, distinct from calibrating. The UI shows the workload exists, with a prompt to check that the OTel Collector is configured for it.
-3. When a new workload is deployed after Ruptura, the informer detects it via watch event and pre-registers it within seconds.
-
-**Helm**: `autodiscovery.enabled: true` is already in the user contract text but has never been implemented. This is the helm value that should gate the feature.
-
-**Effort**: ~1 week for k8s informer + workload registry + API changes + Helm RBAC.
+**Do not start**: topology map, k8s metadata view. Those depend on this being done first.
 
 ---
 
-#### MISSING-07 — Fusion engine state not exposed via API (MEDIUM)
+##### [ ] S1-2 · ruptura-ui scaffold — separate Svelte pod (v1.0.0)
+**Component**: `ruptura-ui` (new) · **Effort**: ~3 days · **Agents**: `architect` → `planner` → `code-reviewer`
 
-**Problem**: Users cannot see the current `metricR`, `logR`, `traceR` values per workload that feed into FusedR. When FusedR spikes, there is no way to determine which of the three pipelines is responsible without reading the narrative explain — which is only generated at rupture time.
+**What to build**:
+- `ui/` directory at repo root: Svelte + Vite project, `package.json`, `src/`, `public/`
+- nginx `Dockerfile` for serving the built assets
+- `.github/workflows/release-ui.yml` — build, tag `ghcr.io/benfradjselim/ruptura-ui:v1.0.0`, push
+- `helm/templates/deployment-ui.yaml`, `service-ui.yaml` — optional second Deployment/Service
+- `helm/values.yaml`: `ui.enabled: true`, `ui.image.tag: v1.0.0`, `ui.replicaCount: 1`
+- `ui/src/lib/api.ts` — typed API client wrapping all `GET /api/v2/*` endpoints
+- Migration: embed current Alpine.js dashboard content as the baseline; port incrementally
 
-**What to build**: `GET /api/v2/engine/fusion/{namespace}/{kind}/{name}` returning:
+**Version**: `ruptura-ui` starts at `v1.0.0`. Version exposed at `GET /ui/version.json`.
+
+---
+
+##### [ ] S1-3 · MISSING-05 — Read-write dashboard (mutation forms)
+**Component**: `ruptura-ui` · **Effort**: ~1 week · **Agents**: `tdd-guide` → `code-reviewer`
+
+**What to build** — one interactive form per mutation endpoint:
+
+| UI action | API call | Location |
+|-----------|----------|----------|
+| Suppress workload (duration + reason) | `POST /api/v2/suppressions` | Workload detail → "Suppress" button |
+| Mark deploy / context event | `POST /api/v2/context` | Workload detail → "Mark deploy" button |
+| Approve / reject action | `POST /api/v2/actions/{id}/approve` or `/reject` | Action queue panel |
+| Edit signal weights | `POST /api/v2/config/weights` | Per-namespace settings panel |
+| Emergency stop | `POST /api/v2/actions/emergency-stop` | Global header bar, guarded confirm dialog |
+
+All forms validate client-side before submission. All errors show inline (not toasts that disappear).
+
+---
+
+##### [ ] S1-4 · MISSING-06 — HealthScore vs FusedR UX explanation
+**Component**: `ruptura-ui` + `ruptura` core · **Effort**: 2–3 days · **Agents**: `code-reviewer`
+
+**What to build**:
+- Core: add `confidence_window` to the forecast API response — number of observations the OLS regression is based on. When < 60 (< 15 min of data), the forecast must be labeled "low confidence" and should not project beyond 30 minutes.
+- UI: when `fused_r > 1.5` AND `health_score > 60` simultaneously, show an inline explanation banner:
+  > "Early rupture signal (FusedR={value}). HealthScore is still {score} because KPI signals are lagging indicators — they integrate over multiple ticks. If this persists, expect HealthScore to decline to ~{projected} in {eta} minutes."
+- This is a display-only change for existing data. Do not add new signals.
+
+**Key files**:
+- `internal/api/handlers_rupture.go` — add `confidence_window int` to forecast response
+- `ui/src/components/WorkloadCard.svelte` — add explanation banner logic
+
+---
+
+#### SPRINT 2 — Core value delivery (make the invisible visible)
+
+**Goal**: Topology graph on screen, FusedR is auditable, Ruptura shows its own health.
+
+---
+
+##### [ ] S2-1 · MISSING-07 — Fusion state API endpoint
+**Component**: `ruptura` core · **Effort**: 1 day · **Agents**: `tdd-guide` → `go-reviewer`
+
+**What to build**: `GET /api/v2/engine/fusion/{namespace}/{kind}/{name}`
+
 ```json
 {
   "workload": "production/Deployment/payment-api",
@@ -1300,119 +1339,210 @@ SREs managing infrastructure-heavy workloads (DaemonSets, node-local services) n
   "last_updated": "2026-05-13T14:32:00Z"
 }
 ```
-This makes the FusedR value auditable in real time, not just explainable after the fact.
 
-**Effort**: ~1 day (the fusion engine already holds this state, just needs an API accessor).
+The fusion engine already holds `metricR`, `logR`, `traceR` per workload in memory. This is a read accessor + route registration. No new computation.
 
----
-
-#### MISSING-08 — No Ruptura self-health dashboard (MEDIUM)
-
-**Problem**: There is no single place to see the operational health of Ruptura itself as a system. When a user suspects Ruptura is misbehaving (wrong signals, delayed updates, high memory), they have to query `/api/v2/metrics` raw Prometheus output and interpret it manually.
-
-**What to build**: A dedicated "Engine" or "System" page in `ruptura-ui` showing:
-
-| Panel | Data source |
-|-------|------------|
-| Core engine: uptime, version, edition | `/api/v2/health` |
-| Analyzer: tick cadence, active workloads, calibrating vs active count | new `GET /api/v2/engine/status` |
-| Ingest rates: metrics/logs/traces per second | `rpt_ingest_samples_total` |
-| Fusion state: per-workload metricR/logR/traceR heatmap | `GET /api/v2/engine/fusion/*` (MISSING-07) |
-| BadgerDB: disk usage, read/write ops, GC cycles | new `GET /api/v2/engine/storage` |
-| Action engine: queue depth, T1/T2/T3 counts | `GET /api/v2/actions` |
-| ruptura-ui: version, connected-to server, API latency | client-side |
-| ruptura-ctl: version (if queried from the UI) | `ruptura-ctl version` |
-
-**Effort**: 1 day for new API endpoints (`/engine/status`, `/engine/storage`) + 2 days UI page.
+**Key files**:
+- `internal/fusion/fusion.go` — add `StateByWorkload(key string) FusionState` method
+- `internal/api/handlers_engine.go` (new file) — `handleFusionState` handler
+- `internal/api/router.go` — register route
 
 ---
 
-#### MISSING-09 — SDK has no event streaming or CI/CD integration (MEDIUM)
+##### [ ] S2-2 · GAP-V7-01 — Topology map: API endpoint + visualization
+**Component**: `ruptura` core + `ruptura-ui` · **Effort**: 1 day API + 4 days UI · **Agents**: `tdd-guide` → `go-reviewer` → `code-reviewer`
 
-**Problem**: The two most concrete SDK use cases are:
-1. **CI/CD gate**: refuse to deploy if FusedR > 2.0 for target namespace
-2. **Custom alerting**: post to Slack/PagerDuty when rupture fires
-
-Both require either real-time event streaming or efficient polling. The SDK currently has no `Watch()`, no `WaitForHealth()`, no retry logic. The Python SDK is stubs.
+**Prerequisite**: S1-1 (auto-discovery) must be done — topology without workloads is an empty graph.
 
 **What to build**:
 
-Core engine: `GET /api/v2/events` as Server-Sent Events stream — emits a JSON event on every state change above a configurable threshold.
-
-Go SDK additions:
-```go
-// CI/CD gate
-err := client.WaitForHealth(ctx, "production/Deployment/payment-api",
-    ruptura.MinHealthScore(80), 5*time.Minute)
-
-// Event stream
-ch, err := client.Watch(ctx, ruptura.WatchFilter{Namespace: "production", MinFusedR: 2.0})
-for event := range ch { ... }
+Core — `GET /api/v2/topology`:
+```json
+{
+  "nodes": [
+    {"id": "production/Deployment/payment-api", "health_score": 72, "fused_r": 2.8, "state": "warning"}
+  ],
+  "edges": [
+    {"source": "production/Deployment/payment-api", "target": "production/Deployment/payment-db",
+     "call_rate": 450, "error_rate": 0.12, "p99_latency_ms": 340}
+  ]
+}
 ```
 
-Python SDK: implement fully (not stubs). Mirror Go SDK interface.
+`TopologyBuilder` in `internal/correlator` already has this data. Route + handler only.
 
-**Effort**: 1 day SSE endpoint + 3 days Go SDK + 1 week Python SDK.
-
----
-
-#### GAP-OP-01 — Operator bundle not updated with app releases (HIGH)
-
-**Problem**: The operator CSV hardcodes a default app image version. Every app release should trigger an operator bundle update. Currently:
-- App ships `v6.8.13` independently
-- Operator bundle still references `v6.8.x` from the last bundle submission
-- Operator-installed instances default to an older version unless the user pins `image.tag`
-
-**What to build**: CI automation — when a new app tag is pushed, a workflow updates the operator CSV's default image tag and opens a PR against the operator bundle. This should be a GitHub Actions workflow triggered by the `release` workflow completing.
-
-**Effort**: ~2 days CI automation.
+UI — "Workload Map" view using [Cytoscape.js](https://js.cytoscape.org/):
+- Force-directed layout, nodes colored by HealthScore (green/yellow/orange/red)
+- Edge thickness = call rate, edge color = error rate (green → red)
+- Click node → open workload detail side panel
+- Active rupture → highlight contagion propagation path in red
+- "Map" tab in top navigation alongside "Workloads" and "Engine"
 
 ---
 
-#### GAP-OP-02 — No smoke test in operator CI (HIGH — from v0.6.7 post-mortem)
+##### [ ] S2-3 · MISSING-08 — Engine self-health page
+**Component**: `ruptura` core + `ruptura-ui` · **Effort**: 1 day API + 2 days UI · **Agents**: `tdd-guide` → `go-reviewer`
 
-**Problem**: v0.6.7 shipped to OperatorHub with a ServiceAccount bug that made every deployed instance fail to schedule. OLM preflight validation only checks structural correctness (CSV fields, CRD schema) — not runtime behavior. The bug was only caught post-submission.
+**What to build**:
 
-**What to build**: A CI job that:
-1. Creates a local k3s cluster (via `k3d` or GitHub Actions service)
-2. Installs the OLM bundle
-3. Applies a `RupturaInstance` CR
-4. Asserts `kubectl get pod -n ruptura-system` shows a `Running` pod within 2 minutes
-5. Asserts `GET /api/v2/health` returns 200
+Core — two new endpoints:
 
-This smoke test must run on every operator PR before the bundle is submitted to OperatorHub.
+`GET /api/v2/engine/status`:
+```json
+{
+  "analyzer": {"tick_interval_ms": 15000, "last_tick_ago_ms": 1200, "active_workloads": 14, "calibrating_workloads": 3},
+  "ingest":   {"metrics_per_sec": 1240, "logs_per_sec": 87, "traces_per_sec": 320},
+  "actions":  {"pending_tier1": 0, "pending_tier2": 2, "executed_last_hour": 5},
+  "version":  "7.0.0",
+  "edition":  "community",
+  "uptime_seconds": 52340
+}
+```
 
-**Effort**: ~3 days CI pipeline work.
+`GET /api/v2/engine/storage`:
+```json
+{
+  "badger": {"disk_bytes": 245760000, "keys": 18420, "vlog_size_bytes": 18000000,
+             "reads_last_min": 840, "writes_last_min": 310}
+}
+```
+
+UI — "Engine" tab in ruptura-ui:
+- Row 1: core version, edition, uptime
+- Row 2: analyzer tick health (last tick ago, active vs calibrating workload counts)
+- Row 3: live ingest rate bars (metrics / logs / traces per second)
+- Row 4: FusedR pipeline heatmap per workload (uses MISSING-07)
+- Row 5: BadgerDB stats
+- Row 6: Action engine queue depth
+- Footer: ruptura-ui v{version} · connected to ruptura v{core_version} · API latency {ms}ms
 
 ---
 
-### v7 Priority Order
+#### SPRINT 3 — Depth and completeness
 
-| Priority | Gap | Why |
-|----------|-----|-----|
-| 1 | GAP-V7-04: Auto-discovery | The Day 1 promise has not been kept since v6.0. Every other improvement is irrelevant if the user can't see their workloads without pre-configuring OTel. |
-| 2 | MISSING-05: Read-write dashboard | User story is limited to read-only. The mutation API is complete — the UI just needs to surface it. |
-| 3 | GAP-V7-01: Topology map | The most valuable signal in the system is invisible. Contagion path, blast radius, cascade origin — all hidden. |
-| 4 | MISSING-06: HealthScore/FusedR contradiction | Erodes trust. Users see green + rupture and think the tool is broken. |
-| 5 | MISSING-07: Fusion state API | Makes FusedR auditable without waiting for a rupture narrative. |
-| 6 | MISSING-08: Engine self-health page | Trust and debugging. Users need to see what the engine is doing, not just its outputs. |
-| 7 | GAP-V7-02: K8s workload metadata | CRD view, replica state, image versions. High value but requires new RBAC. |
-| 8 | GAP-OP-01: Operator bundle automation | Structural CI debt — grows with every app release. |
-| 9 | GAP-OP-02: Operator smoke test | Prevents another v0.6.7-class regression. |
-| 10 | GAP-V7-03: Node health view | Infrastructure layer view. Lower priority than workload layer. |
-| 11 | MISSING-09: SDK event streaming | Enables CI/CD gates and custom alerting integrations. |
-| 12 | FR-10: Multi-tenant (X-Org-ID) | Enterprise feature, deferred from v6.x. Low urgency for current user base. |
+**Goal**: k8s metadata in workload detail, node health view, operator CI hardened.
 
 ---
 
-### What v7 must NOT do
+##### [ ] S3-1 · GAP-V7-02 — Kubernetes workload metadata (CRD view)
+**Component**: `ruptura` core + `ruptura-ui` · **Effort**: 4 days core + 2 days UI · **Agents**: `planner` → `tdd-guide` → `go-reviewer` → `security-reviewer`
 
-- Build the topology map before GAP-V7-04 (auto-discovery). A beautiful workload graph with zero workloads on Day 1 is worse than no graph.
-- Add more KPI signals before fixing the HealthScore/FusedR UX contradiction (MISSING-06). More signals amplify the confusion.
-- Ship ruptura-ui as a separate pod before the core engine has stable API contracts for the new endpoints (MISSING-07, MISSING-08). The frontend should consume real data from day one, not poll stubs.
+**Prerequisite**: S1-1 (informer already watching workloads — extend it to cache full object spec).
 
-### The single test for v7 completion
+**What to build**: Extend the k8s informer to cache full `Deployment`/`StatefulSet`/`DaemonSet` + `Pod` specs. Expose via `GET /api/v2/workloads/{namespace}/{kind}/{name}/k8s`:
 
-> An SRE installs Ruptura on a fresh k3s cluster. Within 15 minutes, without editing any config file, they see all their workloads, can read why one of them is degrading, can click through its service dependencies, can create a suppression window for an upcoming deploy, and can see Ruptura's own component health — all from one browser tab.
+```json
+{
+  "replicas": {"desired": 3, "ready": 3, "available": 3},
+  "image": "payment-api:v2.4.1",
+  "resources": {"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "500m", "memory": "512Mi"}},
+  "pods": [{"name": "payment-api-abc", "node": "node-1", "status": "Running", "restarts": 0}],
+  "labels": {"app": "payment-api", "env": "production"},
+  "last_deploy": "2026-05-12T14:30:00Z"
+}
+```
 
-Every v7 feature either contributes to that scenario or it is deferred to v7.1.
+UI: workload detail page gains a "Kubernetes" tab alongside "Signals" and "History". Shows replica gauge, image tag, pod table, resource usage bars.
+
+**RBAC**: add `get/list/watch` on `pods` to the autodiscovery ClusterRole (already has apps).
+
+---
+
+##### [ ] S3-2 · GAP-V7-03 — Node health view
+**Component**: `ruptura` core + `ruptura-ui` · **Effort**: 3 days API + 2 days UI · **Agents**: `tdd-guide` → `go-reviewer`
+
+**What to build**:
+
+Core:
+- `GET /api/v2/nodes` — list all known nodes with: CPU usage, memory pressure, disk pressure, workload count, worst workload FusedR
+- `GET /api/v2/nodes/{node}` — node detail: all WorkloadRefs running on this node + their HealthScore + FusedR
+
+Node data comes from Prometheus node_exporter metrics already flowing through the ingest pipeline. No new data source needed — just aggregate by `host.name` dimension.
+
+UI: "Nodes" section (accessible from global nav). Grid of node cards, each showing CPU%, memory%, workload count, status badge.
+
+---
+
+##### [ ] S3-3 · GAP-OP-01 — Operator bundle auto-update on app release
+**Component**: CI / operator bundle · **Effort**: 2 days · **Agents**: `code-reviewer`
+
+**What to build**: GitHub Actions workflow `.github/workflows/operator-bump.yml`:
+- Trigger: `workflow_run` on `release.yml` completion when a new `v*` tag is pushed
+- Action: check out operator repo, update `CSV.spec.install.spec.deployments[0].spec.template.spec.containers[0].image` to new tag
+- Create PR to operator bundle with the version bump
+- Add entry to upgrade graph in `catalog.yaml`
+
+This eliminates the manual step of updating the operator every time the app ships.
+
+---
+
+##### [ ] S3-4 · GAP-OP-02 — Operator smoke test in CI
+**Component**: CI / operator · **Effort**: 3 days · **Agents**: `tdd-guide` → `code-reviewer`
+
+**What to build**: `.github/workflows/operator-smoke.yml`:
+1. Spin up k3d cluster (GitHub Actions runner)
+2. Install OLM via `operator-sdk olm install`
+3. Apply operator bundle
+4. Apply `RupturaInstance` CR
+5. Assert: pod `Running` within 2 minutes
+6. Assert: `GET /api/v2/health` returns 200
+
+Must pass on every operator PR. Blocks submission to OperatorHub.
+
+---
+
+#### SPRINT 4 — Ecosystem (SDK + multi-tenant)
+
+**Goal**: CI/CD gates work, Python SDK is real, enterprise path unblocked.
+
+---
+
+##### [ ] S4-1 · MISSING-09 — SSE event stream + SDK Watch/Wait
+**Component**: `ruptura` core + `pkg/client` Go SDK + `sdk/python` · **Effort**: 1 day SSE + 3 days Go SDK + 1 week Python SDK · **Agents**: `tdd-guide` → `go-reviewer` → `security-reviewer`
+
+**What to build**:
+
+Core — `GET /api/v2/events` Server-Sent Events:
+```
+data: {"type":"rupture","workload":"production/Deployment/payment-api","fused_r":2.8,"state":"warning","ts":"..."}
+
+data: {"type":"recovery","workload":"production/Deployment/payment-api","fused_r":1.1,"ts":"..."}
+```
+Query params: `?namespace=production&min_fused_r=1.5&min_health_score=0`
+
+Go SDK — new methods in `pkg/client/client.go`:
+```go
+func (c *Client) Watch(ctx context.Context, f WatchFilter) (<-chan RuptureEvent, error)
+func (c *Client) WaitForHealth(ctx context.Context, workload string, minScore int, timeout time.Duration) error
+```
+
+Python SDK (`sdk/python/ruptura/`) — full implementation, not stubs:
+- `Client.get_rupture(namespace, workload)` → typed `RuptureSnapshot`
+- `Client.watch(namespace, min_fused_r)` → generator of `RuptureEvent`
+- `Client.wait_for_health(workload, min_score, timeout)` → raises `TimeoutError`
+
+---
+
+##### [ ] S4-2 · FR-10 — Multi-tenant via X-Org-ID (DEFERRED — enterprise only)
+**Component**: `ruptura` core · **Effort**: ~1 week · **Agents**: `architect` → `tdd-guide` → `security-reviewer`
+
+**What to build**: `X-Org-ID` request header maps to a namespace filter on all queries. Per-org BadgerDB key prefix. Only relevant when Ruptura serves multiple teams from a single instance.
+
+**Defer condition**: do not start until all Sprint 1–3 items are complete and there is at least one enterprise customer request.
+
+---
+
+### Guard Rails — What v7 Must NOT Do
+
+- **Do not build the topology map (S2-2) before auto-discovery (S1-1).** An empty graph on Day 1 is worse than no graph.
+- **Do not add new KPI signals** until MISSING-06 (HealthScore/FusedR contradiction) is resolved. More signals amplify the confusion.
+- **Do not ship `ruptura-ui` as a real Svelte app** until MISSING-07 (fusion state API) and MISSING-08 (engine status API) return real data. The UI must never poll stubs.
+- **Do not start multi-tenant (FR-10)** before Sprints 1–3 are shipped and validated.
+
+---
+
+### v7 Completion Test
+
+> An SRE installs Ruptura on a fresh k3s cluster. Within 15 minutes, without editing any config file, they see all their workloads. They click one that is degrading, read why it is degrading (causal narrative), click through its service dependency graph, create a suppression window for an upcoming deploy, and see Ruptura's own component health — all from one browser tab. No CLI required for Day 1 operation.
+
+Every v7 feature either contributes to that test or it is deferred to v7.1.
