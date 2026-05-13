@@ -24,6 +24,7 @@ jobs:
           - WorkloadCard
           - SuppressionModal
           - WeightsModal
+          - TopologyMap
 
     steps:
       - uses: actions/checkout@v4

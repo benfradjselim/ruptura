@@ -262,3 +262,29 @@ export function fetchWeights(apiKey?: string) {
 export function saveWeights(weights: SignalWeights[], apiKey?: string) {
   return post<{ applied: number }>('/api/v2/config/weights', weights, apiKey)
 }
+
+// ── topology ──────────────────────────────────────────────────────────────────
+
+export interface TopologyNode {
+  id: string
+  health_score: number
+  fused_r: number
+  state: 'healthy' | 'degraded' | 'critical' | 'pending_telemetry'
+}
+
+export interface TopologyEdge {
+  source: string
+  target: string
+  call_rate: number
+  error_rate: number
+  p99_latency_ms: number
+}
+
+export interface TopologyGraph {
+  nodes: TopologyNode[]
+  edges: TopologyEdge[]
+}
+
+export function fetchTopology(apiKey?: string) {
+  return get<TopologyGraph>('/api/v2/topology', apiKey)
+}

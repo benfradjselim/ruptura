@@ -7,7 +7,10 @@ import (
     "testing"
     "time"
 
+    "encoding/json"
+
     "github.com/benfradjselim/ruptura/internal/analyzer"
+    "github.com/benfradjselim/ruptura/internal/correlator"
     "github.com/benfradjselim/ruptura/internal/fusion"
     "github.com/benfradjselim/ruptura/internal/telemetry"
 )
@@ -191,6 +194,60 @@ func contains(s, sub string) bool {
 			}
 			return false
 		}())
+}
+
+func TestTopologyEndpoint(t *testing.T) {
+	met := telemetry.NewRegistry("test")
+	hc := telemetry.NewHealthChecker()
+	h := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+	h.SetReady(true)
+	router := h.NewRouter()
+
+	t.Run("returns empty nodes and edges when nothing wired", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v2/topology", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		var resp struct {
+			Nodes []interface{} `json:"nodes"`
+			Edges []interface{} `json:"edges"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode error: %v", err)
+		}
+		if resp.Nodes == nil {
+			t.Error("nodes must be non-nil array")
+		}
+		if resp.Edges == nil {
+			t.Error("edges must be non-nil array")
+		}
+	})
+
+	t.Run("edges from topology builder appear in response", func(t *testing.T) {
+		h2 := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+		tb := correlator.NewTopologyBuilder()
+		tb.ObserveSpan("svc-b", "svc-a", 5_000_000, false)
+		tb.ObserveSpan("svc-b", "svc-a", 8_000_000, true)
+		h2.SetTopology(tb)
+		h2.SetReady(true)
+		r2 := h2.NewRouter()
+
+		req, _ := http.NewRequest("GET", "/api/v2/topology", nil)
+		w := httptest.NewRecorder()
+		r2.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+		body := w.Body.String()
+		if !contains(body, "svc-a") || !contains(body, "svc-b") {
+			t.Errorf("edge services missing from response: %s", body)
+		}
+		if !contains(body, "error_rate") {
+			t.Errorf("error_rate field missing: %s", body)
+		}
+	})
 }
 
 func TestConfigWeights(t *testing.T) {

@@ -16,7 +16,7 @@
 | ruptura-operator | v0.6.9 → v0.7.0 target | `ghcr.io/benfradjselim/ruptura-operator:v0.7.0` |
 | Helm chart | 0.7.6 → 0.8.0 target | `oci://ghcr.io/benfradjselim/charts/ruptura` |
 
-Last updated: 2026-05-13 (S1 done; S2-1 done — fusion state API + CI matrix workflow)
+Last updated: 2026-05-13 (S1 done; S2-1 + S2-2 done — fusion state API, topology endpoint + Cytoscape map)
 
 ---
 
@@ -162,7 +162,7 @@ When < 60, the UI must label the forecast "low confidence" and suppress ETAs bey
 | S1 | MISSING-05 Read-write dashboard | [x] **done** — SuppressionModal (create/list/delete), WeightsModal (inline-edit all rows + save), wired into Fleet toolbar |
 | S1 | MISSING-06 HealthScore/FusedR UX | [x] **done** — `confidence_window` in `HealthForecast`; `fused_r`+`health_forecast` in fleet response; rupture-warning banner in `WorkloadCard` |
 | S2 | MISSING-07 Fusion state API | [x] **done** — `fusion.StateByWorkload`, `GET /api/v2/engine/fusion/{ns}/{kind}/{name}`, wired in main; CI matrix workflow `ui-components.yml` |
-| S2 | GAP-V7-01 Topology map | [ ] not started |
+| S2 | GAP-V7-01 Topology map | [x] **done** — `GET /api/v2/topology` (nodes+edges from TopologyBuilder); `TopologyMap.svelte` Cytoscape.js force-directed, side panel, rupture highlight |
 | S2 | MISSING-08 Engine self-health | [ ] not started |
 | S3 | GAP-V7-02 K8s workload metadata | [ ] not started |
 | S3 | GAP-V7-03 Node health view | [ ] not started |

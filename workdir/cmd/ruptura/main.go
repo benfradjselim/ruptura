@@ -319,6 +319,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	handlers.SetAnalyzer(analyzerEngine)
 	handlers.SetIngest(ingestEngine)
 	handlers.SetFusion(fusionEngine)
+	handlers.SetTopology(topoBuilder)
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)
 	histMgr := history.New()

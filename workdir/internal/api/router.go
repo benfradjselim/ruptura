@@ -168,8 +168,8 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/orgs", stubCreate).Methods("POST")
 	api.HandleFunc("/orgs/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
 
-	// Topology (topology view — stub)
-	api.HandleFunc("/topology", stubList).Methods("GET")
+	// Topology
+	api.HandleFunc("/topology", h.handleTopology).Methods("GET")
 
 	// Engine internals
 	api.HandleFunc("/engine/fusion/{namespace}/{kind}/{name}", h.handleFusionState).Methods("GET")
