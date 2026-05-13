@@ -16,7 +16,7 @@
 | ruptura-operator | v0.6.9 → v0.7.0 target | `ghcr.io/benfradjselim/ruptura-operator:v0.7.0` |
 | Helm chart | 0.7.6 → 0.8.0 target | `oci://ghcr.io/benfradjselim/charts/ruptura` |
 
-Last updated: 2026-05-13 (S1-1 + S1-2 complete)
+Last updated: 2026-05-13 (S1-1 + S1-2 + S1-3 complete)
 
 ---
 
@@ -159,7 +159,7 @@ When < 60, the UI must label the forecast "low confidence" and suppress ETAs bey
 |--------|------|--------|
 | S1 | GAP-V7-04 Auto-discovery | [x] **done** — `internal/discovery/`, `analyzer.RegisterWorkload`, `handleFleet` merge, Helm env |
 | S1 | S1-2 ruptura-ui scaffold | [x] **done** — `ui/` Svelte 4+Vite, nginx proxy, Helm `ui.enabled`, CI `release-ui.yml` |
-| S1 | MISSING-05 Read-write dashboard | [ ] not started |
+| S1 | MISSING-05 Read-write dashboard | [x] **done** — SuppressionModal (create/list/delete), WeightsModal (inline-edit all rows + save), wired into Fleet toolbar |
 | S1 | MISSING-06 HealthScore/FusedR UX | [ ] not started |
 | S2 | MISSING-07 Fusion state API | [ ] not started |
 | S2 | GAP-V7-01 Topology map | [ ] not started |

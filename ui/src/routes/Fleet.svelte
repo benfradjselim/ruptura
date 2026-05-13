@@ -3,6 +3,8 @@
   import { fetchFleet, fetchKPIs } from '../lib/api'
   import type { FleetHost, KPIMap } from '../lib/api'
   import WorkloadCard from '../components/WorkloadCard.svelte'
+  import SuppressionModal from '../components/SuppressionModal.svelte'
+  import WeightsModal from '../components/WeightsModal.svelte'
 
   let hosts: FleetHost[] = []
   let selected: FleetHost | null = null
@@ -10,6 +12,10 @@
   let loading = true
   let error = ''
   let refreshTimer: ReturnType<typeof setInterval>
+
+  let showSuppression = false
+  let showWeights = false
+  let suppressionDefaultWorkload = ''
 
   async function load() {
     try {
@@ -47,6 +53,11 @@
     return 'var(--red)'
   }
 
+  function silenceWorkload(h: FleetHost) {
+    suppressionDefaultWorkload = h.host
+    showSuppression = true
+  }
+
   $: healthy = hosts.filter(h => h.state === 'healthy').length
   $: degraded = hosts.filter(h => h.state === 'degraded').length
   $: critical = hosts.filter(h => h.state === 'critical').length
@@ -78,7 +89,15 @@
         <span class="val">{pending}</span>
       </div>
     {/if}
-    <button class="refresh" on:click={load} title="Refresh">↻</button>
+    <div class="toolbar">
+      <button class="tool-btn" on:click={() => { suppressionDefaultWorkload = ''; showSuppression = true }} title="Maintenance windows">
+        🔕 Silence
+      </button>
+      <button class="tool-btn" on:click={() => { showWeights = true }} title="Signal weight overrides">
+        ⚖ Weights
+      </button>
+      <button class="refresh" on:click={load} title="Refresh">↻</button>
+    </div>
   </div>
 
   <div class="layout">
@@ -109,7 +128,12 @@
             <div class="detail-name">{selected.host.split('/').pop()}</div>
             <div class="detail-meta">{selected.host}</div>
           </div>
+          <div class="detail-actions">
+          <button class="detail-action-btn" on:click={() => selected && silenceWorkload(selected)} title="Add maintenance window for this workload">
+            🔕
+          </button>
           <button class="close" on:click={() => { selected = null; kpis = null }}>✕</button>
+        </div>
         </div>
 
         {#if selected.state === 'pending_telemetry'}
@@ -154,6 +178,17 @@
   </div>
 </div>
 
+{#if showSuppression}
+  <SuppressionModal
+    defaultWorkload={suppressionDefaultWorkload}
+    on:close={() => { showSuppression = false }}
+  />
+{/if}
+
+{#if showWeights}
+  <WeightsModal on:close={() => { showWeights = false }} />
+{/if}
+
 <style>
   .fleet {
     display: flex;
@@ -196,8 +231,28 @@
   .stat.crit .val { color: var(--red); }
   .stat.pend .val { color: var(--blue); }
 
-  .refresh {
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin-left: auto;
+  }
+
+  .tool-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .tool-btn:hover { color: var(--cyan); border-color: var(--cyan); }
+
+  .refresh {
     background: none;
     border: 1px solid var(--border);
     color: var(--muted);
@@ -209,6 +264,25 @@
   }
 
   .refresh:hover { color: var(--cyan); border-color: var(--cyan); }
+
+  .detail-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .detail-action-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .detail-action-btn:hover { color: var(--yellow); border-color: var(--yellow); }
 
   .layout {
     display: grid;

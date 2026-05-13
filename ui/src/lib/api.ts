@@ -136,6 +136,32 @@ export interface ClusterNode {
   worst_fused_r: number
 }
 
+export interface Suppression {
+  id: string
+  workload: string
+  start: string
+  end: string
+  reason: string
+}
+
+export interface CreateSuppressionRequest {
+  workload: string
+  start: string   // ISO 8601
+  end: string     // ISO 8601
+  reason: string
+}
+
+// 6-signal weight override for a workload selector glob.
+export interface SignalWeights {
+  selector: string
+  stress: number
+  fatigue: number
+  mood: number
+  pressure: number
+  humidity: number
+  contagion: number
+}
+
 // ── fetch helpers ────────────────────────────────────────────────────────────
 
 async function get<T>(path: string, apiKey?: string): Promise<T> {
@@ -178,4 +204,51 @@ export function fetchEngineStatus(apiKey?: string) {
 
 export function fetchNodes(apiKey?: string) {
   return get<ClusterNode[]>('/api/v2/nodes', apiKey)
+}
+
+// ── write helpers ────────────────────────────────────────────────────────────
+
+async function post<T>(path: string, body: unknown, apiKey?: string): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+  const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) })
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText)
+    throw new Error(`${res.status} — ${text}`)
+  }
+  return res.json() as Promise<T>
+}
+
+async function del(path: string, apiKey?: string): Promise<void> {
+  const headers: Record<string, string> = {}
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+  const res = await fetch(path, { method: 'DELETE', headers })
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text().catch(() => res.statusText)
+    throw new Error(`${res.status} — ${text}`)
+  }
+}
+
+// ── suppressions ─────────────────────────────────────────────────────────────
+
+export function fetchSuppressions(apiKey?: string) {
+  return get<Suppression[]>('/api/v2/suppressions', apiKey)
+}
+
+export function createSuppression(req: CreateSuppressionRequest, apiKey?: string) {
+  return post<Suppression>('/api/v2/suppressions', req, apiKey)
+}
+
+export function deleteSuppression(id: string, apiKey?: string) {
+  return del(`/api/v2/suppressions/${encodeURIComponent(id)}`, apiKey)
+}
+
+// ── signal weights ────────────────────────────────────────────────────────────
+
+export function fetchWeights(apiKey?: string) {
+  return get<SignalWeights[]>('/api/v2/config/weights', apiKey)
+}
+
+export function saveWeights(weights: SignalWeights[], apiKey?: string) {
+  return post<{ applied: number }>('/api/v2/config/weights', weights, apiKey)
 }
