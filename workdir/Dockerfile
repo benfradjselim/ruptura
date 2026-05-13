@@ -21,6 +21,10 @@ RUN CGO_ENABLED=0 GOOS=linux \
       -o /ruptura \
       ./cmd/ruptura
 
+RUN echo "=== Binary embed check ===" && \
+    grep -c "BOiiv4FG" /ruptura && echo "CORRECT: BOiiv4FG in binary" || echo "WRONG: BOiiv4FG not in binary"; \
+    grep -c "Bob2sadS" /ruptura && echo "WRONG: Bob2sadS in binary" || echo "correct: Bob2sadS not in binary"
+
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 # ubi-micro: minimal Red Hat UBI — required for Red Hat OperatorHub preflight certification.
 FROM registry.access.redhat.com/ubi9/ubi-micro
