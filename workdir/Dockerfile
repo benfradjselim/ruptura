@@ -1,5 +1,17 @@
 # syntax=docker/dockerfile:1
-# ── Stage 1: Build ────────────────────────────────────────────────────────────
+
+# ── Stage 0: Frontend build ────────────────────────────────────────────────────
+# Build the Svelte UI from source — guarantees the correct bundle is embedded
+# regardless of which static files are pre-committed in git.
+FROM node:20-alpine AS frontend
+WORKDIR /app
+COPY ui/package.json ui/package-lock.json* ./
+RUN npm ci
+COPY ui/ ./
+# vite.config.js: outDir: '../web' → output lands at /web
+RUN npm run build
+
+# ── Stage 1: Build Go binary ──────────────────────────────────────────────────
 FROM golang:1.22-alpine AS builder
 
 WORKDIR /src
@@ -12,7 +24,11 @@ COPY cmd/      cmd/
 COPY internal/ internal/
 COPY pkg/      pkg/
 
-RUN echo "=== UI static assets ===" && ls internal/ui/static/assets/ && echo "=== index.html ===" && cat internal/ui/static/index.html
+# Overwrite pre-committed static files with the fresh Vite build above.
+# This is the authoritative source — always built from current source.
+COPY --from=frontend /web internal/ui/static
+
+RUN echo "=== UI static assets (fresh Vite build) ===" && ls internal/ui/static/assets/
 
 RUN CGO_ENABLED=0 GOOS=linux \
     go build \
