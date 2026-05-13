@@ -253,6 +253,12 @@ jobs:
           kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system get pods -o wide
 
           echo ""
+          echo "=== Pod image details ==="
+          POD=$(kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system get pods -o jsonpath='{.items[0].metadata.name}')
+          kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system get pod "${POD}" \
+            -o jsonpath='spec.containers[0].image={.spec.containers[0].image}{"\n"}status.imageID={.status.containerStatuses[0].imageID}{"\n"}'
+
+          echo ""
           echo "=== Service ==="
           kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system get svc ruptura
 
