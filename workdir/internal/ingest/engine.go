@@ -51,12 +51,13 @@ type Ingestor interface {
 }
 
 type Engine struct {
-	pipeline  metrics.MetricPipeline
-	logs      LogSink
-	logStore  LogStoreSink
-	spans     SpanSink
-	sentiment SentimentSink
-	traceR    TraceRSink
+	pipeline    metrics.MetricPipeline
+	logs        LogSink
+	logStore    LogStoreSink
+	spans       SpanSink
+	sentiment   SentimentSink
+	traceR      TraceRSink
+	ingestHook  func(source string) // optional; called once per ingested item
 
 	activeSeries sync.Map
 	seriesCount  int32
@@ -84,6 +85,10 @@ func New(pipeline metrics.MetricPipeline, logs LogSink, spans SpanSink, sentimen
 
 // SetLogStore wires a durable storage backend for OTLP log persistence.
 func (e *Engine) SetLogStore(s LogStoreSink) { e.logStore = s }
+
+// SetIngestHook registers a callback invoked once per ingested log or trace item.
+// Used to forward counts to the telemetry registry for Prometheus export.
+func (e *Engine) SetIngestHook(fn func(source string)) { e.ingestHook = fn }
 
 // rateLimiter is a simple token-bucket middleware for the ingest HTTP server.
 // Capacity and refill rate are configurable via RUPTURA_INGEST_RPS env variable.
@@ -394,6 +399,9 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 					pos++
 				}
 				atomic.AddInt64(&e.logsCount, 1)
+				if e.ingestHook != nil {
+					e.ingestHook("logs")
+				}
 			}
 		}
 		if e.sentiment != nil && (pos > 0 || neg > 0) {
@@ -433,6 +441,9 @@ func (e *Engine) handleOTLPTraces(w http.ResponseWriter, r *http.Request) {
 					e.spans.IngestSpan(s)
 				}
 				atomic.AddInt64(&e.tracesCount, 1)
+				if e.ingestHook != nil {
+					e.ingestHook("traces")
+				}
 			}
 		}
 		// Derive traceR from span error rate: 100% error rate → R≈5, 20% → R≈1.

@@ -34,7 +34,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "6.8.12"
+const version = "6.8.13"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -192,6 +192,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 
 	al := alerter.NewAlerter(256)
 	metricsReg := telemetry.NewRegistry(version)
+	ingestEngine.SetIngestHook(metricsReg.IncIngestTotal)
 	explainer := explain.NewEngine()
 
 	// 15-second analyzer ticker: pipeline → analyzer → store → fusion → predictor → explain
