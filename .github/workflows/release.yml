@@ -241,7 +241,7 @@ jobs:
             --set persistence.size=5Gi \
             --set resources.limits.memory=1Gi \
             --set resources.requests.memory=256Mi \
-            --set goMemLimit="966367641" \
+            --set-string goMemLimit="920MiB" \
             --set "podAnnotations.deploy/commit=${{ github.sha }}" \
             --kubeconfig /tmp/kubeconfig \
             --atomic \

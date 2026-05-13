@@ -66,9 +66,9 @@ resources:
     memory: 512Mi
 
 # -- Go runtime memory soft limit (bytes). Set slightly below the container memory limit
-# so the GC kicks in before OOMKill. Default: 400 MiB (419430400 bytes).
-# Override with a string like "419430400" or set to match your resources.limits.memory.
-goMemLimit: "419430400"
+# so the GC kicks in before OOMKill. Default: 400MiB.
+# Use Go memory suffix strings (e.g. "400MiB", "920MiB", "1GiB") — NOT raw byte counts.
+goMemLimit: "400MiB"
 
 serviceAccount:
   create: true
