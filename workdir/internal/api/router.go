@@ -12,7 +12,7 @@ func (h *Handlers) NewRouter() http.Handler {
 	r.Use(loggingMiddleware)
 
 	// Dashboard served without auth — browser loads HTML first, then uses the API key field
-	r.PathPrefix("/ui").Handler(ui.Handler())
+	r.PathPrefix("/ui").Handler(ui.Handler(h.apiKey))
 	r.HandleFunc("/", func(w http.ResponseWriter, rq *http.Request) {
 		http.Redirect(w, rq, "/ui/", http.StatusFound)
 	}).Methods("GET")

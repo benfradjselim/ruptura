@@ -789,7 +789,7 @@ function app() {
 return {
   /* ── state ── */
   apiUrl: sessionStorage.getItem('rpt_url') || '',
-  apiKey: sessionStorage.getItem('rpt_key') || '',
+  apiKey: sessionStorage.getItem('rpt_key') || (window.__RUPTURA_KEY__ || ''),
   connected: false, loading: false, actionBusy: false,
   health: {}, snapshots: [], actions: [], eventLog: [], historyData: [],
   ingest: {metrics:0, logs:0, traces:0},
