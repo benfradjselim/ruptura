@@ -236,7 +236,12 @@ jobs:
             --set image.tag="${TAG}" \
             --set apiKey="${RUPTURA_API_KEY}" \
             --set service.type=NodePort \
+            --set service.nodePorts.api=31468 \
+            --set service.nodePorts.otlp=30298 \
             --set persistence.size=5Gi \
+            --set resources.limits.memory=1Gi \
+            --set resources.requests.memory=256Mi \
+            --set goMemLimit="966367641" \
             --kubeconfig /tmp/kubeconfig \
             --wait \
             --timeout 5m
@@ -253,7 +258,11 @@ jobs:
           echo ""
           echo "=== Node IP / Access ==="
           NODE_IP=$(kubectl --kubeconfig /tmp/kubeconfig get nodes \
-            -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}' 2>/dev/null || echo "pending")
+            -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}' 2>/dev/null)
+          if [ -z "${NODE_IP}" ]; then
+            NODE_IP=$(kubectl --kubeconfig /tmp/kubeconfig get nodes \
+              -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "pending")
+          fi
           NODE_PORT=$(kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system \
             get svc ruptura \
             -o jsonpath='{.spec.ports[?(@.name=="api")].nodePort}' 2>/dev/null || echo "")
@@ -263,6 +272,10 @@ jobs:
         run: |
           NODE_IP=$(kubectl --kubeconfig /tmp/kubeconfig get nodes \
             -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+          if [ -z "${NODE_IP}" ]; then
+            NODE_IP=$(kubectl --kubeconfig /tmp/kubeconfig get nodes \
+              -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+          fi
           NODE_PORT=$(kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system \
             get svc ruptura \
             -o jsonpath='{.spec.ports[?(@.name=="api")].nodePort}')
