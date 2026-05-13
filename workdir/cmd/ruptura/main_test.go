@@ -131,11 +131,12 @@ func TestRunWithContext_HealthEndpoint(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- runWithContext(ctx, cfg) }()
 
-	// Wait for server
+	// Wait for server — use a generous window (5s) because CI runners can be
+	// slow to schedule the goroutine and finish BadgerDB initialization.
 	addr := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var resp *http.Response
-	for i := 0; i < 25; i++ {
-		time.Sleep(20 * time.Millisecond)
+	for i := 0; i < 100; i++ {
+		time.Sleep(50 * time.Millisecond)
 		resp, err = http.Get(addr + "/api/v2/health")
 		if err == nil {
 			break
