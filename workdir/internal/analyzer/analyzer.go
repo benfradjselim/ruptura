@@ -158,6 +158,10 @@ type workloadState struct {
 	sloConfig     *models.SLOConfig
 	nearMissTimes []time.Time
 	inNearMiss    bool
+
+	// v7: set true by RegisterWorkload, cleared on first Update call.
+	// AllSnapshots synthesises a pending_telemetry snapshot while this is true.
+	pendingTelemetry bool
 }
 
 // NewAnalyzer creates a new holistic analyzer
@@ -207,6 +211,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 	defer a.mu.Unlock()
 
 	ws := a.getOrCreate(ref)
+	ws.pendingTelemetry = false // first real data — no longer pending
 	// Store raw inputs for /explain endpoint
 	last := make(map[string]float64, len(metrics))
 	for k, v := range metrics {
@@ -893,4 +898,73 @@ func (a *Analyzer) AllHosts() []string {
 		hosts = append(hosts, h)
 	}
 	return hosts
+}
+
+// RegisterWorkload pre-registers a workload discovered via the k8s informer.
+// Idempotent — if the workload already has telemetry, this is a no-op.
+// The workload will appear in AllSnapshots with status "pending_telemetry" until
+// the first Update() call transitions it to "calibrating".
+func (a *Analyzer) RegisterWorkload(ref models.WorkloadRef) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	key := ref.Key()
+	if _, ok := a.workloads[key]; ok {
+		return // already known (either from telemetry or prior registration)
+	}
+	ws := a.getOrCreate(ref)
+	ws.pendingTelemetry = true
+}
+
+// UnregisterWorkload removes a workload that was deleted from the cluster.
+// Existing snapshots and telemetry history are discarded.
+func (a *Analyzer) UnregisterWorkload(ref models.WorkloadRef) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	key := ref.Key()
+	delete(a.workloads, key)
+	delete(a.snapshots, key)
+}
+
+// AllWorkloadRefs returns every registered WorkloadRef, including pending ones.
+func (a *Analyzer) AllWorkloadRefs() []models.WorkloadRef {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	refs := make([]models.WorkloadRef, 0, len(a.workloads))
+	for _, ws := range a.workloads {
+		refs = append(refs, ws.ref)
+	}
+	return refs
+}
+
+// AllAnalyzerSnapshots returns one KPISnapshot per registered workload.
+// For pending workloads (no telemetry yet) it synthesises a zero-value snapshot
+// with WorkloadStatus = "pending_telemetry".
+func (a *Analyzer) AllAnalyzerSnapshots() []models.KPISnapshot {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	out := make([]models.KPISnapshot, 0, len(a.workloads))
+	for key, ws := range a.workloads {
+		if ws.pendingTelemetry {
+			host := ws.ref.Name
+			if ws.ref.Node != "" {
+				host = ws.ref.Node
+			}
+			out = append(out, models.KPISnapshot{
+				Host:           host,
+				Workload:       ws.ref,
+				Timestamp:      time.Now(),
+				WorkloadStatus: models.WorkloadStatusPending,
+				HealthScore: models.KPI{
+					Name:  "health_score",
+					Value: 0,
+					State: "pending",
+				},
+			})
+			continue
+		}
+		if snap, ok := a.snapshots[key]; ok {
+			out = append(out, snap)
+		}
+	}
+	return out
 }

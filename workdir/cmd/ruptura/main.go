@@ -18,6 +18,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/api"
 	apicontext "github.com/benfradjselim/ruptura/internal/context"
 	"github.com/benfradjselim/ruptura/internal/correlator"
+	"github.com/benfradjselim/ruptura/internal/discovery"
 	"github.com/benfradjselim/ruptura/internal/actions/providers"
 	"github.com/benfradjselim/ruptura/internal/eventbus"
 	"github.com/benfradjselim/ruptura/internal/events"
@@ -178,6 +179,14 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		} else {
 			logger.Default.Warn("RUPTURA_WORKLOAD_WEIGHTS parse error — using defaults", "err", err)
 		}
+	}
+
+	// k8s workload auto-discovery — no-op when not running inside a cluster.
+	if disc, err := discovery.NewInformer(); err == nil {
+		logger.Default.Info("k8s auto-discovery active — watching Deployments/StatefulSets/DaemonSets")
+		go disc.Run(ctx, analyzerEngine.RegisterWorkload, analyzerEngine.UnregisterWorkload)
+	} else {
+		logger.Default.Info("k8s auto-discovery skipped (not in-cluster)", "reason", err.Error())
 	}
 
 	// Pipe burst events into fusion as logR

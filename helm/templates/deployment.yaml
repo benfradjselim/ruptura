@@ -74,6 +74,8 @@ spec:
             - name: RUPTURA_WORKLOAD_WEIGHTS
               value: {{ .Values.workloadWeights | toJson | quote }}
             {{- end }}
+            - name: RUPTURA_AUTODISCOVERY
+              value: {{ .Values.autodiscovery.enabled | default false | quote }}
             - name: GOMEMLIMIT
               value: {{ .Values.goMemLimit | default "419430400" | quote }}
           startupProbe:

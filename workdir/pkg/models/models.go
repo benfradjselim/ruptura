@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+// WorkloadStatus constants for KPISnapshot.WorkloadStatus (v7).
+const (
+	WorkloadStatusPending     = "pending_telemetry" // known from k8s API, no metrics yet
+	WorkloadStatusCalibrating = "calibrating"       // metrics received, baseline learning
+	WorkloadStatusActive      = "active"            // baseline established, detection enabled
+	WorkloadStatusRemoved     = "removed"           // workload deleted from k8s (history only)
+)
+
 // Validatable defines an interface for request payload validation.
 type Validatable interface {
 	Validate() error

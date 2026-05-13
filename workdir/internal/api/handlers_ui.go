@@ -105,6 +105,9 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 	snapshots := h.store.AllSnapshots()
 	resp := fleetResponse{Hosts: make([]fleetHost, 0, len(snapshots))}
 
+	// Track hosts already present in the store so we can add pending-only ones below.
+	knownHosts := make(map[string]bool, len(snapshots))
+
 	for i := range snapshots {
 		h.enrichSnapshot(&snapshots[i])
 		s := snapshots[i]
@@ -113,6 +116,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		if s.Workload.Namespace != "" {
 			name = s.Workload.Namespace + "/" + s.Workload.Kind + "/" + s.Workload.Name
 		}
+		knownHosts[name] = true
 
 		state := snapshotState(s)
 		resp.TotalHosts++
@@ -134,6 +138,26 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 			Contagion:   s.Contagion.Value,
 			LastSeen:    s.Timestamp,
 		})
+	}
+
+	// Merge auto-discovered workloads that have no telemetry yet (pending_telemetry).
+	if h.analyzer != nil {
+		for _, s := range h.analyzer.AllAnalyzerSnapshots() {
+			if s.WorkloadStatus != "pending_telemetry" {
+				continue
+			}
+			name := s.Workload.Namespace + "/" + s.Workload.Kind + "/" + s.Workload.Name
+			if knownHosts[name] {
+				continue
+			}
+			resp.TotalHosts++
+			resp.Hosts = append(resp.Hosts, fleetHost{
+				Host:        name,
+				State:       "pending_telemetry",
+				HealthScore: 0,
+				LastSeen:    s.Timestamp,
+			})
+		}
 	}
 
 	// Critical first, then degraded, then healthy; within a tier sort by health_score ascending.

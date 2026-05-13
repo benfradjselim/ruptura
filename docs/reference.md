@@ -16,7 +16,7 @@
 | ruptura-operator | v0.6.9 → v0.7.0 target | `ghcr.io/benfradjselim/ruptura-operator:v0.7.0` |
 | Helm chart | 0.7.6 → 0.8.0 target | `oci://ghcr.io/benfradjselim/charts/ruptura` |
 
-Last updated: 2026-05-13
+Last updated: 2026-05-13 (S1-1 GAP-V7-04 complete)
 
 ---
 
@@ -42,8 +42,11 @@ Last updated: 2026-05-13
 | `internal/sim/` | ruptura-sim simulation patterns |
 | `internal/telemetry/registry.go` | Prometheus metrics registry, `IncIngestTotal` |
 | `internal/ui/static/index.html` | Embedded Alpine.js dashboard (v6 — to be removed in v7) |
+| `internal/discovery/client.go` | In-cluster SA token + CA cert reader |
+| `internal/discovery/watcher.go` | LIST+WATCH loop, backoff, 410 Gone re-list |
+| `internal/discovery/informer.go` | `Informer.Run()` — 3 goroutines (Deployments/StatefulSets/DaemonSets) |
 | `pkg/client/client.go` | Go SDK HTTP client |
-| `pkg/models/models.go` | Core types: KPISnapshot, WorkloadRef, FusedRuptureIndex |
+| `pkg/models/models.go` | Core types: KPISnapshot, WorkloadRef, FusedRuptureIndex, WorkloadStatus constants |
 
 ### ruptura-ui (`ui/` — v7 new)
 
@@ -154,7 +157,7 @@ When < 60, the UI must label the forecast "low confidence" and suppress ETAs bey
 
 | Sprint | Item | Status |
 |--------|------|--------|
-| S1 | GAP-V7-04 Auto-discovery | [ ] not started |
+| S1 | GAP-V7-04 Auto-discovery | [x] **done** — `internal/discovery/`, `analyzer.RegisterWorkload`, `handleFleet` merge, Helm env |
 | S1 | S1-2 ruptura-ui scaffold | [ ] not started |
 | S1 | MISSING-05 Read-write dashboard | [ ] not started |
 | S1 | MISSING-06 HealthScore/FusedR UX | [ ] not started |
