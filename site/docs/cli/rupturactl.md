@@ -1,6 +1,9 @@
 # ruptura-ctl
 
-`ruptura-ctl` is the command-line interface for Ruptura. It runs **outside the pod** and speaks to the Ruptura REST API — the same API the dashboard uses. You point it at any running instance (local Docker, Kubernetes service, or OpenShift Route) with `--url` or the `RUPTURA_URL` environment variable.
+`ruptura-ctl` **v1.0.0** is the command-line interface for Ruptura. It runs **outside the pod** and speaks to the Ruptura REST API — the same API the dashboard uses. You point it at any running instance (local Docker, Kubernetes service, or OpenShift Route) with `--url` or the `RUPTURA_URL` environment variable.
+
+!!! info "Independent versioning"
+    `ruptura-ctl` is versioned **independently** from the server. You can run `ruptura-ctl v1.0.0` against any `ruptura >= v6.8.x`. Check your CLI version with `ruptura-ctl version`.
 
 ---
 
@@ -17,6 +20,8 @@ Download a pre-built binary from the [GitHub Releases page](https://github.com/b
       https://github.com/benfradjselim/ruptura/releases/latest/download/ruptura-ctl-linux-amd64
     chmod +x ruptura-ctl
     sudo mv ruptura-ctl /usr/local/bin/
+    ruptura-ctl version
+    # ruptura-ctl v1.0.0
     ```
 
 === "Linux (arm64)"
@@ -49,7 +54,8 @@ Download a pre-built binary from the [GitHub Releases page](https://github.com/b
 Verify:
 
 ```bash
-ruptura-ctl --help
+ruptura-ctl version
+# ruptura-ctl v1.0.0
 ```
 
 ### Go install
@@ -81,7 +87,7 @@ chmod +x kubectl-ruptura
 sudo mv kubectl-ruptura /usr/local/bin/
 
 # Verify kubectl picks it up
-kubectl ruptura --help
+kubectl ruptura version
 ```
 
 kubectl discovers plugins by looking for executables named `kubectl-<name>` anywhere on your `PATH`. The dash in `kubectl-ruptura` maps to the space in `kubectl ruptura`.
@@ -92,9 +98,22 @@ kubectl discovers plugins by looking for executables named `kubectl-<name>` anyw
 
 `ruptura-ctl` connects to the Ruptura API via HTTP. Set `RUPTURA_URL` (and optionally `RUPTURA_API_KEY`) before running any command.
 
+### Kubernetes — NodePort
+
+If Ruptura is exposed via NodePort (default in the Helm chart):
+
+```bash
+export RUPTURA_URL=http://<node-ip>:<nodeport>
+export RUPTURA_API_KEY=<your-api-key>
+
+ruptura-ctl version
+ruptura-ctl health
+ruptura-ctl status
+```
+
 ### Kubernetes — port-forward
 
-The most common pattern: forward the Ruptura service to localhost, then run the CLI:
+Forward the Ruptura service to localhost:
 
 ```bash
 # Terminal 1 — keep this running
@@ -152,32 +171,11 @@ kubectl apply -f ruptura-ctl-job.yaml
 kubectl logs -n ruptura-system job/ruptura-ctl-check -f
 ```
 
-This uses the in-cluster DNS name `ruptura.ruptura-system.svc.cluster.local` to reach the Ruptura Service without leaving the cluster.
-
-### Kubernetes — exec into a debug pod
-
-If you need interactive access from inside the cluster without installing anything locally:
-
-```bash
-kubectl run ruptura-ctl-debug \
-  --rm -it \
-  --image=ghcr.io/benfradjselim/ruptura-ctl:latest \
-  --restart=Never \
-  -n ruptura-system \
-  -- /bin/sh
-
-# Inside the shell:
-export RUPTURA_URL=http://ruptura.ruptura-system.svc.cluster.local:80
-export RUPTURA_API_KEY=<your-api-key>
-ruptura-ctl status
-```
-
 ### OpenShift — Route access
 
 On OpenShift the operator automatically creates a Route with edge TLS. Use the Route hostname directly:
 
 ```bash
-# Get the Route hostname
 ROUTE=$(oc get route ruptura -n ruptura-system -o jsonpath='{.spec.host}')
 
 export RUPTURA_URL=https://$ROUTE
@@ -187,22 +185,6 @@ export RUPTURA_API_KEY=$(
     -o jsonpath='{.data.api-key}' | base64 -d
 )
 
-ruptura-ctl status
-```
-
-### OpenShift — oc exec into a debug pod
-
-```bash
-oc run ruptura-ctl-debug \
-  --rm -it \
-  --image=ghcr.io/benfradjselim/ruptura-ctl:latest \
-  --restart=Never \
-  -n ruptura-system \
-  -- /bin/sh
-
-# Inside the shell:
-export RUPTURA_URL=http://ruptura.ruptura-system.svc.cluster.local:80
-export RUPTURA_API_KEY=<your-api-key>
 ruptura-ctl status
 ```
 
@@ -246,12 +228,44 @@ ruptura-ctl completion fish | source
 
 ## Command reference
 
+### `version`
+
+Print the CLI version (independently versioned from the server):
+
+```bash
+ruptura-ctl version
+# ruptura-ctl v1.0.0
+```
+
+### `health`
+
+Raw server health, version, uptime, and ingestion counters:
+
+```bash
+ruptura-ctl health
+ruptura-ctl health -o json
+```
+
+Example output:
+
+```
+Server:   ruptura v6.8.13 (community)
+Uptime:   14h32m
+Status:   ok
+
+Ingest (samples received)
+  metrics (Prometheus/OTLP)  840 200
+  logs    (OTLP :4317)        13 826
+  traces  (OTLP :4317)        42 131
+```
+
 ### `status`
 
 Show health and a summary of all monitored workloads:
 
 ```bash
 ruptura-ctl status
+ruptura-ctl status -n production
 ```
 
 ### `get`
@@ -307,7 +321,8 @@ Create and manage maintenance windows to mute action dispatch during planned dow
 
 ```bash
 # Suppress a single workload for 30 minutes
-ruptura-ctl suppress create "production/Deployment/payment-api" 30m
+ruptura-ctl suppress create "production/Deployment/payment-api" 30m \
+  --reason "rolling deploy"
 
 # Suppress an entire namespace for 1 hour
 ruptura-ctl suppress create "production/*" 1h --reason "k8s cluster upgrade"
@@ -341,15 +356,6 @@ ruptura-ctl sim inject memory-leak \
 ```
 
 Available patterns: `cascade-failure` · `memory-leak` · `traffic-surge` · `slow-burn`
-
-### `health`
-
-Raw server health and ingestion counters:
-
-```bash
-ruptura-ctl health
-ruptura-ctl health -o json
-```
 
 ### `completion`
 

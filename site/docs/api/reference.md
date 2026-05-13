@@ -408,10 +408,12 @@ rpt_kpi_healthscore{host="payment-api"}                                       43
 rpt_kpi_stress{host="payment-api"}                                            0.72
 rpt_kpi_fatigue{host="payment-api"}                                           0.81
 rpt_actions_total{type="scale",tier="2",outcome="approved"}                   3
-rpt_ingest_samples_total{source="prometheus"}                                 840200
+rpt_ingest_samples_total{source="metrics"}                                    840200
+rpt_ingest_samples_total{source="logs"}                                        13826
+rpt_ingest_samples_total{source="traces"}                                      42131
 rpt_memory_bytes                                                               45678900
 rpt_uptime_seconds                                                             3842
-rpt_version_info{version="6.7.0"}                                             1
+rpt_version_info{version="6.8.13"}                                            1
 ```
 
 Prometheus scrape config:

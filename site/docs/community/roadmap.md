@@ -156,12 +156,54 @@ Clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/ruptura`:
 
 ## Planned
 
-### v7.0.0 — Q3 2026
+### v7.0.0 — Q3 2026 — "Deviser pour réunir"
+
+The guiding principle for v7 is **"deviser pour réunir"** — split to unite. The monolithic binary is divided into two independently deployable pods that work together under the same Helm chart, Operator, and namespace.
+
+#### Frontend / Backend separation
+
+| Component | v6.x (current) | v7.0 |
+|-----------|----------------|------|
+| **ruptura** (core engine) | Binary includes embedded UI assets | Pure API server — no UI assets |
+| **ruptura-ui** (new) | — | Dedicated pod serving the Svelte dashboard |
+| **Deployment** | Single pod | Two pods in same namespace, same chart |
+| **Operator** | Manages one Deployment | Manages both Deployments, shared Service |
+| **Helm chart** | Single chart | Same chart, `ui.enabled` toggle |
+
+Architecture:
+
+```
+ruptura-system namespace
+┌─────────────────────────────────────────────┐
+│                                             │
+│  ┌──────────────────┐   ┌────────────────┐  │
+│  │   ruptura        │   │  ruptura-ui    │  │
+│  │  (core engine)   │   │  (dashboard)   │  │
+│  │                  │   │                │  │
+│  │  :8080 REST API  │◄──│  :3000 Svelte  │  │
+│  │  :4317 OTLP      │   │  (nginx)       │  │
+│  │  :8125 StatsD    │   │                │  │
+│  └──────────────────┘   └────────────────┘  │
+│           ▲                      ▲           │
+│           │                      │           │
+│     telemetry              browser/user      │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+Benefits:
+- **Independently scalable**: scale-down `ruptura-ui` to zero during non-business hours; `ruptura` core always runs
+- **Independent versioning**: dashboard iterates at UI cadence; core engine releases on stability cadence  
+- **Smaller core image**: no embedded JS assets → faster cold start, smaller attack surface
+- **Hot-reload dashboard**: `ruptura-ui` can be updated without restarting the analysis engine
+
+#### Other v7.0 features
 
 | Feature | Detail |
 |---------|--------|
 | Multi-tenant opt-in (FR-10) | X-Org-ID header → namespace filter on all queries; per-org storage namespacing |
 | Python SDK v2 | async support (`httpx`), type stubs, full v2 parity with Go SDK |
+| Dashboard version manifest | `ruptura-ui` exports its own `version` at `/ui/version.json` |
 
 ### v7.1.0 — Q4 2026
 

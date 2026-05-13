@@ -29,6 +29,7 @@ nav:
   - Getting Started:
     - index.md
     - Installation: getting-started/installation.md
+    - Ingest Guide: getting-started/ingest.md
     - Quickstart: getting-started/quickstart.md
     - Dashboard Tour: getting-started/dashboard-tour.md
     - Configuration: getting-started/configuration.md

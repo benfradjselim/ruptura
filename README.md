@@ -19,6 +19,7 @@ Ruptura detects workload ruptures before they cause outages — using the Fused 
 
 | Version | Date | Status |
 |---------|------|--------|
+| v6.8.13 | 2026-05-13 | ✅ Released — log/trace ingest counters, Live Data Flow panel fix, ruptura-ctl v1.0.0 |
 | v6.8.2 | 2026-05-10 | ✅ Released — OOMKill prevention: BadgerDB memory tuning, GC loop, GOMEMLIMIT |
 | v6.8.1 | 2026-05-09 | ✅ Released — fleet heatmap visibility and color fix |
 | v6.8.0 | 2026-05-09 | ✅ Released — stable dashboard, correct workload identity |
@@ -165,16 +166,19 @@ GET /api/v2/explain/{rupture_id}/narrative
 
 ## Install in 60 seconds
 
-**Kubernetes (Helm):**
+**Kubernetes (Helm — OCI registry):**
 
 ```bash
-helm install ruptura helm \
+helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system \
   --create-namespace \
-  --set apiKey=$(openssl rand -hex 32)
+  --set apiKey=$(openssl rand -hex 32) \
+  --set resources.limits.memory=2Gi \
+  --set-string goMemLimit="1700MiB" \
+  --set persistence.size=10Gi
 
-kubectl port-forward svc/ruptura 8080:80 -n ruptura-system
-curl http://localhost:8080/api/v2/health
+kubectl get pods -n ruptura-system
+curl http://<node-ip>:<nodeport>/api/v2/health
 ```
 
 **Docker:**
@@ -185,16 +189,60 @@ docker run -d \
   -p 8080:8080 -p 4317:4317 \
   -v ruptura-data:/var/lib/ruptura/data \
   -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-  ghcr.io/benfradjselim/ruptura:6.8.2
+  ghcr.io/benfradjselim/ruptura:v6.8.13
+curl http://localhost:8080/api/v2/health
 ```
+
+**ruptura-ctl (CLI — v1.0.0):**
+
+```bash
+curl -Lo ruptura-ctl \
+  https://github.com/benfradjselim/ruptura/releases/latest/download/ruptura-ctl-linux-amd64
+chmod +x ruptura-ctl && sudo mv ruptura-ctl /usr/local/bin/
+export RUPTURA_URL=http://localhost:8080
+export RUPTURA_API_KEY=<your-api-key>
+ruptura-ctl version   # ruptura-ctl v1.0.0
+ruptura-ctl health
+ruptura-ctl status
+```
+
+**Send telemetry (OTLP JSON):**
+
+```bash
+# Metrics
+curl -X POST http://<host>:4317/otlp/v1/metrics \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <api-key>" \
+  -d '{"resourceMetrics":[{"resource":{"attributes":[
+    {"key":"service.name","value":{"stringValue":"payment-api"}},
+    {"key":"k8s.namespace.name","value":{"stringValue":"production"}}
+  ]},"scopeMetrics":[{"metrics":[
+    {"name":"process.cpu.utilization","gauge":{"dataPoints":[{"timeUnixNano":"'$(date +%s%N)'","asDouble":0.72}]}}
+  ]}]}]}'
+
+# Logs
+curl -X POST http://<host>:4317/otlp/v1/logs \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <api-key>" \
+  -d '{"resourceLogs":[{"resource":{"attributes":[
+    {"key":"service.name","value":{"stringValue":"payment-api"}},
+    {"key":"k8s.namespace.name","value":{"stringValue":"production"}}
+  ]},"scopeLogs":[{"logRecords":[
+    {"timeUnixNano":"'$(date +%s%N)'","severityNumber":17,"severityText":"ERROR",
+     "body":{"stringValue":"DB connection pool exhausted"}}
+  ]}]}]}'
+```
+
+See the [Ingest Guide](https://benfradjselim.github.io/ruptura/getting-started/ingest/) for full examples covering Prometheus remote_write, OTel Collector, traces, DogStatsD, and application SDKs.
 
 ---
 
 ## What's Inside
 
 ```
-workdir/                  Ruptura Go source (v6.8.2)
-  cmd/ruptura/            Main binary
+workdir/                  Ruptura Go source (v6.8.13)
+  cmd/ruptura/            Main binary (server)
+  cmd/ruptura-ctl/        CLI tool (v1.0.0 — independently versioned)
   internal/               Engine, pipelines, API, storage, actions, fusion
   internal/ui/static/     Embedded web dashboard (served at :8080, air-gap safe)
   pkg/                    Public Go packages (rupture, composites, client)
@@ -205,7 +253,7 @@ workdir/                  Ruptura Go source (v6.8.2)
                           RupturaInstance CRD · Deployment + Service + PVC + SA + Route
                           UBI9-based image — certified for Red Hat OperatorHub
 
-helm/                     Helm chart (v0.6.9, appVersion 6.8.2)
+helm/                     Helm chart (v0.7.6, appVersion 6.8.13)
 bundle/                   OLM bundle (OperatorHub submission format)
 catalog/                  File-Based Catalog for OLM
 operators/                community-operators + Red Hat certified-operators submission tree
@@ -222,19 +270,20 @@ docs/
 
 ```
 ruptura (application)
-v6.8.2 ✅  OOMKill prevention — BadgerDB memory tuning, periodic GC, GOMEMLIMIT soft cap
-v6.8.1 ✅  Fleet heatmap visibility and color fix
-v6.8.0 ✅  Stable dashboard · correct workload identity · continuous seed loop
-v6.7.0 ✅  Embedded web dashboard — air-gap safe, vendor-local Chart.js + Alpine.js
-v6.6.3 ✅  Pre-v7 security & correctness hardening (timing-safe auth, emergency stop, forecast fix)
-v6.6.0 ✅  Per-workload signal weight tuning (runtime + env bootstrap)
-v6.5.0 ✅  Edition gate — community (read-only) / autopilot (full execution)
-v6.4.0 ✅  Rupture fingerprinting · business signal layer (SLO burn, blast radius)
-v6.3.0 ✅  Calibration warm-up · HealthScore ETA forecast · ruptura-sim
-v6.2.x ✅  Fused Rupture Index · workload-level signals · adaptive baselines
+v6.8.13 ✅ Log/trace ingest counters · Live Data Flow panel fix · ruptura-ctl v1.0.0 (independent versioning)
+v6.8.2  ✅ OOMKill prevention — BadgerDB memory tuning, periodic GC, GOMEMLIMIT soft cap
+v6.8.1  ✅ Fleet heatmap visibility and color fix
+v6.8.0  ✅ Stable dashboard · correct workload identity · continuous seed loop
+v6.7.0  ✅ Embedded web dashboard — air-gap safe, vendor-local Chart.js + Alpine.js
+v6.6.3  ✅ Pre-v7 security & correctness hardening (timing-safe auth, emergency stop, forecast fix)
+v6.6.0  ✅ Per-workload signal weight tuning (runtime + env bootstrap)
+v6.5.0  ✅ Edition gate — community (read-only) / autopilot (full execution)
+v6.4.0  ✅ Rupture fingerprinting · business signal layer (SLO burn, blast radius)
+v6.3.0  ✅ Calibration warm-up · HealthScore ETA forecast · ruptura-sim
+v6.2.x  ✅ Fused Rupture Index · workload-level signals · adaptive baselines
             narrative explain · topology contagion · maintenance windows
-v6.1.0 ✅  gRPC ingest · NATS/Kafka eventbus · adaptive ensemble · K8s operator
-v7.0.0 ⏳  multi-tenant opt-in (X-Org-ID) · Python SDK v2
+v6.1.0  ✅ gRPC ingest · NATS/Kafka eventbus · adaptive ensemble · K8s operator
+v7.0.0  ⏳ "Deviser pour réunir" — ruptura-ui as separate pod · multi-tenant · Python SDK v2
 
 ruptura-operator (Kubernetes operator — OperatorHub + Red Hat OperatorHub)
 v0.6.9 🔄  Submitted to Red Hat OperatorHub — UBI9 base image, required certification labels

@@ -10,6 +10,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// CTLVersion is the ruptura-ctl release version — versioned independently of the server.
+const CTLVersion = "1.0.0"
+
 var (
 	cfgURL     string
 	cfgAPIKey  string
@@ -59,7 +62,16 @@ func Execute() {
 	}
 }
 
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print ruptura-ctl version",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("ruptura-ctl v%s\n", CTLVersion)
+	},
+}
+
 func init() {
+	rootCmd.AddCommand(versionCmd)
 	rootCmd.PersistentFlags().StringVarP(&cfgURL, "url", "u", "http://localhost:8080", "Ruptura API URL [$RUPTURA_URL]")
 	rootCmd.PersistentFlags().StringVarP(&cfgAPIKey, "api-key", "k", "", "API key [$RUPTURA_API_KEY]")
 	rootCmd.PersistentFlags().StringVarP(&cfgOutput, "output", "o", "table", "Output format: table|json|wide")
