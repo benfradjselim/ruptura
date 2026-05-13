@@ -17,17 +17,12 @@ COPY cmd/      cmd/
 COPY internal/ internal/
 COPY pkg/      pkg/
 
-RUN echo "=== UI static assets ===" && ls internal/ui/static/assets/
-
 RUN CGO_ENABLED=0 GOOS=linux \
     go build \
       -trimpath \
       -ldflags="-s -w" \
       -o /ruptura \
       ./cmd/ruptura
-
-RUN echo "=== Binary embed check ===" && \
-    grep -c "BqBEsm7U" /ruptura && echo "CORRECT: BqBEsm7U in binary" || echo "WRONG: BqBEsm7U not in binary"
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 # ubi-micro: minimal Red Hat UBI — required for Red Hat OperatorHub preflight certification.

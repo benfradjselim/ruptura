@@ -1,14 +1,1311 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/ui/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ui</title>
-    <script type="module" crossorigin src="/ui/assets/index-BqBEsm7U.js"></script>
-    <link rel="stylesheet" crossorigin href="/ui/assets/index-CFkfK7Ul.css">
-  </head>
-  <body>
-    <div id="app"></div>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ruptura — Predictive Action Layer</title>
+<!-- fonts: non-blocking, system stack fallback -->
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      onload="this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"></noscript>
+<!-- local vendors — no CDN dependency -->
+<script src="/ui/vendor/chart.min.js"></script>
+<script src="/ui/vendor/alpine.min.js" defer></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#020408; --bg2:#060c14;
+  --surface:rgba(255,255,255,.03); --surface2:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.07); --border2:rgba(255,255,255,.13);
+  --text:#e2e8f0; --muted:#4b5672; --dim:#1e293b;
+  --cyan:#00d4ff; --blue:#3b82f6; --violet:#7c3aed; --purple:#a855f7;
+  --green:#00e5a0; --yellow:#ffd93d; --orange:#ff9f43; --red:#ff3366; --pink:#ff6b9d;
+  --fs-base:13px; --fs-sm:11px; --fs-xs:10px; --fs-2xs:9px;
+}
+
+html,body{height:100%;background:var(--bg);color:var(--text);
+  font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:var(--fs-base);line-height:1.5}
+
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(circle,rgba(255,255,255,.04) 1px,transparent 1px);
+  background-size:28px 28px}
+body::after{content:'';position:fixed;top:-200px;left:-200px;width:600px;height:600px;
+  background:radial-gradient(circle,rgba(0,212,255,.06) 0%,transparent 70%);
+  pointer-events:none;z-index:0}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+
+/* ── layout ── */
+#app{position:relative;z-index:1;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+#topbar{display:flex;align-items:center;justify-content:space-between;padding:0 18px;
+  height:50px;flex-shrink:0;border-bottom:1px solid var(--border);
+  background:rgba(2,4,8,.9);backdrop-filter:blur(20px);gap:12px}
+#alert-banner{display:none;align-items:center;gap:10px;padding:8px 18px;
+  background:rgba(255,51,102,.1);border-bottom:1px solid rgba(255,51,102,.3);animation:slideDown .3s ease}
+#alert-banner.visible{display:flex}
+@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:none;opacity:1}}
+#main{display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* sidebar */
+#sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;
+  border-right:1px solid var(--border);background:rgba(6,12,20,.7);overflow:hidden}
+
+/* center */
+#center{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* right panel */
+#rightpanel{width:276px;flex-shrink:0;display:flex;flex-direction:column;
+  border-left:1px solid var(--border);background:rgba(6,12,20,.7);overflow-y:auto}
+
+/* ── cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;backdrop-filter:blur(12px)}
+.card-sm{background:var(--surface2);border:1px solid var(--border);border-radius:8px}
+.gcard{position:relative;border-radius:10px;padding:14px;background:var(--surface);border:1px solid var(--border);overflow:hidden}
+.gcard::before{content:'';position:absolute;top:0;left:0;right:0;height:1px}
+.gcard.cyan::before{background:linear-gradient(90deg,var(--cyan),var(--violet))}
+.gcard.green::before{background:linear-gradient(90deg,var(--green),var(--cyan))}
+.gcard.yellow::before{background:linear-gradient(90deg,var(--yellow),var(--orange))}
+.gcard.red::before{background:linear-gradient(90deg,var(--red),var(--pink))}
+.gcard.violet::before{background:linear-gradient(90deg,var(--violet),var(--purple))}
+.gcard.critical-glow{box-shadow:0 0 30px rgba(255,51,102,.2),0 0 60px rgba(255,51,102,.05)}
+.gcard.warn-glow{box-shadow:0 0 20px rgba(255,217,61,.15)}
+
+/* ── toast ── */
+#toast-area{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{padding:10px 16px;border-radius:8px;font-size:var(--fs-sm);font-weight:500;
+  backdrop-filter:blur(12px);pointer-events:auto;animation:toastIn .25s ease;max-width:320px}
+.toast-ok{background:rgba(0,229,160,.15);border:1px solid rgba(0,229,160,.3);color:var(--green)}
+.toast-err{background:rgba(255,51,102,.15);border:1px solid rgba(255,51,102,.3);color:var(--red)}
+.toast-info{background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);color:var(--cyan)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ── modal overlay ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
+  z-index:200;display:flex;align-items:center;justify-content:center}
+.modal{background:#0b1220;border:1px solid var(--border2);border-radius:12px;
+  padding:24px;min-width:420px;max-width:600px;width:90%;max-height:85vh;
+  overflow-y:auto;position:relative}
+.modal-title{font-size:15px;font-weight:600;margin-bottom:18px;
+  background:linear-gradient(135deg,var(--cyan),var(--violet));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+/* ── badges ── */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;
+  border-radius:20px;font-size:var(--fs-2xs);font-weight:600;letter-spacing:.04em}
+.b-cyan{background:rgba(0,212,255,.12);color:var(--cyan);border:1px solid rgba(0,212,255,.2)}
+.b-green{background:rgba(0,229,160,.12);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.b-yellow{background:rgba(255,217,61,.12);color:var(--yellow);border:1px solid rgba(255,217,61,.2)}
+.b-red{background:rgba(255,51,102,.12);color:var(--red);border:1px solid rgba(255,51,102,.2)}
+.b-violet{background:rgba(124,58,237,.15);color:var(--purple);border:1px solid rgba(124,58,237,.25)}
+.b-gray{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border)}
+.b-orange{background:rgba(255,159,67,.12);color:var(--orange);border:1px solid rgba(255,159,67,.2)}
+
+/* ── buttons ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:7px;
+  font-size:var(--fs-sm);font-weight:600;cursor:pointer;border:none;transition:all .15s;
+  font-family:inherit;white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff}
+.btn-primary:hover{filter:brightness(1.15)}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+.btn-ghost:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-danger{background:rgba(255,51,102,.1);color:var(--red);border:1px solid rgba(255,51,102,.3)}
+.btn-danger:hover{background:rgba(255,51,102,.2)}
+.btn-sm{padding:4px 10px;font-size:var(--fs-xs)}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+
+/* ── inputs ── */
+input[type=text],input[type=password],textarea{
+  background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:7px;
+  color:var(--text);padding:7px 11px;font-size:var(--fs-sm);outline:none;
+  font-family:inherit;width:100%;transition:border-color .15s}
+input[type=text]:focus,input[type=password]:focus,textarea:focus{
+  border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,212,255,.08)}
+textarea{resize:vertical;min-height:60px}
+select{background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:6px;
+  color:var(--text);padding:5px 8px;font-size:var(--fs-xs);outline:none;font-family:inherit}
+label{font-size:var(--fs-xs);color:var(--muted);margin-bottom:4px;display:block}
+.form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.form-row:last-child{margin-bottom:0}
+
+/* ── signal bar ── */
+.sig-bar{height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden}
+.sig-fill{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+
+/* ── workload row ── */
+.wl-row{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);
+  cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:10px}
+.wl-row:hover{background:rgba(255,255,255,.03)}
+.wl-row.active{background:rgba(0,212,255,.05);border-left:2px solid var(--cyan)}
+
+/* ── tab bar ── */
+.tab-bar{display:flex;gap:2px;padding:3px;background:rgba(255,255,255,.03);
+  border-radius:8px;border:1px solid var(--border);flex-wrap:wrap}
+.tab{padding:5px 12px;border-radius:6px;cursor:pointer;font-size:var(--fs-sm);
+  font-weight:500;color:var(--muted);transition:all .15s;white-space:nowrap;
+  position:relative;user-select:none}
+.tab.on{background:rgba(255,255,255,.07);color:var(--text)}
+.tab.disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+
+/* ── heatmap ── */
+.heatmap-cell{border-radius:3px;transition:background .4s;height:18px;min-width:18px}
+
+/* ── event log ── */
+.ev-row{display:flex;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.03);
+  transition:background .1s}
+.ev-row:hover{background:rgba(255,255,255,.02)}
+.ev-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px}
+
+/* ── animations ── */
+.pulse{animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.blink{animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.spin{animation:spin 1.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fade-in{animation:fi .3s ease}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ── skeleton ── */
+.skel{background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%);
+  background-size:200% 100%;animation:skel 1.5s infinite;border-radius:4px}
+@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── misc ── */
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.sec-label{font-size:var(--fs-2xs);font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.ring-wrap canvas{transform:rotate(-90deg)}
+.ring-label{position:absolute;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:var(--fs-2xs)}
+.divider{height:1px;background:var(--border);margin:12px 0}
+.signal-toggle{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;
+  border-radius:20px;font-size:var(--fs-xs);font-weight:500;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface2);transition:all .15s;user-select:none}
+.signal-toggle.active{border-color:currentColor;background:rgba(255,255,255,.06)}
+
+/* ── responsive ── */
+@media(max-width:1200px){#rightpanel{display:none}}
+@media(max-width:900px){#sidebar{width:220px}}
+@media(max-width:680px){#sidebar{display:none}}
+</style>
+</head>
+<body>
+<div id="app" x-data="app()" x-init="boot()">
+
+<!-- ═══ TOAST AREA ═══ -->
+<div id="toast-area">
+  <template x-for="t in toasts" :key="t.id">
+    <div class="toast" :class="t.cls" x-text="t.msg"></div>
+  </template>
+</div>
+
+<!-- ═══ SETTINGS MODAL ═══ -->
+<div class="modal-overlay" x-show="showSettings" x-transition.opacity @click.self="showSettings=false" style="display:none">
+  <div class="modal fade-in">
+    <div class="modal-title">⚙ Connection Settings</div>
+    <div class="form-row">
+      <label>Ruptura URL</label>
+      <input type="text" x-model="apiUrl" placeholder="Leave empty to use same origin" @keydown.enter="applySettings()">
+    </div>
+    <div class="form-row">
+      <label>API Key</label>
+      <input type="password" x-model="apiKey" placeholder="Leave empty if no auth" @keydown.enter="applySettings()">
+      <span style="font-size:9px;color:var(--muted);margin-top:3px">Stored in sessionStorage — cleared on tab close.</span>
+    </div>
+    <div class="divider"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <label style="margin:0;flex:1">Auto-refresh interval</label>
+      <select x-model="interval" @change="restartTimer()">
+        <option value="3000">3 s</option>
+        <option value="5000">5 s</option>
+        <option value="10000">10 s</option>
+        <option value="30000">30 s</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost" @click="showSettings=false">Cancel</button>
+      <button class="btn btn-primary" @click="applySettings()">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SUPPRESSIONS MODAL ═══ -->
+<div class="modal-overlay" x-show="showSuppress" x-transition.opacity @click.self="showSuppress=false" style="display:none">
+  <div class="modal fade-in" style="min-width:480px">
+    <div class="modal-title">🔕 Maintenance Windows</div>
+    <!-- create form -->
+    <div class="card-sm" style="padding:14px;margin-bottom:16px">
+      <div class="sec-label" style="margin-bottom:10px">New Window</div>
+      <div class="form-row">
+        <label>Workload key (namespace/kind/name or host)</label>
+        <input type="text" x-model="newSuppress.workload" placeholder="production/Deployment/payment-api">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row">
+          <label>Start (ISO 8601 or blank = now)</label>
+          <input type="text" x-model="newSuppress.start" placeholder="leave blank for now">
+        </div>
+        <div class="form-row">
+          <label>End (ISO 8601, required)</label>
+          <input type="text" x-model="newSuppress.end" placeholder="2026-05-06T12:00:00Z">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Reason (optional)</label>
+        <input type="text" x-model="newSuppress.reason" placeholder="Planned deploy">
+      </div>
+      <button class="btn btn-primary btn-sm" @click="createSuppression()" :disabled="!newSuppress.workload||!newSuppress.end">
+        Create Window
+      </button>
+    </div>
+    <!-- list -->
+    <div class="sec-label" style="margin-bottom:8px">Active Windows (<span x-text="suppressions.length"></span>)</div>
+    <div x-show="!suppressions.length" style="color:var(--muted);font-size:var(--fs-sm);padding:8px 0">No active maintenance windows.</div>
+    <template x-for="s in suppressions" :key="s.id">
+      <div class="card-sm" style="padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <div style="flex:1;min-width:0">
+          <div class="mono" style="font-size:var(--fs-xs);color:var(--cyan);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="s.workload"></div>
+          <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:2px" x-text="fmtTime(s.start)+' → '+fmtTime(s.end)+(s.reason?' · '+s.reason:'')"></div>
+        </div>
+        <button class="btn btn-danger btn-sm" @click="deleteSuppression(s.id)">Delete</button>
+      </div>
+    </template>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" @click="showSuppress=false">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ WEIGHTS MODAL ═══ -->
+<div class="modal-overlay" x-show="showWeights" x-transition.opacity @click.self="showWeights=false" style="display:none">
+  <div class="modal fade-in">
+    <div class="modal-title">⚖ Signal Weight Configuration</div>
+    <p style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:16px">
+      Override HealthScore weights per workload selector. Selector syntax: exact key, <code style="color:var(--cyan)">ns/*</code>, or <code style="color:var(--cyan)">*</code>. Weights are auto-normalised to 1.0.
+    </p>
+    <div x-show="weightsLoading" style="text-align:center;padding:24px;color:var(--muted)">Loading…</div>
+    <div x-show="!weightsLoading">
+      <template x-for="(wc,idx) in weightConfigs" :key="idx">
+        <div class="card-sm" style="padding:12px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <input type="text" x-model="wc.selector" placeholder="* or ns/* or ns/kind/name" style="width:220px">
+            <button class="btn btn-danger btn-sm" @click="weightConfigs.splice(idx,1)">✕</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <template x-for="sig in ['stress','fatigue','mood','pressure','humidity','contagion']" :key="sig">
+              <div>
+                <label x-text="sig"></label>
+                <input type="text" x-model="wc[sig]" placeholder="0.0">
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+      <button class="btn btn-ghost btn-sm" @click="weightConfigs.push({selector:'*',stress:0.25,fatigue:0.20,mood:0.20,pressure:0.15,humidity:0.10,contagion:0.10})" style="margin-bottom:14px">
+        + Add Rule
+      </button>
+      <div class="divider"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost" @click="showWeights=false">Cancel</button>
+        <button class="btn btn-primary" @click="saveWeights()">Save Weights</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOP BAR ═══ -->
+<header id="topbar">
+  <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:8px">
+      <img src="/ui/ruptura-icon.png" alt="Ruptura" width="22" height="22" style="border-radius:4px;flex-shrink:0">
+      <span style="font-weight:700;font-size:14px;letter-spacing:.06em;background:linear-gradient(135deg,var(--cyan),var(--violet));-webkit-background-clip:text;-webkit-text-fill-color:transparent">RUPTURA</span>
+      <span class="mono" style="font-size:var(--fs-xs);color:var(--muted)" x-text="'v'+(health.version||'—')"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div :class="connected?'pulse':'blink'" style="width:7px;height:7px;border-radius:50%" :style="connected?'background:var(--green)':'background:var(--red)'"></div>
+      <span style="font-size:var(--fs-sm)"
+        :style="!connected ? 'color:var(--red)' : (health.status==='ready' ? 'color:var(--green);font-weight:600' : (health.status==='online'||health.status==='degraded') ? 'color:var(--green)' : 'color:var(--yellow,#f5a623)')"
+        x-text="connected?(health.status||'online'):'offline'"></span>
+    </div>
+    <span class="badge b-violet" x-text="health.edition||'community'"></span>
+    <span class="badge b-gray mono" x-text="'↑ '+formatUptime(health.uptime_seconds||0)"></span>
+    <span class="mono" style="font-size:var(--fs-xs);color:var(--muted)" x-text="apiUrlShort"></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+    <!-- ingest pill -->
+    <div style="display:flex;gap:10px;padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-right:4px">
+      <span class="mono" style="font-size:var(--fs-xs)"><span style="color:var(--cyan)" x-text="fmtNum(ingest.metrics)"></span> <span style="color:var(--muted)">m</span></span>
+      <span class="mono" style="font-size:var(--fs-xs)"><span style="color:var(--violet)" x-text="fmtNum(ingest.logs)"></span> <span style="color:var(--muted)">l</span></span>
+      <span class="mono" style="font-size:var(--fs-xs)"><span style="color:var(--green)" x-text="fmtNum(ingest.traces)"></span> <span style="color:var(--muted)">t</span></span>
+    </div>
+    <button class="btn btn-ghost btn-sm" @click="showSuppress=true;loadSuppressions()" title="Maintenance Windows">🔕</button>
+    <button class="btn btn-ghost btn-sm" @click="showWeights=true;loadWeights()" title="Signal Weights">⚖</button>
+    <button class="btn btn-ghost btn-sm" @click="doRefresh()" title="Refresh">
+      <svg :class="loading?'spin':''" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+      Refresh
+    </button>
+    <button class="btn btn-danger btn-sm" @click="emergencyStop()">■ E-Stop</button>
+    <button class="btn btn-ghost btn-sm" @click="showSettings=true" title="Settings">⚙</button>
+  </div>
+</header>
+
+<!-- ═══ ALERT BANNER ═══ -->
+<div id="alert-banner" :class="criticalSnaps.length>0?'visible':''">
+  <span style="color:var(--red);font-size:15px">⚠</span>
+  <span style="font-weight:600;color:var(--red);font-size:var(--fs-sm)" x-text="criticalSnaps.length+' critical rupture'+(criticalSnaps.length!==1?'s':'')"></span>
+  <span style="color:var(--muted)" x-text="'→ '+criticalSnaps.map(s=>wlName(s)).join(', ')"></span>
+  <div style="flex:1"></div>
+  <span style="color:var(--muted);font-size:var(--fs-xs)" x-text="'FusedR max: '+(Math.max(...criticalSnaps.map(s=>s.fused_rupture_index||0))).toFixed(2)"></span>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div id="main">
+
+<!-- ─── SIDEBAR ─── -->
+<aside id="sidebar">
+  <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+    <span class="sec-label">Workloads</span>
+    <span class="badge b-cyan" x-text="snapshots.length"></span>
+  </div>
+  <div style="padding:8px 10px;border-bottom:1px solid var(--border)">
+    <input type="text" x-model="search" placeholder="Filter…" style="font-size:var(--fs-xs)">
+  </div>
+  <div style="flex:1;overflow-y:auto">
+    <template x-for="s in filteredSnaps" :key="wlKey(s)">
+      <div class="wl-row" :class="selectedKey===wlKey(s)?'active':''" @click="selectWorkload(s)">
+        <div class="ring-wrap" style="width:30px;height:30px;flex-shrink:0">
+          <canvas :id="'ring-'+wlKey(s)" width="30" height="30"></canvas>
+          <div class="ring-label" style="font-size:8px" :style="healthColor(s.health_score?.value)" x-text="Math.round(s.health_score?.value||0)"></div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="mono" style="font-size:var(--fs-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="wlName(s)"></div>
+          <div style="display:flex;align-items:center;gap:5px;margin-top:3px">
+            <div class="sig-bar" style="flex:1"><div class="sig-fill" :style="hbar(s.health_score?.value,100)"></div></div>
+            <span class="badge" :class="stateBadge(s)" style="padding:1px 5px;font-size:8px" x-text="stateLabel(s)"></span>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div class="mono" style="font-size:var(--fs-xs);font-weight:600" :style="frColor(s.fused_rupture_index)" x-text="(s.fused_rupture_index||0).toFixed(2)"></div>
+          <div style="font-size:8px;color:var(--muted)">FusedR</div>
+        </div>
+      </div>
+    </template>
+    <div x-show="!filteredSnaps.length" style="padding:24px 12px;text-align:center;color:var(--muted);font-size:var(--fs-sm)">
+      No workloads found.<br>Send telemetry to Ruptura to begin.
+    </div>
+  </div>
+  <!-- fleet summary -->
+  <div style="padding:10px 12px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center">
+    <div>
+      <div class="mono" style="font-size:18px;font-weight:700;color:var(--cyan)" x-text="snapshots.length"></div>
+      <div style="font-size:8px;color:var(--muted)">total</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size:18px;font-weight:700" :style="calibCount>0?'color:var(--yellow)':'color:var(--muted)'" x-text="calibCount"></div>
+      <div style="font-size:8px;color:var(--muted)">calibrating</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size:18px;font-weight:700" :style="critCount>0?'color:var(--red)':'color:var(--green)'" x-text="critCount"></div>
+      <div style="font-size:8px;color:var(--muted)">critical</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ─── CENTER ─── -->
+<main id="center">
+
+  <!-- stat cards -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+    <div class="gcard cyan">
+      <div class="sec-label" style="margin-bottom:6px">Ingest Rate</div>
+      <div class="mono" style="font-size:22px;font-weight:700;color:var(--cyan)" x-text="fmtNum(ingestTotal)"></div>
+      <div style="color:var(--muted);font-size:var(--fs-xs);margin-top:2px">total samples</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <div><div class="mono" style="font-size:var(--fs-sm);color:var(--cyan)" x-text="fmtNum(ingest.metrics)"></div><div style="font-size:8px;color:var(--muted)">metrics</div></div>
+        <div><div class="mono" style="font-size:var(--fs-sm);color:var(--violet)" x-text="fmtNum(ingest.logs)"></div><div style="font-size:8px;color:var(--muted)">logs</div></div>
+        <div><div class="mono" style="font-size:var(--fs-sm);color:var(--green)" x-text="fmtNum(ingest.traces)"></div><div style="font-size:8px;color:var(--muted)">traces</div></div>
+      </div>
+    </div>
+    <div class="gcard green">
+      <div class="sec-label" style="margin-bottom:6px">Fleet Health</div>
+      <div class="mono" style="font-size:22px;font-weight:700" :style="healthColor(avgHealth)" x-text="Math.round(avgHealth)"></div>
+      <div style="color:var(--muted);font-size:var(--fs-xs);margin-top:2px">avg health score</div>
+      <div class="sig-bar" style="margin-top:8px;height:4px"><div class="sig-fill" :style="hbar(avgHealth,100)"></div></div>
+    </div>
+    <div class="gcard yellow" :class="actions.length>0?'warn-glow':''">
+      <div class="sec-label" style="margin-bottom:6px">Pending Actions</div>
+      <div class="mono" style="font-size:22px;font-weight:700" :style="actions.length>0?'color:var(--yellow)':'color:var(--muted)'" x-text="actions.length"></div>
+      <div style="color:var(--muted);font-size:var(--fs-xs);margin-top:2px">awaiting approval</div>
+      <div style="margin-top:8px;display:flex;gap:5px" x-show="actions.length>0">
+        <span class="badge b-red" x-text="actions.filter(a=>a.tier===1).length+' T1'"></span>
+        <span class="badge b-yellow" x-text="actions.filter(a=>a.tier===2).length+' T2'"></span>
+      </div>
+    </div>
+    <div class="gcard" :class="critCount>0?'red critical-glow':'green'">
+      <div class="sec-label" style="margin-bottom:6px">Rupture State</div>
+      <div class="mono" style="font-size:22px;font-weight:700" :style="critCount>0?'color:var(--red)':'color:var(--green)'" x-text="critCount>0?critCount:'✓'"></div>
+      <div style="color:var(--muted);font-size:var(--fs-xs);margin-top:2px" x-text="critCount>0?'active rupture(s)':'all clear'"></div>
+      <div style="margin-top:8px;display:flex;gap:5px">
+        <span class="badge b-yellow" x-text="snapshots.filter(s=>s.fused_rupture_index>=1.5&&s.fused_rupture_index<3).length+' warn'"></span>
+        <span class="badge b-red" x-text="snapshots.filter(s=>s.fused_rupture_index>=5).length+' emerg'"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- workload detail -->
+  <div class="card fade-in" x-show="selected" style="padding:16px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px" x-show="selected">
+      <div>
+        <div class="mono" style="font-size:14px;font-weight:600;background:linear-gradient(135deg,var(--cyan),var(--violet));-webkit-background-clip:text;-webkit-text-fill-color:transparent" x-text="wlName(selected)"></div>
+        <div style="font-size:var(--fs-xs);color:var(--muted);margin-top:1px" x-text="selected?.workload?.namespace ? selected.workload.namespace+' · '+selected.workload.kind : selected?.host"></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+          <span class="badge" :class="stateBadge(selected)" x-text="stateLabel(selected)"></span>
+          <span style="color:var(--muted);font-size:var(--fs-xs)">calib: <span class="mono" x-text="(selected?.calibration_progress||0)+'%'"></span></span>
+          <span x-show="selected?.pattern_match" class="badge b-violet" x-text="'⬡ '+ Math.round((selected?.pattern_match?.similarity||0)*100)+'% match'"></span>
+          <span x-show="selected?.health_forecast?.critical_eta_minutes>0" class="badge b-red" x-text="'⚠ critical in '+(selected?.health_forecast?.critical_eta_minutes||0)+'min'"></span>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="mono" style="font-size:28px;font-weight:700;line-height:1" :style="frColor(selected?.fused_rupture_index)" x-text="(selected?.fused_rupture_index||0).toFixed(2)"></div>
+        <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:2px">Fused Rupture Index</div>
+      </div>
+    </div>
+
+    <!-- tabs -->
+    <div class="tab-bar" style="margin-bottom:12px">
+      <div class="tab" :class="tab==='signals'?'on':''" @click="tab='signals'">KPI Signals</div>
+      <div class="tab" :class="tab==='history'?'on':''" @click="tab='history';loadHistory()">Timeseries</div>
+      <div class="tab" :class="[tab==='forecast'?'on':'', !selected?.health_forecast?'disabled':'']"
+           @click="selected?.health_forecast&&(tab='forecast',drawForecast())"
+           :title="!selected?.health_forecast?'Requires calibration ≥ 100%':''">
+        Forecast<template x-if="!selected?.health_forecast"><span style="font-size:8px;margin-left:3px;opacity:.6">🔒</span></template>
+      </div>
+      <div class="tab" :class="tab==='explain'?'on':''" @click="tab='explain';loadExplain()">Explain</div>
+      <div class="tab" :class="tab==='business'?'on':''" @click="tab='business'">Business</div>
+      <div class="tab" :class="tab==='pattern'?'on':''" @click="tab='pattern'">Pattern</div>
+    </div>
+
+    <!-- ── SIGNALS TAB ── -->
+    <div x-show="tab==='signals'" class="fade-in">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <template x-for="sig in kpiSignals()" :key="sig.name">
+          <div class="card-sm" style="padding:10px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span class="sec-label" x-text="sig.name.toUpperCase()"></span>
+              <span class="mono" style="font-size:13px;font-weight:600" :style="'color:'+sig.hex" x-text="sig.val.toFixed(3)"></span>
+            </div>
+            <div class="sig-bar"><div class="sig-fill" :style="'width:'+Math.min(100,sig.val*100)+'%;background:'+sig.hex"></div></div>
+            <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:5px" x-text="sig.desc"></div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ── TIMESERIES TAB ── -->
+    <div x-show="tab==='history'" class="fade-in">
+      <!-- signal toggles -->
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">
+        <template x-for="sig in tsSignals" :key="sig.key">
+          <div class="signal-toggle" :class="sig.on?'active':''" :style="sig.on?'color:'+sig.color:'color:var(--muted)'"
+               @click="sig.on=!sig.on;renderTSCharts()">
+            <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block"></span>
+            <span x-text="sig.label"></span>
+          </div>
+        </template>
+      </div>
+      <div x-show="historyLoading" style="text-align:center;padding:24px">
+        <div class="skel" style="height:180px;margin-bottom:10px"></div>
+        <div class="skel" style="height:80px"></div>
+      </div>
+      <div x-show="!historyLoading&&historyData.length===0" style="text-align:center;padding:32px;color:var(--muted);font-size:var(--fs-sm)">
+        No historical data yet. Ruptura collects one point every 30 s.<br>Check back shortly.
+      </div>
+      <div x-show="!historyLoading&&historyData.length>0">
+        <div style="height:180px;position:relative;margin-bottom:8px"><canvas id="ts-chart"></canvas></div>
+        <div style="height:90px;position:relative"><canvas id="fusedr-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── FORECAST TAB ── -->
+    <div x-show="tab==='forecast'" class="fade-in">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+        <div class="card-sm" style="padding:12px;text-align:center">
+          <div class="sec-label" style="margin-bottom:6px">NOW</div>
+          <div class="mono" style="font-size:24px;font-weight:700" :style="healthColor(selected?.health_score?.value)" x-text="Math.round(selected?.health_score?.value||0)"></div>
+        </div>
+        <div class="card-sm" style="padding:12px;text-align:center">
+          <div class="sec-label" style="margin-bottom:6px">+ 15 MIN</div>
+          <div class="mono" style="font-size:24px;font-weight:700" :style="healthColor(selected?.health_forecast?.in_15min)" x-text="Math.round(selected?.health_forecast?.in_15min||0)"></div>
+        </div>
+        <div class="card-sm" style="padding:12px;text-align:center">
+          <div class="sec-label" style="margin-bottom:6px">+ 30 MIN</div>
+          <div class="mono" style="font-size:24px;font-weight:700" :style="healthColor(selected?.health_forecast?.in_30min)" x-text="Math.round(selected?.health_forecast?.in_30min||0)"></div>
+        </div>
+      </div>
+      <div x-show="selected?.health_forecast?.critical_eta_minutes>0" class="card-sm" style="padding:10px 14px;display:flex;align-items:center;gap:10px;border-color:rgba(255,51,102,.3);margin-bottom:10px">
+        <span style="color:var(--red);font-size:18px">⚠</span>
+        <div>
+          <div style="font-weight:600;font-size:13px;color:var(--red)">Critical in <span class="mono" x-text="selected?.health_forecast?.critical_eta_minutes"></span> min</div>
+          <div style="font-size:var(--fs-xs);color:var(--muted)">OLS projection — health will drop below 40 if trend continues</div>
+        </div>
+      </div>
+      <div x-show="!selected?.health_forecast?.critical_eta_minutes" class="card-sm" style="padding:10px 14px;border-color:rgba(0,229,160,.2);margin-bottom:10px">
+        <span style="color:var(--green);font-size:var(--fs-sm)">✓ Stable — no critical degradation projected within 30 minutes</span>
+      </div>
+      <div style="height:160px;position:relative"><canvas id="forecast-chart"></canvas></div>
+    </div>
+
+    <!-- ── EXPLAIN TAB ── -->
+    <div x-show="tab==='explain'" class="fade-in">
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" :class="explainMode==='narrative'?'btn-primary':''" @click="explainMode='narrative';fetchExplain()">Narrative</button>
+        <button class="btn btn-ghost btn-sm" :class="explainMode==='formula'?'btn-primary':''" @click="explainMode='formula';fetchExplain()">Formula</button>
+        <button class="btn btn-ghost btn-sm" :class="explainMode==='pipeline'?'btn-primary':''" @click="explainMode='pipeline';fetchExplain()">Pipeline</button>
+        <div style="flex:1"></div>
+        <span style="font-size:var(--fs-xs);color:var(--muted);align-self:center" x-text="explainLoading?'Loading…':''"></span>
+      </div>
+      <!-- rupture selector -->
+      <div x-show="!explainRuptureId" class="card-sm" style="padding:14px;text-align:center;color:var(--muted);font-size:var(--fs-sm)">
+        <div style="margin-bottom:8px">No active rupture ID for this workload.</div>
+        <div style="font-size:var(--fs-xs)">Explain works on rupture events (FusedR ≥ 3). Trigger a simulation or wait for a real rupture.</div>
+      </div>
+      <div x-show="explainRuptureId">
+        <div x-show="explainLoading" style="padding:24px">
+          <div class="skel" style="height:16px;margin-bottom:8px;width:80%"></div>
+          <div class="skel" style="height:16px;margin-bottom:8px;width:60%"></div>
+          <div class="skel" style="height:16px;width:90%"></div>
+        </div>
+        <div x-show="!explainLoading&&explainResult" class="card-sm" style="padding:16px">
+          <pre x-text="explainResult" style="white-space:pre-wrap;font-family:'JetBrains Mono',monospace;font-size:var(--fs-xs);line-height:1.7;color:var(--text)"></pre>
+        </div>
+        <div x-show="!explainLoading&&!explainResult" style="text-align:center;padding:24px;color:var(--muted);font-size:var(--fs-sm)">
+          No explain data available. Select narrative / formula / pipeline above.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BUSINESS TAB ── -->
+    <div x-show="tab==='business'" class="fade-in">
+      <div x-show="!selected?.business" style="text-align:center;padding:24px;color:var(--muted);font-size:var(--fs-sm)">No business signals available.</div>
+      <div x-show="selected?.business" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div class="card-sm" style="padding:14px">
+          <div class="sec-label" style="margin-bottom:8px">SLO BURN VELOCITY</div>
+          <div class="mono" style="font-size:24px;font-weight:700" :style="selected?.business?.slo_burn_velocity>1?'color:var(--red)':selected?.business?.slo_burn_velocity>.5?'color:var(--yellow)':'color:var(--green)'" x-text="(selected?.business?.slo_burn_velocity||0).toFixed(3)"></div>
+          <div class="sig-bar" style="margin-top:8px;height:4px">
+            <div class="sig-fill" :style="'width:'+Math.min(100,(selected?.business?.slo_burn_velocity||0)*50)+'%;background:'+(selected?.business?.slo_burn_velocity>1?'var(--red)':selected?.business?.slo_burn_velocity>.5?'var(--yellow)':'var(--green)')"></div>
+          </div>
+          <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:6px">error rate / allowed rate</div>
+          <span class="badge" style="margin-top:8px" :class="selected?.business?.slo_burn_velocity>1?'b-red':selected?.business?.slo_burn_velocity>.5?'b-yellow':'b-green'" x-text="selected?.business?.slo_burn_velocity>1?'🔥 Burning budget':selected?.business?.slo_burn_velocity>.5?'Elevated':'Healthy'"></span>
+        </div>
+        <div class="card-sm" style="padding:14px">
+          <div class="sec-label" style="margin-bottom:8px">BLAST RADIUS</div>
+          <div class="mono" style="font-size:24px;font-weight:700" :style="selected?.business?.blast_radius>10?'color:var(--red)':selected?.business?.blast_radius>5?'color:var(--yellow)':'color:var(--green)'" x-text="selected?.business?.blast_radius||0"></div>
+          <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:8px">downstream services depending on this workload</div>
+        </div>
+        <div class="card-sm" style="padding:14px">
+          <div class="sec-label" style="margin-bottom:8px">RECOVERY DEBT</div>
+          <div class="mono" style="font-size:24px;font-weight:700" :style="selected?.business?.recovery_debt>=7?'color:var(--red)':selected?.business?.recovery_debt>=3?'color:var(--yellow)':'color:var(--green)'" x-text="selected?.business?.recovery_debt||0"></div>
+          <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:8px">near-misses (FusedR 2–3) in last 7 days</div>
+          <span class="badge" style="margin-top:8px" :class="selected?.business?.recovery_debt>=7?'b-red':selected?.business?.recovery_debt>=3?'b-yellow':'b-green'" x-text="selected?.business?.recovery_debt>=7?'Fragile':selected?.business?.recovery_debt>=3?'Elevated':'Healthy'"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PATTERN TAB ── -->
+    <div x-show="tab==='pattern'" class="fade-in">
+      <div x-show="!selected?.pattern_match" style="text-align:center;padding:24px;color:var(--muted);font-size:var(--fs-sm)">No pattern match — this rupture profile is novel.</div>
+      <div x-show="selected?.pattern_match" class="card-sm" style="padding:16px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div class="mono" style="font-size:32px;font-weight:700;color:var(--cyan)" x-text="Math.round((selected?.pattern_match?.similarity||0)*100)+'%'"></div>
+          <div>
+            <div style="font-weight:600;font-size:13px">Cosine Similarity</div>
+            <div style="font-size:var(--fs-xs);color:var(--muted)">vs. 11-dimensional KPI fingerprint of a past rupture</div>
+          </div>
+        </div>
+        <div class="sig-bar" style="height:6px;margin-bottom:12px">
+          <div class="sig-fill" :style="'width:'+(selected?.pattern_match?.similarity||0)*100+'%;background:var(--cyan)'"></div>
+        </div>
+        <div x-show="selected?.pattern_match?.resolution" class="card-sm" style="padding:10px;background:rgba(0,0,0,.3)">
+          <div class="sec-label" style="margin-bottom:6px">Prior Resolution</div>
+          <div style="font-size:var(--fs-sm);line-height:1.6" x-text="selected?.pattern_match?.resolution"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- pending actions -->
+  <div x-show="actions.length>0" class="card" style="padding:14px" :class="actions.length>0?'warn-glow':''">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="color:var(--yellow);font-size:15px">⚡</span>
+        <span style="font-weight:600;font-size:13px">Pending Actions</span>
+        <span class="badge b-yellow" x-text="actions.length"></span>
+      </div>
+      <button class="btn btn-danger btn-sm" @click="emergencyStop()">■ Emergency Stop All</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <template x-for="a in actions" :key="a.id">
+        <div class="card-sm" style="padding:10px;display:flex;align-items:center;gap:10px">
+          <span class="badge" :class="a.tier===1?'b-red':a.tier===2?'b-yellow':'b-gray'" x-text="'T'+a.tier"></span>
+          <div style="flex:1;min-width:0">
+            <div class="mono" style="font-size:var(--fs-xs);font-weight:600;color:var(--cyan)" x-text="wlNameFromId(a.workload_id)"></div>
+            <div style="font-size:var(--fs-xs);color:var(--muted)" x-text="a.type+' · id: '+a.id?.slice(0,8)"></div>
+          </div>
+          <div class="mono" style="font-size:var(--fs-sm)" :style="frColor(a.fused_rupture_index)" x-text="(a.fused_rupture_index||0).toFixed(2)"></div>
+          <button class="btn btn-primary btn-sm" :disabled="actionBusy" @click="approve(a.id)">Approve</button>
+          <button class="btn btn-ghost btn-sm" :disabled="actionBusy" @click="reject(a.id)">Reject</button>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- fleet heatmap — visible only when no workload is selected -->
+  <div class="card" style="padding:14px" x-show="snapshots.length>0 && !selected">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span class="sec-label">Fleet Signal Heatmap</span>
+      <span style="font-size:var(--fs-xs);color:var(--muted)" x-text="'showing '+Math.min(snapshots.length,20)+' of '+snapshots.length+' workloads'"></span>
+    </div>
+    <!-- header row -->
+    <div style="display:grid;margin-bottom:6px;gap:4px;grid-template-columns:120px repeat(9,1fr)">
+      <div style="font-size:9px;color:var(--muted);font-weight:600">WORKLOAD</div>
+      <template x-for="sig in sigNames" :key="sig">
+        <div style="font-size:9px;color:var(--muted);text-align:center;font-weight:600;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="sig" x-text="sig.slice(0,5)"></div>
+      </template>
+    </div>
+    <!-- data rows -->
+    <template x-for="s in snapshots.slice(0,20)" :key="wlKey(s)">
+      <div style="display:grid;gap:4px;margin-bottom:4px;align-items:center;grid-template-columns:120px repeat(9,1fr)">
+        <div class="mono" style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;padding-right:6px"
+             @click="selectWorkload(s)" :style="'color:'+(selectedKey===wlKey(s)?'var(--cyan)':'var(--text)')" x-text="wlName(s)"></div>
+        <template x-for="sig in sigNames" :key="sig">
+          <div class="heatmap-cell" :style="heatCell(s,sig)" :title="sig+': '+(s[sig]?.value||0).toFixed(3)"></div>
+        </template>
+      </div>
+    </template>
+    <!-- legend -->
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+      <span style="font-size:var(--fs-2xs);color:var(--muted)">Low</span>
+      <div style="flex:1;height:5px;border-radius:3px;background:linear-gradient(90deg,hsl(145,65%,38%),hsl(50,85%,48%),hsl(0,72%,48%))"></div>
+      <span style="font-size:var(--fs-2xs);color:var(--muted)">High</span>
+    </div>
+    <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:6px">
+      mood &amp; resilience are inverted (higher = better). Click a workload name to drill in.
+    </div>
+  </div>
+
+  <!-- empty state -->
+  <div x-show="!selected" class="card" style="padding:40px;text-align:center">
+    <div style="font-size:32px;margin-bottom:8px;opacity:.3">⬡</div>
+    <div style="font-weight:600;margin-bottom:4px">Select a workload</div>
+    <div style="font-size:var(--fs-sm);color:var(--muted)">Click any workload in the left panel to see KPI signals, timeseries, forecast, narrative explain, and business metrics.</div>
+  </div>
+
+</main>
+
+<!-- ─── RIGHT PANEL ─── -->
+<aside id="rightpanel">
+  <!-- data flow canvas -->
+  <div style="padding:12px 12px 0;border-bottom:1px solid var(--border)">
+    <div class="sec-label" style="margin-bottom:8px">Live Data Flow</div>
+    <canvas id="flow-canvas" width="252" height="280" style="width:100%;display:block"></canvas>
+  </div>
+  <!-- ingestion -->
+  <div style="padding:12px;border-bottom:1px solid var(--border)">
+    <div class="sec-label" style="margin-bottom:8px">Ingestion</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);margin-bottom:3px">
+          <span style="color:var(--cyan)">Prometheus (metrics)</span><span class="mono" x-text="fmtNum(ingest.metrics)"></span>
+        </div>
+        <div class="sig-bar"><div class="sig-fill" :style="'width:'+iPct(ingest.metrics)+'%;background:var(--cyan)'"></div></div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);margin-bottom:3px">
+          <span style="color:var(--violet)">OTLP (logs)</span><span class="mono" x-text="fmtNum(ingest.logs)"></span>
+        </div>
+        <div class="sig-bar"><div class="sig-fill" :style="'width:'+iPct(ingest.logs)+'%;background:var(--violet)'"></div></div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);margin-bottom:3px">
+          <span style="color:var(--green)">OTLP (traces)</span><span class="mono" x-text="fmtNum(ingest.traces)"></span>
+        </div>
+        <div class="sig-bar"><div class="sig-fill" :style="'width:'+iPct(ingest.traces)+'%;background:var(--green)'"></div></div>
+      </div>
+    </div>
+  </div>
+  <!-- event log -->
+  <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <span class="sec-label">Event Log</span>
+      <span class="badge b-gray" x-text="eventLog.length"></span>
+    </div>
+    <div style="flex:1;overflow-y:auto">
+      <div x-show="eventLog.length===0" style="padding:16px 12px;text-align:center;color:var(--muted);font-size:var(--fs-xs)">No events yet.</div>
+      <template x-for="ev in eventLog" :key="ev.id">
+        <div class="ev-row">
+          <div class="ev-dot" :style="evDotColor(ev.severity)"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:var(--fs-xs);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="ev.message"></div>
+            <div style="font-size:8px;color:var(--muted)" x-text="relTime(ev.ts)"></div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+  <!-- controls -->
+  <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0">
+    <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);margin-bottom:6px">
+      <span style="color:var(--muted)">Last refresh</span>
+      <span class="mono" x-text="lastRefresh"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <input type="checkbox" x-model="autoRefresh" id="ar" @change="autoRefresh?restartTimer():clearInterval(_timer)">
+      <label for="ar" style="margin:0;font-size:var(--fs-xs);color:var(--muted);cursor:pointer">Auto</label>
+      <select x-model="interval" @change="restartTimer()">
+        <option value="3000">3 s</option>
+        <option value="5000">5 s</option>
+        <option value="10000">10 s</option>
+        <option value="30000">30 s</option>
+      </select>
+      <span style="flex:1"></span>
+      <span class="mono" style="font-size:8px;color:var(--dim)" x-text="'#'+polls"></span>
+    </div>
+  </div>
+</aside>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+Chart.defaults.color = '#4b5672';
+Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 10;
+
+function app() {
+return {
+  /* ── state ── */
+  apiUrl: sessionStorage.getItem('rpt_url') || '',
+  apiKey: sessionStorage.getItem('rpt_key') || (window.__RUPTURA_KEY__ || ''),
+  connected: false, loading: false, actionBusy: false,
+  health: {}, snapshots: [], actions: [], eventLog: [], historyData: [],
+  ingest: {metrics:0, logs:0, traces:0},
+  suppressions: [], weightConfigs: [],
+  selected: null, selectedKey: '',
+  tab: 'signals', search: '',
+  autoRefresh: true, interval: '5000',
+  polls: 0, lastRefresh: '—',
+  showSettings: false, showSuppress: false, showWeights: false,
+  weightsLoading: false, historyLoading: false,
+  toasts: [],
+  explainRuptureId: '', explainMode: 'narrative',
+  explainResult: '', explainLoading: false,
+  newSuppress: {workload:'', start:'', end:'', reason:''},
+  sigNames: ['stress','fatigue','mood','pressure','humidity','contagion','resilience','entropy','velocity'],
+  tsSignals: [
+    {key:'health_score', label:'HealthScore', color:'#00e5a0', on:true},
+    {key:'stress',       label:'Stress',      color:'#ff3366', on:true},
+    {key:'fatigue',      label:'Fatigue',     color:'#ff9f43', on:false},
+    {key:'mood',         label:'Mood',        color:'#00d4ff', on:false},
+    {key:'pressure',     label:'Pressure',    color:'#ffd93d', on:false},
+    {key:'contagion',    label:'Contagion',   color:'#ec4899', on:false},
+    {key:'resilience',   label:'Resilience',  color:'#6366f1', on:false},
+    {key:'entropy',      label:'Entropy',     color:'#a855f7', on:false},
+    {key:'velocity',     label:'Velocity',    color:'#fb7185', on:false},
+  ],
+  _timer: null, _flowAnim: null, _abortCtrl: null,
+  _ringCache: {},   // wlKey → last health value, to avoid needless redraws
+
+  /* ── computed ── */
+  get filteredSnaps(){ return this.snapshots.filter(s => !this.search || this.wlRef(s).toLowerCase().includes(this.search.toLowerCase())) },
+  get ingestTotal(){ return this.ingest.metrics + this.ingest.logs + this.ingest.traces },
+  get avgHealth(){ if(!this.snapshots.length) return 0; return this.snapshots.reduce((a,s)=>a+(s.health_score?.value||0),0)/this.snapshots.length },
+  get critCount(){ return this.snapshots.filter(s=>s.fused_rupture_index>=3).length },
+  get calibCount(){ return this.snapshots.filter(s=>s.calibration_progress<100).length },
+  get criticalSnaps(){ return this.snapshots.filter(s=>s.fused_rupture_index>=3) },
+  get apiUrlShort(){ if(!this.apiUrl) return location.host; try{ const u=new URL(this.apiUrl); return u.host; }catch{ return this.apiUrl } },
+
+  /* ── boot ── */
+  async boot() {
+    // restore URL state
+    const params = new URLSearchParams(location.search);
+    if (params.get('workload')) this.selectedKey = params.get('workload');
+    await this.doRefresh();
+    this.$watch('autoRefresh', v => { if(v) this.restartTimer(); else clearInterval(this._timer) });
+    if (this.autoRefresh) this.restartTimer();
+    this.startFlowCanvas();
+  },
+
+  /* ── settings ── */
+  applySettings() {
+    if (this.apiUrl) sessionStorage.setItem('rpt_url', this.apiUrl);
+    else sessionStorage.removeItem('rpt_url');
+    if (this.apiKey) sessionStorage.setItem('rpt_key', this.apiKey);
+    else sessionStorage.removeItem('rpt_key');
+    this.showSettings = false;
+    this.doRefresh();
+  },
+
+  /* ── refresh ── */
+  restartTimer() {
+    clearInterval(this._timer);
+    if (this.autoRefresh) this._timer = setInterval(() => this.doRefresh(), +this.interval);
+  },
+
+  async doRefresh() {
+    if (this._abortCtrl) this._abortCtrl.abort();
+    this._abortCtrl = new AbortController();
+    const sig = this._abortCtrl.signal;
+    this.loading = true;
+    try {
+      const [h, snaps, acts, met, evs] = await Promise.allSettled([
+        this.api('/api/v2/health', {signal: sig}),
+        this.api('/api/v2/ruptures', {signal: sig}),
+        this.api('/api/v2/actions', {signal: sig}),
+        this.apiRaw('/api/v2/metrics', {signal: sig}),
+        this.api('/api/v2/events?limit=80', {signal: sig}),
+      ]);
+      if (h.status === 'fulfilled') { this.health = h.value; this.connected = true; }
+      else if (h.reason?.name !== 'AbortError') this.connected = false;
+      if (snaps.status === 'fulfilled') this.connected = true;
+      if (snaps.status === 'fulfilled' && Array.isArray(snaps.value)) {
+        this.snapshots = snaps.value;
+        if (this.selectedKey) {
+          const u = this.snapshots.find(s => this.wlKey(s) === this.selectedKey);
+          if (u) this.selected = u;
+          else if (!this.selected && snaps.value.length) {
+            // restore from URL on first load
+            const byUrl = this.snapshots.find(s => this.wlKey(s) === this.selectedKey);
+            if (byUrl) { this.selected = byUrl; }
+          }
+        } else if (this.selected) {
+          const u = this.snapshots.find(s => this.wlKey(s) === this.wlKey(this.selected));
+          if (u) this.selected = u;
+        }
+      }
+      if (acts.status === 'fulfilled' && Array.isArray(acts.value)) this.actions = acts.value;
+      if (met.status === 'fulfilled') this.parseIngest(met.value);
+      if (evs.status === 'fulfilled' && Array.isArray(evs.value)) this.eventLog = evs.value;
+      this.polls++; this.lastRefresh = new Date().toLocaleTimeString();
+      this.$nextTick(() => this.drawMiniRings());
+      if (this.tab === 'history' && this.historyData.length) this.renderTSCharts();
+    } catch(e) {
+      if (e.name !== 'AbortError') console.warn('refresh error', e);
+    } finally { this.loading = false; }
+  },
+
+  /* ── fetch helpers ── */
+  async api(path, opts={}) {
+    const h = {}; if (this.apiKey) h['Authorization'] = 'Bearer ' + this.apiKey;
+    const r = await fetch(this.apiUrl + path, {headers: h, ...opts});
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  },
+  async apiRaw(path, opts={}) {
+    const h = {}; if (this.apiKey) h['Authorization'] = 'Bearer ' + this.apiKey;
+    const r = await fetch(this.apiUrl + path, {headers: h, ...opts});
+    return r.text();
+  },
+  async apiPost(path, body={}) {
+    const h = {'Content-Type':'application/json'}; if (this.apiKey) h['Authorization'] = 'Bearer ' + this.apiKey;
+    const r = await fetch(this.apiUrl + path, {method:'POST', headers:h, body:JSON.stringify(body)});
+    if (!r.ok) { const msg = await r.text().catch(()=>''); throw new Error(msg||r.status); }
+    return r.json().catch(() => ({}));
+  },
+  async apiDelete(path) {
+    const h = {}; if (this.apiKey) h['Authorization'] = 'Bearer ' + this.apiKey;
+    const r = await fetch(this.apiUrl + path, {method:'DELETE', headers:h});
+    if (!r.ok) throw new Error(r.status);
+  },
+
+  parseIngest(raw) {
+    const m = {metrics:0, logs:0, traces:0};
+    (raw||'').split('\n').forEach(l => {
+      if (!l.startsWith('rpt_ingest_samples_total')) return;
+      const v = parseInt(l.split(' ').pop()) || 0;
+      if (l.includes('"metrics"')) m.metrics += v;
+      else if (l.includes('"logs"')) m.logs += v;
+      else if (l.includes('"traces"')) m.traces += v;
+    });
+    this.ingest = m;
+  },
+
+  /* ── workload selection ── */
+  selectWorkload(s) {
+    this.selected = s;
+    this.selectedKey = this.wlKey(s);
+    this.historyData = [];
+    this.explainResult = '';
+    this.explainRuptureId = this.ruptureId(s);
+    // update URL without reload
+    const p = new URLSearchParams(location.search);
+    p.set('workload', this.selectedKey);
+    history.replaceState(null, '', '?' + p.toString());
+    this.$nextTick(() => { this.tab = 'signals'; });
+  },
+
+  ruptureId(s) {
+    if (!s) return '';
+    // use latest rupture event id if available
+    if (s.rupture_events && s.rupture_events.length) return s.rupture_events[s.rupture_events.length-1].id || '';
+    // fallback: use workload key as pseudo-id for explain endpoint
+    return this.wlKey(s);
+  },
+
+  /* ── history / charts ── */
+  async loadHistory() {
+    if (!this.selected) return;
+    this.historyLoading = true;
+    this.historyData = [];
+    try {
+      const key = encodeURIComponent(this.wlRef(this.selected));
+      const data = await this.api('/api/v2/history/' + key);
+      this.historyData = Array.isArray(data) ? data : [];
+      this.$nextTick(() => this.renderTSCharts());
+    } catch(e) { this.historyData = []; }
+    finally { this.historyLoading = false; }
+  },
+
+  renderTSCharts() {
+    if (!this.historyData.length) return;
+    const labels = this.historyData.map(p => {
+      const d = new Date(p.ts); return d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
+    });
+    const mkChart = (id, datasets, opts={}) => {
+      const canvas = document.getElementById(id); if (!canvas) return null;
+      const ex = Chart.getChart(canvas); if (ex) ex.destroy();
+      return new Chart(canvas, {type:'line', data:{labels, datasets}, options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index', intersect:false},
+        plugins:{legend:{display:datasets.length>1, labels:{boxWidth:8, padding:8}}},
+        scales:{
+          y:{grid:{color:'rgba(255,255,255,.04)'}, ticks:{color:'#4b5672'}, ...(opts.y||{})},
+          x:{grid:{display:false}, ticks:{color:'#4b5672', maxTicksLimit:8}},
+        },
+        elements:{point:{radius:0, hoverRadius:4}},
+        animation:{duration:300},
+      }});
+    };
+    const line = (color, data, label) => ({
+      label, data, borderColor:color,
+      backgroundColor: color + '18',
+      tension:.4, fill:true, borderWidth:1.5,
+    });
+    // primary: selected signals
+    const activeSignals = this.tsSignals.filter(s => s.on && s.key !== 'fused_r');
+    const hsOn = this.tsSignals.find(s => s.key === 'health_score')?.on;
+    const primaryDs = activeSignals
+      .filter(s => s.key === 'health_score' || (s.key !== 'health_score'))
+      .map(s => {
+        const vals = this.historyData.map(p => {
+          if (s.key === 'health_score') return Math.round(p.health_score || 0);
+          return +(p[s.key] || 0).toFixed(3);
+        });
+        return line(s.color, vals, s.label);
+      });
+    mkChart('ts-chart', primaryDs, {y: hsOn ? {min:0, max:100} : {min:0}});
+    mkChart('fusedr-chart', [
+      line('#ff3366', this.historyData.map(p => +(p.fused_r || 0).toFixed(3)), 'FusedR'),
+    ], {y:{min:0}});
+  },
+
+  drawForecast() {
+    const f = this.selected?.health_forecast; if (!f) return;
+    const canvas = document.getElementById('forecast-chart'); if (!canvas) return;
+    const ex = Chart.getChart(canvas); if (ex) ex.destroy();
+    const now = Math.round(this.selected?.health_score?.value || 0);
+    new Chart(canvas, {type:'line', data:{
+      labels:['Now', '+ 15 min', '+ 30 min'],
+      datasets:[{
+        label:'HealthScore',
+        data:[now, Math.round(f.in_15min||0), Math.round(f.in_30min||0)],
+        borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,.07)',
+        tension:.5, fill:true, borderWidth:2,
+        pointBackgroundColor:'#00d4ff', pointRadius:5, pointHoverRadius:7,
+      }],
+    }, options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{min:0, max:100, grid:{color:'rgba(255,255,255,.04)'}, ticks:{color:'#4b5672'}},
+        x:{grid:{display:false}, ticks:{color:'#4b5672'}},
+      },
+      animation:{duration:500},
+    }});
+  },
+
+  /* ── explain ── */
+  async loadExplain() {
+    this.explainRuptureId = this.ruptureId(this.selected);
+    if (!this.explainRuptureId) return;
+    await this.fetchExplain();
+  },
+
+  async fetchExplain() {
+    if (!this.explainRuptureId) return;
+    this.explainLoading = true; this.explainResult = '';
+    try {
+      const path = '/api/v2/explain/' + encodeURIComponent(this.explainRuptureId) + '/' + this.explainMode;
+      const data = await this.api(path);
+      // server returns various shapes depending on mode
+      if (typeof data === 'string') this.explainResult = data;
+      else if (data.narrative) this.explainResult = data.narrative;
+      else if (data.formula) this.explainResult = data.formula;
+      else this.explainResult = JSON.stringify(data, null, 2);
+    } catch(e) {
+      this.explainResult = '';
+      this.toast('Explain unavailable: ' + (e.message||e), 'err');
+    } finally { this.explainLoading = false; }
+  },
+
+  /* ── suppressions ── */
+  async loadSuppressions() {
+    try { this.suppressions = await this.api('/api/v2/suppressions') || []; }
+    catch(e) { this.suppressions = []; }
+  },
+  async createSuppression() {
+    try {
+      const body = {workload: this.newSuppress.workload, end: this.newSuppress.end, reason: this.newSuppress.reason};
+      if (this.newSuppress.start) body.start = this.newSuppress.start;
+      await this.apiPost('/api/v2/suppressions', body);
+      this.newSuppress = {workload:'', start:'', end:'', reason:''};
+      await this.loadSuppressions();
+      this.toast('Maintenance window created', 'ok');
+    } catch(e) { this.toast('Failed: ' + (e.message||e), 'err'); }
+  },
+  async deleteSuppression(id) {
+    try {
+      await this.apiDelete('/api/v2/suppressions/' + id);
+      await this.loadSuppressions();
+      this.toast('Window removed', 'ok');
+    } catch(e) { this.toast('Failed: ' + (e.message||e), 'err'); }
+  },
+
+  /* ── weights ── */
+  async loadWeights() {
+    this.weightsLoading = true;
+    try {
+      const data = await this.api('/api/v2/config/weights');
+      this.weightConfigs = Array.isArray(data) ? data : (data.weights || []);
+    } catch(e) { this.weightConfigs = []; }
+    finally { this.weightsLoading = false; }
+  },
+  async saveWeights() {
+    try {
+      await this.apiPost('/api/v2/config/weights', this.weightConfigs);
+      this.showWeights = false;
+      this.toast('Signal weights saved', 'ok');
+    } catch(e) { this.toast('Failed: ' + (e.message||e), 'err'); }
+  },
+
+  /* ── actions ── */
+  async approve(id) {
+    this.actionBusy = true;
+    try {
+      await this.apiPost('/api/v2/actions/' + id + '/approve');
+      this.toast('Action approved', 'ok');
+      await this.doRefresh();
+    } catch(e) { this.toast('Approve failed: ' + (e.message||e), 'err'); }
+    finally { this.actionBusy = false; }
+  },
+  async reject(id) {
+    this.actionBusy = true;
+    try {
+      await this.apiPost('/api/v2/actions/' + id + '/reject');
+      this.toast('Action rejected', 'info');
+      await this.doRefresh();
+    } catch(e) { this.toast('Reject failed: ' + (e.message||e), 'err'); }
+    finally { this.actionBusy = false; }
+  },
+  async emergencyStop() {
+    if (!confirm('Halt ALL Tier-1 auto-actions globally?')) return;
+    try {
+      await this.apiPost('/api/v2/actions/emergency-stop');
+      this.toast('Emergency stop activated', 'err');
+      await this.doRefresh();
+    } catch(e) { this.toast('E-stop failed: ' + (e.message||e), 'err'); }
+  },
+
+  /* ── toast ── */
+  toast(msg, type='info') {
+    const cls = type==='ok'?'toast-ok':type==='err'?'toast-err':'toast-info';
+    const id = Date.now() + Math.random();
+    this.toasts.push({id, msg, cls});
+    setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 4000);
+  },
+
+  /* ── mini rings ── */
+  drawMiniRings() {
+    this.snapshots.forEach(s => {
+      const key = this.wlKey(s);
+      const val = Math.round(s.health_score?.value || 0);
+      if (this._ringCache[key] === val) return; // skip if unchanged
+      this._ringCache[key] = val;
+      const c = document.getElementById('ring-' + key); if (!c) return;
+      const ctx = c.getContext('2d'); if (!ctx) return;
+      const sz=30, cx=sz/2, cy=sz/2, r=11, lw=2.5;
+      ctx.clearRect(0,0,sz,sz);
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=lw; ctx.stroke();
+      const pct = Math.min(100, val)/100;
+      const color = pct>=.8?'#00e5a0':pct>=.4?'#ffd93d':'#ff3366';
+      ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+pct*Math.PI*2);
+      ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.lineCap='round'; ctx.stroke();
+    });
+  },
+
+  /* ── flow canvas ── */
+  startFlowCanvas() {
+    const canvas = document.getElementById('flow-canvas'); if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = 252, H = 280;
+    const nodes = [
+      [20,20,'Prom','#00d4ff'], [20,55,'Logs','#7c3aed'],
+      [20,90,'Traces','#00e5a0'], [20,125,'gRPC','#4b5672'],
+      [104,72,'Ingest','#00d4ff'], [188,55,'Analyzer','#7c3aed'],
+      [188,115,'Fusion','#ffd93d'], [188,175,'Actions','#ff3366'],
+      [104,195,'Explain','#4b5672'], [104,155,'Fingerprint','#4b5672'],
+    ];
+    const edges = [
+      [0,4,'#00d4ff'],[1,4,'#7c3aed'],[2,4,'#00e5a0'],[3,4,'#4b5672'],
+      [4,5,'#00d4ff'],[5,6,'#7c3aed'],[6,7,'#ffd93d'],
+      [6,8,'#4b5672'],[6,9,'#4b5672'],
+    ];
+    const hexToRgb = h => { const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16); return`${r},${g},${b}` };
+    const particles = [];
+    edges.forEach((e,i) => { for(let j=0;j<3;j++) particles.push({edge:i, t:j/3, speed:.004+Math.random()*.003}); });
+
+    const draw = () => {
+      ctx.clearRect(0,0,W,H);
+      edges.forEach(([fi,ti,col]) => {
+        const [x1,y1]=nodes[fi], [x2,y2]=nodes[ti];
+        ctx.beginPath(); ctx.moveTo(x1+32,y1+10); ctx.lineTo(x2,y2+10);
+        ctx.strokeStyle=`rgba(${hexToRgb(col)},.15)`; ctx.lineWidth=1; ctx.stroke();
+      });
+      particles.forEach(p => {
+        const [fi,ti,col]=edges[p.edge], [x1,y1]=nodes[fi], [x2,y2]=nodes[ti];
+        const x=x1+32+(x2-(x1+32))*p.t, y=y1+10+(y2+10-(y1+10))*p.t;
+        ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2);
+        ctx.fillStyle=col; ctx.fill();
+        p.t+=p.speed; if(p.t>1) p.t=0;
+      });
+      nodes.forEach(([x,y,label,col]) => {
+        const w=32, h=20;
+        ctx.fillStyle='rgba(6,12,20,.9)'; ctx.strokeStyle=col; ctx.lineWidth=1;
+        roundRect(ctx,x,y,w,h,4); ctx.fill(); ctx.stroke();
+        ctx.fillStyle='rgba(255,255,255,.75)'; ctx.font='7px Inter'; ctx.textAlign='center';
+        ctx.fillText(label, x+w/2, y+h/2+2.5);
+      });
+      // live counters
+      ctx.fillStyle='rgba(0,212,255,.9)'; ctx.font='7px JetBrains Mono'; ctx.textAlign='center';
+      ctx.fillText(this.ingestTotal>0?fmtNum(this.ingestTotal):'—', 104+16, 72+30);
+      ctx.fillStyle='rgba(124,58,237,.9)';
+      ctx.fillText(this.snapshots.length+' wl', 188+16, 55+30);
+      if (this.actions.length>0) {
+        ctx.fillStyle='rgba(255,51,102,.9)';
+        ctx.fillText(this.actions.length+' pend', 188+16, 175+30);
+      }
+      this._flowAnim = requestAnimationFrame(draw);
+    };
+    if (this._flowAnim) cancelAnimationFrame(this._flowAnim);
+    draw();
+    // cancel animation when page is hidden (visibility API)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { cancelAnimationFrame(this._flowAnim); this._flowAnim = null; }
+      else if (!this._flowAnim) draw();
+    });
+  },
+
+  /* ── helpers ── */
+  wlKey(s) {
+    if (!s) return '';
+    if (s.workload?.namespace && s.workload?.name) return s.workload.namespace+'/'+s.workload.kind+'/'+s.workload.name;
+    return s.host || '';
+  },
+  wlRef(s) {
+    if (!s) return '—';
+    if (s.workload?.namespace) return s.workload.namespace+'/'+s.workload.kind+'/'+s.workload.name;
+    return s.host || '—';
+  },
+  wlName(s) {
+    if (!s) return '—';
+    return s.workload?.name || s.host || '—';
+  },
+  wlNameFromId(id) {
+    if (!id) return '—';
+    // try to match against snapshots
+    const s = this.snapshots.find(s => this.wlKey(s)===id || s.host===id);
+    return s ? this.wlRef(s) : id;
+  },
+  stateLabel(s) {
+    if (!s) return 'unknown';
+    if (s.workload_status) return s.workload_status;
+    if (s.calibration_progress < 100) return 'calibrating';
+    if (s.fused_rupture_index >= 5) return 'emergency';
+    if (s.fused_rupture_index >= 3) return 'critical';
+    if (s.fused_rupture_index >= 1.5) return 'warning';
+    return 'active';
+  },
+  stateBadge(s) {
+    const st = this.stateLabel(s);
+    if (st==='emergency'||st==='critical') return 'b-red';
+    if (st==='warning') return 'b-yellow';
+    if (st==='calibrating') return 'b-violet';
+    if (st==='active') return 'b-green';
+    return 'b-gray';
+  },
+  healthColor(v) { if(v>=80) return 'color:var(--green)'; if(v>=40) return 'color:var(--yellow)'; return 'color:var(--red)'; },
+  frColor(v) { if(v>=5) return 'color:var(--red)'; if(v>=3) return 'color:var(--orange)'; if(v>=1.5) return 'color:var(--yellow)'; return 'color:var(--green)'; },
+  hbar(val, max) { const pct=Math.min(100,(val/max)*100); const c=val>=80?'var(--green)':val>=40?'var(--yellow)':'var(--red)'; return `width:${pct}%;background:${c}`; },
+  iPct(v) { if (!this.ingestTotal) return 0; return Math.round(v/this.ingestTotal*100); },
+  fmtNum(n) { if (!n&&n!==0) return '0'; return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); },
+  formatUptime(s) { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?h+'h '+String(m).padStart(2,'0')+'m':m+'m'; },
+  relTime(ts) {
+    if (!ts) return '—';
+    const diff = Math.floor((Date.now()-new Date(ts).getTime())/1000);
+    if (diff<60) return diff+'s ago'; if (diff<3600) return Math.floor(diff/60)+'m ago';
+    return Math.floor(diff/3600)+'h ago';
+  },
+  fmtTime(ts) {
+    if (!ts) return '—'; try { return new Date(ts).toLocaleString(); } catch { return ts; }
+  },
+  evDotColor(sev) { const m={info:'var(--cyan)',warning:'var(--yellow)',critical:'var(--red)',emergency:'var(--pink)'}; return 'background:'+(m[sev]||'var(--muted)'); },
+  heatCell(s, sig) {
+    const v = Math.max(0, Math.min(1, s[sig]?.value || 0));
+    const inv = sig==='mood'||sig==='resilience';
+    const heat = inv ? 1-v : v;
+    // green (145°) → yellow (50°) → red (0°)
+    const hue = Math.round((1-heat) * 145);
+    const sat = 65;
+    const lit = heat > 0.6 ? 42 : heat > 0.3 ? 46 : 40;
+    return `background:hsl(${hue},${sat}%,${lit}%)`;
+  },
+  kpiSignals() {
+    const s = this.selected; if (!s) return [];
+    return [
+      {name:'stress',    val:s.stress?.value||0,    hex:'#ff3366',desc:'Real-time load pressure'},
+      {name:'fatigue',   val:s.fatigue?.value||0,   hex:'#ff9f43',desc:'Accumulated burden over time'},
+      {name:'mood',      val:s.mood?.value||0,      hex:'#00e5a0',desc:'System well-being'},
+      {name:'pressure',  val:s.pressure?.value||0,  hex:'#ffd93d',desc:'Rate of stress increase'},
+      {name:'humidity',  val:s.humidity?.value||0,  hex:'#6366f1',desc:'Error / timeout density'},
+      {name:'contagion', val:s.contagion?.value||0, hex:'#ec4899',desc:'Cross-service propagation'},
+      {name:'resilience',val:s.resilience?.value||0,hex:'#00d4ff',desc:'Recovery speed'},
+      {name:'entropy',   val:s.entropy?.value||0,   hex:'#a855f7',desc:'Behavioral unpredictability'},
+      {name:'velocity',  val:s.velocity?.value||0,  hex:'#fb7185',desc:'HealthScore rate of change'},
+    ];
+  },
+};
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();
+}
+function fmtNum(n){ return(n||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',') }
+</script>
+</body>
 </html>
