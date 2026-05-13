@@ -27,6 +27,29 @@ edition: community
 autodiscovery:
   enabled: true
 
+# -- ruptura-ui: separate Svelte dashboard pod (v7.0+).
+# Set enabled: true to deploy the UI as a separate container with its own service.
+# The UI proxies /api/ to the ruptura core engine via nginx.
+ui:
+  enabled: false
+  image:
+    repository: ghcr.io/benfradjselim/ruptura-ui
+    tag: ""         # defaults to Chart.appVersion
+    pullPolicy: Always
+  port: 80
+  service:
+    type: ClusterIP
+    annotations: {}
+  # NodePort for the UI when service.type=NodePort
+  nodePort: ""
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
 ports:
   api: 8080    # REST API + Prometheus metrics
   otlp: 4317   # OTLP ingest (metrics/logs/traces)
