@@ -12,6 +12,8 @@ COPY cmd/      cmd/
 COPY internal/ internal/
 COPY pkg/      pkg/
 
+RUN echo "=== UI static assets ===" && ls internal/ui/static/assets/ && echo "=== index.html ===" && cat internal/ui/static/index.html
+
 RUN CGO_ENABLED=0 GOOS=linux \
     go build \
       -trimpath \
