@@ -233,6 +233,7 @@ jobs:
             --namespace ruptura-system \
             --create-namespace \
             --set image.tag="${TAG}" \
+            --set "image.digest=${{ needs.docker.outputs.digest }}" \
             --set apiKey="${RUPTURA_API_KEY}" \
             --set service.type=NodePort \
             --set service.nodePorts.api=31468 \
