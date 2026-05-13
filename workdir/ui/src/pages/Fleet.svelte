@@ -118,7 +118,7 @@
         {/each}
       </div>
     {:else}
-      <div class="empty">No hosts reporting yet. Deploy OHE agents to monitored nodes.</div>
+      <div class="empty">No hosts reporting yet. Deploy Ruptura agents to monitored nodes.</div>
     {/if}
   {/if}
 </div>

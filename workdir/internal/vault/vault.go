@@ -1,10 +1,10 @@
 // Package vault provides a thin client for reading secrets from HashiCorp Vault
 // (KV v2) using only stdlib net/http — no Vault SDK dependency.
 //
-// Usage in OHE:
+// Usage in Ruptura:
 //
 //	v := vault.New(vault.Config{Addr: "http://vault:8200", Token: "s.xxx"})
-//	jwt, err := v.Secret("ohe/data/jwt_secret", "value")
+//	jwt, err := v.Secret("ruptura/data/jwt_secret", "value")
 //
 // Secrets are cached in-process with a configurable TTL and refreshed
 // transparently on next access after expiry.
@@ -23,7 +23,7 @@ import (
 const defaultCacheTTL = 5 * time.Minute
 
 // Config holds Vault connection settings. All fields have env-var overrides
-// documented in the OHE config guide.
+// documented in the Ruptura config guide.
 type Config struct {
 	// Addr is the Vault server URL, e.g. "https://vault.example.com:8200".
 	Addr string
@@ -65,7 +65,7 @@ func New(cfg Config) (*Client, error) {
 }
 
 // Secret fetches the value of key within a KV v2 secret at path.
-// path is the mount-relative path WITHOUT the "data/" prefix, e.g. "ohe/jwt_secret".
+// path is the mount-relative path WITHOUT the "data/" prefix, e.g. "ruptura/jwt_secret".
 // key is the field inside the secret's data map.
 //
 // Results are cached for cfg.CacheTTL.
@@ -153,7 +153,7 @@ func (c *Client) MustSecret(ctx context.Context, path, key string) string {
 	return v
 }
 
-// Loader returns a function that resolves an OHE config field from Vault.
+// Loader returns a function that resolves an Ruptura config field from Vault.
 // If the field already has a non-empty value, it is returned as-is (env/file
 // override takes precedence over Vault).
 func (c *Client) Loader(ctx context.Context, path, key string) func(existing string) string {

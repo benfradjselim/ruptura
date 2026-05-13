@@ -1,12 +1,12 @@
-// OHE API client — thin wrapper around fetch
+// Ruptura API client — thin wrapper around fetch
 const BASE = '/api/v2'
 
-let _token = localStorage.getItem('ohe_token') || window.__RUPTURA_KEY__ || ''
+let _token = localStorage.getItem('ruptura_token') || window.__RUPTURA_KEY__ || ''
 
 export function setToken(t) {
   _token = t
-  if (t) localStorage.setItem('ohe_token', t)
-  else localStorage.removeItem('ohe_token')
+  if (t) localStorage.setItem('ruptura_token', t)
+  else localStorage.removeItem('ruptura_token')
 }
 
 export function getToken() { return _token }

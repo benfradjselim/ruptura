@@ -134,7 +134,7 @@
 
   const CATEGORY_COLOR = {
     'Infrastructure': '#0ea5e9',
-    'OHE KPIs':       '#a855f7',
+    'Ruptura KPIs':       '#a855f7',
     'Kubernetes':     '#3b82f6',
     'SRE':            '#f59e0b',
     'Containers':     '#10b981',

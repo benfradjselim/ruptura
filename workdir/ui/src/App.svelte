@@ -87,7 +87,7 @@
           </svg>
         </div>
         <div>
-          <span class="brand-text">OHE</span>
+          <span class="brand-text">Ruptura</span>
           <span class="brand-ver">v4</span>
         </div>
       </div>

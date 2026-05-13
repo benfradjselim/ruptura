@@ -1,4 +1,4 @@
-// Package eventbus provides an event-streaming abstraction for OHE.
+// Package eventbus provides an event-streaming abstraction for Ruptura.
 //
 // The Bus interface is implemented by:
 //   - MemBus   — in-process pub/sub (zero deps, default)
@@ -116,7 +116,7 @@ func (b *MemBus) Close() error { return nil }
 // -------------------------------------------------------------------
 // NATSBus — NATS JetStream backend using net/http (no nats.go dep)
 //
-// OHE communicates with NATS via the NATS HTTP Monitoring API and the
+// Ruptura communicates with NATS via the NATS HTTP Monitoring API and the
 // NATS REST API (nats-server v2.10+ supports a REST publish endpoint at
 // POST /v1/subject). If the REST endpoint is unavailable, we fall back
 // to MemBus for local delivery and queue events for later replay.

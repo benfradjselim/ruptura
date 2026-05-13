@@ -1,4 +1,4 @@
-/* OHE global reset — all theming is in components */
+/* Ruptura global reset — all theming is in components */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   background: #0f172a;

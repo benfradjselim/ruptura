@@ -571,7 +571,7 @@ type APIKey struct {
 	Name      string    `json:"name"`        // human-readable label
 	Role      string    `json:"role"`        // role granted (viewer/operator/admin)
 	KeyHash   string    `json:"key_hash"`    // bcrypt hash of the full key — never returned to clients
-	Prefix    string    `json:"prefix"`      // first 8 chars of key for display (e.g. "ohe_a1b2")
+	Prefix    string    `json:"prefix"`      // first 8 chars of key for display (e.g. "rpt_a1b2")
 	CreatedAt time.Time `json:"created_at"`
 	ExpiresAt time.Time `json:"expires_at"`  // zero = no expiry
 	LastUsed  time.Time `json:"last_used"`

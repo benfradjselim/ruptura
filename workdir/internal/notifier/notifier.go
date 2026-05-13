@@ -1,4 +1,4 @@
-// Package notifier delivers OHE alerts to external channels (Slack, webhook).
+// Package notifier delivers Ruptura alerts to external channels (Slack, webhook).
 package notifier
 
 import (
@@ -35,7 +35,7 @@ type payload struct {
 }
 
 func buildPayload(a models.Alert) payload {
-	text := fmt.Sprintf("[OHE %s] %s on %s — %s", a.Severity, a.Name, a.Host, a.Description)
+	text := fmt.Sprintf("[Ruptura %s] %s on %s — %s", a.Severity, a.Name, a.Host, a.Description)
 	return payload{
 		Text:      text,
 		AlertID:   a.ID,

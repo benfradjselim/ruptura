@@ -42,7 +42,7 @@
 <div class="login-wrap">
   <div class="card">
     <div class="logo">
-      <span class="logo-text">OHE</span>
+      <span class="logo-text">Ruptura</span>
       <span class="logo-sub">Observability Holistic Engine</span>
     </div>
 

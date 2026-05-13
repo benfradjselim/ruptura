@@ -138,7 +138,7 @@
     <p class="muted">Loading rules…</p>
   {:else if !rules.length}
     <div class="empty">
-      <p>No custom alert rules. OHE default rules are always active.</p>
+      <p>No custom alert rules. Ruptura default rules are always active.</p>
     </div>
   {:else}
     <div class="rules-table">

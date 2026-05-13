@@ -18,7 +18,7 @@ type Rule struct {
 	Message   string
 }
 
-// defaultRules encodes the OHE alerting specification
+// defaultRules encodes the Ruptura alerting specification
 var defaultRules = []Rule{
 	{Name: "stress_nervous", Metric: "stress", Threshold: 0.3, Severity: models.SeverityInfo, Message: "System is nervous"},
 	{Name: "stress_stressed", Metric: "stress", Threshold: 0.6, Severity: models.SeverityWarning, Message: "System is stressed"},
@@ -68,7 +68,7 @@ type Alerter struct {
 	windowsMu   sync.RWMutex
 }
 
-// NewAlerter creates an alerter with default OHE rules
+// NewAlerter creates an alerter with default Ruptura rules
 func NewAlerter(bufferSize int) *Alerter {
 	return &Alerter{
 		rules:       defaultRules,

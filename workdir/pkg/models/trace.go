@@ -17,7 +17,7 @@ type LogEntry struct {
 	Labels    map[string]string `json:"labels,omitempty"`
 	TraceID   string            `json:"trace_id,omitempty"`
 	SpanID    string            `json:"span_id,omitempty"`
-	Source    string            `json:"source,omitempty"` // "loki", "otlp", "elasticsearch", "ohe"
+	Source    string            `json:"source,omitempty"` // "loki", "otlp", "elasticsearch", "ruptura"
 }
 
 // Span is a distributed trace span (OTLP/APM compatible)

@@ -66,7 +66,7 @@ func New(component string) *Logger {
 }
 
 // Default is the application-wide logger.
-var Default = New("ohe")
+var Default = New("ruptura")
 
 func (lg *Logger) emit(level, msg string, ctx context.Context, kvs ...interface{}) {
 	var b strings.Builder

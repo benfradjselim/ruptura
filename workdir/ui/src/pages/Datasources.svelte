@@ -9,7 +9,7 @@
     { value: 'loki',           label: 'Loki',           icon: '📋' },
     { value: 'elasticsearch',  label: 'Elasticsearch',  icon: '🔍' },
     { value: 'datadog',        label: 'Datadog Agent',  icon: '🐾' },
-    { value: 'ohe',            label: 'OHE Agent',      icon: '⬡' },
+    { value: 'ruptura',        label: 'Ruptura Agent',  icon: '⬡' },
   ]
 
   let sources  = []
@@ -129,7 +129,7 @@
       <div class="ds-empty">
         <div class="ds-empty-icon">📡</div>
         <h3>Configure Data Sources</h3>
-        <p>Connect OHE to external data sources — Prometheus scrapers, OTLP collectors, Loki, Elasticsearch, and more.</p>
+        <p>Connect Ruptura to external data sources — Prometheus scrapers, OTLP collectors, Loki, Elasticsearch, and more.</p>
         <button class="btn-primary" on:click={startNew}>+ Add Data Source</button>
       </div>
     {:else}

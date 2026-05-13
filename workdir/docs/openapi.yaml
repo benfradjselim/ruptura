@@ -1,6 +1,6 @@
 openapi: "3.0.3"
 info:
-  title: OHE — Observability Holistic Engine
+  title: Ruptura — Observability Platform
   version: "4.4.0"
   description: |
     MLOps monitoring platform: metrics, KPIs, alerts, dashboards, SLOs, logs, traces,
@@ -27,7 +27,7 @@ components:
     BearerAPIKey:
       type: http
       scheme: bearer
-      description: OHE API key — starts with "ohe_"
+      description: Ruptura API key — starts with "rpt_"
 
   schemas:
     SignalWeights:
@@ -187,7 +187,7 @@ components:
           type: string
         type:
           type: string
-          enum: [prometheus, ohe, elasticsearch, loki]
+          enum: [prometheus, ruptura, elasticsearch, loki]
         url:
           type: string
         org_id:
@@ -1453,7 +1453,7 @@ paths:
                             $ref: "#/components/schemas/APIKey"
                           plaintext_key:
                             type: string
-                            description: Full ohe_* token — store securely, shown once
+                            description: Full rpt_* token — store securely, shown once
 
   /api/v1/api-keys/{id}:
     delete:

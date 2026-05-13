@@ -1,7 +1,7 @@
 mode: central
 host: ""                        # auto-detected from hostname
 port: 8080
-storage_path: /var/lib/ohe/central
+storage_path: /var/lib/ruptura/central
 central_url: ""
 collect_interval: 15s
 buffer_size: 10000

@@ -1,5 +1,5 @@
 // Package receiver provides protocol-compatible ingestion endpoints for
-// OpenTelemetry (OTLP), DogStatsD, Loki, and Elasticsearch — allowing OHE to
+// OpenTelemetry (OTLP), DogStatsD, Loki, and Elasticsearch — allowing Ruptura to
 // act as a drop-in replacement for Grafana Cloud, Datadog, and ELK.
 package receiver
 

@@ -8,7 +8,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
-// Bus wires ingested data from all receivers into the OHE pipeline.
+// Bus wires ingested data from all receivers into the Ruptura pipeline.
 // It implements MetricSink, SpanSink, and LogSink.
 type Bus struct {
 	store    *storage.Store

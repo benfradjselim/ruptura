@@ -17,7 +17,7 @@ import (
 // DogStatsDReceiver listens on UDP 8125 for DogStatsD / StatsD protocol metrics.
 // Supports: counters (c), gauges (g), timers (ms), histograms (h), sets (s).
 // DogStatsD extensions: tags (#tag:value), sample rate (@0.5).
-// This makes OHE a drop-in replacement for the Datadog Agent StatsD endpoint.
+// This makes Ruptura a drop-in replacement for the Datadog Agent StatsD endpoint.
 type DogStatsDReceiver struct {
 	addr    string
 	store   *storage.Store
@@ -79,7 +79,7 @@ func (r *DogStatsDReceiver) Run(ctx context.Context) error {
 }
 
 func (r *DogStatsDReceiver) emit(sm models.StatsDMetric) {
-	// Convert DogStatsD metric to OHE metric
+	// Convert DogStatsD metric to Ruptura metric
 	// Apply sample rate correction for counters
 	value := sm.Value
 	if sm.Type == "c" && sm.SampleRate > 0 && sm.SampleRate < 1 {

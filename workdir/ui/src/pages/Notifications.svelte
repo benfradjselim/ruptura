@@ -166,7 +166,7 @@
     <h4>Integration Guide</h4>
     <ul>
       <li><strong>Webhook</strong> — receives JSON POST with alert payload. Compatible with any HTTP endpoint.</li>
-      <li><strong>Slack</strong> — point to a Slack Incoming Webhook URL. OHE formats a text message automatically.</li>
+      <li><strong>Slack</strong> — point to a Slack Incoming Webhook URL. Ruptura formats a text message automatically.</li>
       <li><strong>PagerDuty</strong> — point to PagerDuty Events API v2. Set <code>routing_key</code> in the Headers field.</li>
     </ul>
   </div>
