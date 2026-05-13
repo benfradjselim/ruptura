@@ -12,6 +12,7 @@ import (
     apicontext "github.com/benfradjselim/ruptura/internal/context"
     "github.com/benfradjselim/ruptura/internal/events"
     "github.com/benfradjselim/ruptura/internal/explain"
+    "github.com/benfradjselim/ruptura/internal/fusion"
     "github.com/benfradjselim/ruptura/internal/history"
     pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
     "github.com/benfradjselim/ruptura/internal/predictor"
@@ -44,9 +45,11 @@ type Handlers struct {
     historyMgr *history.Manager
     eventBus   *events.Bus
     ingest     IngestCounter
+    fusionEng  *fusion.Engine
 }
 
-func (h *Handlers) SetIngest(c IngestCounter) { h.ingest = c }
+func (h *Handlers) SetIngest(c IngestCounter)        { h.ingest = c }
+func (h *Handlers) SetFusion(f *fusion.Engine)       { h.fusionEng = f }
 
 func (h *Handlers) SetAnalyzer(a *analyzer.Analyzer) { h.analyzer = a }
 func (h *Handlers) SetHistoryMgr(m *history.Manager) { h.historyMgr = m }

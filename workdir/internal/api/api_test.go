@@ -5,8 +5,10 @@ import (
     "net/http"
     "net/http/httptest"
     "testing"
+    "time"
 
     "github.com/benfradjselim/ruptura/internal/analyzer"
+    "github.com/benfradjselim/ruptura/internal/fusion"
     "github.com/benfradjselim/ruptura/internal/telemetry"
 )
 
@@ -126,6 +128,69 @@ func TestAPI(t *testing.T) {
             t.Errorf("expected 204, got %d", w.Code)
         }
     })
+}
+
+func TestFusionStateEndpoint(t *testing.T) {
+	met := telemetry.NewRegistry("test")
+	hc := telemetry.NewHealthChecker()
+	h := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+	fe := fusion.NewEngine()
+	h.SetFusion(fe)
+	h.SetReady(true)
+	router := h.NewRouter()
+
+	t.Run("unknown workload returns 404", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v2/engine/fusion/ns/Deployment/missing", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d", w.Code)
+		}
+	})
+
+	t.Run("known workload returns 200 with state", func(t *testing.T) {
+		now := time.Now()
+		fe.SetMetricR("prod/Deployment/api", 1.2, now)
+		fe.SetLogR("prod/Deployment/api", 3.8, now)
+
+		req, _ := http.NewRequest("GET", "/api/v2/engine/fusion/prod/Deployment/api", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		body := w.Body.String()
+		if !contains(body, "prod/Deployment/api") {
+			t.Errorf("response missing workload key: %s", body)
+		}
+		if !contains(body, "fused_r") {
+			t.Errorf("response missing fused_r: %s", body)
+		}
+	})
+
+	t.Run("no fusion engine returns 503", func(t *testing.T) {
+		h2 := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+		h2.SetReady(true)
+		r2 := h2.NewRouter()
+		req, _ := http.NewRequest("GET", "/api/v2/engine/fusion/ns/Deployment/foo", nil)
+		w := httptest.NewRecorder()
+		r2.ServeHTTP(w, req)
+		if w.Code != http.StatusServiceUnavailable {
+			t.Errorf("expected 503, got %d", w.Code)
+		}
+	})
+}
+
+func contains(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
+		func() bool {
+			for i := 0; i <= len(s)-len(sub); i++ {
+				if s[i:i+len(sub)] == sub {
+					return true
+				}
+			}
+			return false
+		}())
 }
 
 func TestConfigWeights(t *testing.T) {

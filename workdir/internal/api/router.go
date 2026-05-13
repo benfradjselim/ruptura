@@ -171,5 +171,8 @@ func (h *Handlers) NewRouter() http.Handler {
 	// Topology (topology view — stub)
 	api.HandleFunc("/topology", stubList).Methods("GET")
 
+	// Engine internals
+	api.HandleFunc("/engine/fusion/{namespace}/{kind}/{name}", h.handleFusionState).Methods("GET")
+
 	return r
 }

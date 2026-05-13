@@ -150,6 +150,7 @@ type HealthForecast struct {
 	In15Min            float64 `json:"in_15min"`                       // projected HealthScore (0–100) in 15 minutes
 	In30Min            float64 `json:"in_30min"`                       // projected HealthScore (0–100) in 30 minutes
 	CriticalETAMinutes int     `json:"critical_eta_minutes,omitempty"` // minutes until HealthScore < 40; 0 if not degrading to critical
+	ConfidenceWindow   int     `json:"confidence_window"`              // number of observations the OLS regression is based on; < 60 means low confidence
 }
 
 // NotificationChannel is a configured alert delivery target

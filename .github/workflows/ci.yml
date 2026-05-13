@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["v6.1", "main"]
+    branches: ["v6.1", "v7", "main"]
   pull_request:
-    branches: ["v6.1", "main"]
+    branches: ["v6.1", "v7", "main"]
 
 jobs:
   # ── Go: build + test ──────────────────────────────────────────────────────

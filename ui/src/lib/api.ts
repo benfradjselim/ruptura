@@ -28,6 +28,14 @@ export interface WorkloadRef {
   node: string
 }
 
+export interface HealthForecast {
+  trend: 'stable' | 'improving' | 'degrading'
+  in_15min: number
+  in_30min: number
+  critical_eta_minutes: number
+  confidence_window: number
+}
+
 export interface FleetHost {
   host: string
   state: 'healthy' | 'degraded' | 'critical' | 'pending_telemetry'
@@ -37,6 +45,8 @@ export interface FleetHost {
   contagion: number
   active_alerts: number
   last_seen: string
+  fused_rupture_index: number
+  health_forecast?: HealthForecast
 }
 
 export interface FleetResponse {

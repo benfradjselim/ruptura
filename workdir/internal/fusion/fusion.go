@@ -196,6 +196,59 @@ func (e *Engine) fusedR(data *hostData) (float64, bool) {
 	return val, true
 }
 
+// WorkloadState holds the per-signal breakdown for a single workload.
+type WorkloadState struct {
+	Workload          string    `json:"workload"`
+	MetricR           float64   `json:"metric_r"`
+	LogR              float64   `json:"log_r"`
+	TraceR            float64   `json:"trace_r"`
+	FusedR            float64   `json:"fused_r"`
+	DominantPipeline  string    `json:"dominant_pipeline"`
+	LastUpdated       time.Time `json:"last_updated"`
+}
+
+// dominantPipeline returns the pipeline name with the highest R value among active signals.
+func dominantPipeline(d hostData) string {
+	best := ""
+	var bestVal float64
+	if !d.metricTs.IsZero() && d.metricVal > bestVal { bestVal = d.metricVal; best = "metrics" }
+	if !d.logTs.IsZero() && d.logVal > bestVal      { bestVal = d.logVal;    best = "logs"    }
+	if !d.traceTs.IsZero() && d.traceVal > bestVal  {                         best = "traces"  }
+	return best
+}
+
+// StateByWorkload returns the full fusion state for a workload key.
+// Returns an error if the workload is unknown or has insufficient signals.
+func (e *Engine) StateByWorkload(key string) (WorkloadState, error) {
+	e.mu.RLock()
+	h, ok := e.hosts[key]
+	if !ok {
+		e.mu.RUnlock()
+		return WorkloadState{}, fmt.Errorf("fusion: unknown workload %q", key)
+	}
+	d := *h
+	e.mu.RUnlock()
+
+	fused, ok := e.fusedR(&d)
+	if !ok {
+		fused = 0
+	}
+
+	latest := d.metricTs
+	if d.logTs.After(latest)   { latest = d.logTs   }
+	if d.traceTs.After(latest) { latest = d.traceTs }
+
+	return WorkloadState{
+		Workload:         key,
+		MetricR:          d.metricVal,
+		LogR:             d.logVal,
+		TraceR:           d.traceVal,
+		FusedR:           math.Round(fused*1000) / 1000,
+		DominantPipeline: dominantPipeline(d),
+		LastUpdated:      latest,
+	}, nil
+}
+
 // Snapshot returns a map of workload key → FusedR value for all known workloads.
 func (e *Engine) Snapshot() map[string]float64 {
 	e.mu.RLock()

@@ -4,6 +4,15 @@
   export let host: FleetHost
   export let selected = false
 
+  $: showRuptureWarning =
+    host.state !== 'pending_telemetry' &&
+    host.fused_rupture_index > 1.5 &&
+    host.health_score > 60
+
+  $: forecastEta = host.health_forecast?.critical_eta_minutes ?? 0
+  $: forecastProjected = host.health_forecast?.in_15min ?? 0
+  $: forecastLowConfidence = (host.health_forecast?.confidence_window ?? 0) < 60
+
   function hsColor(v: number): string {
     if (v >= 70) return 'var(--green)'
     if (v >= 40) return 'var(--yellow)'
@@ -81,6 +90,18 @@
         <div class="bar"><div class="fill" style="width:{host.fatigue}%;background:var(--purple)"></div></div>
       </div>
     </div>
+    {#if showRuptureWarning}
+      <div class="rupture-warn">
+        <span class="rupture-warn-title">Early rupture signal · FusedR {host.fused_rupture_index.toFixed(1)}</span>
+        <span class="rupture-warn-body">
+          HealthScore is still {Math.round(host.health_score)} because KPI signals are lagging indicators.
+          {#if forecastEta > 0}
+            Expect HealthScore ≈ {Math.round(forecastProjected)} in {forecastEta}m.
+            {#if forecastLowConfidence}<span class="low-conf">(low confidence)</span>{/if}
+          {/if}
+        </span>
+      </div>
+    {/if}
   {:else}
     <div class="pending-msg">Waiting for first telemetry…</div>
   {/if}
@@ -193,6 +214,36 @@
     font-size: 11px;
     color: var(--blue);
     margin-top: 4px;
+    font-style: italic;
+  }
+
+  .rupture-warn {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 8px;
+    padding: 7px 10px;
+    background: rgba(255, 85, 85, 0.08);
+    border: 1px solid rgba(255, 85, 85, 0.3);
+    border-radius: 6px;
+  }
+
+  .rupture-warn-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--red);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .rupture-warn-body {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .low-conf {
+    color: var(--yellow);
     font-style: italic;
   }
 </style>
