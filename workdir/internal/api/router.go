@@ -37,6 +37,7 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/rupture/{host}/history", h.handleRupture).Methods("GET")
 	api.HandleFunc("/rupture/{host}/profile", h.handleRupture).Methods("GET")
 
+	api.HandleFunc("/dataflow", h.handleDataflow).Methods("GET")
 	api.HandleFunc("/ruptures", h.handleRuptures).Methods("GET")
 
 	api.HandleFunc("/rupture/{namespace}/{kind}/{workload}", h.handleRuptureByWorkload3).Methods("GET")

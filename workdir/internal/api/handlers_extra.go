@@ -93,6 +93,19 @@ func (h *Handlers) handleRupture(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, snap)
 }
 
+// handleDataflow returns cumulative ingest counts (metrics, logs, traces).
+func (h *Handlers) handleDataflow(w http.ResponseWriter, r *http.Request) {
+	var mCount, lCount, tCount int64
+	if h.ingest != nil {
+		mCount, lCount, tCount = h.ingest.IngestCounts()
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{
+		"metrics": mCount,
+		"logs":    lCount,
+		"traces":  tCount,
+	})
+}
+
 // handleRuptures returns all KPISnapshots for all known hosts.
 func (h *Handlers) handleRuptures(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {

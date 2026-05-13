@@ -1,7 +1,7 @@
 // OHE API client — thin wrapper around fetch
-const BASE = '/api/v1'
+const BASE = '/api/v2'
 
-let _token = localStorage.getItem('ohe_token') || ''
+let _token = localStorage.getItem('ohe_token') || window.__RUPTURA_KEY__ || ''
 
 export function setToken(t) {
   _token = t
@@ -126,6 +126,7 @@ export const api = {
 
   // ── Topology ───────────────────────────────────────────────────────────────
   topology: () => req('GET', '/topology'),
+  dataflow: () => req('GET', '/dataflow'),
 
   // ── Logs ───────────────────────────────────────────────────────────────────
   logs: ({ service = '', severity = '', q = '', from = '', to = '', limit = 200 } = {}) => {

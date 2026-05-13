@@ -296,13 +296,13 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, rm := range req.ResourceMetrics {
 		ref := extractWorkloadRef(rm.Resource)
-		host := ref.Node
-		if host == "" {
-			if !ref.IsEmpty() {
-				host = ref.Key()
-			} else {
-				host = "unknown"
-			}
+		var host string
+		if !ref.IsEmpty() {
+			host = ref.Key() // prefer workload identity (namespace/kind/name) over node name
+		} else if ref.Node != "" {
+			host = ref.Node
+		} else {
+			host = "unknown"
 		}
 		for _, sm := range rm.ScopeMetrics {
 			for _, m := range sm.Metrics {

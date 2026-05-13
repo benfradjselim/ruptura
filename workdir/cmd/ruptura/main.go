@@ -307,6 +307,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 
 	handlers := api.New(store, actionEngine, explainer, al, predictorEngine, pipelineEngine, ctxStore, detector, metricsReg, healthCheck, cfg.APIKey)
 	handlers.SetAnalyzer(analyzerEngine)
+	handlers.SetIngest(ingestEngine)
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)
 	histMgr := history.New()

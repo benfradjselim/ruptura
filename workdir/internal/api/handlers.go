@@ -19,6 +19,11 @@ import (
     "github.com/benfradjselim/ruptura/internal/telemetry"
 )
 
+// IngestCounter exposes cumulative ingest counts from the ingest engine.
+type IngestCounter interface {
+    IngestCounts() (metrics, logs, traces int64)
+}
+
 type Handlers struct {
     store      *storage.Store
     engine     *engine.Engine
@@ -38,7 +43,10 @@ type Handlers struct {
     analyzer   *analyzer.Analyzer
     historyMgr *history.Manager
     eventBus   *events.Bus
+    ingest     IngestCounter
 }
+
+func (h *Handlers) SetIngest(c IngestCounter) { h.ingest = c }
 
 func (h *Handlers) SetAnalyzer(a *analyzer.Analyzer) { h.analyzer = a }
 func (h *Handlers) SetHistoryMgr(m *history.Manager) { h.historyMgr = m }

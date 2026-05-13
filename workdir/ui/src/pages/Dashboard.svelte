@@ -12,6 +12,7 @@
   let recentAlerts = []
   let predictions = []
   let pollTimer = null
+  let dataflow = { metrics: 0, logs: 0, traces: 0 }
 
   const KPI_NAMES = ['stress', 'fatigue', 'mood', 'pressure', 'humidity', 'contagion']
   const ETF_KPI_NAMES = ['resilience', 'entropy', 'velocity', 'health_score']
@@ -97,7 +98,11 @@
     loadAlerts()
     loadPredictions()
     connectWS()
-    pollTimer = setInterval(() => { loadKPIs(); loadAlerts(); loadPredictions() }, 15000)
+    api.dataflow().then(r => { if (r.data) dataflow = r.data }).catch(() => {})
+    pollTimer = setInterval(() => {
+      loadKPIs(); loadAlerts(); loadPredictions()
+      api.dataflow().then(r => { if (r.data) dataflow = r.data }).catch(() => {})
+    }, 15000)
   })
 
   onDestroy(() => {
@@ -133,6 +138,28 @@
         {@const kpi = liveKpis[name] || {}}
         <KpiGauge {name} value={name === 'health_score' ? (kpi.value ?? 0) / 100 : (kpi.value ?? 0)} state={kpi.state ?? ''} label={name === 'health_score' ? 'Health Score (' + (kpi.value ?? 0).toFixed(1) + ')' : undefined} />
       {/each}
+    </div>
+  </section>
+
+  <!-- Data Flow -->
+  <section class="dataflow card">
+    <h2>Data Flow</h2>
+    <div class="flow-grid">
+      <div class="flow-item">
+        <span class="flow-icon metrics-icon">▲</span>
+        <span class="flow-label">Metrics</span>
+        <span class="flow-count">{dataflow.metrics.toLocaleString()}</span>
+      </div>
+      <div class="flow-item">
+        <span class="flow-icon logs-icon">≡</span>
+        <span class="flow-label">Logs</span>
+        <span class="flow-count">{dataflow.logs.toLocaleString()}</span>
+      </div>
+      <div class="flow-item">
+        <span class="flow-icon traces-icon">◎</span>
+        <span class="flow-label">Traces</span>
+        <span class="flow-count">{dataflow.traces.toLocaleString()}</span>
+      </div>
     </div>
   </section>
 
@@ -234,4 +261,12 @@
   .trend-rising { color: #f87171; }
   .trend-falling { color: #4ade80; }
   .trend-stable { color: #94a3b8; }
+  .flow-grid { display: flex; gap: 2rem; }
+  .flow-item { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 90px; }
+  .flow-icon { font-size: 1.1rem; }
+  .metrics-icon { color: #38bdf8; }
+  .logs-icon { color: #a78bfa; }
+  .traces-icon { color: #34d399; }
+  .flow-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+  .flow-count { font-size: 1.4rem; font-weight: 700; color: #e2e8f0; font-variant-numeric: tabular-nums; }
 </style>
