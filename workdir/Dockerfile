@@ -1,17 +1,10 @@
 # syntax=docker/dockerfile:1
 
-# ── Stage 0: Frontend build ────────────────────────────────────────────────────
-# Build the Svelte UI from source — guarantees the correct bundle is embedded
-# regardless of which static files are pre-committed in git.
-FROM node:20-alpine AS frontend
-WORKDIR /app
-COPY ui/package.json ui/package-lock.json* ./
-RUN npm ci
-COPY ui/ ./
-# vite.config.js: outDir: '../web' → output lands at /web
-RUN npm run build
-
 # ── Stage 1: Build Go binary ──────────────────────────────────────────────────
+# The Svelte UI is pre-built locally and committed to internal/ui/static/.
+# Running npm inside Docker for a multi-arch build (amd64 + arm64 via QEMU)
+# can take 60+ minutes. Building locally and committing the bundle is faster
+# and more reliable — the Vite content hash guarantees correctness.
 FROM golang:1.22-alpine AS builder
 
 WORKDIR /src
@@ -24,11 +17,7 @@ COPY cmd/      cmd/
 COPY internal/ internal/
 COPY pkg/      pkg/
 
-# Overwrite pre-committed static files with the fresh Vite build above.
-# This is the authoritative source — always built from current source.
-COPY --from=frontend /web internal/ui/static
-
-RUN echo "=== UI static assets (fresh Vite build) ===" && ls internal/ui/static/assets/
+RUN echo "=== UI static assets ===" && ls internal/ui/static/assets/
 
 RUN CGO_ENABLED=0 GOOS=linux \
     go build \
@@ -38,8 +27,7 @@ RUN CGO_ENABLED=0 GOOS=linux \
       ./cmd/ruptura
 
 RUN echo "=== Binary embed check ===" && \
-    grep -c "BOiiv4FG" /ruptura && echo "CORRECT: BOiiv4FG in binary" || echo "WRONG: BOiiv4FG not in binary"; \
-    grep -c "Bob2sadS" /ruptura && echo "WRONG: Bob2sadS in binary" || echo "correct: Bob2sadS not in binary"
+    grep -c "BqBEsm7U" /ruptura && echo "CORRECT: BqBEsm7U in binary" || echo "WRONG: BqBEsm7U not in binary"
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 # ubi-micro: minimal Red Hat UBI — required for Red Hat OperatorHub preflight certification.

@@ -88,7 +88,7 @@
         </div>
         <div>
           <span class="brand-text">Ruptura</span>
-          <span class="brand-ver">v4</span>
+          <span class="brand-ver">v7</span>
         </div>
       </div>
 

@@ -43,7 +43,7 @@
   <div class="card">
     <div class="logo">
       <span class="logo-text">Ruptura</span>
-      <span class="logo-sub">Observability Holistic Engine</span>
+      <span class="logo-sub">Predictive Observability Platform</span>
     </div>
 
     {#if isSetup}

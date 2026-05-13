@@ -89,5 +89,87 @@ func (h *Handlers) NewRouter() http.Handler {
 		})
 	}).Methods("POST")
 
+	// ── Svelte dashboard v7.0 API bridge ─────────────────────────────────────
+	// Auth stubs (real auth = Bearer API key via window.__RUPTURA_KEY__)
+	r.HandleFunc("/api/v2/auth/setup", h.handleAuthSetup).Methods("POST")
+	r.HandleFunc("/api/v2/auth/login", h.handleAuthLogin).Methods("POST")
+	r.HandleFunc("/api/v2/auth/logout", h.handleAuthLogout).Methods("POST")
+	r.HandleFunc("/api/v2/auth/refresh", h.handleAuthRefresh).Methods("POST")
+	api.HandleFunc("/auth/users", h.handleAuthUsers).Methods("GET")
+	api.HandleFunc("/auth/users/{username}", stubWithID).Methods("POST", "DELETE")
+
+	// KPIs flat map (Dashboard.svelte)
+	api.HandleFunc("/kpis", h.handleKPIs).Methods("GET")
+	api.HandleFunc("/kpis/multi", h.handleKPIs).Methods("GET")
+
+	// Fleet summary (Fleet.svelte)
+	api.HandleFunc("/fleet", h.handleFleet).Methods("GET")
+
+	// Alerts (Alerts.svelte — backed by anomaly events)
+	api.HandleFunc("/alerts", h.handleAlertList).Methods("GET")
+	api.HandleFunc("/alerts/{id}", h.handleAlertGet).Methods("GET")
+	api.HandleFunc("/alerts/{id}", h.handleAlertOp).Methods("DELETE")
+	api.HandleFunc("/alerts/{id}/acknowledge", h.handleAlertOp).Methods("POST")
+	api.HandleFunc("/alerts/{id}/silence", h.handleAlertOp).Methods("POST")
+
+	// Predict (Dashboard.svelte predictions panel)
+	api.HandleFunc("/predict", h.handlePredict).Methods("GET")
+
+	// Traces (Traces.svelte — stub until trace query store is added)
+	api.HandleFunc("/traces", h.handleTraceSearch).Methods("GET")
+	api.HandleFunc("/traces/{id}", h.handleTraceGet).Methods("GET")
+
+	// Logs stream (Logs.svelte SSE — stub; polling via /logs is used instead)
+	api.HandleFunc("/logs/stream", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		_, _ = w.Write([]byte("data: {}\n\n"))
+	}).Methods("GET")
+
+	// Alert rules (AlertRules.svelte — stub)
+	api.HandleFunc("/alert-rules", stubList).Methods("GET")
+	api.HandleFunc("/alert-rules", stubCreate).Methods("POST")
+	api.HandleFunc("/alert-rules/{name:.+}", stubWithID).Methods("PUT", "DELETE")
+
+	// Dashboards (Dashboards.svelte — stub)
+	api.HandleFunc("/dashboards", stubList).Methods("GET")
+	api.HandleFunc("/dashboards", stubCreate).Methods("POST")
+	api.HandleFunc("/dashboards/import", stubCreate).Methods("POST")
+	api.HandleFunc("/dashboards/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
+	api.HandleFunc("/dashboards/{id}/export", stubWithID).Methods("GET")
+
+	// Dashboard templates (Dashboards.svelte — stub)
+	api.HandleFunc("/templates", stubList).Methods("GET")
+	api.HandleFunc("/templates/{id}", stubWithID).Methods("GET")
+	api.HandleFunc("/templates/{id}/apply", stubWithID).Methods("POST")
+
+	// SLOs (SLOs.svelte — stub)
+	api.HandleFunc("/slos", stubList).Methods("GET")
+	api.HandleFunc("/slos", stubCreate).Methods("POST")
+	api.HandleFunc("/slos/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
+	api.HandleFunc("/slos/status", stubList).Methods("GET")
+	api.HandleFunc("/slos/{id}/status", stubWithID).Methods("GET")
+
+	// Notifications (Notifications.svelte — stub)
+	api.HandleFunc("/notifications", stubList).Methods("GET")
+	api.HandleFunc("/notifications", stubCreate).Methods("POST")
+	api.HandleFunc("/notifications/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
+	api.HandleFunc("/notifications/{id}/test", stubWithID).Methods("POST")
+
+	// Datasources (Datasources.svelte — stub)
+	api.HandleFunc("/datasources", stubList).Methods("GET")
+	api.HandleFunc("/datasources", stubCreate).Methods("POST")
+	api.HandleFunc("/datasources/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
+	api.HandleFunc("/datasources/{id}/test", stubWithID).Methods("POST")
+	api.HandleFunc("/datasources/{id}/proxy", stubWithID).Methods("POST")
+
+	// Orgs (Orgs.svelte — stub)
+	api.HandleFunc("/orgs", stubList).Methods("GET")
+	api.HandleFunc("/orgs", stubCreate).Methods("POST")
+	api.HandleFunc("/orgs/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
+
+	// Topology (topology view — stub)
+	api.HandleFunc("/topology", stubList).Methods("GET")
+
 	return r
 }
