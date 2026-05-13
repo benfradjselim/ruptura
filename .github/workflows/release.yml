@@ -243,8 +243,8 @@ jobs:
             --set resources.requests.memory=256Mi \
             --set goMemLimit="966367641" \
             --kubeconfig /tmp/kubeconfig \
-            --wait \
-            --timeout 5m
+            --atomic \
+            --timeout 10m
 
       - name: Show deployment status
         run: |
