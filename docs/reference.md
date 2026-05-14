@@ -16,7 +16,7 @@
 | ruptura-operator | v0.6.9 → v0.7.0 target | `ghcr.io/benfradjselim/ruptura-operator:v0.7.0` |
 | Helm chart | 0.7.6 → 0.8.0 target | `oci://ghcr.io/benfradjselim/charts/ruptura` |
 
-Last updated: 2026-05-14 (Sprint 2 done — fusion state API, topology map, engine self-health page)
+Last updated: 2026-05-14 (Sprint 3+4 done — k8s workload metadata, node health view, operator CI, SSE+SDK)
 
 ---
 
@@ -112,7 +112,8 @@ GET /api/v2/nodes
 → [{ name, cpu_pct, memory_pct, disk_pressure, workload_count, worst_fused_r }]
 
 GET /api/v2/nodes/{node}
-→ { name, workloads: [{ref, health_score, fused_r}] }
+→ { name, cpu_pct, memory_pct, disk_pressure, workload_count, worst_fused_r,
+    workloads: [{ref, health_score, fused_r, status}] }
 ```
 
 ### Kubernetes metadata (requires autodiscovery)
@@ -164,11 +165,11 @@ When < 60, the UI must label the forecast "low confidence" and suppress ETAs bey
 | S2 | MISSING-07 Fusion state API | [x] **done** — `fusion.StateByWorkload`, `GET /api/v2/engine/fusion/{ns}/{kind}/{name}`, wired in main; CI matrix workflow `ui-components.yml` |
 | S2 | GAP-V7-01 Topology map | [x] **done** — `GET /api/v2/topology` (nodes+edges from TopologyBuilder); `TopologyMap.svelte` Cytoscape.js force-directed, side panel, rupture highlight |
 | S2 | MISSING-08 Engine self-health | [x] **done** — `GET /api/v2/engine/status` + `GET /api/v2/engine/storage`; Engine.svelte with runtime, analyzer, ingest bars, action queue, BadgerDB cards + footer |
-| S3 | GAP-V7-02 K8s workload metadata | [ ] not started |
-| S3 | GAP-V7-03 Node health view | [ ] not started |
-| S3 | GAP-OP-01 Operator bundle CI | [ ] not started |
-| S3 | GAP-OP-02 Operator smoke test | [ ] not started |
-| S4 | MISSING-09 SSE + SDK Watch/Wait | [ ] not started |
+| S3 | GAP-V7-02 K8s workload metadata | [x] **done** — MetadataCache + LIST/WATCH pods, GET /api/v2/workloads/{ns}/{kind}/{name}/k8s, Fleet.svelte Kubernetes tab |
+| S3 | GAP-V7-03 Node health view | [x] **done** — GET /api/v2/nodes + /nodes/{node}, Nodes.svelte with detail panel |
+| S3 | GAP-OP-01 Operator bundle CI | [x] **done** — operator-bump.yml: workflow_run trigger, CSV image bump, catalog.yaml PR |
+| S3 | GAP-OP-02 Operator smoke test | [x] **done** — operator-smoke.yml: k3d+OLM, deploy operator, RupturaInstance CR, health assert |
+| S4 | MISSING-09 SSE + SDK Watch/Wait | [x] **done** — SSE fan-out on events.Bus, handleEvents dual-mode, Watch()/WaitForHealth() in pkg/client |
 | S4 | FR-10 Multi-tenant (deferred) | [ ] deferred |
 
 ---
