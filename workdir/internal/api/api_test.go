@@ -367,6 +367,39 @@ func TestWorkloadK8sEndpoint(t *testing.T) {
     })
 }
 
+func TestNodesEndpoint(t *testing.T) {
+    met := telemetry.NewRegistry("test")
+    hc := telemetry.NewHealthChecker()
+    h := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+    h.SetReady(true)
+    router := h.NewRouter()
+
+    t.Run("returns empty array when store is nil", func(t *testing.T) {
+        req, _ := http.NewRequest("GET", "/api/v2/nodes", nil)
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        if w.Code != http.StatusOK {
+            t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+        }
+        var resp []interface{}
+        if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+            t.Fatalf("expected JSON array: %v", err)
+        }
+        if len(resp) != 0 {
+            t.Errorf("expected empty array, got %d items", len(resp))
+        }
+    })
+
+    t.Run("node detail returns 404 when store is nil", func(t *testing.T) {
+        req, _ := http.NewRequest("GET", "/api/v2/nodes/node-1", nil)
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        if w.Code != http.StatusNotFound {
+            t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+        }
+    })
+}
+
 func TestEngineStorageEndpoint(t *testing.T) {
     met := telemetry.NewRegistry("test")
     hc := telemetry.NewHealthChecker()

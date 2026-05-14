@@ -229,6 +229,27 @@ export function fetchNodes(apiKey?: string) {
   return get<ClusterNode[]>('/api/v2/nodes', apiKey)
 }
 
+export interface NodeWorkload {
+  ref: string
+  health_score: number
+  fused_r: number
+  status: string
+}
+
+export interface NodeDetail {
+  name: string
+  cpu_pct: number
+  memory_pct: number
+  disk_pressure: boolean
+  workload_count: number
+  worst_fused_r: number
+  workloads: NodeWorkload[]
+}
+
+export function fetchNodeDetail(node: string, apiKey?: string) {
+  return get<NodeDetail>(`/api/v2/nodes/${encodeURIComponent(node)}`, apiKey)
+}
+
 // ── write helpers ────────────────────────────────────────────────────────────
 
 async function post<T>(path: string, body: unknown, apiKey?: string): Promise<T> {
