@@ -265,3 +265,165 @@ func (c *Client) ListContexts(ctx context.Context) ([]ContextEntry, error) {
 func (c *Client) DeleteContext(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodDelete, "/api/v2/context/"+id, nil, nil)
 }
+
+// ── SSE event streaming ────────────────────────────────────────────────────────
+
+// RuptureEvent is a parsed event from the SSE stream.
+type RuptureEvent struct {
+	Type     string    `json:"type"`
+	Workload string    `json:"workload"`
+	FusedR   float64   `json:"fused_r"`
+	State    string    `json:"state"`
+	Severity string    `json:"severity"`
+	Message  string    `json:"message"`
+	TS       time.Time `json:"ts"`
+}
+
+// WatchFilter controls which events are streamed.
+type WatchFilter struct {
+	Namespace string
+	MinFusedR float64
+}
+
+// Watch connects to GET /api/v2/events as an SSE stream and delivers events on
+// the returned channel. The channel is closed when ctx is cancelled or the server
+// closes the stream.
+func (c *Client) Watch(ctx context.Context, f WatchFilter) (<-chan RuptureEvent, error) {
+	path := "/api/v2/events"
+	sep := "?"
+	if f.Namespace != "" {
+		path += sep + "namespace=" + f.Namespace
+		sep = "&"
+	}
+	if f.MinFusedR > 0 {
+		path += fmt.Sprintf("%smin_fused_r=%.2f", sep, f.MinFusedR)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("watch: build request: %w", err)
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	sseClient := &http.Client{} // no timeout — long-lived connection
+	resp, err := sseClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("watch: connect: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("watch: server returned %d", resp.StatusCode)
+	}
+
+	ch := make(chan RuptureEvent, 32)
+	go func() {
+		defer close(ch)
+		defer resp.Body.Close()
+		readSSEStream(ctx, resp.Body, ch)
+	}()
+	return ch, nil
+}
+
+func readSSEStream(ctx context.Context, body io.Reader, ch chan<- RuptureEvent) {
+	buf := make([]byte, 0, 4096)
+	tmp := make([]byte, 512)
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		n, err := body.Read(tmp)
+		if n > 0 {
+			buf = append(buf, tmp[:n]...)
+			for {
+				idx := sseDoubleNewline(buf)
+				if idx < 0 {
+					break
+				}
+				frame := buf[:idx]
+				buf = buf[idx+2:]
+				for _, line := range sseLines(frame) {
+					const prefix = "data: "
+					if len(line) <= len(prefix) || line[:len(prefix)] != prefix {
+						continue
+					}
+					var ev RuptureEvent
+					if jsonErr := json.Unmarshal([]byte(line[len(prefix):]), &ev); jsonErr == nil {
+						if ev.Type == "heartbeat" || ev.Type == "connected" {
+							continue
+						}
+						select {
+						case ch <- ev:
+						case <-ctx.Done():
+							return
+						}
+					}
+				}
+			}
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
+func sseDoubleNewline(b []byte) int {
+	for i := 0; i < len(b)-1; i++ {
+		if b[i] == '\n' && b[i+1] == '\n' {
+			return i
+		}
+	}
+	return -1
+}
+
+func sseLines(b []byte) []string {
+	var out []string
+	start := 0
+	for i, c := range b {
+		if c == '\n' {
+			out = append(out, string(b[start:i]))
+			start = i + 1
+		}
+	}
+	if start < len(b) {
+		out = append(out, string(b[start:]))
+	}
+	return out
+}
+
+// WaitForHealth polls GET /api/v2/rupture until the workload's HealthScore
+// reaches minScore or timeout elapses. workload must be "ns/kind/name".
+func (c *Client) WaitForHealth(ctx context.Context, workload string, minScore int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	check := func() (bool, error) {
+		snap, err := c.Snapshot(ctx, workload)
+		if err != nil {
+			return false, err
+		}
+		return int(snap.HealthScore.Value) >= minScore, nil
+	}
+
+	if ok, _ := check(); ok {
+		return nil
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case t := <-ticker.C:
+			if t.After(deadline) {
+				return fmt.Errorf("WaitForHealth: timeout after %s — %q did not reach HealthScore %d",
+					timeout, workload, minScore)
+			}
+			if ok, _ := check(); ok {
+				return nil
+			}
+		}
+	}
+}
