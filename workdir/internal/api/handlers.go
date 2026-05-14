@@ -11,6 +11,7 @@ import (
     "github.com/benfradjselim/ruptura/internal/analyzer"
     apicontext "github.com/benfradjselim/ruptura/internal/context"
     "github.com/benfradjselim/ruptura/internal/correlator"
+    "github.com/benfradjselim/ruptura/internal/discovery"
     "github.com/benfradjselim/ruptura/internal/events"
     "github.com/benfradjselim/ruptura/internal/explain"
     "github.com/benfradjselim/ruptura/internal/fusion"
@@ -48,11 +49,13 @@ type Handlers struct {
     ingest      IngestCounter
     fusionEng   *fusion.Engine
     topoBuilder *correlator.TopologyBuilder
+    discovery   *discovery.Informer
 }
 
 func (h *Handlers) SetIngest(c IngestCounter)                       { h.ingest = c }
 func (h *Handlers) SetFusion(f *fusion.Engine)                      { h.fusionEng = f }
 func (h *Handlers) SetTopology(t *correlator.TopologyBuilder)       { h.topoBuilder = t }
+func (h *Handlers) SetDiscovery(d *discovery.Informer)              { h.discovery = d }
 
 func (h *Handlers) SetAnalyzer(a *analyzer.Analyzer) { h.analyzer = a }
 func (h *Handlers) SetHistoryMgr(m *history.Manager) { h.historyMgr = m }

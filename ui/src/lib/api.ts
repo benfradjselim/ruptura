@@ -94,27 +94,6 @@ export interface Alert {
   resolved_at: string | null
 }
 
-// v7 planned endpoints (returned as null until implemented server-side)
-export interface TopologyNode {
-  id: string
-  health_score: number
-  fused_r: number
-  state: string
-}
-
-export interface TopologyEdge {
-  source: string
-  target: string
-  call_rate: number
-  error_rate: number
-  p99_latency_ms: number
-}
-
-export interface TopologyResponse {
-  nodes: TopologyNode[]
-  edges: TopologyEdge[]
-}
-
 export interface EngineStatus {
   analyzer: {
     tick_interval_ms: number
@@ -205,12 +184,32 @@ export function fetchAlerts(apiKey?: string) {
   return get<Alert[]>('/api/v2/alerts', apiKey)
 }
 
-export function fetchTopology(apiKey?: string) {
-  return get<TopologyResponse>('/api/v2/topology', apiKey)
-}
-
 export function fetchEngineStatus(apiKey?: string) {
   return get<EngineStatus>('/api/v2/engine/status', apiKey)
+}
+
+export interface TopologyNode {
+  id: string
+  health_score: number
+  fused_r: number
+  state: 'healthy' | 'degraded' | 'critical' | 'pending_telemetry'
+}
+
+export interface TopologyEdge {
+  source: string
+  target: string
+  call_rate: number
+  error_rate: number
+  p99_latency_ms: number
+}
+
+export interface TopologyGraph {
+  nodes: TopologyNode[]
+  edges: TopologyEdge[]
+}
+
+export function fetchTopology(apiKey?: string) {
+  return get<TopologyGraph>('/api/v2/topology', apiKey)
 }
 
 export interface EngineStorage {
@@ -277,28 +276,36 @@ export function saveWeights(weights: SignalWeights[], apiKey?: string) {
   return post<{ applied: number }>('/api/v2/config/weights', weights, apiKey)
 }
 
-// ── topology ──────────────────────────────────────────────────────────────────
+// ── workload k8s metadata ─────────────────────────────────────────────────────
 
-export interface TopologyNode {
-  id: string
-  health_score: number
-  fused_r: number
-  state: 'healthy' | 'degraded' | 'critical' | 'pending_telemetry'
+export interface PodInfo {
+  name: string
+  node: string
+  status: string
+  restarts: number
+  age: string
 }
 
-export interface TopologyEdge {
-  source: string
-  target: string
-  call_rate: number
-  error_rate: number
-  p99_latency_ms: number
+export interface ResourceSet {
+  cpu: string
+  memory: string
 }
 
-export interface TopologyGraph {
-  nodes: TopologyNode[]
-  edges: TopologyEdge[]
+export interface WorkloadK8sMeta {
+  namespace: string
+  kind: string
+  name: string
+  replicas: { desired: number; ready: number; available: number }
+  image: string
+  resources: { requests: ResourceSet; limits: ResourceSet }
+  labels: Record<string, string>
+  last_deploy: string
+  pods: PodInfo[]
 }
 
-export function fetchTopology(apiKey?: string) {
-  return get<TopologyGraph>('/api/v2/topology', apiKey)
+export function fetchWorkloadK8s(namespace: string, kind: string, name: string, apiKey?: string) {
+  return get<WorkloadK8sMeta>(
+    `/api/v2/workloads/${encodeURIComponent(namespace)}/${encodeURIComponent(kind)}/${encodeURIComponent(name)}/k8s`,
+    apiKey,
+  )
 }

@@ -182,8 +182,10 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 
 	// k8s workload auto-discovery — no-op when not running inside a cluster.
+	var inf *discovery.Informer
 	if disc, err := discovery.NewInformer(); err == nil {
 		logger.Default.Info("k8s auto-discovery active — watching Deployments/StatefulSets/DaemonSets")
+		inf = disc
 		go disc.Run(ctx, analyzerEngine.RegisterWorkload, analyzerEngine.UnregisterWorkload)
 	} else {
 		logger.Default.Info("k8s auto-discovery skipped (not in-cluster)", "reason", err.Error())
@@ -320,6 +322,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	handlers.SetIngest(ingestEngine)
 	handlers.SetFusion(fusionEngine)
 	handlers.SetTopology(topoBuilder)
+	if inf != nil {
+		handlers.SetDiscovery(inf)
+	}
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)
 	histMgr := history.New()

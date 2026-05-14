@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/benfradjselim/ruptura/pkg/models"
 )
@@ -21,6 +22,7 @@ type Informer struct {
 	httpClient *http.Client
 	logMu      sync.Mutex
 	logFn      func(msg string, args ...interface{})
+	cache      *MetadataCache
 }
 
 // NewInformer creates an Informer from in-cluster ServiceAccount credentials.
@@ -34,6 +36,7 @@ func NewInformer() (*Informer, error) {
 		apiBase:    apiBase,
 		token:      token,
 		httpClient: client,
+		cache:      newMetadataCache(),
 	}, nil
 }
 
@@ -44,12 +47,23 @@ func newInformerForTest(apiBase string, client *http.Client) *Informer {
 		apiBase:    apiBase,
 		token:      "test-token",
 		httpClient: client,
+		cache:      newMetadataCache(),
 	}
 }
 
-// Run starts three goroutines — one per resource type — and blocks until ctx is cancelled.
-// onAdd is called for every ADDED or MODIFIED event; onDelete for DELETED.
-// Both callbacks must be safe to call concurrently from multiple goroutines.
+// GetWorkloadMeta returns the cached k8s metadata for a workload.
+// ok is false when the workload is not in the cache (informer not running, or
+// workload not yet discovered).
+func (inf *Informer) GetWorkloadMeta(ns, kind, name string) (WorkloadMeta, bool) {
+	if inf.cache == nil {
+		return WorkloadMeta{}, false
+	}
+	return inf.cache.Get(ns, kind, name)
+}
+
+// Run starts goroutines for workload + pod watching and blocks until ctx is cancelled.
+// onAdd is called for every ADDED/MODIFIED workload event; onDelete for DELETED.
+// The metadata cache is populated in parallel.
 func (inf *Informer) Run(ctx context.Context, onAdd func(models.WorkloadRef), onDelete func(models.WorkloadRef)) {
 	resources := []resource{
 		{path: "apis/apps/v1/deployments", kind: "Deployment"},
@@ -58,15 +72,92 @@ func (inf *Informer) Run(ctx context.Context, onAdd func(models.WorkloadRef), on
 	}
 
 	var wg sync.WaitGroup
+
+	// Existing: WorkloadRef registration goroutines (one per resource type).
 	for _, res := range resources {
-		res := res // capture
+		res := res
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			inf.watchResource(ctx, res, onAdd, onDelete)
 		}()
 	}
+
+	// New: metadata cache goroutines — one per workload type + one for pods.
+	for _, res := range resources {
+		res := res
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			inf.runMetadataLoop(ctx, res.path, res.kind)
+		}()
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		inf.runPodLoop(ctx)
+	}()
+
 	wg.Wait()
+}
+
+// runMetadataLoop runs a perpetual LIST+WATCH loop populating the metadata cache.
+func (inf *Informer) runMetadataLoop(ctx context.Context, path, kind string) {
+	backoff := time.Second
+	const maxBackoff = 30 * time.Second
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		rv, err := inf.listWorkloads(ctx, path, kind)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			inf.logf("discovery: metadata list %s failed: %v — retrying in %s", path, err, backoff)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(backoff):
+			}
+			backoff = minDuration(backoff*2, maxBackoff)
+			continue
+		}
+		backoff = time.Second
+		if err := inf.watchWorkloads(ctx, path, kind, rv); err != nil && ctx.Err() == nil {
+			inf.logf("discovery: metadata watch %s error: %v — re-listing", path, err)
+		}
+	}
+}
+
+// runPodLoop runs a perpetual LIST+WATCH loop for pods, populating the pod cache.
+func (inf *Informer) runPodLoop(ctx context.Context) {
+	backoff := time.Second
+	const maxBackoff = 30 * time.Second
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		rv, err := inf.listPods(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			inf.logf("discovery: pod list failed: %v — retrying in %s", err, backoff)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(backoff):
+			}
+			backoff = minDuration(backoff*2, maxBackoff)
+			continue
+		}
+		backoff = time.Second
+		if err := inf.watchPods(ctx, rv); err != nil && ctx.Err() == nil {
+			inf.logf("discovery: pod watch error: %v — re-listing", err)
+		}
+	}
 }
 
 func (inf *Informer) logf(format string, args ...interface{}) {
@@ -74,6 +165,5 @@ func (inf *Informer) logf(format string, args ...interface{}) {
 		inf.logFn(format, args...)
 		return
 	}
-	// Default: fmt.Printf so tests can see output without importing the logger.
 	fmt.Printf(format+"\n", args...)
 }

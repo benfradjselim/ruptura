@@ -171,6 +171,9 @@ func (h *Handlers) NewRouter() http.Handler {
 	// Topology
 	api.HandleFunc("/topology", h.handleTopology).Methods("GET")
 
+	// Workload k8s metadata
+	api.HandleFunc("/workloads/{namespace}/{kind}/{name}/k8s", h.handleWorkloadK8s).Methods("GET")
+
 	// Engine internals
 	api.HandleFunc("/engine/status", h.handleEngineStatus).Methods("GET")
 	api.HandleFunc("/engine/storage", h.handleEngineStorage).Methods("GET")

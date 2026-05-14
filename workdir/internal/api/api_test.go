@@ -345,6 +345,28 @@ func TestEngineStatusEndpoint(t *testing.T) {
     })
 }
 
+func TestWorkloadK8sEndpoint(t *testing.T) {
+    met := telemetry.NewRegistry("test")
+    hc := telemetry.NewHealthChecker()
+    h := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+    h.SetReady(true)
+    router := h.NewRouter()
+
+    t.Run("returns 503 when discovery is nil", func(t *testing.T) {
+        req, _ := http.NewRequest("GET", "/api/v2/workloads/prod/Deployment/api/k8s", nil)
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        if w.Code != http.StatusServiceUnavailable {
+            t.Fatalf("expected 503, got %d: %s", w.Code, w.Body.String())
+        }
+        var resp map[string]string
+        _ = json.NewDecoder(w.Body).Decode(&resp)
+        if resp["error"] == "" {
+            t.Error("expected error message in response")
+        }
+    })
+}
+
 func TestEngineStorageEndpoint(t *testing.T) {
     met := telemetry.NewRegistry("test")
     hc := telemetry.NewHealthChecker()
