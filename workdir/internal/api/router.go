@@ -172,6 +172,8 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/topology", h.handleTopology).Methods("GET")
 
 	// Engine internals
+	api.HandleFunc("/engine/status", h.handleEngineStatus).Methods("GET")
+	api.HandleFunc("/engine/storage", h.handleEngineStorage).Methods("GET")
 	api.HandleFunc("/engine/fusion/{namespace}/{kind}/{name}", h.handleFusionState).Methods("GET")
 
 	return r

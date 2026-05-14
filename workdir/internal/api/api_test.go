@@ -296,3 +296,75 @@ func TestConfigWeights(t *testing.T) {
         }
     })
 }
+
+func TestEngineStatusEndpoint(t *testing.T) {
+    met := telemetry.NewRegistry("test")
+    hc := telemetry.NewHealthChecker()
+    h := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+    h.SetAnalyzer(analyzer.NewAnalyzer())
+    h.SetVersion("7.0.0")
+    h.SetEdition("community")
+    h.SetReady(true)
+    router := h.NewRouter()
+
+    t.Run("returns 200 with expected fields", func(t *testing.T) {
+        req, _ := http.NewRequest("GET", "/api/v2/engine/status", nil)
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        if w.Code != http.StatusOK {
+            t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+        }
+        var resp map[string]interface{}
+        if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+            t.Fatalf("decode error: %v", err)
+        }
+        for _, field := range []string{"analyzer", "ingest", "actions", "version", "edition", "uptime_seconds"} {
+            if _, ok := resp[field]; !ok {
+                t.Errorf("missing field %q in response", field)
+            }
+        }
+        if resp["version"] != "7.0.0" {
+            t.Errorf("expected version 7.0.0, got %v", resp["version"])
+        }
+        if resp["edition"] != "community" {
+            t.Errorf("expected edition community, got %v", resp["edition"])
+        }
+    })
+
+    t.Run("uptime_seconds increases over time", func(t *testing.T) {
+        time.Sleep(10 * time.Millisecond)
+        req, _ := http.NewRequest("GET", "/api/v2/engine/status", nil)
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        var resp map[string]interface{}
+        _ = json.NewDecoder(w.Body).Decode(&resp)
+        uptime, _ := resp["uptime_seconds"].(float64)
+        if uptime < 0 {
+            t.Errorf("uptime_seconds must be non-negative, got %v", uptime)
+        }
+    })
+}
+
+func TestEngineStorageEndpoint(t *testing.T) {
+    met := telemetry.NewRegistry("test")
+    hc := telemetry.NewHealthChecker()
+    h := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+    h.SetReady(true)
+    router := h.NewRouter()
+
+    t.Run("returns 200 with badger section when store is nil", func(t *testing.T) {
+        req, _ := http.NewRequest("GET", "/api/v2/engine/storage", nil)
+        w := httptest.NewRecorder()
+        router.ServeHTTP(w, req)
+        if w.Code != http.StatusOK {
+            t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+        }
+        var resp map[string]interface{}
+        if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+            t.Fatalf("decode error: %v", err)
+        }
+        if _, ok := resp["badger"]; !ok {
+            t.Error("response missing badger section")
+        }
+    })
+}

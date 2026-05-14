@@ -121,6 +121,7 @@ export interface EngineStatus {
     last_tick_ago_ms: number
     active_workloads: number
     calibrating_workloads: number
+    pending_workloads: number
   }
   ingest: {
     metrics_per_sec: number
@@ -210,6 +211,19 @@ export function fetchTopology(apiKey?: string) {
 
 export function fetchEngineStatus(apiKey?: string) {
   return get<EngineStatus>('/api/v2/engine/status', apiKey)
+}
+
+export interface EngineStorage {
+  badger: {
+    disk_bytes: number
+    vlog_size_bytes: number
+    num_tables: number
+    keys: number
+  }
+}
+
+export function fetchEngineStorage(apiKey?: string) {
+  return get<EngineStorage>('/api/v2/engine/storage', apiKey)
 }
 
 export function fetchNodes(apiKey?: string) {

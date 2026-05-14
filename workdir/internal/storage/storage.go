@@ -130,6 +130,33 @@ func (s *Store) RunGC() error {
 	return s.db.RunValueLogGC(0.5)
 }
 
+// BadgerStats holds lightweight BadgerDB diagnostics.
+type BadgerStats struct {
+	DiskBytes     int64 `json:"disk_bytes"`
+	VlogSizeBytes int64 `json:"vlog_size_bytes"`
+	NumTables     int   `json:"num_tables"`
+	Keys          int64 `json:"keys"`
+}
+
+// Stats returns a snapshot of BadgerDB size and table metrics.
+func (s *Store) Stats() BadgerStats {
+	lsm, vlog := s.db.Size()
+	var tables int
+	for _, lvl := range s.db.Levels() {
+		tables += lvl.NumTables
+	}
+	// Estimate key count from in-memory snapshot map as a cheap proxy.
+	s.snapshotsMu.RLock()
+	keys := int64(len(s.snapshots))
+	s.snapshotsMu.RUnlock()
+	return BadgerStats{
+		DiskBytes:     lsm,
+		VlogSizeBytes: vlog,
+		NumTables:     tables,
+		Keys:          keys,
+	}
+}
+
 // --- Generic set/get helpers ---
 
 func (s *Store) set(key string, value interface{}, ttl time.Duration) error {

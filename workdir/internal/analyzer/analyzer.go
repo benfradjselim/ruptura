@@ -937,6 +937,34 @@ func (a *Analyzer) AllWorkloadRefs() []models.WorkloadRef {
 	return refs
 }
 
+// AnalyzerStats holds aggregate workload counts for the engine status endpoint.
+type AnalyzerStats struct {
+	TotalWorkloads       int
+	ActiveWorkloads      int
+	CalibratingWorkloads int
+	PendingWorkloads     int
+}
+
+// Stats returns aggregate counts across all registered workloads.
+func (a *Analyzer) Stats() AnalyzerStats {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	var s AnalyzerStats
+	s.TotalWorkloads = len(a.workloads)
+	for _, ws := range a.workloads {
+		if ws.pendingTelemetry {
+			s.PendingWorkloads++
+			continue
+		}
+		if ws.observationCount >= 96 {
+			s.ActiveWorkloads++
+		} else {
+			s.CalibratingWorkloads++
+		}
+	}
+	return s
+}
+
 // AllAnalyzerSnapshots returns one KPISnapshot per registered workload.
 // For pending workloads (no telemetry yet) it synthesises a zero-value snapshot
 // with WorkloadStatus = "pending_telemetry".

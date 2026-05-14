@@ -25,6 +25,7 @@ jobs:
           - SuppressionModal
           - WeightsModal
           - TopologyMap
+          - Engine
 
     steps:
       - uses: actions/checkout@v4
