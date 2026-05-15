@@ -3,7 +3,6 @@ package api
 import (
 	"net/http"
 
-	"github.com/benfradjselim/ruptura/internal/ui"
 	"github.com/gorilla/mux"
 )
 
@@ -11,11 +10,8 @@ func (h *Handlers) NewRouter() http.Handler {
 	r := mux.NewRouter()
 	r.Use(loggingMiddleware)
 
-	// Dashboard served without auth — browser loads HTML first, then uses the API key field
-	r.PathPrefix("/ui").Handler(ui.Handler(h.apiKey))
-	r.HandleFunc("/", func(w http.ResponseWriter, rq *http.Request) {
-		http.Redirect(w, rq, "/ui/", http.StatusFound)
-	}).Methods("GET")
+	// Root redirect removed — the v7 ruptura-ui pod serves the dashboard on its own NodePort.
+	// Probe endpoints are always public — k8s liveness/readiness probes carry no auth
 
 	r.HandleFunc("/timeline", h.handleTimeline).Methods("GET")
 

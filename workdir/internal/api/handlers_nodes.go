@@ -53,10 +53,19 @@ func (h *Handlers) handleNodes(w http.ResponseWriter, r *http.Request) {
 
 	for _, s := range snaps {
 		nodeName := s.Workload.Node
-		if nodeName == "" {
-			nodeName = s.Host
+		if nodeName == "" && h.discovery != nil {
+			// Try to resolve the node via the k8s metadata cache.
+			if meta, ok := h.discovery.GetWorkloadMeta(s.Workload.Namespace, s.Workload.Kind, s.Workload.Name); ok {
+				for _, pod := range meta.Pods {
+					if pod.Node != "" {
+						nodeName = pod.Node
+						break
+					}
+				}
+			}
 		}
 		if nodeName == "" {
+			// No real k8s node known — skip; don't use the workload name as a node.
 			continue
 		}
 
@@ -126,8 +135,15 @@ func (h *Handlers) handleNode(w http.ResponseWriter, r *http.Request) {
 
 	for _, s := range snaps {
 		sNode := s.Workload.Node
-		if sNode == "" {
-			sNode = s.Host
+		if sNode == "" && h.discovery != nil {
+			if meta, ok := h.discovery.GetWorkloadMeta(s.Workload.Namespace, s.Workload.Kind, s.Workload.Name); ok {
+				for _, pod := range meta.Pods {
+					if pod.Node != "" {
+						sNode = pod.Node
+						break
+					}
+				}
+			}
 		}
 		if sNode != nodeName {
 			continue
