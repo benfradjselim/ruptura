@@ -36,7 +36,7 @@ beforeEach(() => {
 describe('TopologyMap', () => {
   it('shows empty-state message when no nodes returned', async () => {
     const { findByText } = render(TopologyMap)
-    expect(await findByText(/No workloads discovered/i)).toBeInTheDocument()
+    expect(await findByText(/No service connections discovered yet/i)).toBeInTheDocument()
   })
 
   it('shows node and edge counts when data is present', async () => {
@@ -48,7 +48,7 @@ describe('TopologyMap', () => {
 
   it('renders refresh button', async () => {
     const { findByTitle } = render(TopologyMap)
-    expect(await findByTitle('Refresh')).toBeInTheDocument()
+    expect(await findByTitle('Refresh now')).toBeInTheDocument()
   })
 
   it('calls fetchTopology on mount', async () => {
@@ -72,10 +72,10 @@ describe('TopologyMap', () => {
 
   it('renders legend items', async () => {
     const { findByText } = render(TopologyMap)
-    await findByText(/No workloads discovered/i) // wait for load to complete
+    await findByText(/No service connections discovered yet/i) // wait for load to complete
     expect(document.body).toHaveTextContent('healthy')
     expect(document.body).toHaveTextContent('degraded')
     expect(document.body).toHaveTextContent('critical')
-    expect(document.body).toHaveTextContent('pending')
+    expect(document.body).toHaveTextContent('no telemetry')
   })
 })
