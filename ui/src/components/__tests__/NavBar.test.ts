@@ -33,6 +33,6 @@ describe('NavBar', () => {
 
   it('renders brand name', () => {
     const { getByText } = render(NavBar, { props: { route: 'fleet' } })
-    expect(getByText('ruptura')).toBeInTheDocument()
+    expect(getByText('RUPTURA')).toBeInTheDocument()
   })
 })

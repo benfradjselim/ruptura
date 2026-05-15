@@ -24,7 +24,7 @@ describe('WorkloadCard', () => {
       props: { host: host({ state: 'pending_telemetry' }) },
     })
     expect(getByText('PENDING')).toBeInTheDocument()
-    expect(getByText('Waiting for first telemetry…')).toBeInTheDocument()
+    expect(getByText('Waiting for first OTLP telemetry…')).toBeInTheDocument()
   })
 
   it('shows health score for active workload', () => {
@@ -51,7 +51,7 @@ describe('WorkloadCard', () => {
         }),
       },
     })
-    expect(getByText(/Early rupture signal/i)).toBeInTheDocument()
+    expect(getByText(/Early rupture/i)).toBeInTheDocument()
     expect(getByText(/FusedR 2\.1/)).toBeInTheDocument()
   })
 
@@ -85,7 +85,7 @@ describe('WorkloadCard', () => {
         }),
       },
     })
-    expect(getByText(/low confidence/i)).toBeInTheDocument()
+    expect(getByText(/low conf\./i)).toBeInTheDocument()
   })
 
   it('does NOT show low-confidence when confidence_window >= 60', () => {
@@ -104,10 +104,10 @@ describe('WorkloadCard', () => {
         }),
       },
     })
-    expect(queryByText(/low confidence/i)).not.toBeInTheDocument()
+    expect(queryByText(/low conf\./i)).not.toBeInTheDocument()
   })
 
-  it('shows ETA when critical_eta_minutes > 0', () => {
+  it('shows ETA forecast body when critical_eta_minutes > 0', () => {
     const { getByText } = render(WorkloadCard, {
       props: {
         host: host({
@@ -123,7 +123,7 @@ describe('WorkloadCard', () => {
         }),
       },
     })
-    expect(getByText(/38m/)).toBeInTheDocument()
+    expect(getByText(/in 15m/i)).toBeInTheDocument()
   })
 
   it('does not show score or bars for pending workload', () => {

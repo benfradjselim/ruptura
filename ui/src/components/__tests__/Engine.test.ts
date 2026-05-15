@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/svelte'
 import Engine from '../../routes/Engine.svelte'
-import { fetchEngineStatus, fetchEngineStorage } from '../../lib/api'
+import { fetchEngineStatus, fetchEngineStorage, fetchDataflow } from '../../lib/api'
 
 const STATUS_OK = {
   analyzer: { tick_interval_ms: 15000, last_tick_ago_ms: 1200, active_workloads: 10, calibrating_workloads: 3, pending_workloads: 1 },
@@ -19,12 +19,16 @@ const STORAGE_OK = {
 vi.mock('../../lib/api', () => ({
   fetchEngineStatus: vi.fn(),
   fetchEngineStorage: vi.fn(),
+  fetchDataflow: vi.fn(),
 }))
+
+const DATAFLOW_OK = { metrics: 5000, logs: 320, traces: 1200 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(fetchEngineStatus).mockResolvedValue(STATUS_OK)
   vi.mocked(fetchEngineStorage).mockResolvedValue(STORAGE_OK)
+  vi.mocked(fetchDataflow).mockResolvedValue(DATAFLOW_OK)
 })
 
 describe('Engine', () => {
@@ -40,10 +44,10 @@ describe('Engine', () => {
   })
 
   it('shows ingest rate bars section', async () => {
-    const { findByText } = render(Engine)
-    expect(await findByText('Metrics')).toBeInTheDocument()
-    expect(await findByText('Logs')).toBeInTheDocument()
-    expect(await findByText('Traces')).toBeInTheDocument()
+    const { findAllByText } = render(Engine)
+    expect((await findAllByText('Metrics')).length).toBeGreaterThanOrEqual(1)
+    expect((await findAllByText('Logs')).length).toBeGreaterThanOrEqual(1)
+    expect((await findAllByText('Traces')).length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows formatted ingest values', async () => {
@@ -70,6 +74,7 @@ describe('Engine', () => {
   it('shows error banner when status fetch fails', async () => {
     vi.mocked(fetchEngineStatus).mockRejectedValueOnce(new Error('unreachable'))
     vi.mocked(fetchEngineStorage).mockRejectedValueOnce(new Error('unreachable'))
+    vi.mocked(fetchDataflow).mockRejectedValueOnce(new Error('unreachable'))
     const { findByText } = render(Engine)
     expect(await findByText(/unreachable/i)).toBeInTheDocument()
   })
@@ -77,6 +82,7 @@ describe('Engine', () => {
   it('shows retry button on error', async () => {
     vi.mocked(fetchEngineStatus).mockRejectedValueOnce(new Error('fail'))
     vi.mocked(fetchEngineStorage).mockRejectedValueOnce(new Error('fail'))
+    vi.mocked(fetchDataflow).mockRejectedValueOnce(new Error('fail'))
     const { findByRole } = render(Engine)
     expect(await findByRole('button', { name: /retry/i })).toBeInTheDocument()
   })
