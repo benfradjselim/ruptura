@@ -39,7 +39,7 @@ spec:
               protocol: TCP
           env:
             - name: RUPTURA_BACKEND_URL
-              value: "http://{{ include "ruptura.fullname" . }}:{{ .Values.ports.api }}"
+              value: "http://{{ include "ruptura.fullname" . }}"
           livenessProbe:
             httpGet:
               path: /health
