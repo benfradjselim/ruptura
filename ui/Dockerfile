@@ -2,7 +2,11 @@
 # Skipping Node.js in Docker keeps multi-arch builds fast — no QEMU npm needed.
 FROM nginx:1.25-alpine
 
-RUN rm -f /etc/nginx/conf.d/default.conf
+RUN rm -f /etc/nginx/conf.d/default.conf \
+    && chown nginx:nginx /etc/nginx/conf.d \
+    && touch /var/run/nginx.pid \
+    && chown nginx:nginx /var/run/nginx.pid \
+    && chown -R nginx:nginx /var/cache/nginx /var/log/nginx
 
 COPY dist /usr/share/nginx/html
 COPY nginx.conf.template /tmp/nginx.conf.template
