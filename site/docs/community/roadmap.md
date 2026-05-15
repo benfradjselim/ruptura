@@ -2,6 +2,57 @@
 
 ## Released
 
+### v7.0.4 — 2026-05-15 ✅
+
+| Item | Detail |
+|------|--------|
+| **OTLP NodePort** | OTLP ingest service exposed as NodePort 31470 — send telemetry directly without port-forwarding |
+| **Workload simulator** | `scripts/simulate.py` — 5 behavioral profiles (stable, CPU stress, error bursts, traffic spikes, calibrating) injected every 5s via `/api/v2/write` |
+
+### v7.0.3 — 2026-05-15 ✅
+
+| Item | Detail |
+|------|--------|
+| **JSON crash fix** | `get()` helper in api.ts reads text before parsing — empty body no longer crashes Fleet/Topology |
+| **Real PNG logo** | SVG gradient replaced with actual PNG in NavBar — renders correctly in all browsers |
+| **Topology overhaul** | Explanation banner, edge click panel (call rate / error rate / P99 latency), better empty state |
+| **Per-workload health scores** | WorkloadCard now reads per-snapshot KPI values — each card shows its own health ring |
+
+### v7.0.2 — 2026-05-15 ✅
+
+| Item | Detail |
+|------|--------|
+| **10-signal mini-bars** | WorkloadCard shows all 10 KPI signals (stress → throughput) as color-coded bars |
+| **Light/dark mode** | Theme toggle in NavBar, persisted to localStorage, CSS variables across all components |
+| **Live Data Flow** | Engine view shows cumulative log/metric/trace counters with proportional stacked bar |
+| **All backend APIs wired** | TopologyMap, Settings ingest stats, NodeHealth all pulling from real endpoints |
+
+### v7.0.1 — 2026-05-15 ✅
+
+| Item | Detail |
+|------|--------|
+| **ruptura-ui pod** | Svelte 4 dashboard deployed as separate pod, nginx proxies `/api/` to engine, injects Bearer token |
+| **Logo** | Ruptura logo in NavBar and Settings About section |
+| **Calibrating state** | WorkloadCard shows calibration progress bar and "calibrating" badge |
+| **Settings & Alerts pages** | Ingest Stats, data source config, active/resolved alert feed |
+
+### v7.0.0 — 2026-05-15 ✅
+
+| Item | Detail |
+|------|--------|
+| **v7 architecture** | Two-pod model: ruptura-engine (Go binary) + ruptura-ui (Svelte 4 + nginx) |
+| **SSE live event stream** | `GET /api/v2/events` — real-time rupture/recovery events, live counter in Fleet |
+| **K8s workload metadata** | Pod list, replicas, resources, labels under Fleet → Kubernetes tab |
+| **Node health view** | Nodes page showing CPU, memory, disk pressure per K8s node |
+
+### v6.8.13 — 2026-05-13 ✅
+
+| Item | Detail |
+|------|--------|
+| **Log/trace ingest counters** | `/api/v2/dataflow` endpoint exposes cumulative metrics/logs/traces totals |
+| **Live Data Flow** | Engine dashboard section showing ingest throughput |
+| **ruptura-ctl v1.0.0** | CLI companion — health, status, workload queries, kubectl plugin support |
+
 ### v6.7.0 — 2026-05-06 ✅
 
 | Item | Detail |
@@ -156,62 +207,21 @@ Clean-room rewrite from OHE v5.1 as `github.com/benfradjselim/ruptura`:
 
 ## Planned
 
-### v7.0.0 — Q3 2026 — "Deviser pour réunir"
-
-The guiding principle for v7 is **"deviser pour réunir"** — split to unite. The monolithic binary is divided into two independently deployable pods that work together under the same Helm chart, Operator, and namespace.
-
-#### Frontend / Backend separation
-
-| Component | v6.x (current) | v7.0 |
-|-----------|----------------|------|
-| **ruptura** (core engine) | Binary includes embedded UI assets | Pure API server — no UI assets |
-| **ruptura-ui** (new) | — | Dedicated pod serving the Svelte dashboard |
-| **Deployment** | Single pod | Two pods in same namespace, same chart |
-| **Operator** | Manages one Deployment | Manages both Deployments, shared Service |
-| **Helm chart** | Single chart | Same chart, `ui.enabled` toggle |
-
-Architecture:
-
-```
-ruptura-system namespace
-┌─────────────────────────────────────────────┐
-│                                             │
-│  ┌──────────────────┐   ┌────────────────┐  │
-│  │   ruptura        │   │  ruptura-ui    │  │
-│  │  (core engine)   │   │  (dashboard)   │  │
-│  │                  │   │                │  │
-│  │  :8080 REST API  │◄──│  :3000 Svelte  │  │
-│  │  :4317 OTLP      │   │  (nginx)       │  │
-│  │  :8125 StatsD    │   │                │  │
-│  └──────────────────┘   └────────────────┘  │
-│           ▲                      ▲           │
-│           │                      │           │
-│     telemetry              browser/user      │
-│                                             │
-└─────────────────────────────────────────────┘
-```
-
-Benefits:
-- **Independently scalable**: scale-down `ruptura-ui` to zero during non-business hours; `ruptura` core always runs
-- **Independent versioning**: dashboard iterates at UI cadence; core engine releases on stability cadence  
-- **Smaller core image**: no embedded JS assets → faster cold start, smaller attack surface
-- **Hot-reload dashboard**: `ruptura-ui` can be updated without restarting the analysis engine
-
-#### Other v7.0 features
+### v7.1.0 — Q3 2026
 
 | Feature | Detail |
 |---------|--------|
-| Multi-tenant opt-in (FR-10) | X-Org-ID header → namespace filter on all queries; per-org storage namespacing |
-| Python SDK v2 | async support (`httpx`), type stubs, full v2 parity with Go SDK |
-| Dashboard version manifest | `ruptura-ui` exports its own `version` at `/ui/version.json` |
+| SLO config UI | Configure SLO targets and error budgets directly from the dashboard |
+| Dashboard layout customization | Drag-and-drop card arrangement, pinned signals |
+| Multi-tenant namespaces | X-Org-ID header → namespace filter on all queries; per-org storage namespacing |
 
-### v7.1.0 — Q4 2026
+### v7.2.0 — Q4 2026
 
 | Feature | Detail |
 |---------|--------|
+| Python SDK v2 | async support (`httpx`), type stubs, full v2 API parity with Go SDK |
+| Grafana data source plugin | Native Grafana plugin for Ruptura — query KPIs and FusedR directly in Grafana panels |
 | Cluster mode (WAL + S3) | Raft-based replication, S3-compatible snapshot target (MinIO / AWS / GCS) |
-| FFT cycle detection | Replace manual seasonality buckets with frequency-domain analysis |
-| Confidence intervals | Residual-based uncertainty quantification on predictions |
 
 ---
 

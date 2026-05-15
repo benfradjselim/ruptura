@@ -6,7 +6,9 @@
 
 **The Predictive Action Layer for Cloud-Native Infrastructure.**
 
-Ruptura detects workload ruptures before they cause outages — and acts on them automatically via Kubernetes, webhooks, and alerting integrations. A single Go binary, no external database required.
+Ruptura detects workload ruptures before they cause outages — using the Fused Rupture Index™, 10 composite KPI signals with adaptive per-workload baselines, and an action engine that responds automatically with safety gates.
+
+→ **[Live dashboard](http://185.229.225.115:31469/)** · **[API Specification](../openapi.yaml)** · **[Getting Started →](getting-started/installation.md)**
 
 ---
 
@@ -18,8 +20,37 @@ Ruptura detects workload ruptures before they cause outages — and acts on them
 | Global thresholds — batch jobs always "stressed" | **Adaptive per-workload baselines** after 24 h observation |
 | "host-123 CPU 78%" — what does it mean? | "payment-api is exhausted — 72 h fatigue accumulation, cascade from payment-db" |
 | Manual incident response | Tier-1 actions (scale, restart, rollback) with safety gates |
-| 5+ tools: Prom + Grafana + AM + Loki + PD | **One binary**, one `helm install` |
+| 5+ tools: Prom + Grafana + AM + Loki + PD | **One `helm install`**, two pods, no external database |
 | Numbers, no reasoning | **Narrative explain** — structured English causal chain |
+
+---
+
+## v7 Architecture
+
+v7 ships as **two separate Kubernetes pods** behind a shared Helm chart:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                      ruptura-system                         │
+│                                                             │
+│  ┌───────────────────────┐    ┌────────────────────────┐   │
+│  │    ruptura-engine     │    │      ruptura-ui         │   │
+│  │    (Go binary)        │    │  (Svelte 4 + nginx)     │   │
+│  │                       │    │                          │   │
+│  │  :8080  REST API      │◄───│  nginx proxies /api/    │   │
+│  │  :4317  OTLP ingest   │    │  injects Bearer token   │   │
+│  │                       │    │  :80   dashboard UI      │   │
+│  └───────────────────────┘    └────────────────────────┘   │
+│          NodePort 31468               NodePort 31469         │
+│          NodePort 31470 (OTLP)                               │
+└────────────────────────────────────────────────────────────┘
+```
+
+| Port | Purpose |
+|------|---------|
+| 31468 | Engine REST API (`/api/v2/*`) |
+| 31469 | Svelte dashboard (light/dark mode, SSE live events) |
+| 31470 | OTLP ingest (`/api/v2/write`, `/otlp/v1/metrics`, `/otlp/v1/logs`, `/otlp/v1/traces`) |
 
 ---
 
@@ -30,7 +61,7 @@ Ruptura detects workload ruptures before they cause outages — and acts on them
 Ruptura fuses three independent signal sources — raw metrics, OTLP logs, and OTLP trace spans — into a single rupture index per Kubernetes workload:
 
 ```
-FusedR = f(metricR, logR, traceR)
+FusedR = weighted_average(metricR, logR, traceR)
 
   metricR = |α_burst| / max(|α_stable|, ε)   CA-ILR dual-scale slope ratio
   logR    = burst_rate / log_baseline          fires when error/warn > 3σ
@@ -48,11 +79,22 @@ FusedR requires at least **two** sources — a single noisy signal cannot push a
 
 ### 10 Composite KPI Signals
 
-Every workload gets 10 auditable signals computed from raw telemetry with published formulas:
+Every workload gets 10 auditable signals computed every 15 seconds:
 
-`stress` · `fatigue` · `mood` · `pressure` · `humidity` · `contagion` · `resilience` · `entropy` · `velocity` · `health_score`
+| Signal | Measures |
+|--------|----------|
+| **Stress** | CPU + latency burst |
+| **Fatigue** | Cumulative baseline deviation (long-term wear) |
+| **Mood** | Log error/warn sentiment ratio |
+| **Pressure** | Memory + disk saturation |
+| **Humidity** | Forecast variance — how predictable behavior is |
+| **Contagion** | Error propagation from upstream services |
+| **Resilience** | Recovery speed after spikes |
+| **Entropy** | Internal signal disorder |
+| **Velocity** | Request rate acceleration |
+| **Throughput** | Data volume processed per cycle |
 
-`health_score` (0–100) is an additive-penalty composite. No black boxes — every coefficient is a versioned release artifact.
+Each signal carries `value`, `state` (ok / warning / critical), and `trend` (rising / falling / stable).
 
 ### WorkloadRef — Kubernetes-Native Treatment Unit
 
@@ -70,7 +112,19 @@ Ruptura runs five prediction models in parallel and weights them by recent predi
 | **MAD** | Robust to outliers |
 | **EWMA** | Reacts quickly to recent shifts |
 
-Every 60 seconds, each model's weight is recomputed from its MAE over the past hour. A batch job that runs every night at 02:00 gradually shifts weight toward Holt-Winters — no manual configuration needed.
+Every 60 seconds, each model's weight is recomputed from its MAE over the past hour. No manual configuration needed.
+
+### HealthScore Forecast
+
+Projects HealthScore +15 and +30 minutes forward. `critical_eta_minutes` appears on the workload card when the projected score is heading toward critical — shows "⚠ Critical in ~12m" in the UI.
+
+### Rupture Fingerprinting
+
+At every confirmed rupture (FusedR ≥ 3.0), an 11-dimensional KPI vector is stored. Future queries run cosine similarity — a match ≥ 0.85 surfaces as `pattern_match` with the prior resolution note. Operators can immediately apply a known fix.
+
+### SSE Live Event Stream
+
+`GET /api/v2/events` — Server-Sent Events. Every rupture and recovery fires in real time. The Fleet dashboard shows a live rupture counter that updates without polling.
 
 ### Action Engine — three tiers, multiple safety gates
 
@@ -88,8 +142,7 @@ Safety gates: per-target rate limit (6/hour), cooldown (300s), namespace allowli
 
 ```
 Prometheus remote_write ──┐
-OTLP metrics/logs/traces ─┼─► metric · log · trace pipelines
-gRPC ingest ──────────────┘
+OTLP metrics/logs/traces ─┼─► Ingest (port 31470)
                            │
               WorkloadRef grouping
          (namespace / kind / name — pods merged)
@@ -97,9 +150,9 @@ gRPC ingest ──────────────┘
               Adaptive per-workload baselines
            (Welford online stats · active after 24h)
                            │
-              10 Composite KPI signals computed
+              10 Composite KPI signals computed every 15s
       stress · fatigue · mood · pressure · humidity
-      contagion · resilience · entropy · velocity · health_score
+      contagion · resilience · entropy · velocity · throughput
                            │
               5-model adaptive ensemble
          CA-ILR · ARIMA · Holt-Winters · MAD · EWMA
@@ -123,12 +176,29 @@ gRPC ingest ──────────────┘
 
 ## Quick Start
 
-=== "Red Hat OperatorHub (OpenShift)"
-
-    Install on OpenShift 4.12+ from the embedded OperatorHub in the OpenShift web console, or via CLI:
+=== "Kubernetes (Helm — OCI)"
 
     ```bash
-    # Create a Subscription in the openshift-operators namespace
+    helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
+      --namespace ruptura-system \
+      --create-namespace \
+      --set apiKey=$(openssl rand -hex 32) \
+      --set ui.enabled=true \
+      --set ui.service.type=NodePort \
+      --set ui.nodePort=31469 \
+      --set service.type=NodePort \
+      --set otlpNodePort=31470
+
+    # Dashboard:   http://<node-ip>:31469/
+    # Engine API:  http://<node-ip>:31468/api/v2/health
+    # OTLP ingest: http://<node-ip>:31470/api/v2/write
+    ```
+
+=== "Red Hat OperatorHub (OpenShift)"
+
+    Install from the embedded OperatorHub in the OpenShift web console, or via CLI:
+
+    ```bash
     kubectl apply -f - <<EOF
     apiVersion: operators.coreos.com/v1alpha1
     kind: Subscription
@@ -142,7 +212,6 @@ gRPC ingest ──────────────┘
       sourceNamespace: openshift-marketplace
     EOF
 
-    # Create an instance
     kubectl apply -f - <<EOF
     apiVersion: ruptura.io/v1alpha1
     kind: RupturaInstance
@@ -155,144 +224,79 @@ gRPC ingest ──────────────┘
     EOF
     ```
 
-    The operator automatically creates an OpenShift `Route` with edge TLS — no additional ingress config required.
-
-=== "OperatorHub (OLM)"
-
-    Install from [OperatorHub](https://operatorhub.io/operator/ruptura-operator) on any OLM-enabled cluster:
+=== "Inject synthetic workloads"
 
     ```bash
-    # Subscribe to the operator
-    kubectl apply -f - <<EOF
-    apiVersion: operators.coreos.com/v1alpha1
-    kind: Subscription
-    metadata:
-      name: ruptura-operator
-      namespace: operators
-    spec:
-      channel: stable
-      name: ruptura-operator
-      source: operatorhubio-catalog
-      sourceNamespace: olm
-    EOF
-
-    # Create an instance
-    kubectl apply -f - <<EOF
-    apiVersion: ruptura.io/v1alpha1
-    kind: RupturaInstance
-    metadata:
-      name: ruptura
-      namespace: ruptura-system
-    spec:
-      edition: community
-      storageSize: 10Gi
-    EOF
+    python3 scripts/simulate.py
+    # Sends 5 workloads every 5s:
+    #   gateway        — stable/healthy
+    #   order-service  — slow-burn CPU stress (45→90% over 10 min)
+    #   payment-api    — error bursts every 2 min (8→43%)
+    #   cache-worker   — traffic spikes every 3 min (1200 req/s)
+    #   ml-inference   — noisy/calibrating new workload
     ```
 
-=== "Helm (recommended)"
+=== "Send OTLP metrics directly"
 
     ```bash
-    git clone https://github.com/benfradjselim/ruptura.git
-    cd ruptura
-
-    helm install ruptura helm \
-      --namespace ruptura-system \
-      --create-namespace \
-      --set apiKey=$(openssl rand -hex 32)
-
-    kubectl port-forward svc/ruptura 8080:80 -n ruptura-system
-    curl http://localhost:8080/api/v2/health
+    curl -X POST http://<node-ip>:31470/api/v2/write \
+      -H "Content-Type: application/json" \
+      -d '{
+        "timeseries": [{
+          "Labels": [
+            {"Name": "__name__",   "Value": "cpu_percent"},
+            {"Name": "host",       "Value": "default/Deployment/my-app"},
+            {"Name": "namespace",  "Value": "default"},
+            {"Name": "deployment", "Value": "my-app"}
+          ],
+          "Samples": [{"Value": 72.5, "Timestamp": 1234567890000}]
+        }]
+      }'
     ```
 
-=== "Docker"
+---
 
-    ```bash
-    docker run -d \
-      --name ruptura \
-      -p 8080:8080 \
-      -p 4317:4317 \
-      -v ruptura-data:/var/lib/ruptura/data \
-      -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-      ghcr.io/benfradjselim/ruptura:6.7.0
+## Dashboard (v7)
 
-    curl http://localhost:8080/api/v2/health
-    ```
+Svelte 4 SPA with nginx reverse proxy — light/dark mode toggle, full SSE integration.
 
-=== "kubectl (inline)"
-
-    ```bash
-    # 1 — Namespace + RBAC
-    kubectl apply -f - <<'EOF'
-    apiVersion: v1
-    kind: Namespace
-    metadata:
-      name: ruptura-system
-    ---
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      name: ruptura
-      namespace: ruptura-system
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRole
-    metadata:
-      name: ruptura
-    rules:
-      - apiGroups: ["apps"]
-        resources: ["deployments","statefulsets","daemonsets","replicasets"]
-        verbs: ["get","list","watch"]
-      - apiGroups: [""]
-        resources: ["pods","nodes","namespaces","services"]
-        verbs: ["get","list","watch"]
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
-    metadata:
-      name: ruptura
-    roleRef:
-      apiGroup: rbac.authorization.k8s.io
-      kind: ClusterRole
-      name: ruptura
-    subjects:
-      - kind: ServiceAccount
-        name: ruptura
-        namespace: ruptura-system
-    EOF
-
-    # 2 — API key secret
-    kubectl create secret generic ruptura-secrets \
-      -n ruptura-system \
-      --from-literal=api-key=$(openssl rand -hex 32)
-
-    # 3 — Storage + Deployment + Services (see Installation for full YAML)
-    kubectl port-forward svc/ruptura 8080:80 -n ruptura-system
-    curl http://localhost:8080/api/v2/health
-    ```
+| View | What you see |
+|------|-------------|
+| **Fleet** | Workload grid. Per-card: health ring (actual KPI value), 10 signal mini-bars, calibration progress, rupture warning |
+| **Fleet → Signals** | 10 KPI cells, PatternMatch warning, BusinessSignals, explain panel |
+| **Fleet → History** | Time-series — toggle any of 12 signals; Chart.js |
+| **Fleet → Forecast** | HealthScore projection chart |
+| **Fleet → Predictions** | Per-metric ensemble predictions |
+| **Fleet → Events** | SSE live rupture/recovery log |
+| **Fleet → Logs** | Last 200 log lines for the workload |
+| **Fleet → Actions** | Approve / reject Tier-2 actions |
+| **Fleet → Kubernetes** | Pod list, replicas, resources, labels |
+| **Topology** | Service dependency graph from OTLP traces. Click node → health bar + FusedR. Click edge → call rate, error rate, P99 latency |
+| **Engine** | Runtime stats, analyzer state, ingest rates, cumulative data flow, BadgerDB storage |
+| **Alerts** | Active / resolved alert feed |
+| **Nodes** | K8s node health — CPU, memory, disk pressure |
+| **Settings** | Data sources, Ingest Stats (live totals), preferences |
 
 ---
 
 ## Current Release
 
-**v6.7.0** — embedded web dashboard, air-gap safe. Production-ready for Kubernetes evaluation.
+**v7.0.4** — OTLP NodePort exposed, workload simulator.
 
-- Self-contained Svelte UI served by the binary — open `http://localhost:8080`, no Grafana required
-- Chart.js and Alpine.js vendored locally — no CDN calls, works in air-gapped environments
-- Brand logo embedded in the dashboard topbar
-- All security hardening from v6.6.3: timing-safe auth, emergency stop wired, Slowloris protection
-- All 37 packages pass `go test -race ./...`
+| Version | Date | Status |
+|---------|------|--------|
+| v7.0.4 | 2026-05-15 | ✅ Released — OTLP NodePort 31470 exposed, workload simulator |
+| v7.0.3 | 2026-05-15 | ✅ Released — JSON crash fix, real PNG logo, topology overhaul, health scores per workload |
+| v7.0.2 | 2026-05-15 | ✅ Released — 10-signal bars, light/dark mode, dataflow stats, all backend APIs wired |
+| v7.0.1 | 2026-05-15 | ✅ Released — ruptura-ui pod, logo, calibrating state, Settings & Alerts pages |
+| v7.0.0 | 2026-05-15 | ✅ Released — v7 architecture: separate UI pod, SSE, k8s metadata, node health |
+| v6.8.13 | 2026-05-13 | ✅ Released — log/trace ingest counters, Live Data Flow, ruptura-ctl v1.0.0 |
 
-**ruptura-operator v0.6.9** — submitted to [Red Hat OperatorHub](https://catalog.redhat.com/software/operators) for OpenShift certification.
+**Operator:**
 
-- UBI9 micro base image — satisfies Red Hat preflight `BasedOnUBI` certification check
-- Required Red Hat container labels (`name`, `vendor`, `version`, `release`, `summary`, `description`) added to both images
-- Default app image bumped to `ruptura:v6.7.0`
-- Available on [OperatorHub](https://operatorhub.io/operator/ruptura-operator) (community) · Red Hat OperatorHub certification in progress
+| Version | Date | Status |
+|---------|------|--------|
+| ruptura-operator v0.6.9 | 2026-05-07 | 🔄 Submitted to Red Hat OperatorHub |
+| ruptura-operator v0.6.8 | 2026-05-07 | ✅ Merged into OperatorHub community-operators |
 
-**ruptura-operator v0.6.8** — live on [OperatorHub](https://operatorhub.io/operator/ruptura-operator).
-
-- Installs via OLM `Subscription` on any Kubernetes or OpenShift cluster
-- Manages `RupturaInstance` CRD → Deployment + Service + PVC + ServiceAccount
-- ServiceAccount bug fixed, RBAC corrected, Prometheus metrics on `:9090`
-
-[Full changelog →](community/roadmap.md) · [Getting Started →](getting-started/installation.md) · [Dashboard Tour →](getting-started/dashboard-tour.md) · [Operator →](architecture/operator.md)
+[Full changelog →](community/roadmap.md) · [Getting Started →](getting-started/installation.md) · [Dashboard Tour →](getting-started/dashboard-tour.md) · [Architecture →](architecture/index.md)

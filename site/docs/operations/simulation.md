@@ -1,54 +1,83 @@
-# Simulating Ruptures with `ruptura-sim`
+# Simulating Workloads
 
-`ruptura-sim` is a companion binary that injects synthetic load patterns into a running Ruptura instance. Use it to:
+Ruptura ships two ways to inject synthetic workloads: the **Python workload simulator** (`scripts/simulate.py`) for continuous multi-profile injection, and the **ruptura-sim API** for one-shot failure pattern injection.
 
-- Demo Ruptura without waiting for real incidents
+---
+
+## Python workload simulator (v7+)
+
+`scripts/simulate.py` injects 5 synthetic workloads with distinct failure modes continuously via the `/api/v2/write` endpoint. Use it to:
+
+- Demo Ruptura immediately after install — no real workloads needed
 - Test alert routing and action engine rules before go-live
-- Reproduce a specific failure pattern to validate a fix
-- Train your team on what a cascade failure looks like in the dashboard
+- Validate that the dashboard shows differentiated health scores per workload
+- Train your team on what each failure profile looks like in the dashboard
+
+### Usage
+
+```bash
+python3 scripts/simulate.py [--host HOST] [--port PORT] [--interval SEC]
+
+# Default target: http://185.229.225.115:31470
+# Default interval: 5s between pushes
+```
+
+### Workload profiles
+
+| Workload | Profile | What it shows |
+|----------|---------|---------------|
+| `gateway` | Stable/healthy | All signals green — CPU ~22%, err ~0.3%, latency ~95ms |
+| `order-service` | Slow-burn CPU stress | CPU rises from 45% → 90% over 10 minutes, latency and error rate climb with it |
+| `payment-api` | Error bursts | Error rate spikes from 8% → 43% every 2 minutes, latency explodes to 3s during bursts |
+| `cache-worker` | Traffic spikes | Request rate surges from 150 → 1350 rps every 3 minutes; throughput and CPU spike together |
+| `ml-inference` | Noisy/calibrating | High variance on all signals — simulates a new workload in calibration phase |
+
+### Metric format
+
+Each workload pushes metrics as JSON to `/api/v2/write`. The `host` label must match the workload key `namespace/Kind/name`:
+
+```json
+{
+  "timeseries": [{
+    "Labels": [
+      {"Name": "__name__",   "Value": "cpu_percent"},
+      {"Name": "host",       "Value": "default/Deployment/order-service"},
+      {"Name": "namespace",  "Value": "default"},
+      {"Name": "deployment", "Value": "order-service"}
+    ],
+    "Samples": [{"Value": 78.3, "Timestamp": 1715780000000}]
+  }]
+}
+```
+
+!!! warning "host label is required"
+    The ingest pipeline uses the `host` label as the pipeline key. If `host` is missing, all metrics merge into a single `"unknown"` workload. Always set `host` to `namespace/Kind/name`.
+
+### What you'll see in the dashboard
+
+After ~30 seconds of simulation:
+
+1. **Fleet view** — 5 workload cards appear with different health rings and signal bars
+2. **order-service** — stress and fatigue signals rising; calibration bar fills as baselines form
+3. **payment-api** — mood signal low (error sentiment); FusedR spikes during burst cycles
+4. **cache-worker** — velocity and throughput bars surge on the 3-minute sawtooth
+5. **ml-inference** — card shows "calibrating" badge; signals fluctuate erratically
+6. **gateway** — all green, stable health score near 95+
 
 ---
 
-## Installation
+## ruptura-sim API patterns
 
-`ruptura-sim` is included in the same Docker image and built alongside the main binary.
-
-**Docker:**
-
-```bash
-# Run sim against a local Ruptura container
-docker run --rm --network host \
-  ghcr.io/benfradjselim/ruptura:6.7.0 \
-  /ruptura-sim --help
-```
-
-**From source:**
-
-```bash
-cd ruptura/workdir
-go build -o ruptura-sim ./cmd/ruptura-sim
-```
-
----
-
-## Patterns
-
-Four built-in failure patterns are available:
+Four built-in failure patterns inject via the REST API for one-shot demos:
 
 | Pattern | What it simulates | Signals affected |
 |---------|------------------|-----------------|
 | `memory-leak` | Gradual RAM accumulation over 30 minutes | fatigue ↑, mood ↓, health_score ↓ |
-| `cascade-failure` | Upstream dependency starts failing, errors propagate | contagion ↑↑, FusedR spikes |
+| `cascade-failure` | Upstream dependency fails, errors propagate | contagion ↑↑, FusedR spikes |
 | `traffic-surge` | 10× request rate spike over 5 minutes | stress ↑↑, pressure ↑, velocity ↑ |
-| `slow-burn` | Low-grade degradation over 2 hours — never critical alone | fatigue ↑, entropy ↑, recovery_debt++ |
+| `slow-burn` | Low-grade degradation over 2 hours | fatigue ↑, entropy ↑, recovery_debt++ |
 
----
-
-## Usage
-
-Inject a pattern via the REST API or the CLI binary.
-
-### Via API (any HTTP client)
+### Via API
 
 ```bash
 curl -X POST \
@@ -56,92 +85,70 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -d '{
     "pattern": "cascade-failure",
-    "host": "payment-api",
+    "host": "default/Deployment/payment-api",
     "duration_minutes": 15
   }' \
-  http://localhost:8080/api/v2/sim/inject
-```
-
-### Via CLI binary
-
-```bash
-./ruptura-sim \
-  --pattern=cascade-failure \
-  --host=payment-api \
-  --ruptura-url=http://localhost:8080 \
-  --api-key=$API_KEY \
-  --duration=15m
+  http://<node-ip>:31468/api/v2/sim/inject
 ```
 
 ---
 
 ## Walkthrough: cascade failure demo
 
-This is the recommended first demo for anyone evaluating Ruptura.
-
-**1. Start Ruptura locally:**
+**1. Start the Python simulator (continuous background injection):**
 
 ```bash
-docker run -d --name ruptura \
-  -p 8080:8080 -p 4317:4317 \
-  -e RUPTURA_API_KEY=demo \
-  ghcr.io/benfradjselim/ruptura:6.7.0
+python3 scripts/simulate.py --host <node-ip> --port 31470 &
 ```
 
-**2. Inject a cascade failure:**
+**2. Watch the Fleet dashboard** at `http://<node-ip>:31469/` — after one 15s analyzer tick, all 5 workloads appear.
+
+**3. Inject a cascade failure on top of the running simulator:**
 
 ```bash
 curl -X POST \
-  -H "Authorization: Bearer demo" \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"pattern":"cascade-failure","host":"payment-api","duration_minutes":10}' \
-  http://localhost:8080/api/v2/sim/inject
+  -d '{"pattern":"cascade-failure","host":"default/Deployment/payment-api","duration_minutes":10}' \
+  http://<node-ip>:31468/api/v2/sim/inject
 ```
 
-**3. Watch the Rupture Index climb:**
+**4. Watch the rupture index climb:**
 
 ```bash
-watch -n 5 'curl -s -H "Authorization: Bearer demo" \
-  http://localhost:8080/api/v2/rupture/payment-api \
+watch -n 5 'curl -s \
+  -H "Authorization: Bearer $API_KEY" \
+  http://<node-ip>:31468/api/v2/rupture/default/payment-api \
   | python3 -m json.tool | grep -E "fused_rupture|health_score|contagion|state"'
 ```
 
-You will see `contagion` rise first, then `FusedR` cross 1.5 (warning), then 3.0 (critical). The action engine will queue a Tier-2 recommendation.
+You'll see `contagion` rise first, then `FusedR` cross 1.5 (warning), then 3.0 (critical). The action engine queues a Tier-2 recommendation.
 
-**4. Read the narrative explain:**
+**5. Read the narrative explain:**
 
 ```bash
 # Get the rupture ID from the rupture response, then:
-curl -s -H "Authorization: Bearer demo" \
-  http://localhost:8080/api/v2/explain/<rupture_id>/narrative \
+curl -s -H "Authorization: Bearer $API_KEY" \
+  http://<node-ip>:31468/api/v2/explain/<rupture_id>/narrative \
   | python3 -m json.tool
 ```
 
-Expected output:
-```
-"payment-api has been accumulating contagion from upstream dependencies for 8 minutes.
-Error propagation via the payment-api→payment-db edge pushed FusedR from 1.2 to 4.1.
-This is a cascade rupture, not an isolated spike. Recommended action: scale payment-api
-by 2 replicas and investigate payment-db error rate."
-```
-
-**5. Check the pending action:**
+**6. Check the pending action:**
 
 ```bash
-curl -s -H "Authorization: Bearer demo" \
-  http://localhost:8080/api/v2/actions \
-  | python3 -m json.tool
+curl -s -H "Authorization: Bearer $API_KEY" \
+  http://<node-ip>:31468/api/v2/actions | python3 -m json.tool
 ```
 
 ---
 
 ## Tips
 
-**Combine patterns** for realistic scenarios. Inject `slow-burn` for 30 minutes first, then `traffic-surge` — Ruptura will show the compounding effect of a fatigued workload hitting a traffic spike.
+**Combine patterns** for realistic scenarios. Run the Python simulator for 10 minutes first (builds baselines), then inject `cascade-failure`. Ruptura shows the compounding effect.
 
-**Use a real workload name** matching your K8s namespace/workload key (e.g. `--host=default/Deployment/checkout`) so the simulated signals merge with real telemetry in the dashboard.
+**Watch `recovery_debt` accumulate** by repeatedly injecting patterns that recover just below FusedR 1.0. After a few rounds, `business.recovery_debt` in the snapshot reflects the hidden instability.
 
-**Watch `recovery_debt` accumulate** by repeatedly injecting `slow-burn` patterns that recover below FusedR 1.0. After a few rounds, the `business.recovery_debt` counter in the snapshot will reflect the hidden instability.
+**ml-inference calibration** — this workload stays in "calibrating" state for ~24h of real data. The simulator sends enough variance that baselines never fully settle — showing the calibration UI state indefinitely.
 
 ---
 
@@ -152,7 +159,7 @@ POST /api/v2/sim/inject
 
 Body:
   pattern          string  — "memory-leak" | "cascade-failure" | "traffic-surge" | "slow-burn"
-  host             string  — workload key (e.g. "payment-api" or "payments/Deployment/checkout")
+  host             string  — workload key (e.g. "default/Deployment/payment-api")
   duration_minutes int     — how long the pattern runs (default: 10)
 
 Response: 202 Accepted
