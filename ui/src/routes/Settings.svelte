@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
+  import { fetchDataflow } from '../lib/api'
+  import type { DataflowStats } from '../lib/api'
 
   interface DataSource {
     id: string
@@ -22,6 +24,8 @@
   let sources: DataSource[] = []
   let saved = false
   let activeSection = 'datasources'
+  let dataflow: DataflowStats | null = null
+  let dataflowInterval: ReturnType<typeof setInterval>
 
   const DS_ICONS: Record<string, string> = {
     otlp:          '⊕',
@@ -75,7 +79,17 @@
     localStorage.setItem('ruptura:refresh_interval', val)
   }
 
-  onMount(load)
+  async function pollDataflow() {
+    try { dataflow = await fetchDataflow() } catch { /* non-fatal */ }
+  }
+
+  onMount(() => {
+    load()
+    pollDataflow()
+    dataflowInterval = setInterval(pollDataflow, 10_000)
+  })
+
+  onDestroy(() => clearInterval(dataflowInterval))
 </script>
 
 <div class="settings">
@@ -89,6 +103,7 @@
     <nav class="settings-nav">
       {#each [
         ['datasources', '⊕ Data Sources'],
+        ['dataflow',    '⟳ Ingest Stats'],
         ['general',     '⊞ General'],
         ['about',       '◈ About'],
       ] as [id, label]}
@@ -153,6 +168,34 @@
             {saved ? '✓ Saved' : 'Save changes'}
           </button>
         </div>
+
+      <!-- ── DATAFLOW ── -->
+      {:else if activeSection === 'dataflow'}
+        <div class="section-header">
+          <h2>Ingest Statistics</h2>
+          <p>Cumulative data ingested by the Ruptura engine. Updates every 10 seconds.</p>
+        </div>
+        {#if dataflow}
+          <div class="df-grid">
+            <div class="df-card">
+              <div class="df-icon" style="color:var(--purple)">⊕</div>
+              <div class="df-num">{dataflow.metrics.toLocaleString()}</div>
+              <div class="df-label">Metrics</div>
+            </div>
+            <div class="df-card">
+              <div class="df-icon" style="color:var(--cyan)">▦</div>
+              <div class="df-num">{dataflow.logs.toLocaleString()}</div>
+              <div class="df-label">Log Lines</div>
+            </div>
+            <div class="df-card">
+              <div class="df-icon" style="color:var(--yellow)">⌖</div>
+              <div class="df-num">{dataflow.traces.toLocaleString()}</div>
+              <div class="df-label">Traces</div>
+            </div>
+          </div>
+        {:else}
+          <div class="loading-hint">Fetching ingest stats…</div>
+        {/if}
 
       <!-- ── GENERAL ── -->
       {:else if activeSection === 'general'}
@@ -458,6 +501,31 @@
     transition: opacity 0.15s;
   }
   .btn-save:hover { opacity: 0.85; }
+
+  /* dataflow */
+  .df-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .df-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 16px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .df-icon { font-size: 20px; }
+  .df-num { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
+  .df-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .loading-hint { font-size: 12px; color: var(--muted); font-style: italic; }
 
   /* general */
   .general-body { display: flex; flex-direction: column; gap: 16px; }

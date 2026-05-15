@@ -9,20 +9,32 @@
   import Settings from './routes/Settings.svelte'
 
   let route = ''
+  let theme = 'dark'
 
   function readHash() {
     route = window.location.hash.replace(/^#\/?/, '') || 'fleet'
   }
 
+  function toggleTheme() {
+    theme = theme === 'dark' ? 'light' : 'dark'
+    localStorage.setItem('ruptura:theme', theme)
+    document.documentElement.setAttribute('data-theme', theme)
+  }
+
   onMount(() => {
     readHash()
     window.addEventListener('hashchange', readHash)
+
+    const stored = localStorage.getItem('ruptura:theme') ?? 'dark'
+    theme = stored
+    document.documentElement.setAttribute('data-theme', stored)
+
     return () => window.removeEventListener('hashchange', readHash)
   })
 </script>
 
 <div class="app">
-  <NavBar {route} />
+  <NavBar {route} {theme} on:toggleTheme={toggleTheme} />
   <main>
     {#if route === 'fleet' || route === ''}
       <Fleet />
@@ -50,14 +62,15 @@
   }
 
   :global(body) {
-    background: #0a0d14;
-    color: #e2e8f0;
+    background: var(--bg);
+    color: var(--text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 14px;
     line-height: 1.5;
+    transition: background 0.2s, color 0.2s;
   }
 
-  :global(:root) {
+  :global(:root), :global([data-theme='dark']) {
     --bg:       #0a0d14;
     --surface:  #10151f;
     --surface2: #161c2a;
@@ -74,6 +87,25 @@
     --red:      #ef4444;
     --blue:     #3b82f6;
     --accent:   #a855f7;
+  }
+
+  :global([data-theme='light']) {
+    --bg:       #f0f4f8;
+    --surface:  #ffffff;
+    --surface2: #f8fafc;
+    --surface3: #edf2f7;
+    --border:   #cbd5e0;
+    --text:     #1a202c;
+    --muted:    #718096;
+    --purple:   #7c3aed;
+    --violet:   #6d28d9;
+    --cyan:     #0891b2;
+    --green:    #059669;
+    --yellow:   #d97706;
+    --orange:   #ea580c;
+    --red:      #dc2626;
+    --blue:     #2563eb;
+    --accent:   #7c3aed;
   }
 
   :global(::-webkit-scrollbar) { width: 6px; }

@@ -18,6 +18,7 @@ export interface KPIMap {
   resilience: KPI
   entropy: KPI
   velocity: KPI
+  throughput: KPI
   health_score: KPI
 }
 
@@ -34,6 +35,19 @@ export interface HealthForecast {
   in_30min: number
   critical_eta_minutes: number
   confidence_window: number
+}
+
+export interface PatternMatch {
+  similarity: number
+  matched_rupture_id: string
+  matched_at: string
+  resolution: string
+}
+
+export interface BusinessSignals {
+  slo_burn_velocity: number
+  blast_radius: number
+  recovery_debt: number
 }
 
 export interface FleetHost {
@@ -62,7 +76,7 @@ export interface KPISnapshot {
   host: string
   workload: WorkloadRef
   timestamp: string
-  workload_status: string
+  status: string           // "calibrating" | "active" | "pending_telemetry"
   fused_rupture_index: number
   health_score: KPI
   stress: KPI
@@ -74,6 +88,7 @@ export interface KPISnapshot {
   resilience: KPI
   entropy: KPI
   velocity: KPI
+  throughput: KPI
 }
 
 export interface HealthResponse {
@@ -137,12 +152,11 @@ export interface Suppression {
 
 export interface CreateSuppressionRequest {
   workload: string
-  start: string   // ISO 8601
-  end: string     // ISO 8601
+  start: string
+  end: string
   reason: string
 }
 
-// 6-signal weight override for a workload selector glob.
 export interface SignalWeights {
   selector: string
   stress: number
@@ -155,39 +169,77 @@ export interface SignalWeights {
 
 // ── fetch helpers ────────────────────────────────────────────────────────────
 
-async function get<T>(path: string, apiKey?: string): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
-  const res = await fetch(path, { headers })
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(path)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`)
   return res.json() as Promise<T>
 }
 
-// ── public API ───────────────────────────────────────────────────────────────
-
-export function fetchHealth(apiKey?: string) {
-  return get<HealthResponse>('/api/v2/health', apiKey)
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText)
+    throw new Error(`${res.status} — ${text}`)
+  }
+  return res.json() as Promise<T>
 }
 
-export function fetchFleet(apiKey?: string) {
-  return get<FleetResponse>('/api/v2/fleet', apiKey)
+async function del(path: string): Promise<void> {
+  const res = await fetch(path, { method: 'DELETE' })
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text().catch(() => res.statusText)
+    throw new Error(`${res.status} — ${text}`)
+  }
 }
 
-export function fetchKPIs(host: string, apiKey?: string) {
-  return get<KPIMap>(`/api/v2/kpis?host=${encodeURIComponent(host)}`, apiKey)
+// ── health / version ─────────────────────────────────────────────────────────
+
+export function fetchHealth() {
+  return get<HealthResponse>('/api/v2/health')
 }
 
-export function fetchSnapshot(host: string, apiKey?: string) {
-  return get<KPISnapshot>(`/api/v2/kpi?host=${encodeURIComponent(host)}`, apiKey)
+// ── fleet ────────────────────────────────────────────────────────────────────
+
+export function fetchFleet() {
+  return get<FleetResponse>('/api/v2/fleet')
 }
 
-export function fetchAlerts(apiKey?: string) {
-  return get<Alert[]>('/api/v2/alerts', apiKey)
+// ── kpis ─────────────────────────────────────────────────────────────────────
+
+export function fetchKPIs(host: string) {
+  return get<KPIMap>(`/api/v2/kpis?host=${encodeURIComponent(host)}`)
 }
 
-export function fetchEngineStatus(apiKey?: string) {
-  return get<EngineStatus>('/api/v2/engine/status', apiKey)
+// ── alerts ────────────────────────────────────────────────────────────────────
+
+export function fetchAlerts() {
+  return get<Alert[]>('/api/v2/alerts')
 }
+
+// ── engine status / storage ───────────────────────────────────────────────────
+
+export function fetchEngineStatus() {
+  return get<EngineStatus>('/api/v2/engine/status')
+}
+
+export interface EngineStorage {
+  badger: {
+    disk_bytes: number
+    vlog_size_bytes: number
+    num_tables: number
+    keys: number
+  }
+}
+
+export function fetchEngineStorage() {
+  return get<EngineStorage>('/api/v2/engine/storage')
+}
+
+// ── topology ─────────────────────────────────────────────────────────────────
 
 export interface TopologyNode {
   id: string
@@ -209,25 +261,14 @@ export interface TopologyGraph {
   edges: TopologyEdge[]
 }
 
-export function fetchTopology(apiKey?: string) {
-  return get<TopologyGraph>('/api/v2/topology', apiKey)
+export function fetchTopology() {
+  return get<TopologyGraph>('/api/v2/topology')
 }
 
-export interface EngineStorage {
-  badger: {
-    disk_bytes: number
-    vlog_size_bytes: number
-    num_tables: number
-    keys: number
-  }
-}
+// ── nodes ────────────────────────────────────────────────────────────────────
 
-export function fetchEngineStorage(apiKey?: string) {
-  return get<EngineStorage>('/api/v2/engine/storage', apiKey)
-}
-
-export function fetchNodes(apiKey?: string) {
-  return get<ClusterNode[]>('/api/v2/nodes', apiKey)
+export function fetchNodes() {
+  return get<ClusterNode[]>('/api/v2/nodes')
 }
 
 export interface NodeWorkload {
@@ -247,55 +288,32 @@ export interface NodeDetail {
   workloads: NodeWorkload[]
 }
 
-export function fetchNodeDetail(node: string, apiKey?: string) {
-  return get<NodeDetail>(`/api/v2/nodes/${encodeURIComponent(node)}`, apiKey)
-}
-
-// ── write helpers ────────────────────────────────────────────────────────────
-
-async function post<T>(path: string, body: unknown, apiKey?: string): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
-  const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) })
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`${res.status} — ${text}`)
-  }
-  return res.json() as Promise<T>
-}
-
-async function del(path: string, apiKey?: string): Promise<void> {
-  const headers: Record<string, string> = {}
-  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
-  const res = await fetch(path, { method: 'DELETE', headers })
-  if (!res.ok && res.status !== 204) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`${res.status} — ${text}`)
-  }
+export function fetchNodeDetail(node: string) {
+  return get<NodeDetail>(`/api/v2/nodes/${encodeURIComponent(node)}`)
 }
 
 // ── suppressions ─────────────────────────────────────────────────────────────
 
-export function fetchSuppressions(apiKey?: string) {
-  return get<Suppression[]>('/api/v2/suppressions', apiKey)
+export function fetchSuppressions() {
+  return get<Suppression[]>('/api/v2/suppressions')
 }
 
-export function createSuppression(req: CreateSuppressionRequest, apiKey?: string) {
-  return post<Suppression>('/api/v2/suppressions', req, apiKey)
+export function createSuppression(req: CreateSuppressionRequest) {
+  return post<Suppression>('/api/v2/suppressions', req)
 }
 
-export function deleteSuppression(id: string, apiKey?: string) {
-  return del(`/api/v2/suppressions/${encodeURIComponent(id)}`, apiKey)
+export function deleteSuppression(id: string) {
+  return del(`/api/v2/suppressions/${encodeURIComponent(id)}`)
 }
 
 // ── signal weights ────────────────────────────────────────────────────────────
 
-export function fetchWeights(apiKey?: string) {
-  return get<SignalWeights[]>('/api/v2/config/weights', apiKey)
+export function fetchWeights() {
+  return get<SignalWeights[]>('/api/v2/config/weights')
 }
 
-export function saveWeights(weights: SignalWeights[], apiKey?: string) {
-  return post<{ applied: number }>('/api/v2/config/weights', weights, apiKey)
+export function saveWeights(weights: SignalWeights[]) {
+  return post<{ applied: number }>('/api/v2/config/weights', weights)
 }
 
 // ── workload k8s metadata ─────────────────────────────────────────────────────
@@ -325,10 +343,9 @@ export interface WorkloadK8sMeta {
   pods: PodInfo[]
 }
 
-export function fetchWorkloadK8s(namespace: string, kind: string, name: string, apiKey?: string) {
+export function fetchWorkloadK8s(namespace: string, kind: string, name: string) {
   return get<WorkloadK8sMeta>(
     `/api/v2/workloads/${encodeURIComponent(namespace)}/${encodeURIComponent(kind)}/${encodeURIComponent(name)}/k8s`,
-    apiKey,
   )
 }
 
@@ -347,10 +364,11 @@ export interface HistoryPoint {
   resilience: number
   entropy: number
   velocity: number
+  throughput: number
 }
 
-export function fetchHistory(wlRef: string, apiKey?: string) {
-  return get<HistoryPoint[]>(`/api/v2/history/${encodeURIComponent(wlRef)}`, apiKey)
+export function fetchHistory(wlRef: string) {
+  return get<HistoryPoint[]>(`/api/v2/history/${encodeURIComponent(wlRef)}`)
 }
 
 // ── actions ───────────────────────────────────────────────────────────────────
@@ -365,21 +383,25 @@ export interface Action {
   state: 'pending' | 'approved' | 'rejected' | 'executed'
 }
 
-export function fetchActions(apiKey?: string) {
-  return get<Action[]>('/api/v2/actions', apiKey)
+export function fetchActions() {
+  return get<Action[]>('/api/v2/actions')
 }
 
-export function approveAction(id: string, apiKey?: string) {
-  return post<{ ok: boolean }>(`/api/v2/actions/${encodeURIComponent(id)}/approve`, {}, apiKey)
+export function approveAction(id: string) {
+  return post<{ ok: boolean }>(`/api/v2/actions/${encodeURIComponent(id)}/approve`, {})
 }
 
-export function rejectAction(id: string, apiKey?: string) {
-  return post<{ ok: boolean }>(`/api/v2/actions/${encodeURIComponent(id)}/reject`, {}, apiKey)
+export function rejectAction(id: string) {
+  return post<{ ok: boolean }>(`/api/v2/actions/${encodeURIComponent(id)}/reject`, {})
+}
+
+export function emergencyStop() {
+  return post<{ ok: boolean }>('/api/v2/actions/emergency-stop', {})
 }
 
 // ── explain ───────────────────────────────────────────────────────────────────
 
-export type ExplainMode = 'narrative' | 'formula' | 'json'
+export type ExplainMode = 'narrative' | 'formula' | 'pipeline'
 
 export interface ExplainResult {
   narrative?: string
@@ -387,10 +409,9 @@ export interface ExplainResult {
   [key: string]: unknown
 }
 
-export function fetchExplain(ruptureId: string, mode: ExplainMode, apiKey?: string) {
+export function fetchExplain(ruptureId: string, mode: ExplainMode) {
   return get<ExplainResult>(
     `/api/v2/explain/${encodeURIComponent(ruptureId)}/${mode}`,
-    apiKey,
   )
 }
 
@@ -400,12 +421,15 @@ export interface RuptureSnapshot {
   host: string
   workload: WorkloadRef
   timestamp: string
-  workload_status: string
-  fused_rupture_index: number
+  status: string              // "calibrating" | "active" | "pending_telemetry"
   calibration_progress: number
+  calibration_eta_minutes: number
+  fused_rupture_index: number
   health_score: KPI
   health_forecast?: HealthForecast
   rupture_events?: Array<{ id: string; ts: string; severity: string }>
+  pattern_match?: PatternMatch
+  business?: BusinessSignals
   stress: KPI
   fatigue: KPI
   mood: KPI
@@ -415,12 +439,71 @@ export interface RuptureSnapshot {
   resilience: KPI
   entropy: KPI
   velocity: KPI
+  throughput: KPI
 }
 
-export function fetchRuptures(apiKey?: string) {
-  return get<RuptureSnapshot[]>('/api/v2/ruptures', apiKey)
+export function fetchRuptures() {
+  return get<RuptureSnapshot[]>('/api/v2/ruptures')
 }
 
-export function fetchRupture(host: string, apiKey?: string) {
-  return get<RuptureSnapshot>(`/api/v2/rupture?host=${encodeURIComponent(host)}`, apiKey)
+// ── predictions ───────────────────────────────────────────────────────────────
+
+export interface PredictionEntry {
+  target: string
+  current: number
+  predicted: number
+  trend: 'stable' | 'improving' | 'degrading' | 'rising' | 'falling'
+  horizon_minutes: number
+}
+
+export interface PredictResponse {
+  predictions: PredictionEntry[]
+}
+
+export function fetchPredictions(host: string, horizon = 120) {
+  return get<PredictResponse>(
+    `/api/v2/predict?host=${encodeURIComponent(host)}&horizon=${horizon}`,
+  )
+}
+
+// ── logs ─────────────────────────────────────────────────────────────────────
+
+export interface LogEntry {
+  timestamp: string
+  severity: string
+  body: string
+  service: string
+  attributes: Record<string, string>
+}
+
+export function fetchLogs(service: string, fromMs?: number, toMs?: number, limit = 200) {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (service) params.set('service', service)
+  if (fromMs)  params.set('from', String(fromMs))
+  if (toMs)    params.set('to', String(toMs))
+  return get<LogEntry[]>(`/api/v2/logs?${params}`)
+}
+
+// ── dataflow (ingest totals) ──────────────────────────────────────────────────
+
+export interface DataflowStats {
+  metrics: number
+  logs: number
+  traces: number
+}
+
+export function fetchDataflow() {
+  return get<DataflowStats>('/api/v2/dataflow')
+}
+
+// ── fusion state ─────────────────────────────────────────────────────────────
+
+export interface FusionState {
+  [key: string]: unknown
+}
+
+export function fetchFusion(namespace: string, kind: string, name: string) {
+  return get<FusionState>(
+    `/api/v2/engine/fusion/${encodeURIComponent(namespace)}/${encodeURIComponent(kind)}/${encodeURIComponent(name)}`,
+  )
 }

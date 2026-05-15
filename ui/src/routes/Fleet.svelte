@@ -2,10 +2,14 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import { Chart, registerables } from 'chart.js'
   import {
-    fetchFleet, fetchRupture, fetchRuptures, fetchHistory, fetchActions,
-    fetchWorkloadK8s, approveAction, rejectAction, fetchExplain,
+    fetchFleet, fetchRuptures, fetchHistory, fetchActions,
+    fetchWorkloadK8s, approveAction, rejectAction,
+    fetchExplain, fetchPredictions, fetchLogs, emergencyStop,
   } from '../lib/api'
-  import type { FleetHost, RuptureSnapshot, HistoryPoint, Action, WorkloadK8sMeta } from '../lib/api'
+  import type {
+    FleetHost, RuptureSnapshot, HistoryPoint, Action,
+    WorkloadK8sMeta, PredictionEntry, LogEntry,
+  } from '../lib/api'
   import WorkloadCard from '../components/WorkloadCard.svelte'
   import SuppressionModal from '../components/SuppressionModal.svelte'
   import WeightsModal from '../components/WeightsModal.svelte'
@@ -16,26 +20,29 @@
   let hosts: FleetHost[] = []
   let ruptureMap: Record<string, RuptureSnapshot> = {}
   let selected: FleetHost | null = null
-  let snap: RuptureSnapshot | null = null
   let history: HistoryPoint[] = []
   let actions: Action[] = []
   let k8sMeta: WorkloadK8sMeta | null = null
   let k8sError = ''
   let events: Array<{ type: string; workload: string; fused_r?: number; ts: string }> = []
+  let predictions: PredictionEntry[] = []
+  let logs: LogEntry[] = []
 
-  let tab: 'signals' | 'history' | 'forecast' | 'events' | 'actions' | 'k8s' = 'signals'
+  let tab = 'signals'
   let loading = true
-  let snapLoading = false
   let histLoading = false
   let actLoading = false
+  let predLoading = false
+  let logsLoading = false
   let explainLoading = false
   let explainText = ''
-  let explainMode: 'narrative' | 'formula' = 'narrative'
+  let explainMode = 'narrative'
   let search = ''
   let error = ''
   let showSuppression = false
   let showWeights = false
   let suppressionDefaultWorkload = ''
+  let emergencyStopping = false
 
   // chart refs
   let tsCanvas: HTMLCanvasElement
@@ -46,37 +53,39 @@
   // SSE
   let sse: EventSource | null = null
 
+  // ── signal config ─────────────────────────────────────────────────────────
   const SIG_COLORS: Record<string, string> = {
     health_score: '#00e5a0',
-    stress:      '#ef4444',
-    fatigue:     '#f97316',
-    mood:        '#06b6d4',
-    pressure:    '#f59e0b',
-    humidity:    '#3b82f6',
-    contagion:   '#ec4899',
-    resilience:  '#00e5a0',
-    entropy:     '#a855f7',
-    velocity:    '#fb7185',
-    fused_r:     '#ef4444',
+    stress:       '#ef4444',
+    fatigue:      '#f97316',
+    mood:         '#06b6d4',
+    pressure:     '#f59e0b',
+    humidity:     '#3b82f6',
+    contagion:    '#ec4899',
+    resilience:   '#00e5a0',
+    entropy:      '#a855f7',
+    velocity:     '#fb7185',
+    throughput:   '#818cf8',
+    fused_r:      '#ef4444',
   }
 
   const TS_SIGS = [
-    { key: 'health_score', label: 'HealthScore', on: true },
-    { key: 'stress',       label: 'Stress',      on: true },
-    { key: 'fatigue',      label: 'Fatigue',     on: false },
-    { key: 'mood',         label: 'Mood',        on: false },
-    { key: 'pressure',     label: 'Pressure',    on: false },
-    { key: 'humidity',     label: 'Humidity',    on: false },
-    { key: 'contagion',    label: 'Contagion',   on: false },
-    { key: 'resilience',   label: 'Resilience',  on: false },
-    { key: 'entropy',      label: 'Entropy',     on: false },
-    { key: 'velocity',     label: 'Velocity',    on: false },
-    { key: 'fused_r',      label: 'FusedR',      on: false },
+    { key: 'health_score', label: 'Health',     on: true  },
+    { key: 'stress',       label: 'Stress',     on: true  },
+    { key: 'fatigue',      label: 'Fatigue',    on: false },
+    { key: 'mood',         label: 'Mood',       on: false },
+    { key: 'pressure',     label: 'Pressure',   on: false },
+    { key: 'humidity',     label: 'Humidity',   on: false },
+    { key: 'contagion',    label: 'Contagion',  on: false },
+    { key: 'resilience',   label: 'Resilience', on: false },
+    { key: 'entropy',      label: 'Entropy',    on: false },
+    { key: 'velocity',     label: 'Velocity',   on: false },
+    { key: 'throughput',   label: 'Throughput', on: false },
+    { key: 'fused_r',      label: 'FusedR',     on: false },
   ]
 
   let tsSigs = TS_SIGS.map(s => ({ ...s }))
 
-  // ── chart helpers ─────────────────────────────────────────────────────────
   const CHART_DEFAULTS = {
     responsive: true,
     maintainAspectRatio: false,
@@ -87,18 +96,13 @@
       tooltip: { bodyFont: { family: "'JetBrains Mono', monospace", size: 11 } },
     },
     scales: {
-      x: {
-        grid: { display: false },
-        ticks: { color: '#556080', maxTicksLimit: 8, font: { size: 10 } },
-      },
-      y: {
-        grid: { color: 'rgba(30,45,69,0.8)' },
-        ticks: { color: '#556080', font: { size: 10 } },
-      },
+      x: { grid: { display: false }, ticks: { color: '#556080', maxTicksLimit: 8, font: { size: 10 } } },
+      y: { grid: { color: 'rgba(30,45,69,0.8)' }, ticks: { color: '#556080', font: { size: 10 } } },
     },
     elements: { point: { radius: 0, hoverRadius: 4 }, line: { tension: 0.4 } },
   }
 
+  // ── chart helpers ─────────────────────────────────────────────────────────
   function destroyCharts() {
     tsChart?.destroy(); tsChart = null
     fcastChart?.destroy(); fcastChart = null
@@ -111,27 +115,32 @@
       const d = new Date(p.ts)
       return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
     })
-    const datasets = tsSigs
-      .filter(s => s.on)
-      .map(s => ({
-        label: s.label,
-        data: history.map(p => {
-          const v = snapField(p, s.key)
-          return s.key === 'health_score' ? Math.round(v) : +v.toFixed(3)
-        }),
-        borderColor: SIG_COLORS[s.key] ?? '#888',
-        backgroundColor: (SIG_COLORS[s.key] ?? '#888') + '14',
-        borderWidth: 1.5,
-        fill: true,
-      }))
+    const datasets = tsSigs.filter(s => s.on).map(s => ({
+      label: s.label,
+      data: history.map(p => {
+        const v = snapField(p, s.key)
+        return s.key === 'health_score' ? Math.round(v) : +v.toFixed(3)
+      }),
+      borderColor: SIG_COLORS[s.key] ?? '#888',
+      backgroundColor: (SIG_COLORS[s.key] ?? '#888') + '14',
+      borderWidth: 1.5,
+      fill: true,
+    }))
     tsChart = new Chart(tsCanvas, {
       type: 'line',
       data: { labels, datasets },
-      options: { ...CHART_DEFAULTS, plugins: { ...CHART_DEFAULTS.plugins, legend: { display: datasets.length > 1, labels: { boxWidth: 8, padding: 8, color: '#556080', font: { size: 10 } } } } },
+      options: {
+        ...CHART_DEFAULTS,
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: datasets.length > 1, labels: { boxWidth: 8, padding: 8, color: '#556080', font: { size: 10 } } },
+        },
+      },
     })
   }
 
   async function drawForecastChart() {
+    const snap = currentSnap
     if (!fcastCanvas || !snap?.health_forecast) return
     fcastChart?.destroy()
     const f = snap.health_forecast
@@ -151,15 +160,12 @@
           pointHoverRadius: 7,
         }],
       },
-      options: {
-        ...CHART_DEFAULTS,
-        scales: {
-          ...CHART_DEFAULTS.scales,
-          y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100 },
-        },
-      },
+      options: { ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100 } } },
     })
   }
+
+  // ── derived snap (reactive, no extra network call) ────────────────────────
+  $: currentSnap = selected ? (ruptureMap[selected.host] ?? null) : null
 
   // ── data loading ──────────────────────────────────────────────────────────
   let refreshTimer: ReturnType<typeof setInterval>
@@ -167,7 +173,6 @@
   async function loadFleet() {
     try {
       const [fleetData, snapshots] = await Promise.all([fetchFleet(), fetchRuptures()])
-      // Build a lookup of rupture snapshots keyed by workload ref.
       const newMap: Record<string, RuptureSnapshot> = {}
       for (const s of snapshots) {
         const key = s.workload?.namespace
@@ -177,14 +182,13 @@
       }
       ruptureMap = newMap
 
-      // Merge calibration state from ruptures into fleet hosts.
       const merged = (fleetData.hosts ?? []).map(h => {
         const snap = newMap[h.host]
         if (!snap) return h
-        const isCalibrating = snap.workload_status === 'calibrating' || snap.workload_status === 'pending'
+        const cal = snap.status === 'calibrating' || snap.status === 'pending_telemetry'
         return {
           ...h,
-          state: isCalibrating ? 'calibrating' as const : h.state,
+          state: cal ? 'calibrating' as const : h.state,
           calibration_progress: snap.calibration_progress ?? 100,
         }
       })
@@ -200,15 +204,6 @@
     } finally {
       loading = false
     }
-  }
-
-  async function loadSnap(h: FleetHost) {
-    if (h.state === 'pending_telemetry' || h.state === 'calibrating') { snap = null; return }
-    snapLoading = true
-    try {
-      snap = await fetchRupture(h.host)
-    } catch { snap = null }
-    finally { snapLoading = false }
   }
 
   async function loadHistory(h: FleetHost) {
@@ -237,13 +232,30 @@
     catch (e) { k8sError = e instanceof Error ? e.message : String(e) }
   }
 
+  async function loadPredictions(h: FleetHost) {
+    predLoading = true; predictions = []
+    try {
+      const r = await fetchPredictions(h.host)
+      predictions = r.predictions ?? []
+    } catch { predictions = [] }
+    finally { predLoading = false }
+  }
+
+  async function loadLogs(h: FleetHost) {
+    logsLoading = true; logs = []
+    const service = h.host.split('/').pop() ?? h.host
+    try { logs = await fetchLogs(service) } catch { logs = [] }
+    finally { logsLoading = false }
+  }
+
   async function loadExplain() {
+    const snap = currentSnap
     if (!snap) return
     const id = snap.rupture_events?.[snap.rupture_events.length - 1]?.id ?? selected?.host ?? ''
     if (!id) return
     explainLoading = true; explainText = ''
     try {
-      const r = await fetchExplain(id, explainMode)
+      const r = await fetchExplain(id, explainMode as 'narrative' | 'formula' | 'pipeline')
       explainText = r.narrative ?? r.formula ?? JSON.stringify(r, null, 2)
     } catch (e) { explainText = `Error: ${e instanceof Error ? e.message : e}` }
     finally { explainLoading = false }
@@ -251,46 +263,51 @@
 
   async function select(h: FleetHost) {
     selected = h
-    snap = null; history = []; k8sMeta = null; k8sError = ''; explainText = ''
+    history = []; k8sMeta = null; k8sError = ''; explainText = ''
+    predictions = []; logs = []
     tab = 'signals'
     destroyCharts()
-    await Promise.all([loadSnap(h), loadK8s(h)])
+    await loadK8s(h)
   }
 
-  async function switchTab(t: string) {
-    tab = t as typeof tab
+  function switchTab(t: string) {
+    tab = t
     if (!selected) return
-    if (t === 'history') {
-      await loadHistory(selected)
-    } else if (t === 'forecast') {
-      await tick()
-      drawForecastChart()
-    } else if (t === 'actions') {
-      await loadActions()
-    }
+    if (t === 'history') loadHistory(selected)
+    else if (t === 'forecast') { tick().then(drawForecastChart) }
+    else if (t === 'actions') loadActions()
+    else if (t === 'predictions') loadPredictions(selected)
+    else if (t === 'logs') loadLogs(selected)
   }
 
   async function handleApprove(id: string) {
-    try { await approveAction(id); await loadActions() } catch { /* show inline? */ }
+    try { await approveAction(id); await loadActions() } catch {}
   }
 
   async function handleReject(id: string) {
     try { await rejectAction(id); await loadActions() } catch {}
   }
 
+  async function handleEmergencyStop() {
+    if (!confirm('Trigger emergency stop? This will halt all pending actions.')) return
+    emergencyStopping = true
+    try { await emergencyStop() } catch {}
+    finally { emergencyStopping = false }
+  }
+
   // ── SSE ───────────────────────────────────────────────────────────────────
   function startSSE() {
-    sse = new EventSource('/api/v2/events')
+    sse = new EventSource('/api/v2/events', { withCredentials: false })
     sse.onmessage = (e: MessageEvent) => {
       try {
         const evt = JSON.parse(e.data)
-        if (evt.type === 'heartbeat') return
-        events = [evt, ...events].slice(0, 120)
+        if (evt.type === 'heartbeat' || evt.type === 'connected') return
+        events = [evt, ...events].slice(0, 200)
       } catch {}
     }
     sse.onerror = () => {
       sse?.close()
-      setTimeout(startSSE, 10_000)
+      setTimeout(startSSE, 15_000)
     }
   }
 
@@ -306,7 +323,7 @@
     destroyCharts()
   })
 
-  // ── reactive ──────────────────────────────────────────────────────────────
+  // ── helpers ───────────────────────────────────────────────────────────────
   function hsColor(v: number) {
     if (v >= 70) return 'var(--green)'
     if (v >= 40) return 'var(--yellow)'
@@ -320,39 +337,54 @@
     return 'var(--red)'
   }
 
-  $: healthy   = hosts.filter(h => h.state === 'healthy').length
-  $: degraded  = hosts.filter(h => h.state === 'degraded').length
-  $: critical  = hosts.filter(h => h.state === 'critical').length
-  $: calib     = hosts.filter(h => h.state === 'calibrating').length
-  $: pending   = hosts.filter(h => h.state === 'pending_telemetry').length
+  function evtTypeColor(t: string) {
+    return t === 'rupture' ? 'var(--red)' : t === 'recovery' ? 'var(--green)' : 'var(--muted)'
+  }
+
+  function fmtTs(ts: string) { return new Date(ts).toLocaleTimeString() }
+  function fmtTsFull(ts: string) { return new Date(ts).toLocaleString() }
+
+  function snapField(p: HistoryPoint, key: string): number {
+    return (p as unknown as Record<string, number>)[key] ?? 0
+  }
+
+  function snapKpi(key: string) {
+    const snap = currentSnap
+    if (!snap) return null
+    return (snap as unknown as Record<string, { value: number; state: string; trend: string }>)[key] ?? null
+  }
+
+  function predTrendColor(t: string): string {
+    if (t === 'improving' || t === 'falling') return 'var(--green)'
+    if (t === 'degrading' || t === 'rising') return 'var(--red)'
+    return 'var(--muted)'
+  }
+
+  function logSevColor(s: string): string {
+    const sev = s.toLowerCase()
+    if (sev === 'error' || sev === 'fatal') return 'var(--red)'
+    if (sev === 'warn' || sev === 'warning') return 'var(--yellow)'
+    if (sev === 'debug') return 'var(--muted)'
+    return 'var(--cyan)'
+  }
+
+  // ── reactive counts ───────────────────────────────────────────────────────
+  $: healthy  = hosts.filter(h => h.state === 'healthy').length
+  $: degraded = hosts.filter(h => h.state === 'degraded').length
+  $: critical = hosts.filter(h => h.state === 'critical').length
+  $: calib    = hosts.filter(h => h.state === 'calibrating').length
+  $: pending  = hosts.filter(h => h.state === 'pending_telemetry').length
   $: liveCount = events.filter(e => e.type === 'rupture').length
 
   $: filtered = hosts.filter(h =>
     !search || h.host.toLowerCase().includes(search.toLowerCase())
   )
 
-  const KPI_ORDER = ['stress','fatigue','mood','pressure','humidity','contagion','resilience','entropy','velocity']
-
-  function snapKpi(key: string): { value: number; state: string; trend: string } | null {
-    if (!snap) return null
-    return (snap as Record<string, unknown>)[key] as { value: number; state: string; trend: string } | null
-  }
-
-  function snapField(p: HistoryPoint, key: string): number {
-    return (p as unknown as Record<string, number>)[key] ?? 0
-  }
+  const KPI_ORDER = ['stress','fatigue','mood','pressure','humidity','contagion','resilience','entropy','velocity','throughput']
   const KPI_COLORS: Record<string, string> = {
     stress:'#ef4444', fatigue:'#f97316', mood:'#06b6d4', pressure:'#f59e0b',
     humidity:'#3b82f6', contagion:'#ec4899', resilience:'#00e5a0',
-    entropy:'#a855f7', velocity:'#fb7185',
-  }
-
-  function evtTypeColor(t: string) {
-    return t === 'rupture' ? 'var(--red)' : t === 'recovery' ? 'var(--green)' : 'var(--muted)'
-  }
-
-  function fmtTs(ts: string) {
-    return new Date(ts).toLocaleTimeString()
+    entropy:'#a855f7', velocity:'#fb7185', throughput:'#818cf8',
   }
 </script>
 
@@ -369,15 +401,16 @@
     {#if pending > 0}
       <div class="stat pend"><span class="slabel">Pending</span><span class="sval">{pending}</span></div>
     {/if}
-
     {#if liveCount > 0}
       <div class="live-badge">◉ {liveCount} live rupture{liveCount > 1 ? 's' : ''}</div>
     {/if}
-
     <div class="toolbar">
       <input class="search" bind:value={search} placeholder="Filter…" />
       <button class="tool-btn" on:click={() => { suppressionDefaultWorkload = ''; showSuppression = true }}>🔕 Silence</button>
       <button class="tool-btn" on:click={() => showWeights = true}>⚖ Weights</button>
+      <button class="tool-btn danger" on:click={handleEmergencyStop} disabled={emergencyStopping}>
+        {emergencyStopping ? '…' : '⚠ E-Stop'}
+      </button>
       <button class="refresh-btn" on:click={loadFleet} title="Refresh">↻</button>
     </div>
   </div>
@@ -388,13 +421,14 @@
       {#if loading}
         <div class="empty">Loading…</div>
       {:else if error}
-        <div class="error">{error}</div>
+        <div class="error-box">{error}</div>
       {:else if filtered.length === 0}
         <div class="empty">No workloads match "{search}"</div>
       {:else}
         {#each filtered as host (host.host)}
           <WorkloadCard
             {host}
+            snap={ruptureMap[host.host] ?? null}
             selected={selected?.host === host.host}
             on:click={() => select(host)}
           />
@@ -422,7 +456,9 @@
             ['signals','Signals'],
             ['history','History'],
             ['forecast','Forecast'],
-            ['events','Events' + (liveCount > 0 ? ` (${liveCount})` : '')],
+            ['predictions','Predict'],
+            ['events', 'Events' + (liveCount > 0 ? ` (${liveCount})` : '')],
+            ['logs','Logs'],
             ['actions','Actions'],
             ['k8s','Kubernetes'],
           ] as [tid, tlabel]}
@@ -434,22 +470,39 @@
 
         <!-- ── SIGNALS ── -->
         {#if tab === 'signals'}
-          {#if selected.state === 'pending_telemetry'}
+          {#if !currentSnap}
             <div class="notice">
               <div class="notice-icon">◌</div>
-              <strong>Awaiting telemetry</strong>
-              <p>Configure this workload to push OTLP metrics to <code>otlp-service:4317</code>.</p>
+              <strong>No snapshot data yet</strong>
+              <p>Waiting for the engine to process telemetry for this workload.</p>
             </div>
-          {:else if selected.state === 'calibrating'}
-            <div class="notice calib-notice">
-              <div class="notice-icon spin">⊙</div>
-              <strong>Calibrating baseline</strong>
-              <p>Ruptura received metrics and is building the adaptive baseline. Detection will activate once enough signal history is collected.</p>
-            </div>
-          {:else if snapLoading}
-            <div class="loading">Loading signals…</div>
-          {:else if snap}
-            <!-- health + fusedR headline -->
+          {:else}
+            {@const snap = currentSnap}
+
+            <!-- calibrating notice (non-blocking — show signals anyway) -->
+            {#if snap.status === 'calibrating'}
+              <div class="calib-banner">
+                <span class="spin">⊙</span>
+                Calibrating baseline — {snap.calibration_progress ?? 0}% complete
+                {#if snap.calibration_eta_minutes > 0}
+                  · ETA {snap.calibration_eta_minutes}m
+                {/if}
+              </div>
+            {/if}
+
+            <!-- pattern warning -->
+            {#if snap.pattern_match}
+              {@const pm = snap.pattern_match}
+              <div class="pattern-warn">
+                <div class="pw-title">◈ Pattern match — {Math.round(pm.similarity * 100)}% similar to past rupture</div>
+                <div class="pw-meta">
+                  Matched: {pm.matched_rupture_id}
+                  {#if pm.resolution} · Resolution: {pm.resolution}{/if}
+                </div>
+              </div>
+            {/if}
+
+            <!-- headline -->
             <div class="headline">
               <div class="hs-block">
                 <span class="hs-num" style="color:{hsColor(snap.health_score?.value ?? 0)}">
@@ -465,16 +518,41 @@
                 <span class="fused-label">FusedR</span>
                 <span class="fused-sub">{snap.fused_rupture_index < 1 ? 'normal' : snap.fused_rupture_index < 1.5 ? 'elevated' : snap.fused_rupture_index < 2.5 ? 'warning' : 'critical'}</span>
               </div>
+              {#if snap.business}
+                {@const biz = snap.business}
+                <div class="biz-block">
+                  <div class="biz-row">
+                    <span class="slabel">Blast radius</span>
+                    <span class="biz-val" style="color:{biz.blast_radius > 3 ? 'var(--red)' : biz.blast_radius > 0 ? 'var(--yellow)' : 'var(--muted)'}">
+                      {biz.blast_radius} downstream
+                    </span>
+                  </div>
+                  <div class="biz-row">
+                    <span class="slabel">Recovery debt</span>
+                    <span class="biz-val" style="color:{biz.recovery_debt > 2 ? 'var(--orange)' : 'var(--muted)'}">
+                      {biz.recovery_debt} near-miss{biz.recovery_debt !== 1 ? 'es' : ''}
+                    </span>
+                  </div>
+                  {#if biz.slo_burn_velocity > 0}
+                    <div class="biz-row">
+                      <span class="slabel">SLO burn</span>
+                      <span class="biz-val" style="color:{biz.slo_burn_velocity > 2 ? 'var(--red)' : biz.slo_burn_velocity > 1 ? 'var(--yellow)' : 'var(--green)'}">
+                        {biz.slo_burn_velocity.toFixed(2)}× budget
+                      </span>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
             </div>
 
-            <!-- 9 KPI cells -->
+            <!-- 10 KPI cells -->
             <div class="kpi-grid">
               {#each KPI_ORDER as key}
                 {@const kpi = snapKpi(key)}
                 {#if kpi}
-                  <div class="kpi-cell" style="--accent:{KPI_COLORS[key]}">
+                  <div class="kpi-cell" style="--accent:{KPI_COLORS[key] ?? '#888'}">
                     <div class="kpi-bar-track">
-                      <div class="kpi-bar-fill" style="width:{Math.min(kpi.value, 100)}%;background:{KPI_COLORS[key]}"></div>
+                      <div class="kpi-bar-fill" style="width:{Math.min(kpi.value, 100)}%;background:{KPI_COLORS[key] ?? '#888'}"></div>
                     </div>
                     <div class="kpi-row">
                       <span class="kpi-name">{key}</span>
@@ -488,7 +566,7 @@
               {/each}
             </div>
 
-            <!-- explain section -->
+            <!-- explain -->
             <div class="explain-section">
               <div class="explain-bar">
                 <span class="slabel">Explain</span>
@@ -499,13 +577,11 @@
                 {/if}
               </div>
               {#if explainLoading}
-                <div class="loading">Loading explanation…</div>
+                <div class="loading">Loading…</div>
               {:else if explainText}
                 <pre class="explain-pre">{explainText}</pre>
               {/if}
             </div>
-          {:else}
-            <div class="loading">No signal data available.</div>
           {/if}
 
         <!-- ── HISTORY ── -->
@@ -523,45 +599,60 @@
           {#if histLoading}
             <div class="loading">Loading history…</div>
           {:else if history.length === 0}
-            <div class="notice"><p>No history data yet for this workload.</p></div>
+            <div class="notice"><p>No history data yet. History accumulates as the engine polls workloads.</p></div>
           {:else}
             <div class="chart-wrap"><canvas bind:this={tsCanvas}></canvas></div>
           {/if}
 
         <!-- ── FORECAST ── -->
         {:else if tab === 'forecast'}
-          {#if !snap?.health_forecast}
-            <div class="notice"><p>No forecast available yet — workload needs more signal history.</p></div>
+          {#if !currentSnap?.health_forecast}
+            <div class="notice"><p>No forecast available — workload needs more signal history.</p></div>
           {:else}
-            {@const f = snap.health_forecast}
+            {@const f = currentSnap.health_forecast}
             <div class="forecast-meta">
-              <div class="fcast-stat">
-                <span class="slabel">Trend</span>
-                <span class="fcast-val" class:good={f.trend==='improving'} class:bad={f.trend==='degrading'}>{f.trend}</span>
-              </div>
-              <div class="fcast-stat">
-                <span class="slabel">In 15 min</span>
-                <span class="fcast-val" style="color:{hsColor(f.in_15min ?? 0)}">{Math.round(f.in_15min ?? 0)}</span>
-              </div>
-              <div class="fcast-stat">
-                <span class="slabel">In 30 min</span>
-                <span class="fcast-val" style="color:{hsColor(f.in_30min ?? 0)}">{Math.round(f.in_30min ?? 0)}</span>
-              </div>
-              <div class="fcast-stat">
-                <span class="slabel">Confidence</span>
-                <span class="fcast-val" class:warn={(f.confidence_window ?? 0) < 60}>{f.confidence_window ?? 0} obs.</span>
-              </div>
+              <div class="fcast-stat"><span class="slabel">Trend</span><span class="fcast-val" class:good={f.trend==='improving'} class:bad={f.trend==='degrading'}>{f.trend}</span></div>
+              <div class="fcast-stat"><span class="slabel">In 15 min</span><span class="fcast-val" style="color:{hsColor(f.in_15min ?? 0)}">{Math.round(f.in_15min ?? 0)}</span></div>
+              <div class="fcast-stat"><span class="slabel">In 30 min</span><span class="fcast-val" style="color:{hsColor(f.in_30min ?? 0)}">{Math.round(f.in_30min ?? 0)}</span></div>
+              <div class="fcast-stat"><span class="slabel">Confidence</span><span class="fcast-val" class:warn={(f.confidence_window ?? 0) < 60}>{f.confidence_window ?? 0} obs.</span></div>
               {#if f.critical_eta_minutes > 0}
-                <div class="fcast-stat">
-                  <span class="slabel">Critical ETA</span>
-                  <span class="fcast-val" style="color:var(--red)">{f.critical_eta_minutes}m</span>
-                </div>
+                <div class="fcast-stat"><span class="slabel">Critical ETA</span><span class="fcast-val" style="color:var(--red)">{f.critical_eta_minutes}m</span></div>
               {/if}
             </div>
             {#if (f.confidence_window ?? 0) < 60}
-              <div class="low-conf-banner">⚠ Low confidence — fewer than 60 observations. ETAs beyond 30 min are suppressed.</div>
+              <div class="low-conf-banner">⚠ Low confidence — fewer than 60 observations.</div>
             {/if}
             <div class="chart-wrap"><canvas bind:this={fcastCanvas}></canvas></div>
+          {/if}
+
+        <!-- ── PREDICTIONS ── -->
+        {:else if tab === 'predictions'}
+          {#if predLoading}
+            <div class="loading">Loading predictions…</div>
+          {:else if predictions.length === 0}
+            <div class="notice"><p>No predictions available. The predictor needs calibrated signal history.</p></div>
+          {:else}
+            <div class="pred-grid">
+              {#each predictions as p}
+                <div class="pred-card">
+                  <div class="pred-name">{p.target}</div>
+                  <div class="pred-vals">
+                    <div class="pred-now">
+                      <span class="slabel">Now</span>
+                      <span class="pred-num">{p.current.toFixed(2)}</span>
+                    </div>
+                    <div class="pred-arrow" style="color:{predTrendColor(p.trend)}">→</div>
+                    <div class="pred-then">
+                      <span class="slabel">+{p.horizon_minutes}m</span>
+                      <span class="pred-num" style="color:{predTrendColor(p.trend)}">{p.predicted.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div class="pred-trend" style="color:{predTrendColor(p.trend)}">
+                    {p.trend}
+                  </div>
+                </div>
+              {/each}
+            </div>
           {/if}
 
         <!-- ── EVENTS ── -->
@@ -573,7 +664,7 @@
               {#each events as evt}
                 <div class="event-row" style="--etc:{evtTypeColor(evt.type)}">
                   <span class="evt-type">{evt.type}</span>
-                  <span class="evt-wl">{evt.workload?.split('/').pop() ?? evt.workload}</span>
+                  <span class="evt-wl">{(evt.workload ?? '').split('/').pop() ?? evt.workload}</span>
                   {#if evt.fused_r != null}
                     <span class="evt-fused" style="color:{fuseColor(evt.fused_r ?? 0)}">FusedR {(evt.fused_r ?? 0).toFixed(2)}</span>
                   {/if}
@@ -582,6 +673,24 @@
               {/each}
             {/if}
           </div>
+
+        <!-- ── LOGS ── -->
+        {:else if tab === 'logs'}
+          {#if logsLoading}
+            <div class="loading">Loading logs…</div>
+          {:else if logs.length === 0}
+            <div class="notice"><p>No logs found for this workload. Logs appear when OTLP log data is ingested.</p></div>
+          {:else}
+            <div class="log-list">
+              {#each logs as log}
+                <div class="log-row">
+                  <span class="log-sev" style="color:{logSevColor(log.severity)}">{(log.severity || 'INFO').toUpperCase().slice(0,4)}</span>
+                  <span class="log-ts">{fmtTs(log.timestamp)}</span>
+                  <span class="log-body">{log.body}</span>
+                </div>
+              {/each}
+            </div>
+          {/if}
 
         <!-- ── ACTIONS ── -->
         {:else if tab === 'actions'}
@@ -620,7 +729,7 @@
           {:else if k8sMeta}
             <div class="k8s-section">
               <div class="k8s-field"><span class="slabel">Image</span><span class="k8s-img">{k8sMeta.image || '—'}</span></div>
-              <div class="k8s-field"><span class="slabel">Last Deploy</span><span>{k8sMeta.last_deploy ? new Date(k8sMeta.last_deploy).toLocaleString() : '—'}</span></div>
+              <div class="k8s-field"><span class="slabel">Last Deploy</span><span>{k8sMeta.last_deploy ? fmtTsFull(k8sMeta.last_deploy) : '—'}</span></div>
             </div>
             <div class="k8s-section">
               <div class="slabel">Replicas</div>
@@ -667,18 +776,12 @@
 {/if}
 
 <style>
-  /* ── layout ── */
   .fleet { display: flex; flex-direction: column; gap: 16px; }
 
   .summary {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 18px;
-    flex-wrap: wrap;
+    display: flex; align-items: center; gap: 20px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 18px; flex-wrap: wrap;
   }
 
   .stat { display: flex; flex-direction: column; gap: 1px; }
@@ -691,13 +794,9 @@
   .stat.pend .sval { color: var(--muted); }
 
   .live-badge {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--red);
-    background: rgba(239,68,68,0.1);
-    border: 1px solid rgba(239,68,68,0.3);
-    padding: 3px 10px;
-    border-radius: 20px;
+    font-size: 11px; font-weight: 700; color: var(--red);
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    padding: 3px 10px; border-radius: 20px;
     animation: live-pulse 2s ease-in-out infinite;
   }
   @keyframes live-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
@@ -705,76 +804,45 @@
   .toolbar { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
   .search {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 5px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    outline: none;
-    width: 120px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 5px 10px; border-radius: 6px;
+    font-size: 12px; outline: none; width: 120px;
   }
   .search:focus { border-color: var(--purple); }
 
   .tool-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 5px 11px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); padding: 5px 11px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-weight: 500;
     transition: color 0.15s, border-color 0.15s;
   }
   .tool-btn:hover { color: var(--purple); border-color: var(--purple); }
+  .tool-btn.danger:hover { color: var(--red); border-color: var(--red); }
+  .tool-btn.danger:disabled { opacity: 0.5; cursor: default; }
 
   .refresh-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 5px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 16px;
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 16px;
     transition: color 0.15s;
   }
   .refresh-btn:hover { color: var(--purple); }
 
-  /* ── grid ── */
-  .layout {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 16px;
-    align-items: start;
-  }
+  .layout { display: grid; grid-template-columns: 280px 1fr; gap: 16px; align-items: start; }
   @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
 
   .list { display: flex; flex-direction: column; gap: 8px; }
 
-  .empty, .error {
-    text-align: center; color: var(--muted); padding: 32px 16px;
-    background: var(--surface); border-radius: 12px;
-    border: 1px solid var(--border); line-height: 1.8;
-  }
-  .error { color: var(--red); border-color: var(--red); }
+  .empty { text-align: center; color: var(--muted); padding: 32px 16px; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); }
+  .error-box { text-align: center; color: var(--red); padding: 32px 16px; background: var(--surface); border-radius: 12px; border: 1px solid rgba(239,68,68,0.3); }
 
-  /* ── detail panel ── */
   .detail {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 18px;
-    position: sticky;
-    top: 68px;
-    max-height: calc(100vh - 90px);
-    overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px;
+    position: sticky; top: 68px;
+    max-height: calc(100vh - 90px); overflow-y: auto;
   }
 
-  .detail-header {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    margin-bottom: 14px;
-  }
+  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
   .detail-name { font-weight: 700; font-size: 17px; }
   .detail-meta { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: monospace; }
 
@@ -788,72 +856,79 @@
   .icon-btn:hover { color: var(--yellow); border-color: var(--yellow); }
   .icon-btn.close:hover { color: var(--text); border-color: var(--border); }
 
-  /* tabs */
   .tabs {
-    display: flex; gap: 0; margin-bottom: 16px;
+    display: flex; margin-bottom: 16px;
     border-bottom: 1px solid var(--border);
     overflow-x: auto; scrollbar-width: none;
   }
   .tabs::-webkit-scrollbar { display: none; }
   .tab {
     background: none; border: none; color: var(--muted);
-    padding: 7px 12px; cursor: pointer; font-size: 11px; font-weight: 500;
+    padding: 7px 10px; cursor: pointer; font-size: 11px; font-weight: 500;
     border-bottom: 2px solid transparent; margin-bottom: -1px;
     transition: color 0.15s, border-color 0.15s; white-space: nowrap;
   }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--purple); border-bottom-color: var(--purple); }
 
-  /* ── signals tab ── */
+  /* calibrating banner */
+  .calib-banner {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(168,85,247,0.06); border: 1px solid rgba(168,85,247,0.2);
+    border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;
+    font-size: 12px; color: var(--purple);
+  }
+
+  /* pattern warning */
+  .pattern-warn {
+    background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.25);
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;
+  }
+  .pw-title { font-size: 12px; font-weight: 700; color: var(--yellow); margin-bottom: 4px; }
+  .pw-meta { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  /* headline */
   .headline {
-    display: flex; gap: 24px; align-items: flex-end;
+    display: flex; gap: 20px; align-items: flex-start;
     margin-bottom: 16px; padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
   }
   .hs-block, .fused-block { display: flex; flex-direction: column; gap: 2px; }
-  .hs-num {
-    font-size: 52px; font-weight: 700; font-variant-numeric: tabular-nums;
-    line-height: 1;
-  }
-  .hs-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .hs-num { font-size: 52px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+  .hs-label, .fused-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
   .hs-trend, .fused-sub { font-size: 10px; color: var(--muted); }
   .hs-trend.rising { color: var(--red); }
   .hs-trend.falling { color: var(--green); }
+  .fused-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; line-height: 1; }
 
-  .fused-num {
-    font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums;
-    line-height: 1; font-family: 'JetBrains Mono', monospace;
+  .biz-block { display: flex; flex-direction: column; gap: 6px; margin-left: auto; }
+  .biz-row { display: flex; flex-direction: column; gap: 1px; }
+  .biz-val { font-size: 12px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+  /* KPI grid */
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 6px; margin-bottom: 16px;
   }
-  .fused-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-
-  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
-
   .kpi-cell {
-    background: var(--surface2); border-radius: 8px;
-    padding: 8px 10px; border: 1px solid var(--border);
-    transition: border-color 0.15s;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px;
+    border-left: 2px solid var(--accent);
   }
-  .kpi-cell:hover { border-color: var(--accent); }
-
-  .kpi-bar-track {
-    height: 3px; background: var(--surface3); border-radius: 2px;
-    overflow: hidden; margin-bottom: 6px;
-  }
-  .kpi-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s; min-width: 2px; }
-
+  .kpi-bar-track { height: 3px; background: var(--surface3); border-radius: 2px; margin-bottom: 6px; overflow: hidden; }
+  .kpi-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
   .kpi-row { display: flex; justify-content: space-between; align-items: baseline; }
   .kpi-name { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  .kpi-val { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
-  .kpi-val.ok   { color: var(--green); }
+  .kpi-val { font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--text); }
+  .kpi-val.ok { color: var(--green); }
   .kpi-val.warn { color: var(--yellow); }
   .kpi-val.crit { color: var(--red); }
-
-  .kpi-trend { font-size: 9px; color: var(--muted); margin-top: 1px; }
-  .kpi-trend.rising  { color: var(--red); }
+  .kpi-trend { font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .kpi-trend.rising { color: var(--red); }
   .kpi-trend.falling { color: var(--green); }
 
   /* explain */
-  .explain-section { margin-top: 12px; }
+  .explain-section { margin-top: 4px; }
   .explain-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
   .tab-sm {
     background: none; border: 1px solid var(--border); color: var(--muted);
@@ -864,120 +939,129 @@
   .tool-btn-sm {
     background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
     padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;
-    transition: color 0.15s;
   }
-  .tool-btn-sm:hover { color: var(--purple); }
   .explain-pre {
     background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 8px; padding: 12px; font-size: 11px; font-family: 'JetBrains Mono', monospace;
-    color: var(--text); line-height: 1.7; white-space: pre-wrap; word-break: break-word;
-    max-height: 200px; overflow-y: auto;
+    border-radius: 8px; padding: 12px; font-size: 11px; line-height: 1.6;
+    overflow-x: auto; white-space: pre-wrap; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; max-height: 280px;
   }
 
-  /* ── history tab ── */
+  /* sig toggles */
   .sig-toggles { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
   .sig-toggle {
     background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
-    padding: 3px 8px; border-radius: 20px; cursor: pointer; font-size: 10px;
+    padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: 500;
     transition: color 0.15s, border-color 0.15s, background 0.15s;
   }
-  .sig-toggle.active { color: var(--sc); border-color: var(--sc); background: color-mix(in srgb, var(--sc) 10%, transparent); }
+  .sig-toggle.active { background: color-mix(in srgb, var(--sc) 15%, transparent); color: var(--sc); border-color: var(--sc); }
 
-  .chart-wrap { height: 240px; position: relative; }
+  /* chart */
+  .chart-wrap { height: 220px; position: relative; }
 
-  /* ── forecast tab ── */
-  .forecast-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  /* forecast */
+  .forecast-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
   .fcast-stat { display: flex; flex-direction: column; gap: 2px; }
-  .fcast-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fcast-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .fcast-val.good { color: var(--green); }
   .fcast-val.bad  { color: var(--red); }
   .fcast-val.warn { color: var(--yellow); }
-
   .low-conf-banner {
-    background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3);
-    border-radius: 6px; padding: 7px 10px; font-size: 11px; color: var(--yellow);
-    margin-bottom: 10px;
+    font-size: 11px; color: var(--yellow);
+    background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.2);
+    border-radius: 6px; padding: 6px 10px; margin-bottom: 10px;
   }
 
-  /* ── events tab ── */
-  .event-list { display: flex; flex-direction: column; gap: 4px; max-height: 420px; overflow-y: auto; }
+  /* predictions */
+  .pred-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .pred-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .pred-name { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .pred-vals { display: flex; align-items: center; gap: 6px; }
+  .pred-now, .pred-then { display: flex; flex-direction: column; gap: 1px; }
+  .pred-num { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .pred-arrow { font-size: 16px; }
+  .pred-trend { font-size: 10px; margin-top: 6px; }
+
+  /* events */
+  .event-list { display: flex; flex-direction: column; gap: 3px; }
   .event-row {
-    display: flex; align-items: center; gap: 8px; padding: 6px 10px;
-    background: var(--surface2); border-radius: 6px; font-size: 11px;
-    border-left: 3px solid var(--etc);
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 8px; border-radius: 6px;
+    background: var(--surface2); border-left: 2px solid var(--etc);
+    font-size: 11px;
   }
-  .evt-type { font-weight: 700; color: var(--etc); text-transform: uppercase; font-size: 9px; width: 56px; flex-shrink: 0; }
-  .evt-wl { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; }
-  .evt-fused { font-family: 'JetBrains Mono', monospace; font-size: 10px; flex-shrink: 0; }
-  .evt-ts { font-size: 10px; color: var(--muted); flex-shrink: 0; font-family: monospace; }
+  .evt-type { font-weight: 700; color: var(--etc); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; min-width: 60px; }
+  .evt-wl { font-family: 'JetBrains Mono', monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .evt-fused { font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+  .evt-ts { font-size: 10px; color: var(--muted); flex-shrink: 0; }
 
-  /* ── actions tab ── */
+  /* logs */
+  .log-list { display: flex; flex-direction: column; gap: 2px; max-height: 360px; overflow-y: auto; }
+  .log-row {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 4px 6px; border-radius: 4px; font-size: 11px;
+    background: var(--surface2);
+  }
+  .log-sev { font-size: 9px; font-weight: 800; font-family: 'JetBrains Mono', monospace; flex-shrink: 0; min-width: 32px; }
+  .log-ts { font-size: 9px; color: var(--muted); flex-shrink: 0; font-family: 'JetBrains Mono', monospace; }
+  .log-body { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+
+  /* actions */
   .action-card {
     background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 8px; padding: 12px; margin-bottom: 8px;
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
   }
-  .action-card.tier1 { border-color: rgba(239,68,68,0.3); }
+  .action-card.tier1 { border-color: rgba(168,85,247,0.4); }
   .action-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .action-tier {
-    font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px;
-    background: rgba(239,68,68,0.1); color: var(--red); text-transform: uppercase;
-  }
-  .action-kind { font-size: 11px; font-weight: 600; flex: 1; }
-  .action-state { font-size: 9px; color: var(--muted); text-transform: uppercase; }
+  .action-tier { font-size: 10px; font-weight: 700; color: var(--purple); background: rgba(168,85,247,0.1); padding: 2px 7px; border-radius: 4px; }
+  .action-kind { font-size: 12px; font-weight: 600; }
+  .action-state { font-size: 10px; color: var(--muted); margin-left: auto; }
   .action-state.pending { color: var(--yellow); }
-  .action-desc { font-size: 12px; color: var(--text); margin-bottom: 4px; line-height: 1.4; }
+  .action-desc { font-size: 13px; margin-bottom: 4px; }
   .action-host { font-size: 10px; color: var(--muted); font-family: monospace; margin-bottom: 8px; }
-  .action-btns { display: flex; gap: 6px; }
+  .action-btns { display: flex; gap: 8px; }
   .btn-approve {
     background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.3);
-    color: var(--green); padding: 4px 12px; border-radius: 5px;
-    cursor: pointer; font-size: 11px; font-weight: 600;
-    transition: background 0.15s;
+    color: var(--green); padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
   }
-  .btn-approve:hover { background: rgba(0,229,160,0.2); }
+  .btn-approve:hover { background: rgba(0,229,160,0.18); }
   .btn-reject {
     background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25);
-    color: var(--red); padding: 4px 12px; border-radius: 5px;
-    cursor: pointer; font-size: 11px; font-weight: 600;
-    transition: background 0.15s;
+    color: var(--red); padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
   }
-  .btn-reject:hover { background: rgba(239,68,68,0.15); }
+  .btn-reject:hover { background: rgba(239,68,68,0.14); }
 
-  /* ── kubernetes tab ── */
+  /* k8s */
   .k8s-section { margin-bottom: 14px; }
-  .k8s-field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
-  .k8s-img { font-family: monospace; font-size: 11px; color: var(--cyan); word-break: break-all; }
-
-  .replica-gauge { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
-  .replica-track { flex: 1; height: 7px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
-  .replica-fill { height: 100%; border-radius: 4px; background: var(--muted); transition: width 0.3s; }
+  .k8s-field { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+  .k8s-img { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--cyan); word-break: break-all; }
+  .replica-gauge { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .replica-track { flex: 1; height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+  .replica-fill { height: 100%; border-radius: 3px; }
   .replica-fill.replica-ok { background: var(--green); }
   .replica-fill.replica-warn { background: var(--yellow); }
-  .replica-txt { font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .replica-txt { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--muted); flex-shrink: 0; }
+  .pod-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+  .pod-table th { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 6px; text-align: left; border-bottom: 1px solid var(--border); }
+  .pod-table td { padding: 5px 0; border-bottom: 1px solid rgba(30,45,69,0.5); }
+  .pod-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+  .pod-status { font-size: 10px; font-weight: 600; }
+  .pod-status.pod-running { color: var(--green); }
+  .pod-status.pod-failed  { color: var(--red); }
+  .pod-restarts.warn { color: var(--yellow); }
 
-  .pod-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  .pod-table th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 6px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.04em; font-size: 9px; }
-  .pod-table td { padding: 5px 6px; border-bottom: 1px solid var(--border); color: var(--text); }
-  .pod-table tr:last-child td { border-bottom: none; }
-  .pod-name { font-family: monospace; font-size: 10px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pod-status { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 500; background: var(--surface2); color: var(--muted); }
-  .pod-status.pod-running { background: rgba(0,229,160,0.12); color: var(--green); }
-  .pod-status.pod-failed  { background: rgba(239,68,68,0.12); color: var(--red); }
-  .pod-restarts { font-variant-numeric: tabular-nums; }
-  .pod-restarts.warn { color: var(--yellow); font-weight: 600; }
-
-  /* shared */
+  /* notices */
   .notice {
-    display: flex; flex-direction: column; align-items: center; gap: 10px;
-    padding: 28px 12px; text-align: center; color: var(--muted); font-size: 12px;
+    text-align: center; padding: 32px 16px; color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 8px; line-height: 1.6;
   }
-  .notice strong { color: var(--text); font-size: 14px; }
-  .notice p { line-height: 1.7; max-width: 280px; }
-  .notice code { font-family: monospace; background: var(--surface2); padding: 1px 5px; border-radius: 3px; color: var(--cyan); }
-  .notice-icon { font-size: 36px; opacity: 0.4; }
-  .calib-notice .notice-icon { color: var(--purple); opacity: 1; }
-  .spin { animation: spin 2s linear infinite; display: inline-block; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .notice-icon { font-size: 24px; opacity: 0.4; }
+  .loading { text-align: center; color: var(--muted); padding: 24px; font-size: 13px; }
 
-  .loading { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+  /* spin */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { display: inline-block; animation: spin 2s linear infinite; }
 </style>

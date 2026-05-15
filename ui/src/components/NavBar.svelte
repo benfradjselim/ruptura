@@ -1,8 +1,11 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte'
   import { fetchHealth, fetchEngineStatus } from '../lib/api'
 
   export let route: string
+  export let theme = 'dark'
+
+  const dispatch = createEventDispatcher()
 
   let version = ''
   let connected = false
@@ -73,6 +76,9 @@
     {#if metricsRps > 0}
       <span class="chip ingest">{metricsRps}/s</span>
     {/if}
+    <button class="theme-btn" on:click={() => dispatch('toggleTheme')} title="Toggle light/dark mode">
+      {theme === 'dark' ? '☀' : '🌙'}
+    </button>
     <div class="pulse-wrap" title="Engine: {connected ? 'connected' : 'unreachable'}">
       <div class="dot" class:connected></div>
       {#if connected}<div class="dot-ring"></div>{/if}
@@ -224,4 +230,17 @@
     0%   { transform: scale(0.8); opacity: 0.8; }
     100% { transform: scale(2);   opacity: 0; }
   }
+
+  .theme-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 14px;
+    line-height: 1;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .theme-btn:hover { color: var(--text); border-color: var(--muted); }
 </style>

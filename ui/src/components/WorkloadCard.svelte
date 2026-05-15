@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { FleetHost } from '../lib/api'
+  import type { FleetHost, RuptureSnapshot } from '../lib/api'
 
   export let host: FleetHost
+  export let snap: RuptureSnapshot | null = null
   export let selected = false
 
   const SIG_COLORS: Record<string, string> = {
@@ -14,9 +15,10 @@
     resilience: '#00e5a0',
     entropy:    '#a855f7',
     velocity:   '#fb7185',
+    throughput: '#818cf8',
   }
 
-  const SIG_ORDER = ['stress','fatigue','mood','pressure','humidity','contagion','resilience','entropy','velocity']
+  const SIG_ORDER = ['stress','fatigue','mood','pressure','humidity','contagion','resilience','entropy','velocity','throughput']
 
   $: isRupture = host.state !== 'pending_telemetry' && host.state !== 'calibrating'
     && host.fused_rupture_index > 1.5 && host.health_score > 60
@@ -94,6 +96,10 @@
   }
 
   function sigVal(sig: string): number {
+    if (snap) {
+      const kpi = (snap as unknown as Record<string, { value: number } | undefined>)[sig]
+      if (kpi?.value !== undefined) return kpi.value
+    }
     return ((host as unknown as Record<string, number>)[sig]) ?? 0
   }
 </script>
