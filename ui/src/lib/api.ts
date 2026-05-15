@@ -169,16 +169,31 @@ export interface SignalWeights {
 
 // ── fetch helpers ────────────────────────────────────────────────────────────
 
+function safeJson<T>(text: string, path: string): T {
+  const trimmed = text.trim()
+  if (!trimmed || trimmed === 'null') return null as unknown as T
+  try {
+    return JSON.parse(trimmed) as T
+  } catch {
+    throw new Error(`Invalid JSON from ${path}: ${trimmed.slice(0, 120)}`)
+  }
+}
+
+// get — object endpoint; returns parsed value (null if body is empty/null)
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`)
   const text = await res.text()
-  if (!text || !text.trim()) throw new Error(`Empty response from ${path}`)
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    throw new Error(`Invalid JSON from ${path}`)
-  }
+  return safeJson<T>(text, path)
+}
+
+// getArray — list endpoint; always returns an array, never null
+async function getArray<T>(path: string): Promise<T[]> {
+  const res = await fetch(path)
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`)
+  const text = await res.text()
+  const parsed = safeJson<T[] | null>(text, path)
+  return Array.isArray(parsed) ? parsed : []
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -191,7 +206,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     const text = await res.text().catch(() => res.statusText)
     throw new Error(`${res.status} — ${text}`)
   }
-  return res.json() as Promise<T>
+  const text = await res.text()
+  return safeJson<T>(text, path)
 }
 
 async function del(path: string): Promise<void> {
@@ -223,7 +239,7 @@ export function fetchKPIs(host: string) {
 // ── alerts ────────────────────────────────────────────────────────────────────
 
 export function fetchAlerts() {
-  return get<Alert[]>('/api/v2/alerts')
+  return getArray<Alert>('/api/v2/alerts')
 }
 
 // ── engine status / storage ───────────────────────────────────────────────────
@@ -274,7 +290,7 @@ export function fetchTopology() {
 // ── nodes ────────────────────────────────────────────────────────────────────
 
 export function fetchNodes() {
-  return get<ClusterNode[]>('/api/v2/nodes')
+  return getArray<ClusterNode>('/api/v2/nodes')
 }
 
 export interface NodeWorkload {
@@ -301,7 +317,7 @@ export function fetchNodeDetail(node: string) {
 // ── suppressions ─────────────────────────────────────────────────────────────
 
 export function fetchSuppressions() {
-  return get<Suppression[]>('/api/v2/suppressions')
+  return getArray<Suppression>('/api/v2/suppressions')
 }
 
 export function createSuppression(req: CreateSuppressionRequest) {
@@ -315,7 +331,7 @@ export function deleteSuppression(id: string) {
 // ── signal weights ────────────────────────────────────────────────────────────
 
 export function fetchWeights() {
-  return get<SignalWeights[]>('/api/v2/config/weights')
+  return getArray<SignalWeights>('/api/v2/config/weights')
 }
 
 export function saveWeights(weights: SignalWeights[]) {
@@ -374,7 +390,7 @@ export interface HistoryPoint {
 }
 
 export function fetchHistory(wlRef: string) {
-  return get<HistoryPoint[]>(`/api/v2/history/${encodeURIComponent(wlRef)}`)
+  return getArray<HistoryPoint>(`/api/v2/history/${encodeURIComponent(wlRef)}`)
 }
 
 // ── actions ───────────────────────────────────────────────────────────────────
@@ -390,7 +406,7 @@ export interface Action {
 }
 
 export function fetchActions() {
-  return get<Action[]>('/api/v2/actions')
+  return getArray<Action>('/api/v2/actions')
 }
 
 export function approveAction(id: string) {
@@ -449,7 +465,7 @@ export interface RuptureSnapshot {
 }
 
 export function fetchRuptures() {
-  return get<RuptureSnapshot[]>('/api/v2/ruptures')
+  return getArray<RuptureSnapshot>('/api/v2/ruptures')
 }
 
 // ── predictions ───────────────────────────────────────────────────────────────
@@ -487,7 +503,7 @@ export function fetchLogs(service: string, fromMs?: number, toMs?: number, limit
   if (service) params.set('service', service)
   if (fromMs)  params.set('from', String(fromMs))
   if (toMs)    params.set('to', String(toMs))
-  return get<LogEntry[]>(`/api/v2/logs?${params}`)
+  return getArray<LogEntry>(`/api/v2/logs?${params}`)
 }
 
 // ── dataflow (ingest totals) ──────────────────────────────────────────────────
