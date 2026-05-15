@@ -58,10 +58,14 @@ def post(url: str, payload: dict) -> None:
 
 
 def make_timeseries(deployment: str, metric: str, value: float) -> dict:
-    """Build one timeseries entry for /api/v2/write."""
+    """Build one timeseries entry for /api/v2/write.
+    The 'host' label must equal the workload key (namespace/Kind/name)
+    because the pipeline indexes by host string, not workload ref."""
+    host = f"{NAMESPACE}/Deployment/{deployment}"
     return {
         "Labels": [
             {"Name": "__name__",  "Value": metric},
+            {"Name": "host",      "Value": host},
             {"Name": "namespace", "Value": NAMESPACE},
             {"Name": "deployment","Value": deployment},
         ],
