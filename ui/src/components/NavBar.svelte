@@ -1,38 +1,47 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { fetchHealth } from '../lib/api'
+  import { onMount, onDestroy } from 'svelte'
+  import { fetchHealth, fetchEngineStatus } from '../lib/api'
 
   export let route: string
 
   let version = ''
-  let status = ''
+  let connected = false
+  let calibrating = 0
+  let metricsRps = 0
+  let interval: ReturnType<typeof setInterval>
 
-  onMount(async () => {
+  async function poll() {
     try {
-      const h = await fetchHealth()
+      const [h, s] = await Promise.all([fetchHealth(), fetchEngineStatus()])
       version = h.version
-      status = h.status
+      connected = h.status !== 'unreachable'
+      calibrating = s.analyzer.calibrating_workloads
+      metricsRps = Math.round(s.ingest.metrics_per_sec)
     } catch {
-      status = 'unreachable'
+      connected = false
     }
+  }
+
+  onMount(() => {
+    poll()
+    interval = setInterval(poll, 10_000)
   })
+  onDestroy(() => clearInterval(interval))
 
   const navLinks = [
-    { id: 'fleet',  label: 'Fleet',   icon: '⬡' },
+    { id: 'fleet',  label: 'Fleet',    icon: '⬡' },
     { id: 'map',    label: 'Topology', icon: '⎋' },
-    { id: 'engine', label: 'Engine',  icon: '⚙' },
-    { id: 'nodes',  label: 'Nodes',   icon: '◫' },
+    { id: 'engine', label: 'Engine',   icon: '⚙' },
+    { id: 'nodes',  label: 'Nodes',    icon: '◫' },
   ]
 </script>
 
 <nav>
-  <div class="brand">
-    <span class="logo">◈</span>
-    <span class="name">ruptura</span>
-    {#if version}
-      <span class="version">v{version}</span>
-    {/if}
-  </div>
+  <a class="brand" href="#fleet">
+    <img class="logo-img" src="/ruptura-icon.svg" alt="Ruptura" width="26" height="26" />
+    <span class="name">RUPTURA</span>
+    {#if version}<span class="version">v{version}</span>{/if}
+  </a>
 
   <div class="links">
     {#each navLinks as link}
@@ -46,54 +55,73 @@
     {/each}
   </div>
 
-  <div class="status-dot" class:ok={status === 'ok'} title="Engine: {status}"></div>
+  <div class="right">
+    {#if calibrating > 0}
+      <span class="chip calib" title="{calibrating} workload(s) calibrating">⊙ {calibrating} cal.</span>
+    {/if}
+    {#if metricsRps > 0}
+      <span class="chip ingest">{metricsRps}/s</span>
+    {/if}
+    <div class="pulse-wrap" title="Engine: {connected ? 'connected' : 'unreachable'}">
+      <div class="dot" class:connected></div>
+      {#if connected}<div class="dot-ring"></div>{/if}
+    </div>
+  </div>
 </nav>
 
 <style>
   nav {
     display: flex;
     align-items: center;
-    gap: 24px;
-    padding: 0 24px;
+    gap: 0;
+    padding: 0 20px;
     height: 52px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
     z-index: 100;
+    backdrop-filter: blur(12px);
   }
 
   .brand {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
+    text-decoration: none;
     flex-shrink: 0;
+    margin-right: 24px;
   }
 
-  .logo {
-    color: var(--cyan);
-    font-size: 20px;
+  .logo-img {
+    flex-shrink: 0;
+    border-radius: 5px;
   }
 
   .name {
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: 0.04em;
-    color: var(--text);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    background: linear-gradient(135deg, var(--purple), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .version {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--muted);
     background: var(--surface2);
     padding: 1px 6px;
     border-radius: 4px;
     border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    -webkit-text-fill-color: var(--muted);
   }
 
   .links {
     display: flex;
-    gap: 4px;
+    gap: 2px;
     flex: 1;
   }
 
@@ -116,26 +144,72 @@
   }
 
   a.active {
-    color: var(--cyan);
-    background: rgba(57, 208, 216, 0.1);
+    color: var(--purple);
+    background: rgba(168, 85, 247, 0.12);
   }
 
-  .icon {
-    font-size: 14px;
-    opacity: 0.7;
+  .icon { font-size: 14px; opacity: 0.8; }
+
+  .right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
   }
 
-  .status-dot {
+  .chip {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.04em;
+  }
+
+  .chip.calib {
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--yellow);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .chip.ingest {
+    background: rgba(168, 85, 247, 0.1);
+    color: var(--purple);
+    border: 1px solid rgba(168, 85, 247, 0.25);
+  }
+
+  .pulse-wrap {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     background: var(--muted);
-    flex-shrink: 0;
-    margin-left: auto;
+    position: relative;
+    z-index: 1;
+    transition: background 0.3s;
   }
 
-  .status-dot.ok {
-    background: var(--green);
-    box-shadow: 0 0 6px var(--green);
+  .dot.connected { background: var(--green); }
+
+  .dot-ring {
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: transparent;
+    border: 2px solid var(--green);
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  @keyframes pulse-ring {
+    0%   { transform: scale(0.8); opacity: 0.8; }
+    100% { transform: scale(2);   opacity: 0; }
   }
 </style>

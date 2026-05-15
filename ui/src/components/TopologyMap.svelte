@@ -16,11 +16,11 @@
   let edgeCount = 0
 
   function healthColor(node: TopologyNode): string {
-    if (node.state === 'pending_telemetry') return '#484f58'
-    if (node.health_score >= 70) return '#3fb950'
-    if (node.health_score >= 40) return '#e3b341'
-    if (node.health_score >= 20) return '#f0883e'
-    return '#e05252'
+    if (node.state === 'pending_telemetry') return '#2a3550'
+    if (node.health_score >= 70) return '#00e5a0'
+    if (node.health_score >= 40) return '#f59e0b'
+    if (node.health_score >= 20) return '#f97316'
+    return '#ef4444'
   }
 
   function errorColor(rate: number): string {
@@ -101,31 +101,37 @@
           style: {
             'background-color': 'data(color)',
             'label': 'data(label)',
-            'color': '#c9d1d9',
-            'font-size': 10,
+            'color': '#e2e8f0',
+            'font-size': 11,
+            'font-family': "'JetBrains Mono', monospace",
             'text-valign': 'bottom',
-            'text-margin-y': 4,
-            'width': 28,
-            'height': 28,
-            'border-width': 0,
-            'text-background-color': '#0d1117',
-            'text-background-opacity': 0.7,
-            'text-background-padding': '2px',
+            'text-margin-y': 5,
+            'width': 32,
+            'height': 32,
+            'border-width': 1,
+            'border-color': '#1e2d45',
+            'text-background-color': '#0a0d14',
+            'text-background-opacity': 0.85,
+            'text-background-padding': '3px',
+            'text-background-shape': 'roundrectangle',
           },
         },
         {
           selector: 'node[?rupture]',
           style: {
-            'border-width': 2,
-            'border-color': '#e05252',
+            'border-width': 3,
+            'border-color': '#ef4444',
             'border-style': 'dashed',
+            'box-shadow-blur': 8,
+            'box-shadow-color': '#ef4444',
+            'box-shadow-opacity': 0.6,
           },
         },
         {
           selector: 'node:selected',
           style: {
-            'border-width': 2,
-            'border-color': '#58a6ff',
+            'border-width': 3,
+            'border-color': '#a855f7',
             'border-style': 'solid',
           },
         },
@@ -246,8 +252,10 @@
     position: relative;
     width: 100%;
     height: calc(100vh - 52px);
-    background: #0d1117;
+    background: #0a0d14;
     overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid var(--border);
   }
 
   .cy-container {
@@ -323,7 +331,7 @@
     transition: color 0.15s;
   }
 
-  .refresh-btn:hover { color: var(--cyan); }
+  .refresh-btn:hover { color: var(--purple); }
 
   .legend {
     display: flex;

@@ -38,7 +38,7 @@ export interface HealthForecast {
 
 export interface FleetHost {
   host: string
-  state: 'healthy' | 'degraded' | 'critical' | 'pending_telemetry'
+  state: 'healthy' | 'degraded' | 'critical' | 'pending_telemetry' | 'calibrating'
   health_score: number
   stress: number
   fatigue: number
@@ -329,4 +329,97 @@ export function fetchWorkloadK8s(namespace: string, kind: string, name: string, 
     `/api/v2/workloads/${encodeURIComponent(namespace)}/${encodeURIComponent(kind)}/${encodeURIComponent(name)}/k8s`,
     apiKey,
   )
+}
+
+// ── history / time-series ────────────────────────────────────────────────────
+
+export interface HistoryPoint {
+  ts: string
+  health_score: number
+  fused_r: number
+  stress: number
+  fatigue: number
+  mood: number
+  pressure: number
+  humidity: number
+  contagion: number
+  resilience: number
+  entropy: number
+  velocity: number
+}
+
+export function fetchHistory(wlRef: string, apiKey?: string) {
+  return get<HistoryPoint[]>(`/api/v2/history/${encodeURIComponent(wlRef)}`, apiKey)
+}
+
+// ── actions ───────────────────────────────────────────────────────────────────
+
+export interface Action {
+  id: string
+  host: string
+  tier: number
+  kind: string
+  description: string
+  created_at: string
+  state: 'pending' | 'approved' | 'rejected' | 'executed'
+}
+
+export function fetchActions(apiKey?: string) {
+  return get<Action[]>('/api/v2/actions', apiKey)
+}
+
+export function approveAction(id: string, apiKey?: string) {
+  return post<{ ok: boolean }>(`/api/v2/actions/${encodeURIComponent(id)}/approve`, {}, apiKey)
+}
+
+export function rejectAction(id: string, apiKey?: string) {
+  return post<{ ok: boolean }>(`/api/v2/actions/${encodeURIComponent(id)}/reject`, {}, apiKey)
+}
+
+// ── explain ───────────────────────────────────────────────────────────────────
+
+export type ExplainMode = 'narrative' | 'formula' | 'json'
+
+export interface ExplainResult {
+  narrative?: string
+  formula?: string
+  [key: string]: unknown
+}
+
+export function fetchExplain(ruptureId: string, mode: ExplainMode, apiKey?: string) {
+  return get<ExplainResult>(
+    `/api/v2/explain/${encodeURIComponent(ruptureId)}/${mode}`,
+    apiKey,
+  )
+}
+
+// ── ruptures (full snapshot list) ────────────────────────────────────────────
+
+export interface RuptureSnapshot {
+  host: string
+  workload: WorkloadRef
+  timestamp: string
+  workload_status: string
+  fused_rupture_index: number
+  calibration_progress: number
+  health_score: KPI
+  health_forecast?: HealthForecast
+  rupture_events?: Array<{ id: string; ts: string; severity: string }>
+  stress: KPI
+  fatigue: KPI
+  mood: KPI
+  pressure: KPI
+  humidity: KPI
+  contagion: KPI
+  resilience: KPI
+  entropy: KPI
+  velocity: KPI
+}
+
+export function fetchRuptures(apiKey?: string) {
+  return get<RuptureSnapshot[]>('/api/v2/ruptures', apiKey)
+}
+
+export function fetchRupture(host: string, apiKey?: string) {
+  return get<RuptureSnapshot>(`/api/v2/rupture?host=${encodeURIComponent(host)}`, apiKey)
 }

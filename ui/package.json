@@ -26,6 +26,7 @@
     "vitest": "^4.1.6"
   },
   "dependencies": {
+    "chart.js": "^4.5.1",
     "cytoscape": "^3.33.3"
   }
 }

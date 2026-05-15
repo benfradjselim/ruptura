@@ -44,28 +44,35 @@
   }
 
   :global(body) {
-    background: #0d1117;
-    color: #c9d1d9;
+    background: #0a0d14;
+    color: #e2e8f0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 14px;
     line-height: 1.5;
   }
 
   :global(:root) {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --surface2: #1c2230;
-    --border: #30363d;
-    --text: #c9d1d9;
-    --muted: #6e7681;
-    --cyan: #39d0d8;
-    --green: #00e5a0;
-    --yellow: #e8c848;
-    --orange: #f5a623;
-    --red: #e05252;
-    --blue: #58a6ff;
-    --purple: #bc8cff;
+    --bg:       #0a0d14;
+    --surface:  #10151f;
+    --surface2: #161c2a;
+    --surface3: #1c2438;
+    --border:   #1e2d45;
+    --text:     #e2e8f0;
+    --muted:    #556080;
+    --purple:   #a855f7;
+    --violet:   #7c3aed;
+    --cyan:     #06b6d4;
+    --green:    #00e5a0;
+    --yellow:   #f59e0b;
+    --orange:   #f97316;
+    --red:      #ef4444;
+    --blue:     #3b82f6;
+    --accent:   #a855f7;
   }
+
+  :global(::-webkit-scrollbar) { width: 6px; }
+  :global(::-webkit-scrollbar-track) { background: var(--bg); }
+  :global(::-webkit-scrollbar-thumb) { background: var(--border); border-radius: 3px; }
 
   .app {
     display: flex;
@@ -75,8 +82,8 @@
 
   main {
     flex: 1;
-    padding: 24px;
-    max-width: 1400px;
+    padding: 20px 24px 64px;
+    max-width: 1440px;
     margin: 0 auto;
     width: 100%;
   }
