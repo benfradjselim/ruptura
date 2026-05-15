@@ -67,14 +67,16 @@ func kpiMap(s models.KPISnapshot) map[string]models.KPI {
 // ── /api/v2/fleet ─────────────────────────────────────────────────────────────
 
 type fleetHost struct {
-	Host         string    `json:"host"`
-	State        string    `json:"state"`
-	HealthScore  float64   `json:"health_score"`
-	Stress       float64   `json:"stress"`
-	Fatigue      float64   `json:"fatigue"`
-	Contagion    float64   `json:"contagion"`
-	ActiveAlerts int       `json:"active_alerts"`
-	LastSeen     time.Time `json:"last_seen"`
+	Host              string                `json:"host"`
+	State             string                `json:"state"`
+	HealthScore       float64               `json:"health_score"`
+	Stress            float64               `json:"stress"`
+	Fatigue           float64               `json:"fatigue"`
+	Contagion         float64               `json:"contagion"`
+	ActiveAlerts      int                   `json:"active_alerts"`
+	LastSeen          time.Time             `json:"last_seen"`
+	FusedRuptureIndex float64               `json:"fused_rupture_index"`
+	HealthForecast    *models.HealthForecast `json:"health_forecast,omitempty"`
 }
 
 type fleetResponse struct {
@@ -105,6 +107,9 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 	snapshots := h.store.AllSnapshots()
 	resp := fleetResponse{Hosts: make([]fleetHost, 0, len(snapshots))}
 
+	// Track hosts already present in the store so we can add pending-only ones below.
+	knownHosts := make(map[string]bool, len(snapshots))
+
 	for i := range snapshots {
 		h.enrichSnapshot(&snapshots[i])
 		s := snapshots[i]
@@ -113,6 +118,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		if s.Workload.Namespace != "" {
 			name = s.Workload.Namespace + "/" + s.Workload.Kind + "/" + s.Workload.Name
 		}
+		knownHosts[name] = true
 
 		state := snapshotState(s)
 		resp.TotalHosts++
@@ -126,14 +132,36 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		}
 
 		resp.Hosts = append(resp.Hosts, fleetHost{
-			Host:        name,
-			State:       state,
-			HealthScore: s.HealthScore.Value,
-			Stress:      s.Stress.Value,
-			Fatigue:     s.Fatigue.Value,
-			Contagion:   s.Contagion.Value,
-			LastSeen:    s.Timestamp,
+			Host:              name,
+			State:             state,
+			HealthScore:       s.HealthScore.Value,
+			Stress:            s.Stress.Value,
+			Fatigue:           s.Fatigue.Value,
+			Contagion:         s.Contagion.Value,
+			LastSeen:          s.Timestamp,
+			FusedRuptureIndex: s.FusedRuptureIndex,
+			HealthForecast:    s.HealthForecast,
 		})
+	}
+
+	// Merge auto-discovered workloads that have no telemetry yet (pending_telemetry).
+	if h.analyzer != nil {
+		for _, s := range h.analyzer.AllAnalyzerSnapshots() {
+			if s.WorkloadStatus != "pending_telemetry" {
+				continue
+			}
+			name := s.Workload.Namespace + "/" + s.Workload.Kind + "/" + s.Workload.Name
+			if knownHosts[name] {
+				continue
+			}
+			resp.TotalHosts++
+			resp.Hosts = append(resp.Hosts, fleetHost{
+				Host:        name,
+				State:       "pending_telemetry",
+				HealthScore: 0,
+				LastSeen:    s.Timestamp,
+			})
+		}
 	}
 
 	// Critical first, then degraded, then healthy; within a tier sort by health_score ascending.

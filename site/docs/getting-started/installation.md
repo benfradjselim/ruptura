@@ -2,22 +2,37 @@
 
 ## Quick start (60 seconds)
 
-=== "Kubernetes / k3s (Helm)"
+=== "Kubernetes / Helm (OCI)"
 
     ```bash
     helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
-      --namespace ruptura-system --create-namespace \
+      --namespace ruptura-system \
+      --create-namespace \
       --set apiKey=$(openssl rand -hex 32) \
-      --set resources.limits.memory=2Gi \
-      --set persistence.size=10Gi
+      --set ui.enabled=true \
+      --set ui.service.type=NodePort \
+      --set ui.nodePort=31469 \
+      --set service.type=NodePort \
+      --set otlpNodePort=31470
     ```
 
-    Check it:
+    Verify:
 
     ```bash
     kubectl get pods -n ruptura-system
-    curl http://<node-ip>:<nodeport>/api/v2/health
+    # NAME                             READY   STATUS    RESTARTS   AGE
+    # ruptura-engine-xxx               1/1     Running   0          30s
+    # ruptura-ui-xxx                   1/1     Running   0          30s
+
+    curl http://<node-ip>:31468/api/v2/health
+    # {"status":"ok","version":"7.0.4",...}
     ```
+
+    | Endpoint | URL |
+    |----------|-----|
+    | Dashboard | `http://<node-ip>:31469/` |
+    | Engine API | `http://<node-ip>:31468/api/v2/health` |
+    | OTLP ingest | `http://<node-ip>:31470/api/v2/write` |
 
 === "Docker"
 
@@ -26,9 +41,12 @@
       -p 8080:8080 -p 4317:4317 \
       -v ruptura-data:/var/lib/ruptura/data \
       -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-      ghcr.io/benfradjselim/ruptura:v6.8.13
+      ghcr.io/benfradjselim/ruptura:v7.0.4
     curl http://localhost:8080/api/v2/health
     ```
+
+    !!! note "Dashboard in Docker"
+        In Docker mode, deploy the UI container separately or use `kubectl port-forward` for the full dashboard experience. The engine API is available at port 8080.
 
 === "ruptura-ctl (CLI)"
 
@@ -36,7 +54,7 @@
     curl -Lo ruptura-ctl \
       https://github.com/benfradjselim/ruptura/releases/latest/download/ruptura-ctl-linux-amd64
     chmod +x ruptura-ctl && sudo mv ruptura-ctl /usr/local/bin/
-    export RUPTURA_URL=http://localhost:8080
+    export RUPTURA_URL=http://<node-ip>:31468
     export RUPTURA_API_KEY=<your-api-key>
     ruptura-ctl status
     ```
@@ -45,7 +63,7 @@
 
 ## ruptura-ctl
 
-`ruptura-ctl` **v1.0.0** is the command-line interface for Ruptura. It connects to the Ruptura REST API from your workstation, a CI pipeline, or from inside the cluster. It is versioned **independently** from the server — you can run `ruptura-ctl v1.0.0` against any `ruptura >= v6.8.x`.
+`ruptura-ctl` **v1.0.0** is the command-line interface for Ruptura. It connects to the Ruptura REST API from your workstation, a CI pipeline, or from inside the cluster.
 
 ### Install
 
@@ -101,7 +119,7 @@
 ### Configure
 
 ```bash
-export RUPTURA_URL=http://<host>:8080      # or NodePort URL
+export RUPTURA_URL=http://<node-ip>:31468    # engine NodePort
 export RUPTURA_API_KEY=<your-api-key>
 
 ruptura-ctl version          # ruptura-ctl v1.0.0
@@ -128,8 +146,12 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system \
   --create-namespace \
   --set apiKey=$(openssl rand -hex 32) \
-  --set resources.limits.memory=2Gi \
-  --set-string goMemLimit="1700MiB" \
+  --set ui.enabled=true \
+  --set ui.service.type=NodePort \
+  --set ui.nodePort=31469 \
+  --set service.type=NodePort \
+  --set otlpNodePort=31470 \
+  --set resources.limits.memory=512Mi \
   --set persistence.size=10Gi
 ```
 
@@ -138,13 +160,17 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--set apiKey=<key>` | required | API bearer token |
-| `--set resources.limits.memory=2Gi` | `512Mi` | Memory limit — BadgerDB needs headroom |
-| `--set-string goMemLimit="1700MiB"` | `"400MiB"` | Go GC soft limit — set to ~85% of memory limit. **Use MiB/GiB suffix, not bytes.** |
+| `--set ui.enabled=true` | `false` | Deploy the Svelte dashboard pod |
+| `--set ui.service.type=NodePort` | `ClusterIP` | Expose dashboard via NodePort |
+| `--set ui.nodePort=31469` | auto | NodePort for the dashboard |
+| `--set service.type=NodePort` | `ClusterIP` | Expose engine API via NodePort |
+| `--set otlpNodePort=31470` | `31470` | NodePort for OTLP ingest |
+| `--set resources.limits.memory=512Mi` | `512Mi` | Engine memory limit |
+| `--set-string goMemLimit="400MiB"` | `"400MiB"` | Go GC soft limit — ~85% of memory limit |
 | `--set persistence.size=10Gi` | `10Gi` | PVC size for BadgerDB storage |
-| `--set image.tag=v6.8.13` | `latest` | Pin to specific version |
-| `--set service.type=NodePort` | `ClusterIP` | Expose via NodePort |
-| `--set service.nodePorts.api=31468` | auto | NodePort for REST API |
+| `--set image.tag=v7.0.4` | `latest` | Pin to specific version |
 | `--set serviceMonitor.enabled=true` | `false` | Prometheus Operator scrape |
+| `--set edition=autopilot` | `community` | Enable Tier-1 auto-execution |
 
 ### Upgrade
 
@@ -152,7 +178,7 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
 helm upgrade ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system \
   --reuse-values \
-  --set image.tag=v6.8.13
+  --set image.tag=v7.0.4
 ```
 
 ### Verify
@@ -161,15 +187,9 @@ helm upgrade ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
 kubectl get pods -n ruptura-system
 kubectl logs -n ruptura-system -l app.kubernetes.io/name=ruptura --tail=20
 
-# Port-forward if not using NodePort
-kubectl port-forward svc/ruptura 8080:80 -n ruptura-system
-
-curl http://localhost:8080/api/v2/health
-# {"status":"starting","version":"6.8.13","edition":"community",...}
+curl http://<node-ip>:31468/api/v2/health
+# {"status":"ok","version":"7.0.4","edition":"community",...}
 ```
-
-!!! warning "Memory limit — important"
-    Set `resources.limits.memory` to at least **2Gi** on production clusters. BadgerDB and the analysis engine can spike past 1Gi under load. Set `goMemLimit` to ~85% of the memory limit using Go memory suffixes (`1700MiB` for a `2Gi` limit) — **never use raw byte counts**, Helm may render them in scientific notation which crashes the Go runtime.
 
 ---
 
@@ -206,15 +226,13 @@ docker run -d --name ruptura \
   -p 4317:4317 \
   -v ruptura-data:/var/lib/ruptura/data \
   -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-  ghcr.io/benfradjselim/ruptura:v6.8.13
+  ghcr.io/benfradjselim/ruptura:v7.0.4
 ```
 
 | Port | Purpose |
 |------|---------|
-| `8080` | REST API · Prometheus self-metrics · Web dashboard |
+| `8080` | REST API · Prometheus self-metrics |
 | `4317` | OTLP ingest — metrics, logs, traces (JSON over HTTP) |
-
-The web dashboard is embedded in the binary and served at `http://localhost:8080/ui/`. It requires no external tools and works in air-gapped environments.
 
 ---
 
@@ -235,20 +253,47 @@ Run tests:
 go test -race -timeout=120s ./...
 ```
 
+Build the UI:
+
+```bash
+cd ruptura/ui
+npm install
+npm run build
+# Output: ui/dist/  (served by the ruptura-ui container)
+```
+
 ---
 
 ## Sending telemetry
 
-Ruptura accepts three ingest methods. See the [Ingest Guide →](ingest.md) for full details and language-specific examples.
-
 ### Prometheus remote_write
+
+The `host` label must equal the workload key (`namespace/Kind/name`) so the pipeline can index correctly:
 
 ```yaml
 # prometheus.yml
 remote_write:
-  - url: http://ruptura:8080/api/v2/write
+  - url: http://<node-ip>:31470/api/v2/write
     authorization:
       credentials: <your-api-key>
+```
+
+Or send JSON directly:
+
+```bash
+curl -X POST http://<node-ip>:31470/api/v2/write \
+  -H "Content-Type: application/json" \
+  -d '{
+    "timeseries": [{
+      "Labels": [
+        {"Name": "__name__",   "Value": "cpu_percent"},
+        {"Name": "host",       "Value": "default/Deployment/my-app"},
+        {"Name": "namespace",  "Value": "default"},
+        {"Name": "deployment", "Value": "my-app"}
+      ],
+      "Samples": [{"Value": 72.5, "Timestamp": 1234567890000}]
+    }]
+  }'
 ```
 
 ### OTLP / OpenTelemetry Collector
@@ -257,31 +302,54 @@ remote_write:
 # otel-collector.yaml — exporters section
 exporters:
   otlphttp/ruptura:
-    endpoint: http://ruptura:4317
+    endpoint: http://<node-ip>:31470
     encoding: json          # Ruptura accepts JSON only — no protobuf
     compression: none       # no gzip
     headers:
       Authorization: "Bearer <your-api-key>"
 ```
 
-!!! important "OTLP format constraints"
-    Ruptura's OTLP endpoint accepts **JSON only** (no protobuf) and **no compression** (no gzip). Configure your OTel Collector exporter with `encoding: json` and `compression: none`.
+Ruptura reads `k8s.namespace.name`, `k8s.deployment.name`, etc. from OTLP resource attributes and groups signals by Kubernetes workload automatically.
 
-### Direct curl (raw OTLP JSON)
+!!! important "OTLP format constraints"
+    Ruptura's OTLP endpoint accepts **JSON only** (no protobuf) and **no compression** (no gzip).
+
+### Workload simulator
+
+Inject synthetic workloads with distinct failure profiles to test the system immediately:
+
+```bash
+python3 scripts/simulate.py [--host HOST] [--port PORT] [--interval SEC]
+# Default target: http://185.229.225.115:31470
+
+# Workloads injected every 5s:
+#   gateway        — stable/healthy (CPU ~22%, err ~0.3%)
+#   order-service  — slow-burn CPU stress (45→90% over 10 min)
+#   payment-api    — error bursts every 2 min (8→43% error rate)
+#   cache-worker   — traffic spikes every 3 min (up to 1350 rps)
+#   ml-inference   — noisy/calibrating (high variance, new workload)
+```
+
+See [Operations → Simulation →](../operations/simulation.md) for full simulator documentation.
+
+---
+
+## Direct curl (raw OTLP JSON)
 
 ```bash
 # Send a log
-curl -X POST http://<host>:4317/otlp/v1/logs \
+curl -X POST http://<node-ip>:31470/otlp/v1/logs \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <api-key>" \
   -d '{
     "resourceLogs": [{
       "resource": {"attributes": [
         {"key": "service.name", "value": {"stringValue": "my-service"}},
-        {"key": "k8s.namespace.name", "value": {"stringValue": "production"}}
+        {"key": "k8s.namespace.name", "value": {"stringValue": "production"}},
+        {"key": "k8s.deployment.name", "value": {"stringValue": "my-service"}}
       ]},
       "scopeLogs": [{"logRecords": [{
-        "timeUnixNano": "'$(date +%s%N)'",
+        "timeUnixNano": "1715780000000000000",
         "severityNumber": 17,
         "severityText": "ERROR",
         "body": {"stringValue": "payment timeout after 5000ms"}

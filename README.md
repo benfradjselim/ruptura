@@ -11,7 +11,7 @@ Ruptura detects workload ruptures before they cause outages — using the Fused 
 → **[Technical documentation & quickstart](workdir/README.md)**
 → **[Website & full docs](https://benfradjselim.github.io/ruptura/)**
 → **[API Specification](docs/openapi.yaml)**
-→ **[Live dashboard (GitHub Codespace)](https://improved-yodel-v69jjx9w754jcj5x-8080.app.github.dev/ui/)**
+→ **[Live dashboard](http://185.229.225.115:31469/)**
 
 ---
 
@@ -19,249 +19,260 @@ Ruptura detects workload ruptures before they cause outages — using the Fused 
 
 | Version | Date | Status |
 |---------|------|--------|
-| v6.8.13 | 2026-05-13 | ✅ Released — log/trace ingest counters, Live Data Flow panel fix, ruptura-ctl v1.0.0 |
-| v6.8.2 | 2026-05-10 | ✅ Released — OOMKill prevention: BadgerDB memory tuning, GC loop, GOMEMLIMIT |
-| v6.8.1 | 2026-05-09 | ✅ Released — fleet heatmap visibility and color fix |
-| v6.8.0 | 2026-05-09 | ✅ Released — stable dashboard, correct workload identity |
-| v6.7.0 | 2026-05-06 | ✅ Released — embedded web dashboard, air-gap safe, vendor-local assets |
-| v6.6.3 | 2026-05-06 | ✅ Released — pre-v7 security & correctness hardening |
-| v6.6.0 | 2026-05-05 | ✅ Released — per-workload signal weight tuning |
-| v6.5.0 | 2026-05-05 | ✅ Released — edition gate (community / autopilot) |
-| v6.4.0 | 2026-05-05 | ✅ Released — rupture fingerprinting + business signal layer |
-| v6.3.0 | 2026-05-04 | ✅ Released — calibration warm-up, HealthScore forecast, ruptura-sim |
-| v6.2.2 | 2026-04-30 | ✅ Released — anomaly REST endpoints, all v6.x gaps resolved |
-| v6.1.0 | 2026-04-27 | ✅ Released — gRPC, eventbus, adaptive ensemble, K8s operator |
+| v7.0.4 | 2026-05-15 | ✅ Released — OTLP NodePort 31470 exposed, workload simulator |
+| v7.0.3 | 2026-05-15 | ✅ Released — JSON crash fix, real PNG logo, topology overhaul, health scores per workload |
+| v7.0.2 | 2026-05-15 | ✅ Released — 10-signal bars, light/dark mode, dataflow stats, all backend APIs wired |
+| v7.0.1 | 2026-05-15 | ✅ Released — ruptura-ui pod, logo, calibrating state, Settings & Alerts pages |
+| v7.0.0 | 2026-05-15 | ✅ Released — v7 architecture: separate UI pod, SSE, k8s metadata, node health |
+| v6.8.13 | 2026-05-13 | ✅ Released — log/trace ingest counters, Live Data Flow, ruptura-ctl v1.0.0 |
 
 **Operator:**
 
 | Version | Date | Status |
 |---------|------|--------|
-| ruptura-operator v0.6.9 | 2026-05-07 | 🔄 Submitted to Red Hat OperatorHub — certification pipeline running |
-| ruptura-operator v0.6.8 | 2026-05-07 | ✅ Merged into OperatorHub community-operators — ServiceAccount fix, RBAC fix |
-| ruptura-operator v0.6.7 | 2026-05-07 | ✅ Merged into OperatorHub community-operators |
+| ruptura-operator v0.6.9 | 2026-05-07 | 🔄 Submitted to Red Hat OperatorHub |
+| ruptura-operator v0.6.8 | 2026-05-07 | ✅ Merged into OperatorHub community-operators |
 
-**Active branch:** `main` · **Module:** `github.com/benfradjselim/ruptura`
+**Active branch:** `v7` · **Module:** `github.com/benfradjselim/ruptura`
+
+---
+
+## v7 Architecture
+
+v7 ships as **two separate Kubernetes pods** behind a shared Helm chart:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                      ruptura-system                         │
+│                                                             │
+│  ┌───────────────────────┐    ┌────────────────────────┐   │
+│  │    ruptura-engine     │    │      ruptura-ui         │   │
+│  │    (Go binary)        │    │  (Svelte 4 + nginx)     │   │
+│  │                       │    │                          │   │
+│  │  :8080  REST API      │◄───│  nginx proxies /api/    │   │
+│  │  :4317  OTLP ingest   │    │  injects Bearer token   │   │
+│  │                       │    │  :80   dashboard UI      │   │
+│  └───────────────────────┘    └────────────────────────┘   │
+│          NodePort 31468               NodePort 31469         │
+│          NodePort 31470 (OTLP)                               │
+└────────────────────────────────────────────────────────────┘
+```
+
+| Port | Purpose |
+|------|---------|
+| 31468 | Engine REST API (`/api/v2/*`) |
+| 31469 | Svelte dashboard |
+| 31470 | OTLP ingest (`/api/v2/write`, `/otlp/v1/metrics`, `/otlp/v1/logs`, `/otlp/v1/traces`) |
 
 ---
 
 ## How Ruptura Works
 
-Traditional monitoring fires an alert after something breaks. Ruptura works differently: it continuously measures *how fast* each workload is diverging from its own normal behavior, and acts before that divergence becomes an outage.
-
-### 1 — Telemetry ingestion
-
-Ruptura ingests three independent signal sources:
+### 1 — Telemetry ingestion (port 31470)
 
 ```
-Prometheus remote_write  → metric pipeline  (CPU, RAM, latency, error rates...)
-OTLP logs (port 4317)   → log pipeline     (error/warn burst detection)
-OTLP traces (port 4317) → trace pipeline   (span error rate, P99 latency, service graph)
+Prometheus remote-write  →  /api/v2/write          →  metric pipeline
+OTLP metrics             →  /otlp/v1/metrics        →  metric pipeline
+OTLP logs                →  /otlp/v1/logs           →  burst detector → logR
+OTLP traces              →  /otlp/v1/traces         →  topology graph + traceR
 ```
 
-Multiple pods from the same Kubernetes Deployment are automatically merged into a single **WorkloadRef** treatment unit (`namespace/kind/name`). You never look at pod-level noise — only at workload-level health.
+Workload identity is derived from OTLP resource attributes (`k8s.deployment.name`, `k8s.namespace.name`). Metrics via `/api/v2/write` must include a `host` label set to `namespace/Kind/name`.
 
-### 2 — 10 Composite KPI signals
+### 2 — Signal computation (10 KPIs)
 
-Every workload gets 10 auditable signals recomputed on every data point:
+Every 15 seconds, the analyzer computes 10 composite KPI signals per workload:
 
-| Signal | What it measures |
-|--------|-----------------|
-| `stress` | Instantaneous load: `0.3·CPU + 0.2·RAM + 0.2·latency + 0.2·errors + 0.1·timeouts` |
-| `fatigue` | Stress accumulated over time — dissipates during low-stress periods |
-| `mood` | System well-being: `log(uptime × throughput + 1) / log(errors × timeouts × restarts + 2)` |
-| `pressure` | Rate-of-change of stress + integrated error load (early storm signal) |
-| `humidity` | Error × timeout density relative to throughput |
-| `contagion` | Error propagation across service dependencies (real trace edges when available) |
-| `resilience` | How fast the workload recovers: `mood × (1−fatigue) × (1−contagion)` |
-| `entropy` | Behavioral unpredictability: rolling variance of HealthScore |
-| `velocity` | Rate of HealthScore change — how fast degradation is progressing |
-| `health_score` | Additive-penalty composite (0–100): `100 × (1 − (0.25·stress + 0.20·fatigue + ...))` |
+| Signal | Measures |
+|--------|----------|
+| **Stress** | CPU + latency burst |
+| **Fatigue** | Cumulative baseline deviation (long-term wear) |
+| **Mood** | Log error/warn sentiment ratio |
+| **Pressure** | Memory + disk saturation |
+| **Humidity** | Forecast variance — how predictable behavior is |
+| **Contagion** | Error propagation from upstream services |
+| **Resilience** | Recovery speed after spikes |
+| **Entropy** | Internal signal disorder |
+| **Velocity** | Request rate acceleration |
+| **Throughput** | Data volume processed per cycle |
 
-All formulas are versioned release artifacts — no black boxes.
+Each signal carries `value`, `state` (ok / warning / critical), and `trend` (rising / falling / stable).
 
-### 3 — Calibration warm-up & adaptive baselines
-
-For the first 24h, Ruptura is in `calibrating` state — signals are recorded but predictions and actions are suppressed until the baseline is ready. Every API response carries `calibration_progress` (0–100) and `calibration_eta_minutes`.
-
-After calibration, every threshold becomes relative to that workload's own Welford baseline:
-
-- A batch job at 90% CPU every night → z-score ≈ 0.1 → no alarm
-- An API server normally at 10% suddenly at 40% → z-score = 4.2 → stress alarm fires
-
-A **HealthScore trend forecast** is computed once active: OLS regression over the rolling health history projects `in_15min`, `in_30min`, and `critical_eta_minutes`. "Your score is 54" becomes "you have 28 minutes."
-
-### 4 — Fused Rupture Index™
-
-Three independent signals are fused into a single rupture index per workload:
+### 3 — Fused Rupture Index (FusedR)
 
 ```
-metricR  = |α_burst| / max(|α_stable|, ε)   ← 5-min vs 60-min ILR slope ratio
-logR     = burst_rate / log_baseline          ← fires when error/warn > 3σ
-traceR   = span_error_rate × P99_deviation    ← from OTLP trace spans
-
-FusedR   = weighted combination (requires ≥ 2 sources to reach "critical")
+FusedR = weighted_average(metricR, logR, traceR)
 ```
-
-FusedR requires at least two independent sources to agree — a single noisy metric cannot push a workload to critical. This eliminates false positives from transient spikes.
 
 | FusedR | State | Default action |
-|--------|-------|---------------|
+|--------|-------|----------------|
 | < 1.5 | Stable / Elevated | None |
 | 1.5 – 3.0 | Warning | Tier-3 — human alert |
-| 3.0 – 5.0 | Critical | Tier-2 — suggested action (approve via API) |
+| 3.0 – 5.0 | Critical | Tier-2 — suggested action |
 | ≥ 5.0 | Emergency | Tier-1 — automated action |
 
-### 5 — Adaptive ensemble (5 models)
+### 4 — Adaptive 5-model ensemble
 
-The rupture detector uses a 5-model ensemble with online MAE-based weighting:
+| Model | Strength |
+|-------|----------|
+| CA-ILR (dual-scale) | O(1) update, detects acceleration |
+| ARIMA | Stationary series with trends |
+| Holt-Winters | Seasonal / periodic patterns |
+| MAD | Outlier-robust |
+| EWMA | Fast reaction to recent shifts |
 
-| Model | Strengths |
-|-------|-----------|
-| CA-ILR (dual-scale) | O(1) update, detects acceleration, sub-millisecond |
-| ARIMA | Strong on stationary series with trends |
-| Holt-Winters | Excellent on seasonal / periodic patterns |
-| MAD | Robust to outliers |
-| EWMA | Reacts quickly to recent shifts |
+Models are re-weighted every 60s based on actual prediction error — no config needed.
 
-Every 60 seconds, models are re-weighted based on their actual prediction error over the past hour. No configuration needed — the ensemble adapts automatically to your traffic patterns.
+### 5 — HealthScore forecast
 
-### 6 — Rupture fingerprinting & business signals
+Projects HealthScore +15 and +30 minutes forward. `critical_eta_minutes` appears on the card when the projected score is heading toward critical — shows "⚠ Critical in ~12m" in the UI.
 
-At every confirmed rupture (FusedR ≥ 3.0), an 11-dimensional KPI vector is stored as a fingerprint. Future queries run cosine similarity against all past fingerprints — a match ≥ 0.85 surfaces as `pattern_match` with the prior resolution note.
+### 6 — Rupture fingerprinting & pattern matching
 
-Three business signals are embedded in every snapshot: `slo_burn_velocity` (are you burning your error budget too fast?), `blast_radius` (how many downstream services depend on this workload?), and `recovery_debt` (how many near-misses in the last 7 days?).
+At every confirmed rupture (FusedR ≥ 3.0), an 11-dimensional KPI vector is stored. Future queries run cosine similarity — a match ≥ 0.85 surfaces as `pattern_match` with the prior resolution note. Operators can immediately apply a known fix.
 
-### 7 — Action engine with safety gates
+### 7 — Business signals
 
-When FusedR crosses a threshold, the action engine fires:
+| Signal | Description |
+|--------|-------------|
+| `slo_burn_velocity` | Error budget burn rate (multiples) |
+| `blast_radius` | Downstream service count |
+| `recovery_debt` | Near-miss count in 7 days |
 
-```
-FusedR ≥ threshold
-      ↓
-Safety gates (rate limit · cooldown · namespace allowlist · confidence threshold)
-      ↓
-execution_mode?
-  shadow  → log only
-  suggest → queue at /api/v2/actions for human approval
-  auto    → execute immediately (Tier-1) or queue (Tier-2)
-      ↓
-K8s (scale · restart · cordon · drain) / Webhook / Alertmanager / PagerDuty
-```
+### 8 — SSE live event stream
 
-### 8 — Narrative explain
+`GET /api/v2/events` — Server-Sent Events. Every rupture and recovery fires in real time. The Fleet dashboard shows a live rupture counter that updates without polling.
 
-Every rupture event gets a structured English explanation:
+### 9 — Action engine
 
 ```
-GET /api/v2/explain/{rupture_id}/narrative
+FusedR ≥ threshold → safety gates → K8s (scale / restart / cordon) or webhook
+POST /api/v2/actions/emergency-stop   →  halt all pending actions immediately
+```
 
-→ "payment-api has been accumulating fatigue for 72h (fatigue 0.81).
-   A contagion wave from payment-db propagated via the payment-api→payment-db
-   call edge and pushed FusedR from 1.8 to 4.2 in 18 minutes.
-   This is a cascade rupture, not an isolated spike.
-   Recommended action: scale payment-api by 2 replicas."
+### 10 — Narrative explain
+
+```
+GET /api/v2/explain/{id}/narrative
+→ "payment-api fatigue 0.81 + contagion wave from payment-db pushed
+   FusedR from 1.8 to 4.2 in 18 minutes. Cascade rupture, not an isolated spike."
+
+GET /api/v2/explain/{id}/formula
+→ raw KPI breakdown
 ```
 
 ---
 
-## Install in 60 seconds
+## Dashboard (v7)
 
-**Kubernetes (Helm — OCI registry):**
+Svelte 4 SPA with nginx reverse proxy — light/dark mode toggle, full SSE integration.
+
+| View | What you see |
+|------|-------------|
+| **Fleet** | Workload grid. Per-card: health ring (actual KPI value), 10 signal mini-bars, calibration progress, rupture warning |
+| **Fleet → Signals** | 10 KPI cells, PatternMatch warning, BusinessSignals, explain panel |
+| **Fleet → History** | Time-series — toggle any of 12 signals; Chart.js |
+| **Fleet → Forecast** | HealthScore projection chart |
+| **Fleet → Predictions** | Per-metric ensemble predictions |
+| **Fleet → Events** | SSE live rupture/recovery log |
+| **Fleet → Logs** | Last 200 log lines for the workload |
+| **Fleet → Actions** | Approve / reject Tier-2 actions |
+| **Fleet → Kubernetes** | Pod list, replicas, resources, labels |
+| **Topology** | Service dependency graph from OTLP traces. Click node → health bar + FusedR. Click edge → call rate, error rate, P99 latency |
+| **Engine** | Runtime stats, analyzer state, ingest rates, cumulative data flow, BadgerDB storage |
+| **Alerts** | Active / resolved alert feed |
+| **Nodes** | K8s node health — CPU, memory, disk pressure |
+| **Settings** | Data sources, Ingest Stats (live totals), preferences |
+
+---
+
+## Install
+
+**Kubernetes (Helm — OCI):**
 
 ```bash
 helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system \
   --create-namespace \
-  --set apiKey=$(openssl rand -hex 32) \
-  --set resources.limits.memory=2Gi \
-  --set-string goMemLimit="1700MiB" \
-  --set persistence.size=10Gi
+  --set apiKey=$(openssl rand -hex 32)
 
-kubectl get pods -n ruptura-system
-curl http://<node-ip>:<nodeport>/api/v2/health
+# Dashboard:   http://<node-ip>:31469/
+# Engine API:  http://<node-ip>:31468/api/v2/health
+# OTLP ingest: http://<node-ip>:31470/api/v2/write
 ```
 
-**Docker:**
+**Inject synthetic workloads immediately:**
 
 ```bash
-docker run -d \
-  --name ruptura \
-  -p 8080:8080 -p 4317:4317 \
-  -v ruptura-data:/var/lib/ruptura/data \
-  -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-  ghcr.io/benfradjselim/ruptura:v6.8.13
-curl http://localhost:8080/api/v2/health
+python3 scripts/simulate.py
+# Sends 5 workloads every 5s:
+#   gateway        — stable/healthy
+#   order-service  — slow-burn CPU stress (45→90% over 10 min)
+#   payment-api    — error bursts every 2 min (8→43%)
+#   cache-worker   — traffic spikes every 3 min (1200 req/s)
+#   ml-inference   — noisy/calibrating new workload
 ```
 
-**ruptura-ctl (CLI — v1.0.0):**
+**Send OTLP metrics directly:**
 
 ```bash
-curl -Lo ruptura-ctl \
-  https://github.com/benfradjselim/ruptura/releases/latest/download/ruptura-ctl-linux-amd64
-chmod +x ruptura-ctl && sudo mv ruptura-ctl /usr/local/bin/
-export RUPTURA_URL=http://localhost:8080
-export RUPTURA_API_KEY=<your-api-key>
-ruptura-ctl version   # ruptura-ctl v1.0.0
-ruptura-ctl health
-ruptura-ctl status
-```
-
-**Send telemetry (OTLP JSON):**
-
-```bash
-# Metrics
-curl -X POST http://<host>:4317/otlp/v1/metrics \
+# Remote-write format
+curl -X POST http://<node-ip>:31470/api/v2/write \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <api-key>" \
+  -d '{
+    "timeseries": [{
+      "Labels": [
+        {"Name": "__name__",   "Value": "cpu_percent"},
+        {"Name": "host",       "Value": "default/Deployment/my-app"},
+        {"Name": "namespace",  "Value": "default"},
+        {"Name": "deployment", "Value": "my-app"}
+      ],
+      "Samples": [{"Value": 72.5, "Timestamp": '$(date +%s%3N)'}]
+    }]
+  }'
+
+# OTLP JSON
+curl -X POST http://<node-ip>:31470/otlp/v1/metrics \
+  -H "Content-Type: application/json" \
   -d '{"resourceMetrics":[{"resource":{"attributes":[
-    {"key":"service.name","value":{"stringValue":"payment-api"}},
-    {"key":"k8s.namespace.name","value":{"stringValue":"production"}}
+    {"key":"k8s.deployment.name","value":{"stringValue":"my-app"}},
+    {"key":"k8s.namespace.name","value":{"stringValue":"default"}}
   ]},"scopeMetrics":[{"metrics":[
-    {"name":"process.cpu.utilization","gauge":{"dataPoints":[{"timeUnixNano":"'$(date +%s%N)'","asDouble":0.72}]}}
-  ]}]}]}'
-
-# Logs
-curl -X POST http://<host>:4317/otlp/v1/logs \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <api-key>" \
-  -d '{"resourceLogs":[{"resource":{"attributes":[
-    {"key":"service.name","value":{"stringValue":"payment-api"}},
-    {"key":"k8s.namespace.name","value":{"stringValue":"production"}}
-  ]},"scopeLogs":[{"logRecords":[
-    {"timeUnixNano":"'$(date +%s%N)'","severityNumber":17,"severityText":"ERROR",
-     "body":{"stringValue":"DB connection pool exhausted"}}
+    {"name":"process.cpu.utilization","gauge":{"dataPoints":[
+      {"timeUnixNano":"'$(date +%s%N)'","asDouble":0.72}
+    ]}}
   ]}]}]}'
 ```
-
-See the [Ingest Guide](https://benfradjselim.github.io/ruptura/getting-started/ingest/) for full examples covering Prometheus remote_write, OTel Collector, traces, DogStatsD, and application SDKs.
 
 ---
 
-## What's Inside
+## Repository Layout
 
 ```
-workdir/                  Ruptura Go source (v6.8.13)
-  cmd/ruptura/            Main binary (server)
-  cmd/ruptura-ctl/        CLI tool (v1.0.0 — independently versioned)
-  internal/               Engine, pipelines, API, storage, actions, fusion
-  internal/ui/static/     Embedded web dashboard (served at :8080, air-gap safe)
-  pkg/                    Public Go packages (rupture, composites, client)
-  deploy/
-    *.yaml                Kustomize manifests
-    grafana/              Grafana dashboard JSON + provisioning
-  operator/               Kubernetes operator (ruptura-operator v0.6.9)
-                          RupturaInstance CRD · Deployment + Service + PVC + SA + Route
-                          UBI9-based image — certified for Red Hat OperatorHub
+workdir/                  Go source (v7.0.4)
+  cmd/ruptura/            Engine binary
+  cmd/ruptura-ctl/        CLI tool
+  internal/
+    analyzer/             10-signal KPI computation + calibration
+    api/                  REST API (44 endpoints)
+    actions/              Action engine + K8s actuator + safety gates
+    correlator/           Burst detector + topology builder
+    explain/              Narrative engine + fingerprinting
+    fusion/               FusedR compositor (metricR + logR + traceR)
+    history/              Time-series history manager
+    ingest/               OTLP + Prometheus remote-write receivers
+    pipeline/             5-model anomaly ensemble
+    predictor/            HealthScore forecast
+    storage/              BadgerDB + TTL GC
 
-helm/                     Helm chart (v0.7.6, appVersion 6.8.13)
-bundle/                   OLM bundle (OperatorHub submission format)
-catalog/                  File-Based Catalog for OLM
-operators/                community-operators + Red Hat certified-operators submission tree
+ui/                       Svelte 4 dashboard (v7.0.4)
+  src/routes/             Fleet, Map, Engine, Alerts, Nodes, Settings
+  src/components/         WorkloadCard, TopologyMap, NavBar, modals
 
-docs/
-  v6.0.0/                 SPECS, AGENTS, ROADMAP, whitepaper, DEV-GUIDE
-  v6.1.0/                 v6.1 delta specs
-  judgment.md             Design conscience — gaps, milestones, version log
+helm/                     Helm chart (OCI: ghcr.io/benfradjselim/charts/ruptura)
+scripts/
+  simulate.py             Workload simulator (5 behavioral profiles)
+operator/                 Kubernetes operator (ruptura-operator v0.6.9)
 ```
 
 ---
@@ -269,33 +280,22 @@ docs/
 ## Roadmap
 
 ```
-ruptura (application)
-v6.8.13 ✅ Log/trace ingest counters · Live Data Flow panel fix · ruptura-ctl v1.0.0 (independent versioning)
-v6.8.2  ✅ OOMKill prevention — BadgerDB memory tuning, periodic GC, GOMEMLIMIT soft cap
-v6.8.1  ✅ Fleet heatmap visibility and color fix
-v6.8.0  ✅ Stable dashboard · correct workload identity · continuous seed loop
-v6.7.0  ✅ Embedded web dashboard — air-gap safe, vendor-local Chart.js + Alpine.js
-v6.6.3  ✅ Pre-v7 security & correctness hardening (timing-safe auth, emergency stop, forecast fix)
-v6.6.0  ✅ Per-workload signal weight tuning (runtime + env bootstrap)
-v6.5.0  ✅ Edition gate — community (read-only) / autopilot (full execution)
-v6.4.0  ✅ Rupture fingerprinting · business signal layer (SLO burn, blast radius)
-v6.3.0  ✅ Calibration warm-up · HealthScore ETA forecast · ruptura-sim
-v6.2.x  ✅ Fused Rupture Index · workload-level signals · adaptive baselines
-            narrative explain · topology contagion · maintenance windows
-v6.1.0  ✅ gRPC ingest · NATS/Kafka eventbus · adaptive ensemble · K8s operator
-v7.0.0  ⏳ "Deviser pour réunir" — ruptura-ui as separate pod · multi-tenant · Python SDK v2
+v7.0.4  ✅  OTLP NodePort 31470 · workload simulator
+v7.0.3  ✅  JSON crash fix · PNG logo · topology edge click · per-workload health scores
+v7.0.2  ✅  10-signal bars · light/dark mode · dataflow stats · all backend APIs wired
+v7.0.1  ✅  ruptura-ui pod · calibration per workload · Settings + Alerts pages
+v7.0.0  ✅  Separate UI pod · SSE stream · k8s metadata · node health view
+v6.8.x  ✅  Log/trace counters · BadgerDB GC · embedded dashboard (pre-v7)
 
-ruptura-operator (Kubernetes operator — OperatorHub + Red Hat OperatorHub)
-v0.6.9 🔄  Submitted to Red Hat OperatorHub — UBI9 base image, required certification labels
-v0.6.8 ✅  Merged into OperatorHub — ServiceAccount fix · RBAC fix · Prometheus metrics
-v0.6.7 ✅  First OperatorHub release — merged into community-operators
+v7.1.0  ⏳  SLO config UI · dashboard layout customization · multi-tenant namespaces
+v7.2.0  ⏳  Python SDK v2 · Grafana data source plugin
 ```
 
 ---
 
 ## CNCF
 
-Ruptura targets alignment with CNCF sandbox criteria: Apache 2.0 license, open governance ([GOVERNANCE.md](GOVERNANCE.md)), documented security policy ([SECURITY.md](SECURITY.md)), public roadmap. A sandbox application requires demonstrable production adoption — contributions and production feedback are the path there.
+Ruptura targets alignment with CNCF sandbox criteria: Apache 2.0 license, open governance ([GOVERNANCE.md](GOVERNANCE.md)), documented security policy ([SECURITY.md](SECURITY.md)), public roadmap.
 
 ---
 

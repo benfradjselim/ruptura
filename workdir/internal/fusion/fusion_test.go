@@ -183,3 +183,54 @@ func TestFusion_Snapshot(t *testing.T) {
 		t.Error("expected non-zero snapshot value for host1")
 	}
 }
+
+func TestFusion_StateByWorkload_AllSignals(t *testing.T) {
+	e := NewEngine()
+	now := time.Now()
+	e.SetMetricR("prod/Deployment/api", 1.2, now)
+	e.SetLogR("prod/Deployment/api", 3.8, now)
+	e.SetTraceR("prod/Deployment/api", 0.4, now)
+
+	st, err := e.StateByWorkload("prod/Deployment/api")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if st.Workload != "prod/Deployment/api" {
+		t.Errorf("wrong workload: %q", st.Workload)
+	}
+	if st.MetricR != 1.2 || st.LogR != 3.8 || st.TraceR != 0.4 {
+		t.Errorf("wrong signal values: metric=%.2f log=%.2f trace=%.2f", st.MetricR, st.LogR, st.TraceR)
+	}
+	if st.FusedR == 0 {
+		t.Error("expected non-zero FusedR")
+	}
+	if st.DominantPipeline != "logs" {
+		t.Errorf("expected dominant=logs, got %q", st.DominantPipeline)
+	}
+	if st.LastUpdated.IsZero() {
+		t.Error("expected non-zero LastUpdated")
+	}
+}
+
+func TestFusion_StateByWorkload_Unknown(t *testing.T) {
+	e := NewEngine()
+	_, err := e.StateByWorkload("ns/Deployment/missing")
+	if err == nil {
+		t.Error("expected error for unknown workload")
+	}
+}
+
+func TestFusion_StateByWorkload_InsufficientSignals(t *testing.T) {
+	e := NewEngine()
+	now := time.Now()
+	e.SetMetricR("ns/Deployment/lonely", 2.0, now)
+
+	st, err := e.StateByWorkload("ns/Deployment/lonely")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// FusedR should be 0 when only one signal available
+	if st.FusedR != 0 {
+		t.Errorf("expected FusedR=0 with single signal, got %.3f", st.FusedR)
+	}
+}

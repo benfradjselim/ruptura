@@ -10,8 +10,11 @@ import (
     "github.com/benfradjselim/ruptura/internal/alerter"
     "github.com/benfradjselim/ruptura/internal/analyzer"
     apicontext "github.com/benfradjselim/ruptura/internal/context"
+    "github.com/benfradjselim/ruptura/internal/correlator"
+    "github.com/benfradjselim/ruptura/internal/discovery"
     "github.com/benfradjselim/ruptura/internal/events"
     "github.com/benfradjselim/ruptura/internal/explain"
+    "github.com/benfradjselim/ruptura/internal/fusion"
     "github.com/benfradjselim/ruptura/internal/history"
     pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
     "github.com/benfradjselim/ruptura/internal/predictor"
@@ -40,13 +43,19 @@ type Handlers struct {
     apiKey     string // expected bearer token; "" disables auth
     edition    string // "community" (default) or "autopilot"
     version    string
-    analyzer   *analyzer.Analyzer
-    historyMgr *history.Manager
-    eventBus   *events.Bus
-    ingest     IngestCounter
+    analyzer    *analyzer.Analyzer
+    historyMgr  *history.Manager
+    eventBus    *events.Bus
+    ingest      IngestCounter
+    fusionEng   *fusion.Engine
+    topoBuilder *correlator.TopologyBuilder
+    discovery   *discovery.Informer
 }
 
-func (h *Handlers) SetIngest(c IngestCounter) { h.ingest = c }
+func (h *Handlers) SetIngest(c IngestCounter)                       { h.ingest = c }
+func (h *Handlers) SetFusion(f *fusion.Engine)                      { h.fusionEng = f }
+func (h *Handlers) SetTopology(t *correlator.TopologyBuilder)       { h.topoBuilder = t }
+func (h *Handlers) SetDiscovery(d *discovery.Informer)              { h.discovery = d }
 
 func (h *Handlers) SetAnalyzer(a *analyzer.Analyzer) { h.analyzer = a }
 func (h *Handlers) SetHistoryMgr(m *history.Manager) { h.historyMgr = m }

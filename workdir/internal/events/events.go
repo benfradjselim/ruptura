@@ -32,16 +32,37 @@ type Bus struct {
 	events []Event
 	seq    int
 	// track last known FusedR per workload to detect threshold crossings
-	lastFusedR map[string]float64
+	lastFusedR  map[string]float64
+	subscribers map[chan Event]struct{}
 }
 
 func New() *Bus {
-	return &Bus{lastFusedR: make(map[string]float64)}
+	return &Bus{
+		lastFusedR:  make(map[string]float64),
+		subscribers: make(map[chan Event]struct{}),
+	}
+}
+
+// Subscribe returns a buffered channel that receives every future event.
+// Call Unsubscribe when the consumer is done to avoid leaking the channel.
+func (b *Bus) Subscribe() chan Event {
+	ch := make(chan Event, 64)
+	b.mu.Lock()
+	b.subscribers[ch] = struct{}{}
+	b.mu.Unlock()
+	return ch
+}
+
+// Unsubscribe removes the channel from the fan-out list and closes it.
+func (b *Bus) Unsubscribe(ch chan Event) {
+	b.mu.Lock()
+	delete(b.subscribers, ch)
+	b.mu.Unlock()
+	close(ch)
 }
 
 func (b *Bus) Push(ev Event) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	b.seq++
 	ev.ID = fmt.Sprintf("ev_%06d", b.seq)
 	if ev.TS.IsZero() {
@@ -51,6 +72,14 @@ func (b *Bus) Push(ev Event) {
 	if len(b.events) > maxEvents {
 		b.events = b.events[len(b.events)-maxEvents:]
 	}
+	// Fan-out to SSE subscribers — non-blocking; drop if subscriber is slow.
+	for ch := range b.subscribers {
+		select {
+		case ch <- ev:
+		default:
+		}
+	}
+	b.mu.Unlock()
 }
 
 // ObserveFusedR detects threshold crossings and auto-emits events.

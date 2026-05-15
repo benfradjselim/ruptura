@@ -3,7 +3,6 @@ package api
 import (
 	"net/http"
 
-	"github.com/benfradjselim/ruptura/internal/ui"
 	"github.com/gorilla/mux"
 )
 
@@ -11,11 +10,8 @@ func (h *Handlers) NewRouter() http.Handler {
 	r := mux.NewRouter()
 	r.Use(loggingMiddleware)
 
-	// Dashboard served without auth — browser loads HTML first, then uses the API key field
-	r.PathPrefix("/ui").Handler(ui.Handler(h.apiKey))
-	r.HandleFunc("/", func(w http.ResponseWriter, rq *http.Request) {
-		http.Redirect(w, rq, "/ui/", http.StatusFound)
-	}).Methods("GET")
+	// Root redirect removed — the v7 ruptura-ui pod serves the dashboard on its own NodePort.
+	// Probe endpoints are always public — k8s liveness/readiness probes carry no auth
 
 	r.HandleFunc("/timeline", h.handleTimeline).Methods("GET")
 
@@ -168,8 +164,20 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/orgs", stubCreate).Methods("POST")
 	api.HandleFunc("/orgs/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
 
-	// Topology (topology view — stub)
-	api.HandleFunc("/topology", stubList).Methods("GET")
+	// Topology
+	api.HandleFunc("/topology", h.handleTopology).Methods("GET")
+
+	// Node health
+	api.HandleFunc("/nodes", h.handleNodes).Methods("GET")
+	api.HandleFunc("/nodes/{node:.+}", h.handleNode).Methods("GET")
+
+	// Workload k8s metadata
+	api.HandleFunc("/workloads/{namespace}/{kind}/{name}/k8s", h.handleWorkloadK8s).Methods("GET")
+
+	// Engine internals
+	api.HandleFunc("/engine/status", h.handleEngineStatus).Methods("GET")
+	api.HandleFunc("/engine/storage", h.handleEngineStorage).Methods("GET")
+	api.HandleFunc("/engine/fusion/{namespace}/{kind}/{name}", h.handleFusionState).Methods("GET")
 
 	return r
 }

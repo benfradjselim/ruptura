@@ -1,0 +1,190 @@
+name: Operator — Smoke test
+
+# Spins up a local k3d cluster, installs OLM, deploys the operator bundle,
+# applies a RupturaInstance CR, and asserts the pod reaches Running state + the
+# health endpoint returns HTTP 200.
+#
+# Runs on every PR that touches operator or bundle files, and on workflow_dispatch.
+# This is the gate that must pass before any OperatorHub submission.
+
+on:
+  pull_request:
+    paths:
+      - "bundle/**"
+      - "catalog/**"
+      - "workdir/internal/operator/**"
+      - "workdir/operator/**"
+  push:
+    branches: [main]
+    paths:
+      - "bundle/**"
+      - "catalog/**"
+  workflow_dispatch:
+    inputs:
+      bundle_image:
+        description: "Bundle image to test (default: build from local bundle/)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Operator smoke test (k3d + OLM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Install tools ────────────────────────────────────────────────────────
+      - name: Install k3d
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.29.0"
+
+      - name: Install operator-sdk
+        run: |
+          OS=$(uname | tr '[:upper:]' '[:lower:]')
+          ARCH=$(uname -m | sed 's/x86_64/amd64/')
+          curl -fsSLo /usr/local/bin/operator-sdk \
+            "https://github.com/operator-framework/operator-sdk/releases/download/v1.42.2/operator-sdk_${OS}_${ARCH}"
+          chmod +x /usr/local/bin/operator-sdk
+          operator-sdk version
+
+      # ── Create cluster ───────────────────────────────────────────────────────
+      - name: Create k3d cluster
+        run: |
+          k3d cluster create ruptura-smoke \
+            --agents 1 \
+            --wait \
+            --timeout 120s \
+            --k3s-arg "--disable=traefik@server:0"
+          kubectl cluster-info
+
+      # ── Install OLM ─────────────────────────────────────────────────────────
+      - name: Install OLM
+        run: |
+          operator-sdk olm install --timeout 5m
+          kubectl -n olm wait deployment/olm-operator --for=condition=Available --timeout=120s
+          kubectl -n olm wait deployment/catalog-operator --for=condition=Available --timeout=120s
+          echo "OLM ready"
+
+      # ── Validate bundle (structural check) ───────────────────────────────────
+      - name: Validate OLM bundle
+        run: |
+          operator-sdk bundle validate ./bundle \
+            --select-optional suite=operatorframework \
+            --select-optional name=community
+
+      # ── Build bundle image locally and load into k3d ─────────────────────────
+      - name: Build & load bundle image
+        run: |
+          BUNDLE_IMG="ruptura-operator-bundle:smoke"
+          docker build -t "${BUNDLE_IMG}" ./bundle
+          k3d image import "${BUNDLE_IMG}" -c ruptura-smoke
+          echo "bundle_img=${BUNDLE_IMG}" >> "$GITHUB_ENV"
+
+      # ── Build operator image and load into k3d ────────────────────────────────
+      - name: Build & load operator image
+        run: |
+          OP_IMG="ruptura-operator:smoke"
+          docker build -t "${OP_IMG}" ./workdir/operator
+          k3d image import "${OP_IMG}" -c ruptura-smoke
+          # Patch CSV to use local image tag (no registry pull)
+          sed -i "s|ghcr.io/benfradjselim/ruptura-operator:[^\"]*|${OP_IMG}|g" \
+            bundle/manifests/ruptura-operator.clusterserviceversion.yaml
+
+      # ── Deploy operator via OLM ───────────────────────────────────────────────
+      - name: Deploy operator
+        run: |
+          operator-sdk run bundle \
+            "${{ env.bundle_img }}" \
+            --namespace operators \
+            --timeout 5m
+          kubectl -n operators wait deployment \
+            --selector "app.kubernetes.io/name=ruptura-operator" \
+            --for=condition=Available \
+            --timeout=120s
+
+      # ── Apply a minimal RupturaInstance CR ───────────────────────────────────
+      - name: Apply RupturaInstance CR
+        run: |
+          cat <<'EOF' | kubectl apply -f -
+          apiVersion: ruptura.io/v1alpha1
+          kind: RupturaInstance
+          metadata:
+            name: smoke
+            namespace: operators
+          spec:
+            edition: community
+            storageSize: "1Gi"
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "128Mi"
+              limits:
+                cpu: "200m"
+                memory: "256Mi"
+          EOF
+
+      # ── Assert: pod reaches Running ───────────────────────────────────────────
+      - name: Wait for RupturaInstance pod to reach Running
+        run: |
+          echo "Waiting for pod to appear…"
+          # Give the operator up to 60s to create the pod
+          for i in $(seq 1 30); do
+            COUNT=$(kubectl -n operators get pods \
+              --selector "app.kubernetes.io/instance=smoke" \
+              --field-selector status.phase=Running \
+              -o name 2>/dev/null | wc -l)
+            if [ "${COUNT}" -ge 1 ]; then
+              echo "Pod is Running"
+              kubectl -n operators get pods -l "app.kubernetes.io/instance=smoke"
+              break
+            fi
+            echo "  attempt ${i}/30 — pod not Running yet, retrying…"
+            sleep 4
+          done
+
+          FINAL=$(kubectl -n operators get pods \
+            --selector "app.kubernetes.io/instance=smoke" \
+            --field-selector status.phase=Running \
+            -o name 2>/dev/null | wc -l)
+          if [ "${FINAL}" -lt 1 ]; then
+            echo "FAIL: pod did not reach Running within 2 minutes"
+            kubectl -n operators describe pods -l "app.kubernetes.io/instance=smoke"
+            kubectl -n operators logs -l "app.kubernetes.io/instance=smoke" --tail=50 || true
+            exit 1
+          fi
+
+      # ── Assert: health endpoint returns 200 ──────────────────────────────────
+      - name: Assert health endpoint returns 200
+        run: |
+          # Port-forward the API service to localhost
+          kubectl -n operators port-forward \
+            svc/smoke 18080:8080 &
+          PF_PID=$!
+          sleep 3
+
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+            http://localhost:18080/api/v2/health || echo "000")
+          kill "${PF_PID}" 2>/dev/null || true
+
+          echo "Health endpoint status: ${STATUS}"
+          if [ "${STATUS}" != "200" ]; then
+            echo "FAIL: expected 200, got ${STATUS}"
+            exit 1
+          fi
+          echo "PASS: health endpoint returned 200"
+
+      # ── Cleanup ───────────────────────────────────────────────────────────────
+      - name: Cleanup k3d cluster
+        if: always()
+        run: k3d cluster delete ruptura-smoke || true

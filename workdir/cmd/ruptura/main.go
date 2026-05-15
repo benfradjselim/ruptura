@@ -18,6 +18,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/api"
 	apicontext "github.com/benfradjselim/ruptura/internal/context"
 	"github.com/benfradjselim/ruptura/internal/correlator"
+	"github.com/benfradjselim/ruptura/internal/discovery"
 	"github.com/benfradjselim/ruptura/internal/actions/providers"
 	"github.com/benfradjselim/ruptura/internal/eventbus"
 	"github.com/benfradjselim/ruptura/internal/events"
@@ -34,7 +35,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "6.8.13"
+const version = "7.0.3"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -180,6 +181,16 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		}
 	}
 
+	// k8s workload auto-discovery — no-op when not running inside a cluster.
+	var inf *discovery.Informer
+	if disc, err := discovery.NewInformer(); err == nil {
+		logger.Default.Info("k8s auto-discovery active — watching Deployments/StatefulSets/DaemonSets")
+		inf = disc
+		go disc.Run(ctx, analyzerEngine.RegisterWorkload, analyzerEngine.UnregisterWorkload)
+	} else {
+		logger.Default.Info("k8s auto-discovery skipped (not in-cluster)", "reason", err.Error())
+	}
+
 	// Pipe burst events into fusion as logR
 	go fusionEngine.StartLogWatcher(ctx, burstDet.Events())
 
@@ -309,6 +320,11 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	handlers := api.New(store, actionEngine, explainer, al, predictorEngine, pipelineEngine, ctxStore, detector, metricsReg, healthCheck, cfg.APIKey)
 	handlers.SetAnalyzer(analyzerEngine)
 	handlers.SetIngest(ingestEngine)
+	handlers.SetFusion(fusionEngine)
+	handlers.SetTopology(topoBuilder)
+	if inf != nil {
+		handlers.SetDiscovery(inf)
+	}
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)
 	histMgr := history.New()

@@ -6,7 +6,7 @@ Get Ruptura up and running in minutes.
 
 | Method | Best for |
 |--------|----------|
-| [Kubernetes / Helm](installation.md#kubernetes) | Production, GitOps workflows |
+| [Kubernetes / Helm](installation.md#kubernetes-helm) | Production, GitOps workflows |
 | [Docker](installation.md#docker) | Local dev, single-host deployments |
 | [Binary](installation.md#build-from-source) | Edge, air-gapped, minimal footprint |
 

@@ -1,0 +1,138 @@
+name: Operator — Bump bundle on app release
+
+# Triggered when the "Release ruptura" workflow completes successfully on a tag push.
+# Reads the new app tag, updates the ruptura app image reference in the OLM bundle CSV
+# and catalog.yaml, then opens a PR so a human approves before it lands on main.
+
+on:
+  workflow_run:
+    workflows: ["Release ruptura"]
+    types: [completed]
+    branches-ignore: []
+  workflow_dispatch:
+    inputs:
+      app_tag:
+        description: "New ruptura app tag (e.g. v7.0.1)"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  APP_IMAGE: ghcr.io/${{ github.repository_owner }}/ruptura
+
+jobs:
+  bump:
+    name: Bump operator bundle image reference
+    runs-on: ubuntu-latest
+    # Skip if triggered by workflow_run that failed or was not a tag push.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'refs/tags/v'))
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Determine the new app tag ───────────────────────────────────────────
+      - name: Resolve app tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            APP_TAG="${{ github.event.inputs.app_tag }}"
+          else
+            # Extract tag from the triggering workflow_run ref (refs/tags/v7.0.1 → v7.0.1)
+            APP_TAG="${{ github.event.workflow_run.head_branch }}"
+            APP_TAG="${APP_TAG#refs/tags/}"
+          fi
+          echo "app_tag=${APP_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Bumping to app tag: ${APP_TAG}"
+
+      # ── Update relatedImages app reference in CSV ────────────────────────────
+      - name: Update CSV relatedImages
+        run: |
+          APP_TAG="${{ steps.tag.outputs.app_tag }}"
+          CSV="bundle/manifests/ruptura-operator.clusterserviceversion.yaml"
+          # Replace ghcr.io/benfradjselim/ruptura:v<old> with new tag
+          sed -i -E \
+            "s|(image: ${APP_IMAGE}):v[0-9]+\.[0-9]+\.[0-9]+|\1:${APP_TAG}|g" \
+            "${CSV}"
+          echo "Updated ${CSV}"
+          grep "image:" "${CSV}" | grep ruptura
+
+      # ── Bump catalog.yaml with a new bundle entry ────────────────────────────
+      - name: Update catalog.yaml upgrade graph
+        run: |
+          APP_TAG="${{ steps.tag.outputs.app_tag }}"
+          # Derive operator semver from app tag: v7.0.1 → 0.7.1
+          OP_VER="${APP_TAG#v}"
+          CATALOG="catalog/ruptura-operator/catalog.yaml"
+
+          # Find the most recent bundle version to set as 'replaces'
+          PREV_VER=$(grep 'version:' "${CATALOG}" | head -1 | awk '{print $2}')
+
+          # Append new bundle block only when app tag is newer than what's there
+          if grep -q "version: ${OP_VER}" "${CATALOG}"; then
+            echo "Version ${OP_VER} already in catalog — no change needed"
+          else
+            cat >> "${CATALOG}" << BUNDLE
+          ---
+          schema: olm.bundle
+          name: ruptura-operator.v${OP_VER}
+          package: ruptura-operator
+          image: ghcr.io/${{ github.repository_owner }}/ruptura-operator-bundle:v${OP_VER}
+          replaces: ruptura-operator.v${PREV_VER}
+          properties:
+            - type: olm.package
+              value:
+                packageName: ruptura-operator
+                version: ${OP_VER}
+          BUNDLE
+            echo "Added bundle v${OP_VER} to ${CATALOG}"
+          fi
+
+      # ── Commit and open a PR ─────────────────────────────────────────────────
+      - name: Configure git
+        run: |
+          git config user.name  "OHE Bot"
+          git config user.email "bot@ruptura.io"
+
+      - name: Create bump branch and PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          APP_TAG="${{ steps.tag.outputs.app_tag }}"
+          BRANCH="chore/operator-bump-${APP_TAG}"
+
+          git checkout -b "${BRANCH}"
+          git add bundle/manifests/ruptura-operator.clusterserviceversion.yaml \
+                  catalog/ruptura-operator/catalog.yaml
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+
+          git commit -m "chore(operator): bump app image to ${APP_TAG}"
+          git push origin "${BRANCH}"
+
+          gh pr create \
+            --title "chore(operator): bump app image to ${APP_TAG}" \
+            --body "$(cat <<'EOF'
+          ## Automated operator bundle bump
+
+          Triggered by the successful completion of the **Release ruptura** workflow.
+
+          ### Changes
+          - Updated `bundle/manifests/ruptura-operator.clusterserviceversion.yaml` — `relatedImages` app reference → \`${APP_TAG}\`
+          - Added bundle entry to `catalog/ruptura-operator/catalog.yaml`
+
+          ### Before merging
+          - [ ] Confirm the smoke test passes on this branch
+          - [ ] Verify the CSV `relatedImages` points to the correct digest
+
+          🤖 Auto-generated by `operator-bump.yml`
+          EOF
+          )" \
+            --base main \
+            --head "${BRANCH}"
