@@ -5,6 +5,8 @@
   import Map from './routes/Map.svelte'
   import Engine from './routes/Engine.svelte'
   import Nodes from './routes/Nodes.svelte'
+  import Alerts from './routes/Alerts.svelte'
+  import Settings from './routes/Settings.svelte'
 
   let route = ''
 
@@ -26,10 +28,14 @@
       <Fleet />
     {:else if route === 'map'}
       <Map />
+    {:else if route === 'alerts'}
+      <Alerts />
     {:else if route === 'engine'}
       <Engine />
     {:else if route === 'nodes'}
       <Nodes />
+    {:else if route === 'settings'}
+      <Settings />
     {:else}
       <div class="not-found">Page not found</div>
     {/if}

@@ -181,9 +181,15 @@
     })
   }
 
-  onMount(load)
+  let refreshInterval: ReturnType<typeof setInterval>
+
+  onMount(() => {
+    load()
+    refreshInterval = setInterval(load, 20_000)
+  })
 
   onDestroy(() => {
+    clearInterval(refreshInterval)
     if (cy) cy.destroy()
   })
 </script>

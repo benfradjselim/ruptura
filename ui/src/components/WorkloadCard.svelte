@@ -125,6 +125,12 @@
       <span class="calib-icon">⊙</span>
       <span class="calib-txt">Building baseline…</span>
     </div>
+    {#if (host.calibration_progress ?? 0) > 0}
+      <div class="calib-progress-wrap">
+        <div class="calib-progress-fill" style="width:{host.calibration_progress ?? 0}%"></div>
+      </div>
+      <div class="calib-pct">{host.calibration_progress ?? 0}%</div>
+    {/if}
 
   {:else}
     <!-- health ring + score + FusedR -->
@@ -339,6 +345,29 @@
     font-size: 11px;
     color: var(--purple);
     font-style: italic;
+  }
+
+  .calib-progress-wrap {
+    height: 3px;
+    background: var(--surface3);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .calib-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--violet), var(--purple));
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .calib-pct {
+    font-size: 9px;
+    color: var(--muted);
+    text-align: right;
+    margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   /* pending */

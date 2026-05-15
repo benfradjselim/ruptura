@@ -47,6 +47,7 @@ export interface FleetHost {
   last_seen: string
   fused_rupture_index: number
   health_forecast?: HealthForecast
+  calibration_progress?: number
 }
 
 export interface FleetResponse {

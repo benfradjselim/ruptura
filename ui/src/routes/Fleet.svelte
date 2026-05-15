@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import { Chart, registerables } from 'chart.js'
   import {
-    fetchFleet, fetchRupture, fetchHistory, fetchActions,
+    fetchFleet, fetchRupture, fetchRuptures, fetchHistory, fetchActions,
     fetchWorkloadK8s, approveAction, rejectAction, fetchExplain,
   } from '../lib/api'
   import type { FleetHost, RuptureSnapshot, HistoryPoint, Action, WorkloadK8sMeta } from '../lib/api'
@@ -14,6 +14,7 @@
 
   // ── state ─────────────────────────────────────────────────────────────────
   let hosts: FleetHost[] = []
+  let ruptureMap: Record<string, RuptureSnapshot> = {}
   let selected: FleetHost | null = null
   let snap: RuptureSnapshot | null = null
   let history: HistoryPoint[] = []
@@ -165,8 +166,30 @@
 
   async function loadFleet() {
     try {
-      const data = await fetchFleet()
-      hosts = data.hosts ?? []
+      const [fleetData, snapshots] = await Promise.all([fetchFleet(), fetchRuptures()])
+      // Build a lookup of rupture snapshots keyed by workload ref.
+      const newMap: Record<string, RuptureSnapshot> = {}
+      for (const s of snapshots) {
+        const key = s.workload?.namespace
+          ? `${s.workload.namespace}/${s.workload.kind}/${s.workload.name}`
+          : s.host
+        newMap[key] = s
+      }
+      ruptureMap = newMap
+
+      // Merge calibration state from ruptures into fleet hosts.
+      const merged = (fleetData.hosts ?? []).map(h => {
+        const snap = newMap[h.host]
+        if (!snap) return h
+        const isCalibrating = snap.workload_status === 'calibrating' || snap.workload_status === 'pending'
+        return {
+          ...h,
+          state: isCalibrating ? 'calibrating' as const : h.state,
+          calibration_progress: snap.calibration_progress ?? 100,
+        }
+      })
+      hosts = merged
+
       if (selected) {
         const updated = hosts.find(h => h.host === selected!.host)
         if (updated) selected = updated
