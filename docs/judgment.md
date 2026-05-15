@@ -830,7 +830,7 @@ The engine is now honest, wired end-to-end, and stable. The next meaningful addi
 ### P0 — Must ship before showing anyone (dropout prevention)
 
 #### IMPROVE-01 — Calibration Window & Warm-up State
-**Status**: [ ] Not started
+**Status**: [x] shipped v6.3.0
 
 **Problem**: A fresh install shows `fatigue: 0.91` on a perfectly healthy workload within the first hour because the baseline hasn't been learned yet. An engineer reads this as a broken tool, not a learning one, and uninstalls within 48h.
 
@@ -855,7 +855,7 @@ Once `calibration_progress` reaches 100 (after 96 observations at 15s intervals 
 ---
 
 #### IMPROVE-02 — HealthScore Trend Forecast + Rupture ETA
-**Status**: [ ] Not started
+**Status**: [x] shipped v6.3.0
 
 **Problem**: Ruptura currently tells you the current HealthScore. That is a present-tense number. The differentiation — and the sentence that makes an engineer stop — is a future-tense number: "you have 38 minutes."
 
@@ -884,7 +884,7 @@ When HealthScore is stable or improving, `forecast` returns `"trend": "stable"` 
 ---
 
 #### IMPROVE-03 — Ruptura Simulator (`ruptura-sim`)
-**Status**: [ ] Not started
+**Status**: [x] shipped v6.3.0
 
 **Problem**: You cannot wait for a real production incident to demo the tool. Without a controlled demo, every conversation requires explaining the concept in the abstract. A 2-minute screen recording of Ruptura catching a simulated memory leak is worth more than any README.
 
@@ -916,7 +916,7 @@ ruptura-sim patterns
 ### P1 — Makes it genuinely predictive (not just reactive)
 
 #### IMPROVE-04 — Rupture Fingerprinting
-**Status**: [ ] Not started
+**Status**: [x] shipped v6.4.0
 
 **Problem**: Ruptura detects that a workload is degrading. It does not know if this pattern looks like anything it has seen before. Pattern recognition over historical ruptures is the moat — it grows in value the longer the tool runs.
 
@@ -940,7 +940,7 @@ ruptura-sim patterns
 ---
 
 #### IMPROVE-05 — Business Signal Layer (3 new signals)
-**Status**: [ ] Not started
+**Status**: [x] shipped v6.4.0
 
 **Problem**: The current 10 signals are all infrastructure-level. An SRE understands them. A manager does not. Adding business-aware signals makes the tool legible at multiple levels of the org and creates a natural upsell conversation.
 
@@ -1279,7 +1279,7 @@ Context7 libraries to pre-load for v7:
 
 ---
 
-##### [ ] S1-1 · GAP-V7-04 — Auto-discovery (k8s informer)
+##### [x] S1-1 · GAP-V7-04 — Auto-discovery (k8s informer)
 **Component**: `ruptura` core engine · **Effort**: ~1 week · **Agents**: `planner` → `tdd-guide` → `go-reviewer`
 
 **What is broken**: Workloads appear only when telemetry arrives. The Day 1 promise ("within 15 minutes, without manual config, see every Deployment and StatefulSet") is unmet. If OTel Collector is not pre-configured, Ruptura shows nothing.
@@ -1302,7 +1302,7 @@ Context7 libraries to pre-load for v7:
 
 ---
 
-##### [ ] S1-2 · ruptura-ui scaffold — separate Svelte pod (v1.0.0)
+##### [x] S1-2 · ruptura-ui scaffold — separate Svelte pod (v1.0.0)
 **Component**: `ruptura-ui` (new) · **Effort**: ~3 days · **Agents**: `architect` → `planner` → `code-reviewer`
 
 **What to build**:
@@ -1318,7 +1318,7 @@ Context7 libraries to pre-load for v7:
 
 ---
 
-##### [ ] S1-3 · MISSING-05 — Read-write dashboard (mutation forms)
+##### [x] S1-3 · MISSING-05 — Read-write dashboard (mutation forms)
 **Component**: `ruptura-ui` · **Effort**: ~1 week · **Agents**: `tdd-guide` → `code-reviewer`
 
 **What to build** — one interactive form per mutation endpoint:
@@ -1335,7 +1335,7 @@ All forms validate client-side before submission. All errors show inline (not to
 
 ---
 
-##### [ ] S1-4 · MISSING-06 — HealthScore vs FusedR UX explanation
+##### [x] S1-4 · MISSING-06 — HealthScore vs FusedR UX explanation
 **Component**: `ruptura-ui` + `ruptura` core · **Effort**: 2–3 days · **Agents**: `code-reviewer`
 
 **What to build**:
@@ -1356,7 +1356,7 @@ All forms validate client-side before submission. All errors show inline (not to
 
 ---
 
-##### [ ] S2-1 · MISSING-07 — Fusion state API endpoint
+##### [x] S2-1 · MISSING-07 — Fusion state API endpoint
 **Component**: `ruptura` core · **Effort**: 1 day · **Agents**: `tdd-guide` → `go-reviewer`
 
 **What to build**: `GET /api/v2/engine/fusion/{namespace}/{kind}/{name}`
@@ -1382,7 +1382,7 @@ The fusion engine already holds `metricR`, `logR`, `traceR` per workload in memo
 
 ---
 
-##### [ ] S2-2 · GAP-V7-01 — Topology map: API endpoint + visualization
+##### [x] S2-2 · GAP-V7-01 — Topology map: API endpoint + visualization
 **Component**: `ruptura` core + `ruptura-ui` · **Effort**: 1 day API + 4 days UI · **Agents**: `tdd-guide` → `go-reviewer` → `code-reviewer`
 
 **Prerequisite**: S1-1 (auto-discovery) must be done — topology without workloads is an empty graph.
@@ -1413,7 +1413,7 @@ UI — "Workload Map" view using [Cytoscape.js](https://js.cytoscape.org/):
 
 ---
 
-##### [ ] S2-3 · MISSING-08 — Engine self-health page
+##### [x] S2-3 · MISSING-08 — Engine self-health page
 **Component**: `ruptura` core + `ruptura-ui` · **Effort**: 1 day API + 2 days UI · **Agents**: `tdd-guide` → `go-reviewer`
 
 **What to build**:
@@ -1457,7 +1457,7 @@ UI — "Engine" tab in ruptura-ui:
 
 ---
 
-##### [ ] S3-1 · GAP-V7-02 — Kubernetes workload metadata (CRD view)
+##### [x] S3-1 · GAP-V7-02 — Kubernetes workload metadata (CRD view)
 **Component**: `ruptura` core + `ruptura-ui` · **Effort**: 4 days core + 2 days UI · **Agents**: `planner` → `tdd-guide` → `go-reviewer` → `security-reviewer`
 
 **Prerequisite**: S1-1 (informer already watching workloads — extend it to cache full object spec).
@@ -1481,7 +1481,7 @@ UI: workload detail page gains a "Kubernetes" tab alongside "Signals" and "Histo
 
 ---
 
-##### [ ] S3-2 · GAP-V7-03 — Node health view
+##### [x] S3-2 · GAP-V7-03 — Node health view
 **Component**: `ruptura` core + `ruptura-ui` · **Effort**: 3 days API + 2 days UI · **Agents**: `tdd-guide` → `go-reviewer`
 
 **What to build**:
@@ -1496,7 +1496,7 @@ UI: "Nodes" section (accessible from global nav). Grid of node cards, each showi
 
 ---
 
-##### [ ] S3-3 · GAP-OP-01 — Operator bundle auto-update on app release
+##### [x] S3-3 · GAP-OP-01 — Operator bundle auto-update on app release
 **Component**: CI / operator bundle · **Effort**: 2 days · **Agents**: `code-reviewer`
 
 **What to build**: GitHub Actions workflow `.github/workflows/operator-bump.yml`:
@@ -1509,7 +1509,7 @@ This eliminates the manual step of updating the operator every time the app ship
 
 ---
 
-##### [ ] S3-4 · GAP-OP-02 — Operator smoke test in CI
+##### [x] S3-4 · GAP-OP-02 — Operator smoke test in CI
 **Component**: CI / operator · **Effort**: 3 days · **Agents**: `tdd-guide` → `code-reviewer`
 
 **What to build**: `.github/workflows/operator-smoke.yml`:
@@ -1530,7 +1530,7 @@ Must pass on every operator PR. Blocks submission to OperatorHub.
 
 ---
 
-##### [ ] S4-1 · MISSING-09 — SSE event stream + SDK Watch/Wait
+##### [x] S4-1 · MISSING-09 — SSE event stream + SDK Watch/Wait
 **Component**: `ruptura` core + `pkg/client` Go SDK + `sdk/python` · **Effort**: 1 day SSE + 3 days Go SDK + 1 week Python SDK · **Agents**: `tdd-guide` → `go-reviewer` → `security-reviewer`
 
 **What to build**:
