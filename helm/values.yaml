@@ -59,8 +59,11 @@ service:
   annotations: {}
 
 otlpService:
-  type: ClusterIP
+  type: NodePort
   annotations: {}
+
+# -- NodePort for the OTLP ingest port (4317). Set to "" for auto-assignment.
+otlpNodePort: 31470
 
 ingress:
   enabled: false

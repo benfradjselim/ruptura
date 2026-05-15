@@ -39,3 +39,6 @@ spec:
       port: 4317
       targetPort: otlp
       protocol: TCP
+      {{- if and (eq .Values.otlpService.type "NodePort") .Values.otlpNodePort }}
+      nodePort: {{ .Values.otlpNodePort }}
+      {{- end }}
