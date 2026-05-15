@@ -172,7 +172,13 @@ export interface SignalWeights {
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`)
-  return res.json() as Promise<T>
+  const text = await res.text()
+  if (!text || !text.trim()) throw new Error(`Empty response from ${path}`)
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(`Invalid JSON from ${path}`)
+  }
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {

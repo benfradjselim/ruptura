@@ -43,16 +43,7 @@
 
 <nav>
   <a class="brand" href="#fleet">
-    <svg class="logo-img" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" width="26" height="26" aria-label="Ruptura">
-      <defs>
-        <linearGradient id="rnav" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#a855f7"/>
-          <stop offset="100%" stop-color="#06b6d4"/>
-        </linearGradient>
-      </defs>
-      <polygon points="20,3 35,11.5 35,28.5 20,37 5,28.5 5,11.5" fill="url(#rnav)"/>
-      <text x="20" y="26" text-anchor="middle" font-family="monospace" font-weight="700" font-size="17" fill="white">R</text>
-    </svg>
+    <img class="logo-img" src="/ruptura-icon-64.png" alt="Ruptura" width="28" height="28" />
     <span class="name">RUPTURA</span>
     {#if version}<span class="version">v{version}</span>{/if}
   </a>

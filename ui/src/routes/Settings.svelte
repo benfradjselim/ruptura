@@ -243,16 +243,7 @@
         </div>
         <div class="about-body">
           <div class="about-logo">
-            <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
-              <defs>
-                <linearGradient id="rabout" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stop-color="#a855f7"/>
-                  <stop offset="100%" stop-color="#06b6d4"/>
-                </linearGradient>
-              </defs>
-              <polygon points="20,3 35,11.5 35,28.5 20,37 5,28.5 5,11.5" fill="url(#rabout)"/>
-              <text x="20" y="26" text-anchor="middle" font-family="monospace" font-weight="700" font-size="17" fill="white">R</text>
-            </svg>
+            <img src="/ruptura-icon-64.png" alt="Ruptura" width="48" height="48" style="border-radius:8px" />
             <div class="about-name">RUPTURA</div>
           </div>
           <dl class="about-dl">

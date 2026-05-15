@@ -20,8 +20,11 @@
 
   const SIG_ORDER = ['stress','fatigue','mood','pressure','humidity','contagion','resilience','entropy','velocity','throughput']
 
+  $: displayScore   = snap?.health_score?.value ?? host.health_score
+  $: displayFusedR  = snap?.fused_rupture_index ?? host.fused_rupture_index
+
   $: isRupture = host.state !== 'pending_telemetry' && host.state !== 'calibrating'
-    && host.fused_rupture_index > 1.5 && host.health_score > 60
+    && displayFusedR > 1.5 && displayScore > 60
 
   $: forecastEta      = host.health_forecast?.critical_eta_minutes ?? 0
   $: forecastIn15     = host.health_forecast?.in_15min ?? 0
@@ -139,20 +142,18 @@
     {/if}
 
   {:else}
-    <!-- health ring + score + FusedR -->
+    <!-- health ring + score + FusedR (prefer snap KPI values when available) -->
     <div class="metrics-row">
       <svg class="ring" viewBox="0 0 40 40">
-        <!-- track -->
         <circle cx="20" cy="20" r="16" fill="none" stroke="var(--surface3)" stroke-width="3"/>
-        <!-- arc -->
-        <path d={arc(host.health_score)} fill="none" stroke={hsColor(host.health_score)} stroke-width="3" stroke-linecap="round"/>
+        <path d={arc(displayScore)} fill="none" stroke={hsColor(displayScore)} stroke-width="3" stroke-linecap="round"/>
       </svg>
       <div class="score-block">
-        <span class="score" style="color:{hsColor(host.health_score)}">{Math.round(host.health_score)}</span>
+        <span class="score" style="color:{hsColor(displayScore)}">{Math.round(displayScore)}</span>
         <span class="score-label">Health</span>
       </div>
       <div class="fused-block">
-        <span class="fused-val" style="color:{fuseColor(host.fused_rupture_index)}">{host.fused_rupture_index.toFixed(2)}</span>
+        <span class="fused-val" style="color:{fuseColor(displayFusedR)}">{displayFusedR.toFixed(2)}</span>
         <span class="fused-label">FusedR</span>
       </div>
     </div>
@@ -174,7 +175,7 @@
     <!-- early rupture warning -->
     {#if isRupture}
       <div class="rupture-warn">
-        <span class="rw-title">◉ Early rupture · FusedR {host.fused_rupture_index.toFixed(1)}</span>
+        <span class="rw-title">◉ Early rupture · FusedR {displayFusedR.toFixed(1)}</span>
         {#if forecastEta > 0}
           <span class="rw-body">→ HealthScore ≈ {Math.round(forecastIn15)} in 15m
             {#if forecastLowConf}<em>(low conf.)</em>{/if}

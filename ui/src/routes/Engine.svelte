@@ -1,23 +1,41 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { fetchEngineStatus, fetchEngineStorage } from '../lib/api'
-  import type { EngineStatus, EngineStorage } from '../lib/api'
+  import { fetchEngineStatus, fetchEngineStorage, fetchDataflow } from '../lib/api'
+  import type { EngineStatus, EngineStorage, DataflowStats } from '../lib/api'
 
   let status: EngineStatus | null = null
   let storage: EngineStorage | null = null
+  let dataflow: DataflowStats | null = null
+  let prevDataflow: DataflowStats | null = null
   let statusErr = ''
   let storageErr = ''
   let loading = true
   let apiLatencyMs = 0
   let interval: ReturnType<typeof setInterval>
 
+  // rolling rate estimate from two consecutive dataflow snapshots
+  $: metricsRate = prevDataflow && dataflow
+    ? Math.max(0, dataflow.metrics - prevDataflow.metrics)
+    : 0
+  $: logsRate = prevDataflow && dataflow
+    ? Math.max(0, dataflow.logs - prevDataflow.logs)
+    : 0
+  $: tracesRate = prevDataflow && dataflow
+    ? Math.max(0, dataflow.traces - prevDataflow.traces)
+    : 0
+
   async function load() {
     const t0 = Date.now()
     try {
-      ;[status, storage] = await Promise.all([
+      const [s, st, df] = await Promise.all([
         fetchEngineStatus(),
-        fetchEngineStorage(),
+        fetchEngineStorage().catch(() => null),
+        fetchDataflow().catch(() => null),
       ])
+      status = s
+      storage = st
+      prevDataflow = dataflow
+      dataflow = df
       apiLatencyMs = Date.now() - t0
       statusErr = ''
       storageErr = ''
@@ -154,7 +172,52 @@
       </div>
     </div>
 
-    <!-- Row 5: Storage -->
+    <!-- Row 5: Live Data Flow (cumulative totals) -->
+    {#if dataflow}
+      <div class="section-label">Live Data Flow</div>
+      <div class="grid grid-3">
+        <div class="card df-card">
+          <div class="card-title">Total Metrics</div>
+          <div class="big-val cyan">{dataflow.metrics.toLocaleString()}</div>
+          {#if metricsRate > 0}<div class="sub">+{metricsRate.toLocaleString()} since last tick</div>{/if}
+        </div>
+        <div class="card df-card">
+          <div class="card-title">Total Log Lines</div>
+          <div class="big-val blue">{dataflow.logs.toLocaleString()}</div>
+          {#if logsRate > 0}<div class="sub">+{logsRate.toLocaleString()} since last tick</div>{/if}
+        </div>
+        <div class="card df-card">
+          <div class="card-title">Total Traces</div>
+          <div class="big-val violet">{dataflow.traces.toLocaleString()}</div>
+          {#if tracesRate > 0}<div class="sub">+{tracesRate.toLocaleString()} since last tick</div>{/if}
+        </div>
+      </div>
+      <div class="df-flow-bar">
+        {#each [
+          { label:'Metrics', val: dataflow.metrics, color:'var(--cyan)' },
+          { label:'Logs',    val: dataflow.logs,    color:'var(--blue)' },
+          { label:'Traces',  val: dataflow.traces,  color:'#bc8cff' },
+        ] as seg}
+          {@const total = dataflow.metrics + dataflow.logs + dataflow.traces || 1}
+          <div
+            class="df-seg"
+            style="flex:{seg.val / total};background:{seg.color}"
+            title="{seg.label}: {seg.val.toLocaleString()}"
+          ></div>
+        {/each}
+      </div>
+      <div class="df-legend">
+        {#each [
+          { label:'Metrics', color:'var(--cyan)' },
+          { label:'Logs',    color:'var(--blue)' },
+          { label:'Traces',  color:'#bc8cff' },
+        ] as item}
+          <span class="df-leg-item"><span class="df-dot" style="background:{item.color}"></span>{item.label}</span>
+        {/each}
+      </div>
+    {/if}
+
+    <!-- Row 6: Storage -->
     {#if storage}
       <div class="section-label">Storage (BadgerDB)</div>
       <div class="grid grid-4">
@@ -296,6 +359,40 @@
   .big-val.muted   { color: var(--muted); }
   .big-val.edition { text-transform: capitalize; font-size: 18px; }
   .big-val.warn    { color: #e3b341; }
+  .big-val.cyan    { color: var(--cyan); }
+  .big-val.blue    { color: var(--blue); }
+  .big-val.violet  { color: #bc8cff; }
+
+  /* dataflow flow bar */
+  .df-flow-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    gap: 2px;
+  }
+
+  .df-seg {
+    border-radius: 4px;
+    transition: flex 0.5s ease;
+    min-width: 4px;
+  }
+
+  .df-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .df-leg-item { display: flex; align-items: center; gap: 5px; }
+
+  .df-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
 
   .sub { font-size: 10px; color: var(--muted); }
 
