@@ -40,6 +40,13 @@ spec:
           env:
             - name: RUPTURA_BACKEND_URL
               value: "http://{{ include "ruptura.fullname" . }}"
+            {{- if .Values.apiKey }}
+            - name: RUPTURA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ruptura.fullname" . }}-secret
+                  key: api-key
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /health
