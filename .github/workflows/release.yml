@@ -347,6 +347,7 @@ jobs:
             --set "podAnnotations.deploy/commit=${{ github.sha }}" \
             --set ui.enabled=true \
             --set "ui.image.tag=${{ needs.docker-ui.outputs.ui-tag }}" \
+            --set "podAnnotations.deploy/ui-sha=${{ github.sha }}" \
             --set ui.service.type=NodePort \
             --set ui.nodePort=31469 \
             --kubeconfig /tmp/kubeconfig \

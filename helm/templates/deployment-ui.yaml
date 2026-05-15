@@ -15,6 +15,13 @@ spec:
       app.kubernetes.io/component: ui
   template:
     metadata:
+      annotations:
+        {{- if .Values.ui.image.tag }}
+        deploy/ui-image: {{ .Values.ui.image.tag | quote }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "ruptura.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: ui
