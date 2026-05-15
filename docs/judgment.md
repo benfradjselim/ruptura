@@ -1151,6 +1151,39 @@ workloadWeights:
 
 ---
 
+### v7.0.0 (shipped 2026-05-15 — "Deviser pour réunir" release)
+
+**What shipped across Sprints 1–4**:
+- **S1-1 / GAP-V7-04** — Auto-discovery: k8s informer (`internal/discovery/`) watches Deployments/StatefulSets/DaemonSets cluster-wide. Workloads pre-registered with `pending_telemetry` state. Day 1 promise fulfilled — all workloads visible within 15 minutes without manual annotation.
+- **S1-2** — `ruptura-ui v1.0.0`: separate Svelte 4 + Vite pod, nginx multi-stage Dockerfile, Helm `ui.enabled`, `release-ui.yml` CI workflow. `ui/public/version.json` created.
+- **S1-3 / MISSING-05** — Read-write dashboard: SuppressionModal (create/list/delete), WeightsModal (inline edit + save), wired into Fleet toolbar.
+- **S1-4 / MISSING-06** — HealthScore/FusedR UX: `confidence_window` added to `HealthForecast`; inline rupture-warning banner in WorkloadCard when `fused_r > 1.5` AND `health_score > 60`.
+- **S2-1 / MISSING-07** — Fusion state API: `GET /api/v2/engine/fusion/{ns}/{kind}/{name}` returns `metric_r`, `log_r`, `trace_r`, `fused_r`, `dominant_pipeline`.
+- **S2-2 / GAP-V7-01** — Topology map: `GET /api/v2/topology` (nodes + edges from TopologyBuilder); `TopologyMap.svelte` Cytoscape.js force-directed with contagion path highlight.
+- **S2-3 / MISSING-08** — Engine self-health: `GET /api/v2/engine/status` + `GET /api/v2/engine/storage`; Engine.svelte with analyzer, ingest bars, action queue, BadgerDB cards.
+- **S3-1 / GAP-V7-02** — k8s workload metadata: MetadataCache + LIST/WATCH pods; `GET /api/v2/workloads/{ns}/{kind}/{name}/k8s`; Fleet.svelte Kubernetes tab.
+- **S3-2 / GAP-V7-03** — Node health view: `GET /api/v2/nodes` + `/nodes/{node}`; Nodes.svelte with detail panel.
+- **S3-3 / GAP-OP-01** — Operator bundle CI: `operator-bump.yml` workflow_run trigger, CSV image bump, catalog.yaml PR automation.
+- **S3-4 / GAP-OP-02** — Operator smoke test CI: `operator-smoke.yml` k3d+OLM, deploys RupturaInstance CR, asserts `Running` pod + `/api/v2/health` 200.
+- **S4-1 / MISSING-09** — SSE event stream: `GET /api/v2/events` fan-out, heartbeat every 30s. Go SDK `Watch()` and `WaitForHealth()` in `pkg/client`. Python SDK full implementation at `sdk/python/ruptura/`.
+- **FR-10 / S4-2** — Multi-tenant X-Org-ID: **deferred** — no enterprise customer request yet.
+
+**Version bumps in this release**:
+- `ruptura` core: `6.8.13 → 7.0.0`
+- `ruptura-ctl`: `1.0.0 → 1.1.0`
+- Helm chart: `0.7.6 / appVersion 6.8.13 → 0.8.0 / appVersion 7.0.0`
+- `ruptura-ui`: v1.0.0 (new component)
+
+**`go test -race ./...`**: all packages pass clean.
+**`helm lint`**: 0 failures.
+
+**v7 Completion Test status**: ✅ An SRE installs on a fresh cluster, sees all workloads within 15 min (auto-discovery), clicks a degrading workload for causal narrative, views the service dependency graph (topology map), creates a suppression window, and checks engine health — all from one browser tab.
+
+**Deferred to v7.1**:
+- FR-10: X-Org-ID multi-tenant isolation (enterprise only, requires customer demand).
+
+---
+
 ## v7.0 Judgment — "Deviser pour réunir" (May 2026)
 
 > This section is the v7 sprint authority.

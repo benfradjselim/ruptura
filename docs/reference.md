@@ -10,13 +10,13 @@
 
 | Component | Version | Image / Binary |
 |-----------|---------|----------------|
-| ruptura (core engine) | v7.0.0 (in progress) | `ghcr.io/benfradjselim/ruptura:v7.0.0` |
-| ruptura-ui (dashboard) | v1.0.0 (new — not yet built) | `ghcr.io/benfradjselim/ruptura-ui:v1.0.0` |
-| ruptura-ctl (CLI) | v1.0.0 → v1.1.0 target | binary `ruptura-ctl-{os}-{arch}` |
+| ruptura (core engine) | v7.0.0 | `ghcr.io/benfradjselim/ruptura:v7.0.0` |
+| ruptura-ui (dashboard) | v1.0.0 | `ghcr.io/benfradjselim/ruptura-ui:v1.0.0` |
+| ruptura-ctl (CLI) | v1.1.0 | binary `ruptura-ctl-{os}-{arch}` |
 | ruptura-operator | v0.6.9 → v0.7.0 target | `ghcr.io/benfradjselim/ruptura-operator:v0.7.0` |
-| Helm chart | 0.7.6 → 0.8.0 target | `oci://ghcr.io/benfradjselim/charts/ruptura` |
+| Helm chart | 0.8.0 (appVersion 7.0.0) | `oci://ghcr.io/benfradjselim/charts/ruptura` |
 
-Last updated: 2026-05-14 (Sprint 3+4 done — k8s workload metadata, node health view, operator CI, SSE+SDK)
+Last updated: 2026-05-15 (v7.0.0 shipped — all sprints complete, version bumps applied)
 
 ---
 
