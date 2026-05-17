@@ -20,7 +20,7 @@ env:
 # packages: write  → push image + Helm chart to GHCR
 # id-token: write  → Cosign OIDC keyless signing
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write
 
@@ -81,6 +81,20 @@ jobs:
             -o /tmp/ruptura-ctl-linux-arm64  ./cmd/ruptura-ctl
           GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" \
             -o /tmp/ruptura-ctl-darwin-arm64 ./cmd/ruptura-ctl
+
+      - name: Create GitHub release (if it doesn't exist)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --title "$TAG" \
+              --notes "Release $TAG" \
+              --draft=false \
+              --prerelease=false
+          fi
 
       - name: Attach binaries to GitHub release
         env:
