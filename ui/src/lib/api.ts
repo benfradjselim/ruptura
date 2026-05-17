@@ -295,8 +295,9 @@ export interface TopologyGraph {
   edges: TopologyEdge[]
 }
 
-export function fetchTopology() {
-  return get<TopologyGraph>('/api/v2/topology')
+export async function fetchTopology(): Promise<TopologyGraph> {
+  const r = await get<TopologyGraph | null>('/api/v2/topology')
+  return r ?? { nodes: [], edges: [] }
 }
 
 // ── nodes ────────────────────────────────────────────────────────────────────

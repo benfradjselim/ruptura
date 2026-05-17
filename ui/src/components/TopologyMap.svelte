@@ -172,9 +172,11 @@
     loadErr = ''
     try {
       const graph = await fetchTopology()
-      mergeGraph(graph.nodes, graph.edges)
-      edgeType = graph.edges.length === 0 ? 'none'
-        : graph.edges.some(e => e.edge_type === 'trace') ? 'trace' : 'inferred'
+      const safeNodes = graph?.nodes ?? []
+      const safeEdges = graph?.edges ?? []
+      mergeGraph(safeNodes, safeEdges)
+      edgeType = safeEdges.length === 0 ? 'none'
+        : safeEdges.some(e => e.edge_type === 'trace') ? 'trace' : 'inferred'
     } catch (e) {
       loadErr = e instanceof Error ? e.message : String(e)
     } finally {
