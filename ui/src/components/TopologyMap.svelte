@@ -406,12 +406,14 @@
           {@const isHovered  = n.id === hoveredId}
           {@const isImpact   = impactNodeIds.has(n.id)}
           {@const dimmed     = hoveredId !== null && !isHovered && !isImpact}
-          <!-- svelte-ignore a11y-no-static-element-interactions -->
           <g
+            role="button"
+            tabindex="0"
             class="node-g {pulseClass(n)}"
             transform="translate({n.x},{n.y})"
             style="cursor:pointer; opacity:{dimmed ? 0.2 : 1}"
             on:click={() => selectNode(n.id)}
+            on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectNode(n.id) }}
             on:mouseenter={() => { hoveredId = n.id }}
             on:mouseleave={() => { hoveredId = null }}
           >
@@ -471,9 +473,10 @@
           {#each isolatedNodes as n (n.id)}
             {@const col = healthColor(n.health_score, n.state)}
             {@const isSelected = n.id === selectedId}
-            <!-- svelte-ignore a11y-no-static-element-interactions -->
-            <g transform="translate({n.x},{n.y})" style="cursor:pointer"
+            <g role="button" tabindex="0"
+              transform="translate({n.x},{n.y})" style="cursor:pointer"
               on:click={() => selectNode(n.id)}
+              on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectNode(n.id) }}
               on:mouseenter={() => { hoveredId = n.id }}
               on:mouseleave={() => { hoveredId = null }}>
               <!-- rounded rect background -->
