@@ -245,8 +245,14 @@ export function fetchAlerts() {
 
 // ── engine status / storage ───────────────────────────────────────────────────
 
-export function fetchEngineStatus() {
-  return get<EngineStatus>('/api/v2/engine/status')
+export async function fetchEngineStatus(): Promise<EngineStatus> {
+  const r = await get<EngineStatus | null>('/api/v2/engine/status')
+  return r ?? {
+    analyzer: { tick_interval_ms: 0, last_tick_ago_ms: 0, active_workloads: 0, calibrating_workloads: 0, pending_workloads: 0 },
+    ingest: { metrics_per_sec: 0, logs_per_sec: 0, traces_per_sec: 0 },
+    actions: { pending_tier1: 0, pending_tier2: 0, executed_last_hour: 0 },
+    version: '', edition: '', uptime_seconds: 0,
+  }
 }
 
 export interface EngineStorage {
