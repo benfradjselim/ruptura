@@ -27,6 +27,7 @@
   let events: Array<{ type: string; workload: string; fused_r?: number; ts: string }> = []
   let predictions: PredictionEntry[] = []
   let logs: LogEntry[] = []
+  let predHorizon = 120
 
   let tab = 'signals'
   let loading = true
@@ -235,10 +236,15 @@
   async function loadPredictions(h: FleetHost) {
     predLoading = true; predictions = []
     try {
-      const r = await fetchPredictions(h.host)
+      const r = await fetchPredictions(h.host, predHorizon)
       predictions = r.predictions ?? []
     } catch { predictions = [] }
     finally { predLoading = false }
+  }
+
+  function changePredHorizon(h: number) {
+    predHorizon = h
+    if (selected) loadPredictions(selected)
   }
 
   async function loadLogs(h: FleetHost) {
@@ -627,6 +633,12 @@
 
         <!-- ── PREDICTIONS ── -->
         {:else if tab === 'predictions'}
+          <div class="pred-horizon-bar">
+            <span class="slabel">Horizon:</span>
+            {#each [{m:60,l:'1h'},{m:120,l:'2h'},{m:360,l:'6h'},{m:720,l:'12h'},{m:1440,l:'24h'},{m:2880,l:'48h'}] as opt}
+              <button class="hz-btn" class:active={predHorizon === opt.m} on:click={() => changePredHorizon(opt.m)}>{opt.l}</button>
+            {/each}
+          </div>
           {#if predLoading}
             <div class="loading">Loading predictions…</div>
           {:else if predictions.length === 0}
@@ -973,6 +985,14 @@
   }
 
   /* predictions */
+  .pred-horizon-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .hz-btn {
+    padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--muted); font-size: 11px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .hz-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .hz-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
   .pred-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
   .pred-card {
     background: var(--surface2); border: 1px solid var(--border);

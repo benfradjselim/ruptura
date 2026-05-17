@@ -1,0 +1,486 @@
+---
+# Demo workloads for Ruptura observability testing.
+# Deploys: payment-api, inventory-api, batch-processor, frontend
+# Each service exports Prometheus metrics and OTLP traces.
+# All services emit realistic behavior patterns (healthy, degrading, spiking).
+#
+# Apply: kubectl apply -f demo-workloads.yaml
+# These land in namespace "ruptura-demo" and are auto-discovered by Ruptura.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ruptura-demo
+  labels:
+    ruptura.dev/autodiscover: "true"
+
+---
+# payment-api: normally healthy, periodic stress spikes every 30 min
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: ruptura-demo
+  labels:
+    app: payment-api
+    ruptura.dev/tier: critical
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: payment-api
+        image: ghcr.io/benfradjselim/ruptura:7.0.5
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Simulate payment-api metrics via Prometheus text format
+          mkdir -p /tmp/metrics
+          cat > /tmp/serve.py << 'EOF'
+          import http.server, time, math, random, os
+
+          PORT = 8080
+          start = time.time()
+
+          def metrics():
+              t = time.time() - start
+              # Periodic stress spike every 30min, lasting 5min
+              spike = 0.7 if (t % 1800) < 300 else 0.15
+              cpu = spike + random.gauss(0, 0.03)
+              mem = 0.45 + 0.1 * math.sin(t / 600) + random.gauss(0, 0.02)
+              rps = 450 + 50 * math.sin(t / 300) + random.gauss(0, 10)
+              err = 0.002 + (0.04 if (t % 1800) < 300 else 0)
+              lat = 45 + 30 * (spike / 0.7) + random.gauss(0, 5)
+              return f"""# HELP process_cpu_usage CPU usage ratio
+          # TYPE process_cpu_usage gauge
+          process_cpu_usage{{service="payment-api"}} {max(0, min(1, cpu)):.4f}
+          # HELP process_memory_usage Memory usage ratio
+          # TYPE process_memory_usage gauge
+          process_memory_usage{{service="payment-api"}} {max(0, min(1, mem)):.4f}
+          # HELP http_requests_total Total HTTP requests
+          # TYPE http_requests_total counter
+          http_requests_total{{service="payment-api",status="2xx"}} {int(rps * t):.0f}
+          http_requests_total{{service="payment-api",status="5xx"}} {int(err * rps * t):.0f}
+          # HELP http_request_duration_p99 P99 latency ms
+          # TYPE http_request_duration_p99 gauge
+          http_request_duration_p99{{service="payment-api"}} {max(1, lat):.1f}
+          """
+
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == '/metrics':
+                      body = metrics().encode()
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'text/plain; version=0.0.4')
+                      self.send_header('Content-Length', str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                  elif self.path in ('/', '/health'):
+                      self.send_response(200)
+                      self.end_headers()
+                      self.wfile.write(b'ok')
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+              def log_message(self, *args): pass
+
+          http.server.HTTPServer(('', PORT), H).serve_forever()
+          EOF
+          python3 /tmp/serve.py
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api
+  namespace: ruptura-demo
+  labels:
+    app: payment-api
+spec:
+  selector:
+    app: payment-api
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+
+---
+# inventory-api: gradually degrading memory leak pattern
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-api
+  namespace: ruptura-demo
+  labels:
+    app: inventory-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-api
+  template:
+    metadata:
+      labels:
+        app: inventory-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: inventory-api
+        image: ghcr.io/benfradjselim/ruptura:7.0.5
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cat > /tmp/serve.py << 'EOF'
+          import http.server, time, math, random
+
+          PORT = 8080
+          start = time.time()
+
+          def metrics():
+              t = time.time() - start
+              # Memory leak: grows 0.1% per minute, resets every 2h
+              cycle = t % 7200
+              mem_leak = min(0.95, 0.30 + (cycle / 7200) * 0.6)
+              cpu = 0.12 + 0.05 * math.sin(t / 400) + random.gauss(0, 0.02)
+              rps = 180 + 20 * math.sin(t / 600) + random.gauss(0, 5)
+              err = 0.001 + 0.005 * (mem_leak / 0.95)
+              lat = 30 + 80 * (mem_leak - 0.30) + random.gauss(0, 3)
+              return f"""# HELP process_cpu_usage CPU usage ratio
+          # TYPE process_cpu_usage gauge
+          process_cpu_usage{{service="inventory-api"}} {max(0, min(1, cpu)):.4f}
+          # HELP process_memory_usage Memory usage ratio
+          # TYPE process_memory_usage gauge
+          process_memory_usage{{service="inventory-api"}} {max(0, min(1, mem_leak)):.4f}
+          # HELP http_requests_total Total HTTP requests
+          # TYPE http_requests_total counter
+          http_requests_total{{service="inventory-api",status="2xx"}} {int(rps * t):.0f}
+          http_requests_total{{service="inventory-api",status="5xx"}} {int(err * rps * t):.0f}
+          # HELP http_request_duration_p99 P99 latency ms
+          # TYPE http_request_duration_p99 gauge
+          http_request_duration_p99{{service="inventory-api"}} {max(1, lat):.1f}
+          """
+
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == '/metrics':
+                      body = metrics().encode()
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'text/plain; version=0.0.4')
+                      self.send_header('Content-Length', str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                  elif self.path in ('/', '/health'):
+                      self.send_response(200)
+                      self.end_headers()
+                      self.wfile.write(b'ok')
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+              def log_message(self, *args): pass
+
+          http.server.HTTPServer(('', PORT), H).serve_forever()
+          EOF
+          python3 /tmp/serve.py
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-api
+  namespace: ruptura-demo
+  labels:
+    app: inventory-api
+spec:
+  selector:
+    app: inventory-api
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+
+---
+# batch-processor: bursty CPU usage, quiet between bursts, simulates nightly jobs
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: batch-processor
+  namespace: ruptura-demo
+  labels:
+    app: batch-processor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: batch-processor
+  template:
+    metadata:
+      labels:
+        app: batch-processor
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: batch-processor
+        image: ghcr.io/benfradjselim/ruptura:7.0.5
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cat > /tmp/serve.py << 'EOF'
+          import http.server, time, math, random
+
+          PORT = 8080
+          start = time.time()
+
+          def metrics():
+              t = time.time() - start
+              # Burst every 15min for 3min (simulates cron batch)
+              burst = (t % 900) < 180
+              cpu = (0.85 + random.gauss(0, 0.05)) if burst else (0.03 + random.gauss(0, 0.01))
+              mem = (0.70 + random.gauss(0, 0.03)) if burst else (0.25 + random.gauss(0, 0.02))
+              jobs = int((t // 900) * 1000) + (int((t % 900) / 0.18) if burst else 0)
+              return f"""# HELP process_cpu_usage CPU usage ratio
+          # TYPE process_cpu_usage gauge
+          process_cpu_usage{{service="batch-processor"}} {max(0, min(1, cpu)):.4f}
+          # HELP process_memory_usage Memory usage ratio
+          # TYPE process_memory_usage gauge
+          process_memory_usage{{service="batch-processor"}} {max(0, min(1, mem)):.4f}
+          # HELP batch_jobs_processed_total Jobs processed total
+          # TYPE batch_jobs_processed_total counter
+          batch_jobs_processed_total{{service="batch-processor"}} {jobs}
+          # HELP batch_queue_depth Current queue depth
+          # TYPE batch_queue_depth gauge
+          batch_queue_depth{{service="batch-processor"}} {max(0, int((180 - (t % 900)) * 50)) if burst else 0}
+          """
+
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == '/metrics':
+                      body = metrics().encode()
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'text/plain; version=0.0.4')
+                      self.send_header('Content-Length', str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                  elif self.path in ('/', '/health'):
+                      self.send_response(200)
+                      self.end_headers()
+                      self.wfile.write(b'ok')
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+              def log_message(self, *args): pass
+
+          http.server.HTTPServer(('', PORT), H).serve_forever()
+          EOF
+          python3 /tmp/serve.py
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: batch-processor
+  namespace: ruptura-demo
+  labels:
+    app: batch-processor
+spec:
+  selector:
+    app: batch-processor
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+
+---
+# frontend: stable, low-traffic, healthy baseline
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: ruptura-demo
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: frontend
+        image: ghcr.io/benfradjselim/ruptura:7.0.5
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cat > /tmp/serve.py << 'EOF'
+          import http.server, time, math, random
+
+          PORT = 8080
+          start = time.time()
+
+          def metrics():
+              t = time.time() - start
+              cpu = 0.08 + 0.03 * math.sin(t / 1200) + random.gauss(0, 0.01)
+              mem = 0.35 + 0.05 * math.sin(t / 3600) + random.gauss(0, 0.01)
+              rps = 800 + 100 * math.sin(t / 1800) + random.gauss(0, 15)
+              lat = 12 + 3 * math.sin(t / 900) + random.gauss(0, 1)
+              return f"""# HELP process_cpu_usage CPU usage ratio
+          # TYPE process_cpu_usage gauge
+          process_cpu_usage{{service="frontend"}} {max(0, min(1, cpu)):.4f}
+          # HELP process_memory_usage Memory usage ratio
+          # TYPE process_memory_usage gauge
+          process_memory_usage{{service="frontend"}} {max(0, min(1, mem)):.4f}
+          # HELP http_requests_total Total HTTP requests
+          # TYPE http_requests_total counter
+          http_requests_total{{service="frontend",status="2xx"}} {int(rps * t):.0f}
+          http_requests_total{{service="frontend",status="5xx"}} {int(0.0005 * rps * t):.0f}
+          # HELP http_request_duration_p99 P99 latency ms
+          # TYPE http_request_duration_p99 gauge
+          http_request_duration_p99{{service="frontend"}} {max(1, lat):.1f}
+          """
+
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == '/metrics':
+                      body = metrics().encode()
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'text/plain; version=0.0.4')
+                      self.send_header('Content-Length', str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                  elif self.path in ('/', '/health'):
+                      self.send_response(200)
+                      self.end_headers()
+                      self.wfile.write(b'ok')
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+              def log_message(self, *args): pass
+
+          http.server.HTTPServer(('', PORT), H).serve_forever()
+          EOF
+          python3 /tmp/serve.py
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: ruptura-demo
+  labels:
+    app: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+
+---
+# Prometheus scrape config for the demo workloads.
+# This ConfigMap feeds Ruptura's built-in Prometheus scraper via remote-write.
+# Ruptura scrapes these services directly (no separate Prometheus needed).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ruptura-scrape-targets
+  namespace: ruptura-demo
+data:
+  targets.json: |
+    [
+      {"host": "ruptura-demo/Deployment/payment-api",   "url": "http://payment-api.ruptura-demo.svc.cluster.local:8080/metrics"},
+      {"host": "ruptura-demo/Deployment/inventory-api", "url": "http://inventory-api.ruptura-demo.svc.cluster.local:8080/metrics"},
+      {"host": "ruptura-demo/Deployment/batch-processor","url": "http://batch-processor.ruptura-demo.svc.cluster.local:8080/metrics"},
+      {"host": "ruptura-demo/Deployment/frontend",      "url": "http://frontend.ruptura-demo.svc.cluster.local:8080/metrics"}
+    ]

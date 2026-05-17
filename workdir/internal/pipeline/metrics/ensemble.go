@@ -198,7 +198,7 @@ func (e *seriesEnsemble) confidence() float64 {
 
 // forecastOffsets returns an ascending set of minute offsets up to horizonMin.
 func forecastOffsets(horizonMin int) []int {
-	bases := []int{1, 5, 10, 30, 60, 120, 360}
+	bases := []int{1, 5, 10, 30, 60, 120, 360, 720, 1440, 2880}
 	var out []int
 	for _, b := range bases {
 		if b < horizonMin {
