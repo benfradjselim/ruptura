@@ -40,7 +40,7 @@ spec:
     spec:
       containers:
       - name: payment-api
-        image: ghcr.io/benfradjselim/ruptura:7.0.5
+        image: python:3.11-alpine
         command:
         - /bin/sh
         - -c
@@ -156,7 +156,7 @@ spec:
     spec:
       containers:
       - name: inventory-api
-        image: ghcr.io/benfradjselim/ruptura:7.0.5
+        image: python:3.11-alpine
         command:
         - /bin/sh
         - -c
@@ -270,7 +270,7 @@ spec:
     spec:
       containers:
       - name: batch-processor
-        image: ghcr.io/benfradjselim/ruptura:7.0.5
+        image: python:3.11-alpine
         command:
         - /bin/sh
         - -c
@@ -381,7 +381,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ghcr.io/benfradjselim/ruptura:7.0.5
+        image: python:3.11-alpine
         command:
         - /bin/sh
         - -c

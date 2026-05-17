@@ -1,0 +1,128 @@
+---
+# Ruptura Demo Scraper — bridges Prometheus text-format endpoints to Ruptura
+# Deploys in ruptura-demo namespace and scrapes all demo services every 15s.
+# Forwards metrics to Ruptura via the /api/v2/write JSON API.
+#
+# Apply after deploy/demo-workloads.yaml:
+#   kubectl apply -f deploy/scraper.yaml
+#
+# The RUPTURA_URL env var points to the Ruptura service inside the cluster.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruptura-scraper
+  namespace: ruptura-demo
+  labels:
+    app: ruptura-scraper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruptura-scraper
+  template:
+    metadata:
+      labels:
+        app: ruptura-scraper
+    spec:
+      containers:
+      - name: scraper
+        image: python:3.11-alpine
+        env:
+        - name: RUPTURA_URL
+          value: "http://ruptura.ruptura-system.svc.cluster.local:8080"
+        - name: SCRAPE_INTERVAL
+          value: "15"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cat > /scraper.py << 'PYEOF'
+          import json, time, urllib.request, urllib.error, os, re, sys
+
+          RUPTURA = os.environ.get("RUPTURA_URL", "http://ruptura.ruptura-system.svc.cluster.local:8080")
+          INTERVAL = int(os.environ.get("SCRAPE_INTERVAL", "15"))
+          NAMESPACE = "ruptura-demo"
+
+          TARGETS = [
+              {"host": f"{NAMESPACE}/Deployment/payment-api",    "url": "http://payment-api.ruptura-demo.svc.cluster.local:8080/metrics"},
+              {"host": f"{NAMESPACE}/Deployment/inventory-api",  "url": "http://inventory-api.ruptura-demo.svc.cluster.local:8080/metrics"},
+              {"host": f"{NAMESPACE}/Deployment/batch-processor","url": "http://batch-processor.ruptura-demo.svc.cluster.local:8080/metrics"},
+              {"host": f"{NAMESPACE}/Deployment/frontend",       "url": "http://frontend.ruptura-demo.svc.cluster.local:8080/metrics"},
+          ]
+
+          METRIC_RE = re.compile(r'^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:{[^}]*})?\s+([-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)')
+
+          def scrape(target_url):
+              try:
+                  with urllib.request.urlopen(target_url, timeout=5) as r:
+                      return r.read().decode()
+              except Exception as e:
+                  print(f"[WARN] scrape {target_url}: {e}", flush=True)
+                  return ""
+
+          def parse_metrics(text):
+              metrics = {}
+              for line in text.splitlines():
+                  line = line.strip()
+                  if not line or line.startswith("#"):
+                      continue
+                  m = METRIC_RE.match(line)
+                  if m:
+                      name, val = m.group(1), float(m.group(2))
+                      metrics[name] = val
+              return metrics
+
+          def ts_ms():
+              return int(time.time() * 1000)
+
+          def make_timeseries(host, metric, value):
+              parts = host.split("/")
+              ns = parts[0] if parts else "unknown"
+              name = parts[2] if len(parts) > 2 else host
+              return {
+                  "Labels": [
+                      {"Name": "__name__",   "Value": metric},
+                      {"Name": "host",       "Value": host},
+                      {"Name": "namespace",  "Value": ns},
+                      {"Name": "deployment", "Value": name},
+                  ],
+                  "Samples": [{"Value": round(value, 6), "Timestamp": ts_ms()}],
+              }
+
+          def push(timeseries):
+              if not timeseries:
+                  return
+              payload = json.dumps({"timeseries": timeseries}).encode()
+              req = urllib.request.Request(
+                  f"{RUPTURA}/api/v2/write",
+                  data=payload,
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=5) as r:
+                      pass
+              except Exception as e:
+                  print(f"[ERR] push to Ruptura: {e}", flush=True)
+
+          print(f"[INFO] Scraper started. Ruptura: {RUPTURA}, interval: {INTERVAL}s", flush=True)
+          while True:
+              all_ts = []
+              for t in TARGETS:
+                  text = scrape(t["url"])
+                  metrics = parse_metrics(text)
+                  for name, val in metrics.items():
+                      all_ts.append(make_timeseries(t["host"], name, val))
+              push(all_ts)
+              print(f"[INFO] Pushed {len(all_ts)} timeseries from {len(TARGETS)} targets", flush=True)
+              time.sleep(INTERVAL)
+          PYEOF
+          python3 /scraper.py
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi

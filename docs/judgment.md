@@ -1579,3 +1579,75 @@ Python SDK (`sdk/python/ruptura/`) — full implementation, not stubs:
 > An SRE installs Ruptura on a fresh k3s cluster. Within 15 minutes, without editing any config file, they see all their workloads. They click one that is degrading, read why it is degrading (causal narrative), click through its service dependency graph, create a suppression window for an upcoming deploy, and see Ruptura's own component health — all from one browser tab. No CLI required for Day 1 operation.
 
 Every v7 feature either contributes to that test or it is deferred to v7.1.
+
+---
+
+## v7.0.5 Session Findings (2026-05-17)
+
+### What shipped in this session
+
+**Topology panel rewrite (complete)**
+- Replaced static Cytoscape-based topology with a pure SVG force-simulation graph
+- requestAnimationFrame-based spring physics: repulsion, attraction, damping, center gravity
+- Particle animation along edges (dots moving in traffic direction)
+- CSS pulse animation for health rings; contagion spinning ring indicator
+- Inferred KPI correlation edges when no OTLP trace spans available (backend)
+- Isolated nodes shown in a separate grid section below the graph
+- Impact propagation highlight on hover (upstream/downstream highlighted)
+- Detail panel shows: HealthScore ring, KPI bars (stress/fatigue/mood/velocity/entropy), upstream + downstream chip lists
+
+**BadgerDB stability**
+- 2-day TTL for raw metrics (was 7 days) — 70% less steady-state disk usage
+- Periodic `Compact()` every 30 minutes prevents SST file accumulation
+- `LoadSnapshots()` on startup restores state across pod restarts
+
+**Extended forecast horizon (48h)**
+- `forecastOffsets` now includes 12h (720m), 24h (1440m), 48h (2880m)
+- UI Predictions tab has a 1h/2h/6h/12h/24h/48h horizon selector
+- Backend models (ILR, HoltWinters, ARIMA) already support arbitrary horizons
+
+**Demo workloads + scraper**
+- `deploy/demo-workloads.yaml`: 4 services with realistic failure patterns
+- `deploy/scraper.yaml`: Prometheus→Ruptura bridge (scrapes every 15s, pushes JSON)
+- `scripts/deploy-kamatera.sh`: automated deploy + smoke test script
+
+### Gaps identified this session
+
+**GAP-V7-04: SSH access lost to Kamatera lab**
+- The lab VM at 185.229.225.115 no longer accepts the local SSH key
+- No ability to `kubectl apply` or `helm upgrade` directly from CI environment
+- Workaround: user must run `bash scripts/deploy-kamatera.sh` from the lab or via the Codespace SSH tunnel
+- Fix: store lab kubeconfig as GitHub Actions secret `KUBECONFIG_KAMATERA` and deploy in CI
+
+**GAP-V7-05: Topology needs OTLP trace source for real edges**
+- Current inferred edges (KPI correlation) work but are synthetic approximations
+- Real service dependency graph requires OTLP trace spans with `span.kind=client/server`
+- To get real edges: deploy `opentelemetry-demo` or instrument actual services
+- The scraper bridges Prometheus text → Ruptura but does not generate trace spans
+
+**GAP-V7-06: CI release failure — missing GitHub release object**
+- v7.0.5 Docker image was built successfully but "CLI — Build & Attach to Release" step failed because no GitHub release existed
+- Root cause: tag v7.0.5 was force-pushed (pointing to new commit) but GitHub release wasn't auto-created
+- Fix: the release was created manually after the fact; Docker image at `ghcr.io/benfradjselim/ruptura:v7.0.5` is correct
+- Long-term fix: Release workflow should create the release object before the CLI upload step, or use `--create-release` flag
+
+**GAP-V7-07: Demo workload image reuse is wrong**
+- `deploy/demo-workloads.yaml` uses `ghcr.io/benfradjselim/ruptura:7.0.5` image for demo services
+- This is wrong — Ruptura binary won't serve Prometheus metrics on port 8080 as expected
+- Should use a minimal Python image (e.g. `python:3.11-alpine`) to run the inline Python HTTP server
+- Fix applied in next commit
+
+### What still needs doing for v7.1
+
+1. **Real OTLP workloads**: Deploy `opentelemetry-demo` in `ruptura-demo` namespace with traces configured to send to Ruptura OTLP endpoint (`:31470`)
+2. **Multi-step forecast UI**: Show a multi-point forecast chart (not just current→future), with 80% and 95% confidence bands rendered as area fills
+3. **Node health view (S3-2)**: `GET /api/v2/nodes` listing nodes with CPU/memory/disk pressure and workload counts
+4. **Auto-deploy via CI**: GitHub Actions job that deploys to Kamatera on every tagged release using stored kubeconfig secret
+5. **Forecast warmup indicator**: The UI shows "calibrating" text but no progress bar — add a warmup progress indicator (e.g., "collecting baseline: 23/240 observations")
+
+### Decisions made
+
+- **No Cytoscape**: removed as dependency. Pure SVG + requestAnimationFrame is smaller, faster, and more controllable for this use case.
+- **Inferred topology edges are acceptable for v7**: when no trace spans exist, KPI correlation provides useful signal about potential relationships. Must be clearly labeled as "inferred" (already done).
+- **Demo workloads should use `python:3.11-alpine` image**: not the Ruptura image. Ruptura image starts a full observability server, not an HTTP metrics endpoint.
+- **2-day TTL + 30-min compaction**: validated approach for single-node k3s with 10GB disk. Steady-state BadgerDB usage should stay under 200MB.
