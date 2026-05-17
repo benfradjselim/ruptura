@@ -351,6 +351,25 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	defer scraperMgr.Stop()
 	handlers.SetScraper(scraperMgr)
 
+	// Seed a self-scrape datasource on first boot so the scrape engine has something to show.
+	if existing, _ := store.ListDatasources(); len(existing) == 0 {
+		now := time.Now()
+		selfDS := scraper.DatasourceConfig{
+			ID:                "self-ruptura-metrics",
+			Name:              "Ruptura Engine (self)",
+			Type:              scraper.TypeDirect,
+			URL:               fmt.Sprintf("http://localhost:%d/metrics", cfg.Port),
+			Enabled:           true,
+			ScrapeIntervalSec: 30,
+			WorkloadKey:       "ruptura/Deployment/ruptura",
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		}
+		if err := scraperMgr.Put(selfDS); err != nil {
+			logger.Default.Warn("seed datasource failed", "err", err)
+		}
+	}
+
 	handlers.SetReady(true)
 
 	router := handlers.NewRouter()

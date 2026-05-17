@@ -13,8 +13,9 @@
   }
 
   interface Particle {
+    id: string     // stable — edgeKey + index
     edgeKey: string
-    t: number   // 0–1 progress along edge
+    t: number      // 0–1 progress along edge
     speed: number
   }
 
@@ -36,6 +37,8 @@
   let rafId: number
   let refreshTimer: ReturnType<typeof setInterval>
   let tick = 0
+  let settled = false
+  let settleCount = 0
 
   // ── derived helpers ──────────────────────────────────────────────────────────
   $: connectedNodes = simNodes.filter(n => n.connected)
@@ -95,19 +98,19 @@
   function bar(v: number): number  { return Math.min(Math.round(v * 100), 100) }
 
   // ── force simulation ─────────────────────────────────────────────────────────
-  const REPULSION   = 6000
-  const ATTRACTION  = 0.04
-  const DAMPING     = 0.78
-  const CENTER_G    = 0.012
-  const MIN_DIST    = 60
+  const REPULSION   = 28000   // strong push-apart
+  const ATTRACTION  = 0.03
+  const DAMPING     = 0.60    // converge quickly
+  const CENTER_G    = 0.005
+  const MIN_DIST    = 150     // minimum separation between node centres
 
   function applyForces() {
+    if (settled) return
     const cx = W / 2
-    const cy = H * 0.45  // connected-graph area centre
+    const cy = H * 0.45
 
     for (const a of simNodes) {
       if (!a.connected) continue
-      // repulsion from every other connected node
       for (const b of simNodes) {
         if (a === b || !b.connected) continue
         const dx = a.x - b.x
@@ -117,12 +120,10 @@
         a.vx += (dx / dist) * force
         a.vy += (dy / dist) * force
       }
-      // centre gravity for connected nodes
       a.vx += (cx - a.x) * CENTER_G
       a.vy += (cy - a.y) * CENTER_G
     }
 
-    // edge attraction (only trace or strong inferred)
     for (const e of edges) {
       const src = simNodes.find(n => n.id === e.source)
       const tgt = simNodes.find(n => n.id === e.target)
@@ -130,21 +131,26 @@
       const dx = tgt.x - src.x
       const dy = tgt.y - src.y
       const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-      const strength = e.edge_type === 'trace' ? ATTRACTION : ATTRACTION * e.strength * 0.6
+      const strength = e.edge_type === 'trace' ? ATTRACTION : ATTRACTION * e.strength * 0.5
       const fx = dx * strength
       const fy = dy * strength
       src.vx += fx; src.vy += fy
       tgt.vx -= fx; tgt.vy -= fy
     }
 
-    // integrate + damp, clamped to connected-graph area
+    let totalKE = 0
     for (const n of simNodes) {
       if (!n.connected) continue
       n.vx *= DAMPING
       n.vy *= DAMPING
-      n.x = Math.max(40, Math.min(W - 40, n.x + n.vx))
-      n.y = Math.max(40, Math.min(H * 0.88, n.y + n.vy))
+      n.x = Math.max(60, Math.min(W - 60, n.x + n.vx))
+      n.y = Math.max(60, Math.min(H * 0.85, n.y + n.vy))
+      totalKE += n.vx * n.vx + n.vy * n.vy
     }
+
+    // detect convergence — freeze simulation once nodes stop moving
+    settleCount = totalKE < 0.4 ? settleCount + 1 : 0
+    if (settleCount > 15) settled = true
   }
 
   // ── particle system ──────────────────────────────────────────────────────────
@@ -188,36 +194,49 @@
     const existingById = new Map(simNodes.map(n => [n.id, n]))
     const connectedIds = new Set(newEdges.flatMap(e => [e.source, e.target]))
 
+    // spread new connected nodes evenly in a ring — avoids the initial cluster
+    const connectedList = newNodes.filter(n => connectedIds.has(n.id))
+    const ringR = Math.min(W, H) * 0.28
+    const cx = W / 2
+    const cy = H * 0.44
+    let ringIdx = 0
+
     simNodes = newNodes.map(n => {
       const old = existingById.get(n.id)
-      return {
-        ...n,
-        x: old?.x ?? (W / 2 + (Math.random() - 0.5) * 200),
-        y: old?.y ?? (H * 0.45 + (Math.random() - 0.5) * 150),
-        vx: old?.vx ?? 0,
-        vy: old?.vy ?? 0,
-        connected: connectedIds.has(n.id),
+      if (old) {
+        return { ...n, x: old.x, y: old.y, vx: old.vx, vy: old.vy, connected: connectedIds.has(n.id) }
       }
+      if (connectedIds.has(n.id)) {
+        const angle = (ringIdx++ / Math.max(connectedList.length, 1)) * 2 * Math.PI - Math.PI / 2
+        return {
+          ...n,
+          x: cx + Math.cos(angle) * ringR + (Math.random() - 0.5) * 30,
+          y: cy + Math.sin(angle) * ringR + (Math.random() - 0.5) * 30,
+          vx: 0, vy: 0, connected: true,
+        }
+      }
+      return { ...n, x: cx + (Math.random() - 0.5) * 300, y: H * 0.45 + (Math.random() - 0.5) * 200, vx: 0, vy: 0, connected: false }
     })
 
     edges = newEdges
 
-    // Rebuild particles — one per edge (trace gets 3, inferred gets 1)
-    const existingParticlesByKey = new Map(particles.map(p => [p.edgeKey, p]))
+    // restart physics for new data
+    settled = false
+    settleCount = 0
+
+    // particles — stable IDs so Svelte doesn't churn the DOM
+    const existingById2 = new Map(particles.map(p => [p.id, p]))
     particles = newEdges.flatMap(e => {
       const k = edgeKey(e)
-      const count = e.edge_type === 'trace' ? 3 : 1
+      const count = e.edge_type === 'trace' ? 2 : 1
       return Array.from({ length: count }, (_, i) => {
-        const existing = existingParticlesByKey.get(k)
-        return {
-          edgeKey: k,
-          t: existing ? existing.t : i / count,
-          speed: 0.004 + Math.random() * 0.003,
-        }
+        const pid = `${k}-${i}`
+        const old = existingById2.get(pid)
+        return { id: pid, edgeKey: k, t: old?.t ?? i / count, speed: 0.0015 + Math.random() * 0.001 }
       })
     })
 
-    // Layout isolated nodes in rows below main graph
+    // layout isolated nodes in rows below main graph
     const rowW = Math.floor((W - 40) / 140)
     isolatedNodes.forEach((n, i) => {
       n.x = 30 + (i % rowW) * 140 + 50
@@ -230,7 +249,7 @@
     tick++
     applyForces()
     stepParticles()
-    simNodes = simNodes  // trigger Svelte reactivity
+    if (!settled) simNodes = simNodes  // only dirty-check nodes until settled
     particles = particles
     rafId = requestAnimationFrame(frame)
   }
@@ -386,14 +405,14 @@
         {/each}
 
         <!-- ── PARTICLES ──────────────────────────────────────────────────────── -->
-        {#each particles as p (p.edgeKey + '-' + p.t.toFixed(3))}
+        {#each particles as p (p.id)}
           {@const pos = particlePos(p)}
           {@const e = edges.find(e => edgeKey(e) === p.edgeKey)}
           {#if pos && e}
             <circle
-              cx={pos.x} cy={pos.y} r={e.edge_type === 'trace' ? 3.5 : 2.5}
+              cx={pos.x} cy={pos.y} r={e.edge_type === 'trace' ? 2.5 : 1.8}
               fill={edgeColor(e)}
-              opacity={hoveredId ? (impactEdgeKeys.has(p.edgeKey) ? 0.95 : 0.08) : 0.85}
+              opacity={hoveredId ? (impactEdgeKeys.has(p.edgeKey) ? 0.8 : 0.05) : 0.55}
             />
           {/if}
         {/each}
@@ -699,22 +718,22 @@
   /* node animations */
   .ring { animation: none; }
   .pulse-crit .ring {
-    animation: pulse-crit 1.1s ease-in-out infinite;
+    animation: pulse-crit 2.2s ease-in-out infinite;
   }
   .pulse-warn .ring {
-    animation: pulse-warn 1.8s ease-in-out infinite;
+    animation: pulse-warn 3.5s ease-in-out infinite;
   }
   .contagion-ring {
-    animation: spin-slow 8s linear infinite;
+    animation: spin-slow 20s linear infinite;
     transform-origin: center;
   }
   @keyframes pulse-crit {
-    0%, 100% { opacity: 0.15; r: 24; }
-    50%       { opacity: 0.55; r: 32; }
+    0%, 100% { opacity: 0.12; }
+    50%       { opacity: 0.45; }
   }
   @keyframes pulse-warn {
-    0%, 100% { opacity: 0.1; r: 24; }
-    50%       { opacity: 0.35; r: 28; }
+    0%, 100% { opacity: 0.08; }
+    50%       { opacity: 0.28; }
   }
   @keyframes spin-slow {
     to { transform: rotate(360deg); }
