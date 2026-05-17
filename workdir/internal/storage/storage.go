@@ -775,3 +775,23 @@ func (s *Store) QueryTraceList(service string, limit int) ([]TraceHeader, error)
 	}
 	return headers, nil
 }
+
+// --- Datasource configs ---
+// Key schema: ds:{id}
+
+func (s *Store) PutDatasource(id string, data []byte) error {
+	return s.set(fmt.Sprintf("ds:%s", id), json.RawMessage(data), 0)
+}
+
+func (s *Store) DeleteDatasource(id string) error {
+	return s.delete(fmt.Sprintf("ds:%s", id))
+}
+
+func (s *Store) ListDatasources() ([][]byte, error) {
+	var results [][]byte
+	err := s.listByPrefix("ds:", func(_, val []byte) error {
+		results = append(results, val)
+		return nil
+	})
+	return results, err
+}

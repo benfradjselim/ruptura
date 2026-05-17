@@ -210,6 +210,20 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return safeJson<T>(text, path)
 }
 
+async function put<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText)
+    throw new Error(`${res.status} — ${text}`)
+  }
+  const text = await res.text()
+  return safeJson<T>(text, path)
+}
+
 async function del(path: string): Promise<void> {
   const res = await fetch(path, { method: 'DELETE' })
   if (!res.ok && res.status !== 204) {
@@ -594,6 +608,68 @@ export interface RuptureEvent {
 
 export function fetchRecentEvents(limit = 50) {
   return getArray<RuptureEvent>(`/api/v2/events?limit=${limit}`)
+}
+
+// ── datasources ───────────────────────────────────────────────────────────────
+
+export interface DatasourceConfig {
+  id: string
+  name: string
+  type: 'prometheus' | 'direct_metrics' | 'otlp'
+  url: string
+  enabled: boolean
+  scrape_interval_seconds: number
+  workload_key: string
+  namespace: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DatasourceStatus extends DatasourceConfig {
+  status: 'ok' | 'error' | 'pending' | 'disabled' | 'unknown'
+  last_scrape: string
+  last_error: string
+  scraped_metrics: number
+}
+
+export interface CreateDatasourceRequest {
+  name: string
+  type: string
+  url: string
+  enabled: boolean
+  scrape_interval_seconds?: number
+  workload_key?: string
+  namespace?: string
+}
+
+export function fetchDatasources() {
+  return getArray<DatasourceStatus>('/api/v2/datasources')
+}
+
+export function createDatasource(req: CreateDatasourceRequest) {
+  return post<DatasourceStatus>('/api/v2/datasources', req)
+}
+
+export function updateDatasource(id: string, req: CreateDatasourceRequest) {
+  return put<DatasourceStatus>(`/api/v2/datasources/${encodeURIComponent(id)}`, req)
+}
+
+export function deleteDatasource(id: string) {
+  return del(`/api/v2/datasources/${encodeURIComponent(id)}`)
+}
+
+export interface TestDatasourceResult {
+  ok: boolean
+  scraped_metrics?: number
+  error?: string
+}
+
+export function testDatasource(req: CreateDatasourceRequest) {
+  return post<TestDatasourceResult>('/api/v2/datasources/test', req)
+}
+
+export function testDatasourceById(id: string) {
+  return post<TestDatasourceResult>(`/api/v2/datasources/${encodeURIComponent(id)}/test`, {})
 }
 
 export function openEventStream(

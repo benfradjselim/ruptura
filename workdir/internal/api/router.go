@@ -156,12 +156,14 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/notifications/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
 	api.HandleFunc("/notifications/{id}/test", stubWithID).Methods("POST")
 
-	// Datasources (Datasources.svelte — stub)
-	api.HandleFunc("/datasources", stubList).Methods("GET")
-	api.HandleFunc("/datasources", stubCreate).Methods("POST")
-	api.HandleFunc("/datasources/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
-	api.HandleFunc("/datasources/{id}/test", stubWithID).Methods("POST")
-	api.HandleFunc("/datasources/{id}/proxy", stubWithID).Methods("POST")
+	// Datasources — real scrape engine
+	api.HandleFunc("/datasources", h.handleListDatasources).Methods("GET")
+	api.HandleFunc("/datasources", h.handleCreateDatasource).Methods("POST")
+	api.HandleFunc("/datasources/test", h.handleTestDatasource).Methods("POST")
+	api.HandleFunc("/datasources/{id}", h.handleGetDatasource).Methods("GET")
+	api.HandleFunc("/datasources/{id}", h.handleUpdateDatasource).Methods("PUT")
+	api.HandleFunc("/datasources/{id}", h.handleDeleteDatasource).Methods("DELETE")
+	api.HandleFunc("/datasources/{id}/test", h.handleTestDatasource).Methods("POST")
 
 	// Orgs (Orgs.svelte — stub)
 	api.HandleFunc("/orgs", stubList).Methods("GET")

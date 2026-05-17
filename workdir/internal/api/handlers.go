@@ -18,6 +18,7 @@ import (
     "github.com/benfradjselim/ruptura/internal/history"
     pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
     "github.com/benfradjselim/ruptura/internal/predictor"
+    "github.com/benfradjselim/ruptura/internal/scraper"
     "github.com/benfradjselim/ruptura/internal/storage"
     "github.com/benfradjselim/ruptura/internal/telemetry"
 )
@@ -50,7 +51,10 @@ type Handlers struct {
     fusionEng   *fusion.Engine
     topoBuilder *correlator.TopologyBuilder
     discovery   *discovery.Informer
+    scraper     *scraper.Manager
 }
+
+func (h *Handlers) SetScraper(s *scraper.Manager) { h.scraper = s }
 
 func (h *Handlers) SetIngest(c IngestCounter)                       { h.ingest = c }
 func (h *Handlers) SetFusion(f *fusion.Engine)                      { h.fusionEng = f }

@@ -28,6 +28,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/ingest"
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/predictor"
+	"github.com/benfradjselim/ruptura/internal/scraper"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
 	"github.com/benfradjselim/ruptura/pkg/logger"
@@ -343,6 +344,13 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	evBus := events.New()
 	handlers.SetHistoryMgr(histMgr)
 	handlers.SetEventBus(evBus)
+
+	// Active scrape engine — pulls data from Prometheus servers and direct /metrics endpoints.
+	scraperMgr := scraper.New(pipelineEngine, store)
+	scraperMgr.Start()
+	defer scraperMgr.Stop()
+	handlers.SetScraper(scraperMgr)
+
 	handlers.SetReady(true)
 
 	router := handlers.NewRouter()

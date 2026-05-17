@@ -1,90 +1,164 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { fetchDataflow } from '../lib/api'
-  import type { DataflowStats } from '../lib/api'
+  import {
+    fetchDataflow, fetchDatasources, createDatasource,
+    updateDatasource, deleteDatasource, testDatasource, testDatasourceById,
+  } from '../lib/api'
+  import type { DataflowStats, DatasourceStatus, CreateDatasourceRequest } from '../lib/api'
 
-  interface DataSource {
-    id: string
-    type: 'otlp' | 'prometheus' | 'loki' | 'elasticsearch'
-    label: string
-    endpoint: string
-    enabled: boolean
-    status: 'unknown' | 'ok' | 'error' | 'testing'
-    lastTested?: string
+  interface LocalDS extends DatasourceStatus {
+    _dirty: boolean
+    _saving: boolean
+    _testing: boolean
+    _testOk: boolean | null
+    _testMsg: string
   }
 
-  const DEFAULTS: DataSource[] = [
-    { id: 'otlp',   type: 'otlp',          label: 'OTLP gRPC',       endpoint: 'http://otel-collector:4317', enabled: true,  status: 'unknown' },
-    { id: 'otlph',  type: 'otlp',          label: 'OTLP HTTP',       endpoint: 'http://otel-collector:4318', enabled: false, status: 'unknown' },
-    { id: 'prom',   type: 'prometheus',    label: 'Prometheus',       endpoint: 'http://prometheus:9090',     enabled: false, status: 'unknown' },
-    { id: 'loki',   type: 'loki',          label: 'Loki',             endpoint: 'http://loki:3100',           enabled: false, status: 'unknown' },
-    { id: 'es',     type: 'elasticsearch', label: 'Elasticsearch',    endpoint: 'http://elasticsearch:9200',  enabled: false, status: 'unknown' },
-  ]
+  const DS_TYPE_LABELS: Record<string, string> = {
+    prometheus:     'Prometheus',
+    direct_metrics: 'Direct /metrics',
+    otlp:           'OTLP (push)',
+  }
 
-  let sources: DataSource[] = []
-  let saved = false
+  const DS_ICONS: Record<string, string> = {
+    prometheus:     '◎',
+    direct_metrics: '⊕',
+    otlp:           '⊗',
+  }
+
+  let sources: LocalDS[] = []
+  let loadingDS = true
+  let loadError = ''
   let activeSection = 'datasources'
   let dataflow: DataflowStats | null = null
   let dataflowInterval: ReturnType<typeof setInterval>
 
-  const DS_ICONS: Record<string, string> = {
-    otlp:          '⊕',
-    prometheus:    '◎',
-    loki:          '▦',
-    elasticsearch: '⌖',
+  let showAddForm = false
+  let addSaving = false
+  let newDS: CreateDatasourceRequest = blankDS()
+
+  function blankDS(): CreateDatasourceRequest {
+    return { name: '', type: 'prometheus', url: '', enabled: true, scrape_interval_seconds: 30, namespace: 'default', workload_key: '' }
   }
 
-  function load() {
+  function wrapDS(ds: DatasourceStatus): LocalDS {
+    return { ...ds, _dirty: false, _saving: false, _testing: false, _testOk: null, _testMsg: '' }
+  }
+
+  async function loadSources() {
+    loadingDS = true
+    loadError = ''
     try {
-      const stored = localStorage.getItem('ruptura:datasources')
-      sources = stored ? JSON.parse(stored) : DEFAULTS.map(d => ({ ...d }))
-    } catch {
-      sources = DEFAULTS.map(d => ({ ...d }))
+      sources = (await fetchDatasources()).map(wrapDS)
+    } catch (e: unknown) {
+      loadError = e instanceof Error ? e.message : 'Failed to load datasources'
+    } finally {
+      loadingDS = false
     }
   }
 
-  function save() {
-    localStorage.setItem('ruptura:datasources', JSON.stringify(sources))
-    saved = true
-    setTimeout(() => { saved = false }, 2000)
+  function markDirty(src: LocalDS) {
+    src._dirty = true
+    sources = sources
   }
 
-  async function testSource(src: DataSource) {
-    src.status = 'testing'
+  async function saveSource(src: LocalDS) {
+    src._saving = true
     sources = sources
-    await new Promise(r => setTimeout(r, 800))
-    // Attempt a lightweight fetch — just check reachability.
-    // For OTLP gRPC we can't do a browser fetch, so we skip body validation.
     try {
-      const url = src.endpoint.startsWith('http') ? src.endpoint : `http://${src.endpoint}`
-      const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(4000) })
-      src.status = res.ok || res.status < 500 ? 'ok' : 'error'
-    } catch {
-      src.status = 'error'
+      const updated = await updateDatasource(src.id, {
+        name: src.name,
+        type: src.type,
+        url: src.url,
+        enabled: src.enabled,
+        scrape_interval_seconds: src.scrape_interval_seconds,
+        workload_key: src.workload_key,
+        namespace: src.namespace,
+      })
+      const idx = sources.findIndex(s => s.id === src.id)
+      if (idx >= 0) {
+        sources[idx] = { ...wrapDS(updated), _testOk: src._testOk, _testMsg: src._testMsg }
+      }
+      sources = sources
+    } catch (e: unknown) {
+      src._saving = false
+      sources = sources
+      alert(`Save failed: ${e instanceof Error ? e.message : String(e)}`)
     }
-    src.lastTested = new Date().toLocaleTimeString()
+  }
+
+  async function removeSource(id: string) {
+    if (!confirm('Remove this datasource? Ruptura will stop scraping it.')) return
+    try {
+      await deleteDatasource(id)
+      sources = sources.filter(s => s.id !== id)
+    } catch (e: unknown) {
+      alert(`Delete failed: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  async function runTest(src: LocalDS) {
+    src._testing = true
+    src._testOk = null
+    src._testMsg = ''
     sources = sources
+    try {
+      let res
+      if (src._dirty || !src.id) {
+        res = await testDatasource({ name: src.name, type: src.type, url: src.url, enabled: src.enabled, scrape_interval_seconds: src.scrape_interval_seconds, namespace: src.namespace, workload_key: src.workload_key })
+      } else {
+        res = await testDatasourceById(src.id)
+      }
+      src._testOk = res.ok
+      src._testMsg = res.ok
+        ? `${res.scraped_metrics ?? 0} metric(s) found`
+        : (res.error ?? 'Test failed')
+    } catch (e: unknown) {
+      src._testOk = false
+      src._testMsg = e instanceof Error ? e.message : 'Connection failed'
+    } finally {
+      src._testing = false
+      sources = sources
+    }
   }
 
-  function addSource() {
-    sources = [...sources, { id: `ds-${Date.now()}`, type: 'otlp', label: 'New source', endpoint: '', enabled: false, status: 'unknown' }]
+  async function addSource() {
+    if (!newDS.url) { alert('URL is required'); return }
+    if (!newDS.name) newDS.name = newDS.url
+    addSaving = true
+    try {
+      const created = await createDatasource(newDS)
+      sources = [...sources, wrapDS(created)]
+      showAddForm = false
+      newDS = blankDS()
+    } catch (e: unknown) {
+      alert(`Create failed: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      addSaving = false
+    }
   }
 
-  function removeSource(id: string) {
-    sources = sources.filter(s => s.id !== id)
-  }
-
-  function onRefreshIntervalChange(e: Event) {
-    const val = (e.target as HTMLInputElement).value
-    localStorage.setItem('ruptura:refresh_interval', val)
+  function formatScrapeTime(ts: string): string {
+    if (!ts || ts === '0001-01-01T00:00:00Z') return '—'
+    try {
+      const d = new Date(ts)
+      const ago = Math.floor((Date.now() - d.getTime()) / 1000)
+      if (ago < 60)  return `${ago}s ago`
+      if (ago < 3600) return `${Math.floor(ago / 60)}m ago`
+      return d.toLocaleTimeString()
+    } catch { return ts }
   }
 
   async function pollDataflow() {
     try { dataflow = await fetchDataflow() } catch { /* non-fatal */ }
   }
 
+  function onRefreshIntervalChange(e: Event) {
+    localStorage.setItem('ruptura:refresh_interval', (e.target as HTMLInputElement).value)
+  }
+
   onMount(() => {
-    load()
+    loadSources()
     pollDataflow()
     dataflowInterval = setInterval(pollDataflow, 10_000)
   })
@@ -120,54 +194,150 @@
       {#if activeSection === 'datasources'}
         <div class="section-header">
           <h2>Data Sources</h2>
-          <p>Configure ingest endpoints for metrics, logs, and traces. Ruptura's OTLP receiver is always active on the engine pod. External sources are for future federation support.</p>
+          <p>Configure Prometheus servers or direct <code>/metrics</code> endpoints. Ruptura actively scrapes them and feeds data into the health engine — no YAML or external agents needed.</p>
         </div>
 
-        <div class="ds-list">
-          {#each sources as src (src.id)}
-            <div class="ds-card" class:ds-enabled={src.enabled} class:ds-disabled={!src.enabled}>
-              <div class="ds-top">
-                <span class="ds-icon">{DS_ICONS[src.type] ?? '◈'}</span>
-                <input class="ds-label-input" bind:value={src.label} placeholder="Label" />
-                <div class="ds-status" class:ok={src.status==='ok'} class:err={src.status==='error'} class:testing={src.status==='testing'}>
-                  {#if src.status === 'testing'}⟳{:else if src.status === 'ok'}✓{:else if src.status === 'error'}✗{:else}—{/if}
+        {#if loadingDS}
+          <div class="loading-hint">Loading datasources…</div>
+        {:else if loadError}
+          <div class="err-banner">{loadError} <button class="btn-retry" on:click={loadSources}>Retry</button></div>
+        {:else}
+          <div class="ds-list">
+            {#each sources as src (src.id)}
+              <div class="ds-card" class:ds-enabled={src.enabled} class:ds-err={src.status === 'error'}>
+                <div class="ds-top">
+                  <span class="ds-icon">{DS_ICONS[src.type] ?? '◈'}</span>
+                  <input
+                    class="ds-label-input"
+                    bind:value={src.name}
+                    placeholder="Name"
+                    on:input={() => markDirty(src)}
+                  />
+                  <div class="ds-status-badge"
+                    class:ok={src.status === 'ok'}
+                    class:err={src.status === 'error'}
+                    class:pending={src.status === 'pending'}
+                    class:disabled={src.status === 'disabled'}
+                    title={src.last_error || src.status}
+                  >
+                    {#if src.status === 'ok'}✓ ok
+                    {:else if src.status === 'error'}✗ error
+                    {:else if src.status === 'pending'}⟳ pending
+                    {:else if src.status === 'disabled'}○ off
+                    {:else}— —{/if}
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" bind:checked={src.enabled} on:change={() => markDirty(src)} />
+                    <span class="toggle-track"></span>
+                  </label>
                 </div>
-                <label class="toggle">
-                  <input type="checkbox" bind:checked={src.enabled} />
-                  <span class="toggle-track"></span>
-                </label>
-              </div>
 
-              <div class="ds-body">
-                <select class="ds-type-sel" bind:value={src.type}>
-                  <option value="otlp">OTLP</option>
-                  <option value="prometheus">Prometheus</option>
-                  <option value="loki">Loki</option>
-                  <option value="elasticsearch">Elasticsearch</option>
-                </select>
-                <input class="ds-endpoint" bind:value={src.endpoint} placeholder="http://host:port" />
-              </div>
+                <div class="ds-body">
+                  <select class="ds-type-sel" bind:value={src.type} on:change={() => markDirty(src)}>
+                    <option value="prometheus">Prometheus</option>
+                    <option value="direct_metrics">Direct /metrics</option>
+                    <option value="otlp">OTLP (info only)</option>
+                  </select>
+                  <input
+                    class="ds-endpoint"
+                    bind:value={src.url}
+                    placeholder="http://host:port"
+                    on:input={() => markDirty(src)}
+                  />
+                </div>
 
-              <div class="ds-footer">
-                {#if src.lastTested}
-                  <span class="ds-ts">Tested {src.lastTested}</span>
+                {#if src.type === 'prometheus'}
+                  <div class="ds-extra">
+                    <span class="extra-label">\1</span>
+                    <input class="ds-extra-input" bind:value={src.namespace} placeholder="all" on:input={() => markDirty(src)} />
+                    <span class="extra-label">\1</span>
+                    <input class="ds-extra-input w60" type="number" min="5" bind:value={src.scrape_interval_seconds} on:input={() => markDirty(src)} />
+                  </div>
+                {:else if src.type === 'direct_metrics'}
+                  <div class="ds-extra">
+                    <span class="extra-label">\1</span>
+                    <input class="ds-extra-input" bind:value={src.workload_key} placeholder="namespace/Kind/name" on:input={() => markDirty(src)} />
+                    <span class="extra-label">\1</span>
+                    <input class="ds-extra-input w60" type="number" min="5" bind:value={src.scrape_interval_seconds} on:input={() => markDirty(src)} />
+                  </div>
                 {/if}
-                <button class="btn-test" on:click={() => testSource(src)} disabled={src.status==='testing'}>
-                  {src.status === 'testing' ? 'Testing…' : 'Test'}
-                </button>
-                <button class="btn-remove" on:click={() => removeSource(src.id)} title="Remove">✕</button>
+
+                <div class="ds-footer">
+                  <div class="ds-meta">
+                    {#if src.last_scrape && src.last_scrape !== '0001-01-01T00:00:00Z'}
+                      <span class="ds-ts">Scraped {formatScrapeTime(src.last_scrape)}</span>
+                      {#if src.scraped_metrics > 0}
+                        <span class="ds-count">{src.scraped_metrics} metrics</span>
+                      {/if}
+                    {:else}
+                      <span class="ds-ts">Not yet scraped</span>
+                    {/if}
+                    {#if src._testOk !== null}
+                      <span class="test-msg" class:test-ok={src._testOk} class:test-err={!src._testOk}>
+                        {src._testMsg}
+                      </span>
+                    {/if}
+                  </div>
+                  <div class="ds-actions">
+                    {#if src._dirty}
+                      <button class="btn-save-inline" on:click={() => saveSource(src)} disabled={src._saving}>
+                        {src._saving ? 'Saving…' : 'Save'}
+                      </button>
+                    {/if}
+                    {#if src.type !== 'otlp'}
+                      <button class="btn-test" on:click={() => runTest(src)} disabled={src._testing}>
+                        {src._testing ? 'Testing…' : 'Test'}
+                      </button>
+                    {/if}
+                    <button class="btn-remove" on:click={() => removeSource(src.id)} title="Remove datasource">✕</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          {/each}
+            {/each}
 
-          <button class="btn-add" on:click={addSource}>+ Add data source</button>
-        </div>
+            {#if !showAddForm}
+              <button class="btn-add" on:click={() => { showAddForm = true }}>+ Add data source</button>
+            {:else}
+              <!-- new datasource form -->
+              <div class="ds-card ds-add-form">
+                <div class="add-form-title">New Data Source</div>
 
-        <div class="save-row">
-          <button class="btn-save" on:click={save}>
-            {saved ? '✓ Saved' : 'Save changes'}
-          </button>
-        </div>
+                <div class="ds-body">
+                  <select class="ds-type-sel" bind:value={newDS.type}>
+                    <option value="prometheus">Prometheus</option>
+                    <option value="direct_metrics">Direct /metrics</option>
+                    <option value="otlp">OTLP (info only)</option>
+                  </select>
+                  <input class="ds-endpoint" bind:value={newDS.url} placeholder="http://prometheus:9090" />
+                </div>
+
+                <div class="ds-extra">
+                  <span class="extra-label">\1</span>
+                  <input class="ds-extra-input" bind:value={newDS.name} placeholder="My Prometheus" />
+                  {#if newDS.type === 'prometheus'}
+                    <span class="extra-label">\1</span>
+                    <input class="ds-extra-input" bind:value={newDS.namespace} placeholder="all" />
+                  {:else if newDS.type === 'direct_metrics'}
+                    <span class="extra-label">\1</span>
+                    <input class="ds-extra-input" bind:value={newDS.workload_key} placeholder="default/Deployment/my-app" />
+                  {/if}
+                  <span class="extra-label">\1</span>
+                  <input class="ds-extra-input w60" type="number" min="5" bind:value={newDS.scrape_interval_seconds} />
+                </div>
+
+                <div class="ds-footer">
+                  <div class="ds-meta"></div>
+                  <div class="ds-actions">
+                    <button class="btn-cancel" on:click={() => { showAddForm = false; newDS = blankDS() }}>Cancel</button>
+                    <button class="btn-save-inline" on:click={addSource} disabled={addSaving}>
+                      {addSaving ? 'Adding…' : 'Add'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/if}
 
       <!-- ── DATAFLOW ── -->
       {:else if activeSection === 'dataflow'}
@@ -223,17 +393,6 @@
               on:change={onRefreshIntervalChange}
             />
           </div>
-
-          <div class="pref-row">
-            <div>
-              <div class="pref-label">Topology refresh interval</div>
-              <div class="pref-hint">How often the topology graph redraws (seconds).</div>
-            </div>
-            <input class="pref-input" type="number" min="10" max="300"
-              value="20"
-              readonly
-            />
-          </div>
         </div>
 
       <!-- ── ABOUT ── -->
@@ -249,7 +408,7 @@
           <dl class="about-dl">
             <dt>Platform</dt><dd>Predictive Kubernetes Workload Health</dd>
             <dt>Signals</dt><dd>9 KPI signals + FusedR composite index</dd>
-            <dt>Ingest</dt><dd>OTLP (gRPC + HTTP), native Prometheus pull</dd>
+            <dt>Ingest</dt><dd>OTLP (gRPC + HTTP), active Prometheus scrape</dd>
             <dt>Storage</dt><dd>BadgerDB embedded time-series store</dd>
             <dt>License</dt><dd>Proprietary — benfradjselim/ruptura</dd>
           </dl>
@@ -323,6 +482,31 @@
 
   .section-header h2 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
   .section-header p { font-size: 12px; color: var(--muted); line-height: 1.6; max-width: 540px; }
+  .section-header code { font-family: 'JetBrains Mono', monospace; font-size: 11px; background: var(--surface3); padding: 1px 4px; border-radius: 3px; }
+
+  .loading-hint { font-size: 12px; color: var(--muted); font-style: italic; }
+
+  .err-banner {
+    font-size: 12px;
+    color: var(--red);
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn-retry {
+    background: none;
+    border: 1px solid rgba(239,68,68,0.4);
+    color: var(--red);
+    padding: 3px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11px;
+  }
 
   /* data source cards */
   .ds-list {
@@ -341,7 +525,11 @@
     gap: 10px;
     transition: border-color 0.15s;
   }
-  .ds-card.ds-enabled { border-color: rgba(168,85,247,0.4); }
+  .ds-card.ds-enabled  { border-color: rgba(168,85,247,0.35); }
+  .ds-card.ds-err      { border-color: rgba(239,68,68,0.35); }
+  .ds-card.ds-add-form { border: 1px dashed var(--border); background: var(--surface3); }
+
+  .add-form-title { font-size: 13px; font-weight: 600; color: var(--purple); }
 
   .ds-top {
     display: flex;
@@ -362,19 +550,21 @@
     min-width: 0;
   }
 
-  .ds-status {
-    font-size: 12px;
+  .ds-status-badge {
+    font-size: 10px;
     font-weight: 700;
-    width: 20px;
-    text-align: center;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: var(--surface3);
     color: var(--muted);
+    white-space: nowrap;
     font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
   }
-  .ds-status.ok { color: var(--green); }
-  .ds-status.err { color: var(--red); }
-  .ds-status.testing { color: var(--yellow); animation: spin 1s linear infinite; }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .ds-status-badge.ok       { background: rgba(34,197,94,0.12); color: var(--green); }
+  .ds-status-badge.err      { background: rgba(239,68,68,0.12); color: var(--red); }
+  .ds-status-badge.pending  { background: rgba(234,179,8,0.12);  color: var(--yellow); }
+  .ds-status-badge.disabled { opacity: 0.5; }
 
   /* toggle switch */
   .toggle { position: relative; display: inline-block; width: 32px; height: 18px; flex-shrink: 0; }
@@ -430,13 +620,64 @@
   }
   .ds-endpoint:focus { border-color: var(--purple); }
 
+  .ds-extra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+  }
+
+  .extra-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  .ds-extra-input {
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    outline: none;
+    min-width: 100px;
+    flex: 1;
+  }
+  .ds-extra-input.w60 { flex: 0 0 60px; min-width: 60px; }
+  .ds-extra-input:focus { border-color: var(--purple); }
+
   .ds-footer {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
-  .ds-ts { font-size: 10px; color: var(--muted); flex: 1; }
+  .ds-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    flex-wrap: wrap;
+  }
+
+  .ds-ts    { font-size: 10px; color: var(--muted); }
+  .ds-count { font-size: 10px; color: var(--cyan); font-family: 'JetBrains Mono', monospace; }
+
+  .test-msg { font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+  .test-msg.test-ok  { color: var(--green); }
+  .test-msg.test-err { color: var(--red); }
+
+  .ds-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
 
   .btn-test {
     background: var(--surface3);
@@ -451,6 +692,31 @@
   }
   .btn-test:hover:not(:disabled) { border-color: var(--cyan); }
   .btn-test:disabled { opacity: 0.5; cursor: default; }
+
+  .btn-save-inline {
+    background: var(--purple);
+    border: none;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    transition: opacity 0.15s;
+  }
+  .btn-save-inline:hover:not(:disabled) { opacity: 0.85; }
+  .btn-save-inline:disabled { opacity: 0.5; cursor: default; }
+
+  .btn-cancel {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+  .btn-cancel:hover { color: var(--text); }
 
   .btn-remove {
     background: none;
@@ -478,21 +744,6 @@
   }
   .btn-add:hover { color: var(--purple); border-color: var(--purple); }
 
-  .save-row { display: flex; justify-content: flex-end; }
-
-  .btn-save {
-    background: var(--purple);
-    border: none;
-    color: white;
-    padding: 8px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    transition: opacity 0.15s;
-  }
-  .btn-save:hover { opacity: 0.85; }
-
   /* dataflow */
   .df-grid {
     display: grid;
@@ -515,8 +766,6 @@
   .df-icon { font-size: 20px; }
   .df-num { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
   .df-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-
-  .loading-hint { font-size: 12px; color: var(--muted); font-style: italic; }
 
   /* general */
   .general-body { display: flex; flex-direction: column; gap: 16px; }

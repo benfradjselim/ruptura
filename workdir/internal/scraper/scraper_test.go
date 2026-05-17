@@ -1,0 +1,243 @@
+package scraper
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+)
+
+// ── mapper tests ──────────────────────────────────────────────────────────────
+
+func TestMapMetric_ExactMatch(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"stress", "stress"},
+		{"cpu_percent", "stress"},
+		{"memory_usage_percent", "pressure"},
+		{"restart_count", "fatigue"},
+		{"request_rate", "velocity"},
+		{"goroutine_count", "entropy"},
+		{"queue_depth", "humidity"},
+		{"health_score", "health_score"},
+		{"http_error_rate", "mood"},
+	}
+	for _, c := range cases {
+		got := MapMetric(c.in)
+		if got != c.want {
+			t.Errorf("MapMetric(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestMapMetric_SubstringFallback(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"container_cpu_usage_total", "stress"},
+		{"container_memory_bytes", "pressure"},
+		{"pod_restarts_total", "fatigue"},
+		{"http_error_rate_total", "mood"},
+		{"go_goroutines_total", "entropy"},
+		{"queue_pending_jobs", "humidity"},
+		{"request_rate_p99", "velocity"},
+		{"data_throughput_bytes", "throughput"},
+	}
+	for _, c := range cases {
+		got := MapMetric(c.in)
+		if got != c.want {
+			t.Errorf("MapMetric(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestMapMetric_Unknown(t *testing.T) {
+	if got := MapMetric("completely_unknown_xyzzy"); got != "" {
+		t.Errorf("MapMetric(unknown) = %q, want empty", got)
+	}
+}
+
+func TestNormalizeValue_MoodInversion(t *testing.T) {
+	// mood = 1 - error_rate*100 (when error_rate is 0-1)
+	got := NormalizeValue("mood", 0.05) // 5% error rate
+	want := 95.0
+	if got != want {
+		t.Errorf("NormalizeValue(mood, 0.05) = %v, want %v", got, want)
+	}
+}
+
+func TestNormalizeValue_Passthrough(t *testing.T) {
+	if got := NormalizeValue("stress", 42.5); got != 42.5 {
+		t.Errorf("NormalizeValue(stress, 42.5) = %v, want 42.5", got)
+	}
+}
+
+// ── direct scraper tests ──────────────────────────────────────────────────────
+
+func TestScrapeDirect_ParsesPrometheusText(t *testing.T) {
+	body := `# HELP cpu_percent CPU usage percent
+# TYPE cpu_percent gauge
+cpu_percent 42.5
+# HELP memory_usage_percent Memory usage percent
+# TYPE memory_usage_percent gauge
+memory_usage_percent 70.1
+# HELP unknown_xyzzy Unknown metric
+unknown_xyzzy 1.0
+`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	cfg := &DatasourceConfig{
+		Type:        TypeDirect,
+		URL:         srv.URL + "/metrics",
+		WorkloadKey: "production/Deployment/api",
+	}
+
+	samples, err := scrapeDirect(cfg, &http.Client{Timeout: 5 * time.Second})
+	if err != nil {
+		t.Fatalf("scrapeDirect failed: %v", err)
+	}
+	if len(samples) < 2 {
+		t.Fatalf("expected >=2 samples, got %d", len(samples))
+	}
+	for _, s := range samples {
+		if s.workload != "production/Deployment/api" {
+			t.Errorf("expected workload=production/Deployment/api, got %q", s.workload)
+		}
+		if s.metric == "" {
+			t.Error("empty metric name")
+		}
+	}
+}
+
+func TestScrapeDirect_ConnectionError(t *testing.T) {
+	cfg := &DatasourceConfig{
+		Type: TypeDirect,
+		URL:  "http://127.0.0.1:19999/metrics", // nothing listening
+	}
+	_, err := scrapeDirect(cfg, &http.Client{Timeout: 100 * time.Millisecond})
+	if err == nil {
+		t.Error("expected error for unreachable endpoint")
+	}
+}
+
+func TestScrapeDirect_HTTP500(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	cfg := &DatasourceConfig{Type: TypeDirect, URL: srv.URL}
+	_, err := scrapeDirect(cfg, &http.Client{Timeout: 5 * time.Second})
+	if err == nil {
+		t.Error("expected error for HTTP 500")
+	}
+}
+
+// ── parsePrometheusText tests ─────────────────────────────────────────────────
+
+func TestParsePrometheusText_SkipsComments(t *testing.T) {
+	body := `# HELP test ignored
+# TYPE test gauge
+stress 50
+`
+	samples, err := parsePrometheusText(strings.NewReader(body), "ns/Deployment/svc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(samples) != 1 {
+		t.Fatalf("expected 1 sample, got %d", len(samples))
+	}
+	if samples[0].value != 50 {
+		t.Errorf("expected value=50, got %v", samples[0].value)
+	}
+}
+
+func TestParsePrometheusText_StripsTotalSuffix(t *testing.T) {
+	body := `restart_count_total 3
+`
+	samples, err := parsePrometheusText(strings.NewReader(body), "wl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(samples) != 1 {
+		t.Fatalf("expected 1 sample, got %d: %v", len(samples), samples)
+	}
+	if samples[0].metric != "fatigue" {
+		t.Errorf("expected metric=fatigue (from restart_count), got %q", samples[0].metric)
+	}
+}
+
+func TestParsePrometheusText_HandlesLabels(t *testing.T) {
+	body := `cpu_percent{job="api",pod="api-123"} 55.2
+`
+	samples, err := parsePrometheusText(strings.NewReader(body), "wl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(samples) != 1 {
+		t.Fatalf("expected 1 sample, got %d", len(samples))
+	}
+	if samples[0].metric != "stress" {
+		t.Errorf("expected metric=stress, got %q", samples[0].metric)
+	}
+	if samples[0].value != 55.2 {
+		t.Errorf("expected value=55.2, got %v", samples[0].value)
+	}
+}
+
+// ── workloadFromURL tests ─────────────────────────────────────────────────────
+
+func TestWorkloadFromURL(t *testing.T) {
+	cases := []struct {
+		url  string
+		want string
+	}{
+		{"http://payment-api:8080/metrics", "default/Deployment/payment-api"},
+		{"http://svc:9090", "default/Deployment/svc"},
+		{"https://api.internal:443/metrics", "default/Deployment/api.internal"},
+	}
+	for _, c := range cases {
+		got := workloadFromURL(c.url)
+		if got != c.want {
+			t.Errorf("workloadFromURL(%q) = %q, want %q", c.url, got, c.want)
+		}
+	}
+}
+
+// ── stripPodSuffix tests ──────────────────────────────────────────────────────
+
+func TestStripPodSuffix(t *testing.T) {
+	cases := []struct {
+		pod  string
+		want string
+	}{
+		{"payment-api-7d6b9f4c8-xk2pq", "payment-api"},
+		{"frontend-abc12-xyz99", "frontend"},
+		{"simple-app-abc12-xyz99", "simple-app"},
+		{"single", "single"},
+	}
+	for _, c := range cases {
+		got := stripPodSuffix(c.pod)
+		if got != c.want {
+			t.Errorf("stripPodSuffix(%q) = %q, want %q", c.pod, got, c.want)
+		}
+	}
+}
+
+// ── configIntervalDefault tests ───────────────────────────────────────────────
+
+func TestDatasourceConfig_DefaultInterval(t *testing.T) {
+	cfg := &DatasourceConfig{}
+	if cfg.scrapeInterval() != 30*time.Second {
+		t.Errorf("expected 30s default interval, got %v", cfg.scrapeInterval())
+	}
+}
+
+func TestDatasourceConfig_CustomInterval(t *testing.T) {
+	cfg := &DatasourceConfig{ScrapeIntervalSec: 60}
+	if cfg.scrapeInterval() != 60*time.Second {
+		t.Errorf("expected 60s, got %v", cfg.scrapeInterval())
+	}
+}
