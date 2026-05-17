@@ -167,6 +167,28 @@ export interface SignalWeights {
   contagion: number
 }
 
+// ── stale-while-revalidate cache ─────────────────────────────────────────────
+// Serves the last-known value immediately, then refreshes in background.
+// GET-only endpoints benefit; POST/PUT/DELETE bypass the cache entirely.
+
+interface CacheEntry { value: unknown; ts: number }
+const _cache = new Map<string, CacheEntry>()
+const CACHE_TTL_MS = 30_000
+
+function cacheGet<T>(key: string): T | undefined {
+  const e = _cache.get(key)
+  if (!e) return undefined
+  if (Date.now() - e.ts > CACHE_TTL_MS * 3) { _cache.delete(key); return undefined }
+  return e.value as T
+}
+function cacheSet(key: string, value: unknown) {
+  _cache.set(key, { value, ts: Date.now() })
+}
+function cacheStale(key: string): boolean {
+  const e = _cache.get(key)
+  return !!e && Date.now() - e.ts > CACHE_TTL_MS
+}
+
 // ── fetch helpers ────────────────────────────────────────────────────────────
 
 function safeJson<T>(text: string, path: string): T {
@@ -179,21 +201,42 @@ function safeJson<T>(text: string, path: string): T {
   }
 }
 
-// get — object endpoint; returns parsed value (null if body is empty/null)
+// get — object endpoint with stale-while-revalidate
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(path)
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`)
-  const text = await res.text()
-  return safeJson<T>(text, path)
+  const cached = cacheGet<T>(path)
+  if (cached !== undefined && !cacheStale(path)) return cached
+  const fetchFresh = async () => {
+    const res = await fetch(path)
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`)
+    const val = safeJson<T>(await res.text(), path)
+    cacheSet(path, val)
+    return val
+  }
+  if (cached !== undefined) {
+    // stale: return immediately, refresh in background
+    fetchFresh().catch(() => {})
+    return cached
+  }
+  return fetchFresh()
 }
 
-// getArray — list endpoint; always returns an array, never null
+// getArray — list endpoint with stale-while-revalidate
 async function getArray<T>(path: string): Promise<T[]> {
-  const res = await fetch(path)
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`)
-  const text = await res.text()
-  const parsed = safeJson<T[] | null>(text, path)
-  return Array.isArray(parsed) ? parsed : []
+  const cached = cacheGet<T[]>(path)
+  if (cached !== undefined && !cacheStale(path)) return cached
+  const fetchFresh = async () => {
+    const res = await fetch(path)
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`)
+    const parsed = safeJson<T[] | null>(await res.text(), path)
+    const val = Array.isArray(parsed) ? parsed : []
+    cacheSet(path, val)
+    return val
+  }
+  if (cached !== undefined) {
+    fetchFresh().catch(() => {})
+    return cached
+  }
+  return fetchFresh()
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {

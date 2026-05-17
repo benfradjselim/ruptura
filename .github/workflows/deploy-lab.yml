@@ -1,0 +1,67 @@
+name: Deploy ruptura-lab workloads
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Apply lab workloads to k3s
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v7
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.K3S_KUBECONFIG }}
+        run: |
+          mkdir -p ~/.kube
+          echo "${KUBECONFIG_B64}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl cluster-info
+
+      - name: Apply lab workloads
+        run: |
+          kubectl apply -f k8s/lab/workloads.yaml
+          echo ""
+          echo "=== Waiting for deployments ==="
+          kubectl rollout status deployment/api-gateway        -n ruptura-lab --timeout=2m
+          kubectl rollout status deployment/payment-service    -n ruptura-lab --timeout=2m
+          kubectl rollout status deployment/cache-worker       -n ruptura-lab --timeout=2m
+          kubectl rollout status deployment/order-processor    -n ruptura-lab --timeout=2m
+          kubectl rollout status deployment/ml-inference       -n ruptura-lab --timeout=2m
+          kubectl rollout status deployment/inventory-service  -n ruptura-lab --timeout=2m
+          # notification-worker crash-loops by design — just wait for it to exist
+          kubectl wait pod -l app=notification-worker -n ruptura-lab --for=condition=Ready --timeout=30s || true
+
+      - name: Show pod status
+        run: |
+          kubectl get pods -n ruptura-lab -o wide
+          echo ""
+          kubectl top pods -n ruptura-lab 2>/dev/null || echo "(metrics-server not available)"
+
+      - name: Wire ruptura-lab datasource into Ruptura
+        env:
+          RUPTURA_API_KEY: ${{ secrets.RUPTURA_API_KEY }}
+          NODE_IP: "185.229.225.115"
+          API_PORT: "31468"
+        run: |
+          # Add ruptura-lab as a second Prometheus datasource scoped to that namespace
+          HTTP=$(curl -s -o /tmp/r.json -w "%{http_code}" \
+            -X POST "http://${NODE_IP}:${API_PORT}/api/v2/datasources" \
+            -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "id":   "prometheus-ruptura-lab",
+              "name": "Prometheus (ruptura-lab)",
+              "type": "prometheus",
+              "url":  "http://prometheus-server.monitoring.svc.cluster.local:80",
+              "enabled": true,
+              "scrape_interval_seconds": 30,
+              "namespace": "ruptura-lab"
+            }')
+          cat /tmp/r.json; echo ""
+          [ "$HTTP" = "201" ] || [ "$HTTP" = "200" ] && echo "✓ datasource wired" || { echo "✗ HTTP $HTTP"; exit 1; }

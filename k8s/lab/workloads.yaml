@@ -1,0 +1,183 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ruptura-lab
+  labels:
+    app.kubernetes.io/managed-by: ruptura
+---
+# 1. api-gateway — healthy baseline (nginx)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: ruptura-lab
+  labels: {app: api-gateway, scenario: healthy}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: api-gateway}
+  template:
+    metadata:
+      labels: {app: api-gateway}
+    spec:
+      containers:
+      - name: api-gateway
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests: {cpu: "30m", memory: "32Mi"}
+          limits:   {cpu: "150m", memory: "96Mi"}
+        livenessProbe:
+          httpGet: {path: /, port: 80}
+          periodSeconds: 15
+---
+# 2. payment-service — CPU stressed (stress-ng burning ~80% of limit)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: ruptura-lab
+  labels: {app: payment-service, scenario: cpu-stress}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: payment-service}
+  template:
+    metadata:
+      labels: {app: payment-service}
+    spec:
+      containers:
+      - name: payment-service
+        image: progrium/stress
+        args: ["--cpu", "2", "--timeout", "99999s"]
+        resources:
+          requests: {cpu: "100m", memory: "64Mi"}
+          limits:   {cpu: "250m", memory: "128Mi"}
+---
+# 3. cache-worker — memory pressure (fills ~85% of limit)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-worker
+  namespace: ruptura-lab
+  labels: {app: cache-worker, scenario: memory-pressure}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: cache-worker}
+  template:
+    metadata:
+      labels: {app: cache-worker}
+    spec:
+      containers:
+      - name: cache-worker
+        image: progrium/stress
+        args: ["--vm", "1", "--vm-bytes", "100M", "--vm-keep", "--timeout", "99999s"]
+        resources:
+          requests: {cpu: "30m", memory: "64Mi"}
+          limits:   {cpu: "100m", memory: "128Mi"}
+---
+# 4. notification-worker — crash loop (exits with error every ~45s → high fatigue KPI)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-worker
+  namespace: ruptura-lab
+  labels: {app: notification-worker, scenario: crash-loop}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: notification-worker}
+  template:
+    metadata:
+      labels: {app: notification-worker}
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: notification-worker
+        image: busybox:1.36
+        command: ["sh", "-c", "echo 'worker started'; sleep 45; echo 'unhandled panic - exiting'; exit 1"]
+        resources:
+          requests: {cpu: "5m",  memory: "16Mi"}
+          limits:   {cpu: "50m", memory: "32Mi"}
+---
+# 5. order-processor — normal healthy (2 replicas, low utilisation)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-processor
+  namespace: ruptura-lab
+  labels: {app: order-processor, scenario: healthy}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: order-processor}
+  template:
+    metadata:
+      labels: {app: order-processor}
+    spec:
+      containers:
+      - name: order-processor
+        image: nginx:alpine
+        resources:
+          requests: {cpu: "20m", memory: "32Mi"}
+          limits:   {cpu: "100m", memory: "64Mi"}
+---
+# 6. ml-inference — high CPU + memory simultaneously (multi-signal)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-inference
+  namespace: ruptura-lab
+  labels: {app: ml-inference, scenario: multi-stress}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ml-inference}
+  template:
+    metadata:
+      labels: {app: ml-inference}
+    spec:
+      containers:
+      - name: ml-inference
+        image: progrium/stress
+        args: ["--cpu", "2", "--vm", "1", "--vm-bytes", "180M", "--vm-keep", "--timeout", "99999s"]
+        resources:
+          requests: {cpu: "150m", memory: "128Mi"}
+          limits:   {cpu: "350m", memory: "256Mi"}
+---
+# 7. inventory-service — gradual memory leak simulation (restarts every ~5min from OOM)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: ruptura-lab
+  labels: {app: inventory-service, scenario: memory-leak}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: inventory-service}
+  template:
+    metadata:
+      labels: {app: inventory-service}
+    spec:
+      containers:
+      - name: inventory-service
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          echo 'starting inventory-service'
+          # Allocate memory in 5MB chunks every 10s until OOM kill
+          i=0
+          while true; do
+            i=$((i+1))
+            dd if=/dev/zero bs=5M count=1 2>/dev/null | cat > /tmp/leak_$i
+            echo "allocated chunk $i ($(du -sh /tmp/leak_* 2>/dev/null | tail -1))"
+            sleep 10
+          done
+        resources:
+          requests: {cpu: "10m", memory: "32Mi"}
+          limits:   {cpu: "50m", memory: "96Mi"}
