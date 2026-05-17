@@ -499,6 +499,32 @@ export function fetchPredictions(host: string, horizon = 120) {
   )
 }
 
+export interface ForecastPoint {
+  offset_minutes: number
+  mean: number
+  lower_80: number
+  upper_80: number
+  lower_95: number
+  upper_95: number
+}
+
+export interface ForecastResult {
+  host: string
+  metric: string
+  current: number
+  trend: string
+  confidence: number
+  warming_up?: boolean
+  points: ForecastPoint[]
+  timestamp: string
+}
+
+export function fetchForecast(host: string, metric: string, horizon = 1440) {
+  return get<ForecastResult>(
+    `/api/v2/forecast/${encodeURIComponent(metric)}/${encodeURIComponent(host)}?horizon=${horizon}`,
+  )
+}
+
 // ── logs ─────────────────────────────────────────────────────────────────────
 
 export interface LogEntry {

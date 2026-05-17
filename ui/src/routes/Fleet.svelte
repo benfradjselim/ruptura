@@ -4,11 +4,11 @@
   import {
     fetchFleet, fetchRuptures, fetchHistory, fetchActions,
     fetchWorkloadK8s, approveAction, rejectAction,
-    fetchExplain, fetchPredictions, fetchLogs, emergencyStop,
+    fetchExplain, fetchPredictions, fetchLogs, emergencyStop, fetchForecast,
   } from '../lib/api'
   import type {
     FleetHost, RuptureSnapshot, HistoryPoint, Action,
-    WorkloadK8sMeta, PredictionEntry, LogEntry,
+    WorkloadK8sMeta, PredictionEntry, LogEntry, ForecastResult,
   } from '../lib/api'
   import WorkloadCard from '../components/WorkloadCard.svelte'
   import SuppressionModal from '../components/SuppressionModal.svelte'
@@ -50,6 +50,12 @@
   let fcastCanvas: HTMLCanvasElement
   let tsChart: Chart | null = null
   let fcastChart: Chart | null = null
+
+  // forecast state
+  let fcastResult: ForecastResult | null = null
+  let fcastMetric = 'health_score'
+  let fcastHorizon = 1440  // default 24h
+  let fcastLoading = false
 
   // SSE
   let sse: EventSource | null = null
@@ -142,27 +148,97 @@
 
   async function drawForecastChart() {
     const snap = currentSnap
-    if (!fcastCanvas || !snap?.health_forecast) return
-    fcastChart?.destroy()
-    const f = snap.health_forecast
-    const now = Math.round(snap.health_score?.value ?? 0)
+    if (!fcastCanvas || !snap) return
+    const host = snap.workload?.namespace
+      ? `${snap.workload.namespace}/${snap.workload.kind}/${snap.workload.name}`
+      : snap.host
+    if (!host) return
+
+    fcastLoading = true
+    fcastChart?.destroy(); fcastChart = null
+    try {
+      fcastResult = await fetchForecast(host, fcastMetric, fcastHorizon)
+    } catch { fcastResult = null }
+    fcastLoading = false
+
+    if (!fcastResult || !fcastCanvas) return
+    const pts = fcastResult.points ?? []
+    if (pts.length === 0) return
+
+    const now = fcastResult.current
+    const labels = ['Now', ...pts.map(p => {
+      const m = p.offset_minutes
+      if (m >= 1440) return `+${Math.round(m/1440)}d`
+      if (m >= 60)   return `+${Math.round(m/60)}h`
+      return `+${m}m`
+    })]
+    const means  = [now,  ...pts.map(p => p.mean)]
+    const lo80   = [now,  ...pts.map(p => p.lower_80)]
+    const hi80   = [now,  ...pts.map(p => p.upper_80)]
+
     fcastChart = new Chart(fcastCanvas, {
       type: 'line',
       data: {
-        labels: ['Now', '+15 min', '+30 min'],
-        datasets: [{
-          data: [now, Math.round(f.in_15min ?? 0), Math.round(f.in_30min ?? 0)],
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6,182,212,0.07)',
-          borderWidth: 2,
-          fill: true,
-          pointBackgroundColor: '#06b6d4',
-          pointRadius: 5,
-          pointHoverRadius: 7,
-        }],
+        labels,
+        datasets: [
+          {
+            label: fcastMetric,
+            data: means,
+            borderColor: '#06b6d4',
+            backgroundColor: 'rgba(6,182,212,0.07)',
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            tension: 0.3,
+          },
+          {
+            label: '80% CI low',
+            data: lo80,
+            borderColor: 'rgba(6,182,212,0.2)',
+            borderDash: [4, 4],
+            borderWidth: 1,
+            fill: false,
+            pointRadius: 0,
+            tension: 0.3,
+          },
+          {
+            label: '80% CI high',
+            data: hi80,
+            borderColor: 'rgba(6,182,212,0.2)',
+            borderDash: [4, 4],
+            borderWidth: 1,
+            fill: '-1',
+            backgroundColor: 'rgba(6,182,212,0.06)',
+            pointRadius: 0,
+            tension: 0.3,
+          },
+        ],
       },
-      options: { ...CHART_DEFAULTS, scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100 } } },
+      options: {
+        ...CHART_DEFAULTS,
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: false },
+        },
+        scales: {
+          ...CHART_DEFAULTS.scales,
+          y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100 },
+        },
+      },
     })
+  }
+
+  async function changeFcastMetric(m: string) {
+    fcastMetric = m
+    await tick()
+    drawForecastChart()
+  }
+
+  async function changeFcastHorizon(h: number) {
+    fcastHorizon = h
+    await tick()
+    drawForecastChart()
   }
 
   // ── derived snap (reactive, no extra network call) ────────────────────────
@@ -612,15 +688,29 @@
 
         <!-- ── FORECAST ── -->
         {:else if tab === 'forecast'}
-          {#if !currentSnap?.health_forecast}
-            <div class="notice"><p>No forecast available — workload needs more signal history.</p></div>
-          {:else}
+          <div class="fcast-controls">
+            <div class="fcast-ctrl-row">
+              <span class="slabel">Signal:</span>
+              {#each ['health_score','stress','fatigue','mood','velocity','entropy','contagion'] as sig}
+                <button class="hz-btn" class:active={fcastMetric === sig} on:click={() => changeFcastMetric(sig)}>{sig.replace('_',' ')}</button>
+              {/each}
+            </div>
+            <div class="fcast-ctrl-row">
+              <span class="slabel">Horizon:</span>
+              {#each [{m:60,l:'1h'},{m:120,l:'2h'},{m:360,l:'6h'},{m:720,l:'12h'},{m:1440,l:'24h'},{m:2880,l:'48h'}] as opt}
+                <button class="hz-btn" class:active={fcastHorizon === opt.m} on:click={() => changeFcastHorizon(opt.m)}>{opt.l}</button>
+              {/each}
+            </div>
+          </div>
+          {#if currentSnap?.health_forecast}
             {@const f = currentSnap.health_forecast}
             <div class="forecast-meta">
               <div class="fcast-stat"><span class="slabel">Trend</span><span class="fcast-val" class:good={f.trend==='improving'} class:bad={f.trend==='degrading'}>{f.trend}</span></div>
               <div class="fcast-stat"><span class="slabel">In 15 min</span><span class="fcast-val" style="color:{hsColor(f.in_15min ?? 0)}">{Math.round(f.in_15min ?? 0)}</span></div>
               <div class="fcast-stat"><span class="slabel">In 30 min</span><span class="fcast-val" style="color:{hsColor(f.in_30min ?? 0)}">{Math.round(f.in_30min ?? 0)}</span></div>
-              <div class="fcast-stat"><span class="slabel">Confidence</span><span class="fcast-val" class:warn={(f.confidence_window ?? 0) < 60}>{f.confidence_window ?? 0} obs.</span></div>
+              {#if fcastResult?.confidence !== undefined}
+                <div class="fcast-stat"><span class="slabel">Conf.</span><span class="fcast-val">{Math.round((fcastResult.confidence ?? 0) * 100)}%</span></div>
+              {/if}
               {#if f.critical_eta_minutes > 0}
                 <div class="fcast-stat"><span class="slabel">Critical ETA</span><span class="fcast-val" style="color:var(--red)">{f.critical_eta_minutes}m</span></div>
               {/if}
@@ -628,6 +718,14 @@
             {#if (f.confidence_window ?? 0) < 60}
               <div class="low-conf-banner">⚠ Low confidence — fewer than 60 observations.</div>
             {/if}
+          {/if}
+          {#if fcastLoading}
+            <div class="loading">Loading forecast…</div>
+          {:else if fcastResult?.warming_up}
+            <div class="notice"><p>Accumulating observations — forecast available after ~15 minutes of data.</p></div>
+          {:else if !fcastResult || (fcastResult.points ?? []).length === 0}
+            <div class="notice"><p>No forecast available — workload needs more signal history.</p></div>
+          {:else}
             <div class="chart-wrap"><canvas bind:this={fcastCanvas}></canvas></div>
           {/if}
 
@@ -972,6 +1070,8 @@
   .chart-wrap { height: 220px; position: relative; }
 
   /* forecast */
+  .fcast-controls { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .fcast-ctrl-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .forecast-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
   .fcast-stat { display: flex; flex-direction: column; gap: 2px; }
   .fcast-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
