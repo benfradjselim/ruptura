@@ -8,7 +8,7 @@
   } from '../lib/api'
   import type {
     FleetHost, RuptureSnapshot, HistoryPoint, Action,
-    WorkloadK8sMeta, PredictionEntry, LogEntry, ForecastResult,
+    WorkloadK8sMeta, PredictionEntry, LogEntry, ForecastResult, ModelContribution,
   } from '../lib/api'
   import WorkloadCard from '../components/WorkloadCard.svelte'
   import SuppressionModal from '../components/SuppressionModal.svelte'
@@ -732,7 +732,7 @@
             <div class="chart-wrap"><canvas bind:this={fcastCanvas}></canvas></div>
             {#if (fcastResult?.models ?? []).length > 0}
               <div class="model-contrib">
-                {#each fcastResult.models as m}
+                {#each (fcastResult.models ?? []) as m (m.name)}
                   <div class="model-chip" title="{m.name}: weight {(m.weight*100).toFixed(0)}%, mean {m.mean.toFixed(2)}">
                     <span class="model-name">{m.name}</span>
                     <span class="model-w">{(m.weight * 100).toFixed(0)}%</span>

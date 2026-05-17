@@ -299,7 +299,7 @@
   /* hide browser number spinners */
   .num-input::-webkit-inner-spin-button,
   .num-input::-webkit-outer-spin-button { -webkit-appearance: none; }
-  .num-input { -moz-appearance: textfield; }
+  .num-input { -moz-appearance: textfield; appearance: textfield; }
 
   .sum-cell {
     font-weight: 700;
