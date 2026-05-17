@@ -35,7 +35,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.0.3"
+const version = "7.0.4"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -138,20 +138,32 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	defer store.Close()
 
-	// Periodic BadgerDB value-log GC — prevents vlog files from accumulating and
-	// reclaims space from TTL-expired entries. Runs every 10 minutes; each pass
-	// discards at most one vlog file with ≥50% garbage.
+	// Restore in-memory snapshots from BadgerDB so the analyzer sees prior state
+	// immediately after restart (data continuity across pod restarts and upgrades).
+	if n, err := store.LoadSnapshots(); err != nil {
+		logger.Default.Warn("snapshot restore partial", "loaded", n, "err", err)
+	} else {
+		logger.Default.Info("snapshots restored", "count", n)
+	}
+
+	// Periodic BadgerDB maintenance: value-log GC (reclaim deleted/expired vlog space)
+	// + SST compaction (compact raw→5m→1h tiers, evict expired keys from SSTables).
+	// GC runs every 10 min; compaction runs every 30 min.
+	// Without compaction, TTL-expired SST entries accumulate on disk indefinitely.
 	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
-		defer ticker.Stop()
+		gcTicker := time.NewTicker(10 * time.Minute)
+		compactTicker := time.NewTicker(30 * time.Minute)
+		defer gcTicker.Stop()
+		defer compactTicker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
+			case <-gcTicker.C:
 				for store.RunGC() == nil {
-					// keep GC-ing until no more garbage remains
 				}
+			case <-compactTicker.C:
+				store.Compact()
 			}
 		}
 	}()

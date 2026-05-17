@@ -13,13 +13,15 @@ import (
 	"github.com/dgraph-io/badger/v3"
 )
 
-// TTL constants aligned with spec
+// TTL constants. Raw metrics/KPIs use a short window because the compaction engine
+// rolls them up to 5m (35d) and 1h (400d) tiers. Keeping raw data longer than 2 days
+// causes rapid SST accumulation on a single-node cluster with continuous simulator load.
 const (
-	MetricsTTL     = 7 * 24 * time.Hour  // 7 days
+	MetricsTTL     = 2 * 24 * time.Hour  // 2 days (compacted to 5m tier after 2h)
 	LogsTTL        = 30 * 24 * time.Hour // 30 days
 	PredictionsTTL = 30 * 24 * time.Hour
 	AlertsTTL      = 90 * 24 * time.Hour
-	KPIsTTL        = 7 * 24 * time.Hour
+	KPIsTTL        = 2 * 24 * time.Hour  // 2 days (compacted to 5m tier after 2h)
 )
 
 // Store wraps Badger with typed key helpers
@@ -44,7 +46,9 @@ func Open(path string) (*Store, error) {
 		WithBlockCacheSize(32 << 20).     // 32 MB (default 256 MB)
 		WithIndexCacheSize(8 << 20).      // 8 MB (default 0, uses block cache)
 		WithValueLogFileSize(64 << 20).   // 64 MB per vlog (default 1 GB)
-		WithValueThreshold(1 << 10)       // 1 KB: inline small values, vlog only for large
+		WithValueThreshold(1 << 10).      // 1 KB: inline small values, vlog only for large
+		WithNumLevelZeroTables(2).        // trigger L0→L1 compaction earlier (default 5)
+		WithNumLevelZeroTablesStall(4)    // stall writes at 4 L0 tables (default 15)
 
 	db, err := badger.Open(opts)
 	if err != nil {
@@ -93,6 +97,32 @@ func (s *Store) AllSnapshots() []models.KPISnapshot {
 	}
 	s.snapshotsMu.RUnlock()
 	return result
+}
+
+// LoadSnapshots restores in-memory snapshots from BadgerDB on startup.
+// This ensures continuity across pod restarts and version upgrades — the analyzer
+// sees the last known state immediately rather than starting cold.
+func (s *Store) LoadSnapshots() (int, error) {
+	var loaded int
+	err := s.listByPrefix("snapshot:", func(_, val []byte) error {
+		var snap models.KPISnapshot
+		if err := json.Unmarshal(val, &snap); err != nil {
+			return nil // skip corrupt entries
+		}
+		s.snapshotsMu.Lock()
+		if snap.Host != "" {
+			s.snapshots[snap.Host] = snap
+			loaded++
+		}
+		if !snap.Workload.IsEmpty() {
+			if key := snap.Workload.Key(); key != snap.Host {
+				s.snapshots[key] = snap
+			}
+		}
+		s.snapshotsMu.Unlock()
+		return nil
+	})
+	return loaded, err
 }
 
 // FlushSnapshots persists all in-memory snapshots to BadgerDB for durability on shutdown.

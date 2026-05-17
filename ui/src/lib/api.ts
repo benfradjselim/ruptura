@@ -265,9 +265,18 @@ export function fetchEngineStorage() {
 
 export interface TopologyNode {
   id: string
+  label: string
+  namespace: string
+  kind: string
   health_score: number
   fused_r: number
-  state: 'healthy' | 'degraded' | 'critical' | 'pending_telemetry'
+  state: string
+  stress: number
+  fatigue: number
+  contagion: number
+  mood: number
+  velocity: number
+  entropy: number
 }
 
 export interface TopologyEdge {
@@ -276,6 +285,8 @@ export interface TopologyEdge {
   call_rate: number
   error_rate: number
   p99_latency_ms: number
+  edge_type: 'trace' | 'inferred'
+  strength: number
 }
 
 export interface TopologyGraph {

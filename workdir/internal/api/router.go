@@ -20,6 +20,10 @@ func (h *Handlers) NewRouter() http.Handler {
 	r.HandleFunc("/api/v2/ready", h.handleReady).Methods("GET")
 	r.HandleFunc("/api/v2/version", h.handleHealth).Methods("GET")
 
+	// Prometheus scrape endpoint — public so Prometheus can scrape without auth config.
+	// Also aliased at /api/v2/metrics (behind auth) for manual queries.
+	r.HandleFunc("/metrics", h.handleMetrics).Methods("GET")
+
 	// All other /api/v2 routes require authentication
 	api := r.PathPrefix("/api/v2").Subrouter()
 	api.Use(h.authMiddleware)
