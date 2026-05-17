@@ -10,13 +10,13 @@
 
 | Component | Version | Image / Binary |
 |-----------|---------|----------------|
-| ruptura (core engine) | v7.0.0 | `ghcr.io/benfradjselim/ruptura:v7.0.0` |
-| ruptura-ui (dashboard) | v1.0.0 | `ghcr.io/benfradjselim/ruptura-ui:v1.0.0` |
-| ruptura-ctl (CLI) | v1.1.0 | binary `ruptura-ctl-{os}-{arch}` |
-| ruptura-operator | v0.6.9 → v0.7.0 target | `ghcr.io/benfradjselim/ruptura-operator:v0.7.0` |
-| Helm chart | 0.8.0 (appVersion 7.0.0) | `oci://ghcr.io/benfradjselim/charts/ruptura` |
+| ruptura (core engine) | v7.0.6 | `ghcr.io/benfradjselim/ruptura:v7.0.6` |
+| ruptura-ui (dashboard) | ui-v7.0.6 | `ghcr.io/benfradjselim/ruptura-ui:ui-v7.0.6` |
+| ruptura-ctl (CLI) | v7.0.6 | binary attached to GitHub release `v7.0.6` |
+| ruptura-operator | v0.7.0 | `ghcr.io/benfradjselim/ruptura-operator:v0.7.0` |
+| Helm chart | 0.8.2 (appVersion 7.0.6) | `oci://ghcr.io/benfradjselim/charts/ruptura:0.8.2` |
 
-Last updated: 2026-05-15 (v7.0.0 shipped — all sprints complete, version bumps applied)
+Last updated: 2026-05-17 (v7.0.6 — live topology graph, 48h forecasts, multi-step chart)
 
 ---
 
@@ -97,12 +97,47 @@ GET /api/v2/engine/storage
 → { badger: {disk_bytes, keys, vlog_size_bytes, reads_last_min, writes_last_min} }
 ```
 
-### Topology
+### Topology (v7.0.5+)
 
 ```
 GET /api/v2/topology
-→ { nodes: [{id, health_score, fused_r, state}],
-    edges: [{source, target, call_rate, error_rate, p99_latency_ms}] }
+→ {
+    nodes: [{
+      id, label, namespace, kind,
+      health_score, fused_r, state,
+      stress, fatigue, contagion, mood, velocity, entropy
+    }],
+    edges: [{
+      source, target,
+      call_rate, error_rate, p99_latency_ms,
+      edge_type: "trace"|"inferred",  // "inferred" = KPI correlation edge
+      strength: 0-1
+    }]
+  }
+```
+
+### Forecast (v7.0.5+)
+
+```
+GET /api/v2/forecast/{metric}/{host}?horizon={minutes}
+→ {
+    host, metric, current, trend, confidence, warming_up,
+    timestamp,
+    points: [{ offset_minutes, mean, lower_80, upper_80, lower_95, upper_95 }],
+    models: [{ name, weight, mean }]   // ilr, holt_winters, arima
+  }
+
+Available metrics: stress, fatigue, mood, pressure, humidity, contagion,
+                   resilience, entropy, velocity, health_score
+Horizon: any positive integer minutes (1 to 10080); default 60
+Forecast offsets: 1, 5, 10, 30, 60, 120, 360, 720, 1440, 2880 min (up to horizon)
+```
+
+### Predictions (legacy — use forecast instead for multi-step)
+
+```
+GET /api/v2/predict?host={host}&horizon={minutes}
+→ { predictions: [{ target, current, predicted, trend, horizon_minutes }] }
 ```
 
 ### Nodes
