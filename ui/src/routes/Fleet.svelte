@@ -251,7 +251,7 @@
     try {
       const [fleetData, snapshots] = await Promise.all([fetchFleet(), fetchRuptures()])
       const newMap: Record<string, RuptureSnapshot> = {}
-      for (const s of snapshots) {
+      for (const s of (snapshots ?? [])) {
         const key = s.workload?.namespace
           ? `${s.workload.namespace}/${s.workload.kind}/${s.workload.name}`
           : s.host
@@ -259,7 +259,7 @@
       }
       ruptureMap = newMap
 
-      const merged = (fleetData.hosts ?? []).map(h => {
+      const merged = ((fleetData?.hosts) ?? []).map(h => {
         const snap = newMap[h.host]
         if (!snap) return h
         const cal = snap.status === 'calibrating' || snap.status === 'pending_telemetry'

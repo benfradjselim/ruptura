@@ -226,8 +226,9 @@ export function fetchHealth() {
 
 // ── fleet ────────────────────────────────────────────────────────────────────
 
-export function fetchFleet() {
-  return get<FleetResponse>('/api/v2/fleet')
+export async function fetchFleet(): Promise<FleetResponse> {
+  const r = await get<FleetResponse | null>('/api/v2/fleet')
+  return r ?? { total_hosts: 0, healthy_hosts: 0, degraded_hosts: 0, critical_hosts: 0, hosts: [] }
 }
 
 // ── kpis ─────────────────────────────────────────────────────────────────────
