@@ -1,0 +1,96 @@
+name: Deploy Prometheus + wire Ruptura datasource
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Prometheus → monitoring namespace
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+      - uses: azure/setup-helm@v4
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.K3S_KUBECONFIG }}
+        run: |
+          mkdir -p ~/.kube
+          echo "${KUBECONFIG_B64}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl cluster-info
+
+      - name: Add prometheus-community helm repo
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Deploy Prometheus
+        run: |
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+          helm upgrade --install prometheus prometheus-community/prometheus \
+            --namespace monitoring \
+            --set server.service.type=ClusterIP \
+            --set server.persistentVolume.enabled=false \
+            --set alertmanager.enabled=false \
+            --set pushgateway.enabled=false \
+            --set nodeExporter.enabled=true \
+            --set kube-state-metrics.enabled=true \
+            --wait --timeout=5m
+          echo "Prometheus deployed."
+          kubectl get pods -n monitoring
+
+      - name: Wait for Prometheus to be ready
+        run: |
+          kubectl rollout status deployment/prometheus-server -n monitoring --timeout=3m
+          kubectl rollout status deployment/prometheus-kube-state-metrics -n monitoring --timeout=2m
+
+      - name: Wire Prometheus datasource into Ruptura
+        env:
+          RUPTURA_API_KEY: ${{ secrets.RUPTURA_API_KEY }}
+          NODE_IP: "185.229.225.115"
+          API_PORT: "31468"
+        run: |
+          # Prometheus is reachable inside the cluster at this DNS name.
+          # Ruptura's scraper runs server-side so it uses the cluster-internal URL.
+          PROM_URL="http://prometheus-server.monitoring.svc.cluster.local:80"
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "id": "prometheus-cluster",
+            "name": "Prometheus (cluster)",
+            "type": "prometheus",
+            "url": "${PROM_URL}",
+            "enabled": true,
+            "scrape_interval_seconds": 30,
+            "namespace": ""
+          }
+          EOF
+          )
+
+          echo "Creating datasource..."
+          HTTP_STATUS=$(curl -s -o /tmp/ds_response.json -w "%{http_code}" \
+            -X POST "http://${NODE_IP}:${API_PORT}/api/v2/datasources" \
+            -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "${PAYLOAD}")
+
+          cat /tmp/ds_response.json
+          echo ""
+
+          if [ "$HTTP_STATUS" = "201" ] || [ "$HTTP_STATUS" = "200" ]; then
+            echo "✓ Datasource created (HTTP ${HTTP_STATUS})"
+          else
+            echo "✗ Failed with HTTP ${HTTP_STATUS}"
+            exit 1
+          fi
+
+      - name: Smoke-test — Prometheus reachable from inside cluster
+        run: |
+          # Run a quick curl from inside a pod to confirm Prometheus is up
+          kubectl run prom-check --image=curlimages/curl:8.7.1 --restart=Never --rm -i \
+            --namespace=monitoring \
+            -- curl -sf http://prometheus-server.monitoring.svc.cluster.local:80/-/ready
+          echo "Prometheus is reachable from inside the cluster."
