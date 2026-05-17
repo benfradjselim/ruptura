@@ -529,7 +529,7 @@ export interface ForecastResult {
   trend: string
   confidence: number
   warming_up?: boolean
-  points: ForecastPoint[]
+  points?: ForecastPoint[]
   models?: ModelContribution[]
   timestamp: string
 }

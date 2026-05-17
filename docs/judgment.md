@@ -1651,3 +1651,64 @@ Every v7 feature either contributes to that test or it is deferred to v7.1.
 - **Inferred topology edges are acceptable for v7**: when no trace spans exist, KPI correlation provides useful signal about potential relationships. Must be clearly labeled as "inferred" (already done).
 - **Demo workloads should use `python:3.11-alpine` image**: not the Ruptura image. Ruptura image starts a full observability server, not an HTTP metrics endpoint.
 - **2-day TTL + 30-min compaction**: validated approach for single-node k3s with 10GB disk. Steady-state BadgerDB usage should stay under 200MB.
+
+---
+
+## v7.0.6 Session Findings (2026-05-17)
+
+### What shipped in this session
+
+**UI null-safety audit (complete)**
+- Root cause of "Cannot read properties of null (reading 'hosts')" crash: `safeJson<T>()` returns `null as unknown as T` for empty/null API bodies
+- Fixed `fetchFleet()`, `fetchTopology()`, `fetchEngineStatus()` — all now return safe fallbacks instead of null
+- `loadFleet()` in Fleet.svelte: added `(fleetData?.hosts ?? [])` and `(snapshots ?? [])` null guards
+- TopologyMap `load()`: now uses `graph?.nodes ?? []` and `graph?.edges ?? []` before passing to force simulation
+- NavBar `poll()`: `fetchEngineStatus()` safe fallback prevents `s.analyzer.calibrating_workloads` crash
+
+**Forecast canvas timing fix**
+- Chart.js `new Chart(fcastCanvas, ...)` was called before Svelte re-rendered the DOM after `fcastResult` was set
+- Fixed by adding `await tick()` after `fcastResult = ...` to ensure canvas is mounted before construction
+
+**Multi-step forecast UI improvements**
+- Added `ModelContribution` TypeScript interface to match backend `models: [{name, weight, mean}]` field
+- Added `models` field to `ForecastResult` interface (was missing — backend already returned it)
+- Forecast tab now shows ILR/Holt-Winters/ARIMA weight chips below the chart
+
+**Test coverage expansion**
+- `internal/history/history_test.go`: 9 tests covering MaybePush throttle/interval, maxPoints cap, copy safety, PointFromSnapshot
+- `internal/api/endpoints_test.go`: 10 endpoint tests covering health, fleet, ruptures, alerts, nodes, topology, engine/status, suppressions, dataflow, and 404
+
+**A11y improvements**
+- TopologyMap SVG `<g>` nodes now have `role="button"`, `tabindex="0"`, and `on:keydown` handlers
+- Eliminates a11y warnings that appeared on every build
+
+**CI fix (v7.0.6)**
+- Release workflow updated to create GitHub release object before attaching CLI binaries
+- Added idempotent `gh release create` step; elevated workflow `contents` permission to `write`
+
+### Gaps identified this session
+
+**GAP-V7-08: No deploy automation — v7.0.6 images built but not deployed**
+- Images `ghcr.io/benfradjselim/ruptura:v7.0.6` and `ghcr.io/benfradjselim/ruptura-ui:ui-v7.0.6` are built in CI
+- Kamatera lab still runs v7.0.5 (SSH access was lost in prior session)
+- Fix: store kubeconfig as `KUBECONFIG_KAMATERA` GitHub Actions secret; add post-release deploy job
+
+**GAP-V7-09: ForecastResult warming_up has no `points` field**
+- When predictor is warming up, backend returns `{ warming_up: true, current, note }` with NO `points` array
+- The TypeScript `ForecastResult` interface types `points` as required, which means TypeScript would consider it invalid
+- The UI handles this with `fcastResult?.warming_up` check but the interface should type `points` as optional
+- Fix: change `points: ForecastPoint[]` to `points?: ForecastPoint[]` in ForecastResult
+
+### What still needs doing for v7.1
+
+1. **Real OTLP workloads**: Deploy `opentelemetry-demo` in `ruptura-demo` namespace with traces to Ruptura OTLP endpoint
+2. **Auto-deploy via CI**: GitHub Actions post-release job deploying to Kamatera using `KUBECONFIG_KAMATERA` secret
+3. **Fix ForecastResult.points optional**: `points?: ForecastPoint[]` for warming_up case
+4. **Forecast warmup progress bar**: show "collecting baseline: X/240 observations" during warmup
+5. **SSE event stream in UI**: Connect the `/api/v2/events` endpoint to the dashboard for real-time alerts
+
+### Decisions made
+
+- **`safeJson` null-safety is a design choice, not a bug**: returning `null as unknown as T` is intentional for empty API responses. All callers must add null-safe wrappers at the fetch level, not in every component.
+- **History package tests confirm copy semantics**: `Get()` and `All()` both return deep copies. This is the correct behavior — mutations to returned slices must not affect the manager's internal state.
+- **Endpoint tests belong at the `api` package level**: they test the full HTTP handler stack (router + handler + store) without needing a real server. This is the right integration boundary.

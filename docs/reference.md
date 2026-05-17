@@ -16,7 +16,7 @@
 | ruptura-operator | v0.7.0 | `ghcr.io/benfradjselim/ruptura-operator:v0.7.0` |
 | Helm chart | 0.8.2 (appVersion 7.0.6) | `oci://ghcr.io/benfradjselim/charts/ruptura:0.8.2` |
 
-Last updated: 2026-05-17 (v7.0.6 — live topology graph, 48h forecasts, multi-step chart)
+Last updated: 2026-05-17 (v7.0.6 — null-safety audit, model contributions UI, endpoint tests, a11y)
 
 ---
 
