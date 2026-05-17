@@ -148,7 +148,7 @@
 
   async function drawForecastChart() {
     const snap = currentSnap
-    if (!fcastCanvas || !snap) return
+    if (!snap) return
     const host = snap.workload?.namespace
       ? `${snap.workload.namespace}/${snap.workload.kind}/${snap.workload.name}`
       : snap.host
@@ -160,6 +160,9 @@
       fcastResult = await fetchForecast(host, fcastMetric, fcastHorizon)
     } catch { fcastResult = null }
     fcastLoading = false
+
+    // Wait for Svelte to render the canvas (it's conditionally shown based on fcastResult)
+    await tick()
 
     if (!fcastResult || !fcastCanvas) return
     const pts = fcastResult.points ?? []
