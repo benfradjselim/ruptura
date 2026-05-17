@@ -1,13 +1,16 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { fetchAlerts } from '../lib/api'
-  import type { Alert } from '../lib/api'
+  import { fetchAlerts, openEventStream, fetchRecentEvents } from '../lib/api'
+  import type { Alert, RuptureEvent } from '../lib/api'
 
   let alerts: Alert[] = []
   let loading = true
   let error = ''
   let filter = 'active'
   let interval: ReturnType<typeof setInterval>
+  let liveEvents: RuptureEvent[] = []
+  let eventSource: EventSource | null = null
+  let sseConnected = false
 
   async function load() {
     try {
@@ -20,11 +23,30 @@
     }
   }
 
-  onMount(() => {
+  function startSSE() {
+    if (eventSource) { eventSource.close(); eventSource = null }
+    try {
+      eventSource = openEventStream((ev) => {
+        if (ev.type === 'heartbeat') { sseConnected = true; return }
+        sseConnected = true
+        liveEvents = [ev, ...liveEvents].slice(0, 50)
+      })
+      eventSource.onerror = () => { sseConnected = false }
+    } catch { /* SSE not supported or backend down */ }
+  }
+
+  onMount(async () => {
     load()
     interval = setInterval(load, 15_000)
+    try {
+      liveEvents = await fetchRecentEvents(20)
+    } catch { /* ignore */ }
+    startSSE()
   })
-  onDestroy(() => clearInterval(interval))
+  onDestroy(() => {
+    clearInterval(interval)
+    eventSource?.close()
+  })
 
   function matchFilter(a: Alert): boolean {
     if (filter === 'active')   return !a.resolved_at
@@ -124,6 +146,28 @@
           </div>
         </div>
       {/each}
+    </div>
+  {/if}
+
+  <!-- live event stream panel -->
+  {#if liveEvents.length > 0}
+    <div class="live-section">
+      <div class="live-header">
+        <span class="live-title">Live Event Stream</span>
+        <span class="live-dot" class:connected={sseConnected} title={sseConnected ? 'SSE connected' : 'SSE disconnected'}></span>
+      </div>
+      <div class="live-list">
+        {#each liveEvents as ev}
+          {#if ev.type !== 'heartbeat'}
+            <div class="live-row" class:rupture={ev.type === 'rupture'} class:recovery={ev.type === 'recovery'}>
+              <span class="live-type">{ev.type.toUpperCase()}</span>
+              {#if ev.workload}<span class="live-wl">{ev.workload}</span>{/if}
+              {#if ev.fused_r != null}<span class="live-fused">FusedR {ev.fused_r.toFixed(2)}</span>{/if}
+              <span class="live-ts">{new Date(ev.ts).toLocaleTimeString()}</span>
+            </div>
+          {/if}
+        {/each}
+      </div>
     </div>
   {/if}
 </div>
@@ -292,4 +336,73 @@
     color: var(--muted);
     font-family: 'JetBrains Mono', monospace;
   }
+
+  .live-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+  }
+
+  .live-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .live-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+
+  .live-dot.connected { background: var(--green); }
+
+  .live-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .live-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--surface2);
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .live-row.rupture { border-left: 3px solid var(--red); }
+  .live-row.recovery { border-left: 3px solid var(--green); }
+
+  .live-type {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+  }
+
+  .live-row.rupture .live-type { color: var(--red); }
+  .live-row.recovery .live-type { color: var(--green); }
+
+  .live-wl { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .live-fused { color: var(--yellow); flex-shrink: 0; }
+  .live-ts { color: var(--muted); flex-shrink: 0; font-size: 10px; }
 </style>

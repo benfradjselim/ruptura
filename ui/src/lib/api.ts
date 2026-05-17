@@ -581,3 +581,34 @@ export function fetchFusion(namespace: string, kind: string, name: string) {
     `/api/v2/engine/fusion/${encodeURIComponent(namespace)}/${encodeURIComponent(kind)}/${encodeURIComponent(name)}`,
   )
 }
+
+// ── SSE event stream ──────────────────────────────────────────────────────────
+
+export interface RuptureEvent {
+  type: 'rupture' | 'recovery' | 'heartbeat'
+  workload?: string
+  fused_r?: number
+  state?: string
+  ts: string
+}
+
+export function fetchRecentEvents(limit = 50) {
+  return getArray<RuptureEvent>(`/api/v2/events?limit=${limit}`)
+}
+
+export function openEventStream(
+  onEvent: (e: RuptureEvent) => void,
+  opts?: { namespace?: string; minFusedR?: number },
+): EventSource {
+  const params = new URLSearchParams()
+  if (opts?.namespace) params.set('namespace', opts.namespace)
+  if (opts?.minFusedR != null) params.set('min_fused_r', String(opts.minFusedR))
+  const es = new EventSource(`/api/v2/events?${params}`)
+  es.onmessage = (ev) => {
+    try {
+      const data = JSON.parse(ev.data) as RuptureEvent
+      onEvent(data)
+    } catch { /* ignore malformed */ }
+  }
+  return es
+}
