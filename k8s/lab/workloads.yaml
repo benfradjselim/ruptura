@@ -49,7 +49,7 @@ spec:
     spec:
       containers:
       - name: payment-service
-        image: progrium/stress
+        image: polinux/stress
         args: ["--cpu", "2", "--timeout", "99999s"]
         resources:
           requests: {cpu: "100m", memory: "64Mi"}
@@ -72,7 +72,7 @@ spec:
     spec:
       containers:
       - name: cache-worker
-        image: progrium/stress
+        image: polinux/stress
         args: ["--vm", "1", "--vm-bytes", "100M", "--vm-keep", "--timeout", "99999s"]
         resources:
           requests: {cpu: "30m", memory: "64Mi"}
@@ -141,7 +141,7 @@ spec:
     spec:
       containers:
       - name: ml-inference
-        image: progrium/stress
+        image: polinux/stress
         args: ["--cpu", "2", "--vm", "1", "--vm-bytes", "180M", "--vm-keep", "--timeout", "99999s"]
         resources:
           requests: {cpu: "150m", memory: "128Mi"}
