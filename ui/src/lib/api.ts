@@ -516,6 +516,12 @@ export interface ForecastPoint {
   upper_95: number
 }
 
+export interface ModelContribution {
+  name: string
+  weight: number
+  mean: number
+}
+
 export interface ForecastResult {
   host: string
   metric: string
@@ -524,6 +530,7 @@ export interface ForecastResult {
   confidence: number
   warming_up?: boolean
   points: ForecastPoint[]
+  models?: ModelContribution[]
   timestamp: string
 }
 

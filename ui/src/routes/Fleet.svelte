@@ -730,6 +730,16 @@
             <div class="notice"><p>No forecast available — workload needs more signal history.</p></div>
           {:else}
             <div class="chart-wrap"><canvas bind:this={fcastCanvas}></canvas></div>
+            {#if (fcastResult?.models ?? []).length > 0}
+              <div class="model-contrib">
+                {#each fcastResult.models as m}
+                  <div class="model-chip" title="{m.name}: weight {(m.weight*100).toFixed(0)}%, mean {m.mean.toFixed(2)}">
+                    <span class="model-name">{m.name}</span>
+                    <span class="model-w">{(m.weight * 100).toFixed(0)}%</span>
+                  </div>
+                {/each}
+              </div>
+            {/if}
           {/if}
 
         <!-- ── PREDICTIONS ── -->
@@ -1096,6 +1106,14 @@
   }
   .hz-btn:hover { border-color: var(--accent); color: var(--accent); }
   .hz-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+  .model-contrib { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .model-chip {
+    display: flex; align-items: center; gap: 4px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 2px 8px; font-size: 10px;
+  }
+  .model-name { color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .model-w { color: var(--purple); font-weight: 700; font-family: 'JetBrains Mono', monospace; }
   .pred-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
   .pred-card {
     background: var(--surface2); border: 1px solid var(--border);
