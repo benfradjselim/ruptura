@@ -2,7 +2,9 @@ package api
 
 import (
     "encoding/json"
+    "log"
     "net/http"
+    "strconv"
     "sync/atomic"
     "time"
 
@@ -113,9 +115,16 @@ func (h *Handlers) SetReady(v bool) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+    data, err := json.Marshal(v)
+    if err != nil {
+        log.Printf("writeJSON marshal error (status %d): %v", status, err)
+        http.Error(w, `{"error":"internal serialization error"}`, http.StatusInternalServerError)
+        return
+    }
     w.Header().Set("Content-Type", "application/json")
+    w.Header().Set("Content-Length", strconv.Itoa(len(data)))
     w.WriteHeader(status)
-    json.NewEncoder(w).Encode(v)
+    w.Write(data) //nolint:errcheck
 }
 func writeError(w http.ResponseWriter, status int, msg string) {
     writeJSON(w, status, map[string]string{"error": msg})

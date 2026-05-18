@@ -8,6 +8,7 @@ package api
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"sort"
 	"time"
@@ -15,6 +16,14 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/gorilla/mux"
 )
+
+// safeF64 replaces NaN/Inf with 0 so json.Marshal never returns UnsupportedValueError.
+func safeF64(v float64) float64 {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0
+	}
+	return v
+}
 
 // ── /api/v2/kpis ──────────────────────────────────────────────────────────────
 
@@ -134,12 +143,12 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		resp.Hosts = append(resp.Hosts, fleetHost{
 			Host:              name,
 			State:             state,
-			HealthScore:       s.HealthScore.Value,
-			Stress:            s.Stress.Value,
-			Fatigue:           s.Fatigue.Value,
-			Contagion:         s.Contagion.Value,
+			HealthScore:       safeF64(s.HealthScore.Value),
+			Stress:            safeF64(s.Stress.Value),
+			Fatigue:           safeF64(s.Fatigue.Value),
+			Contagion:         safeF64(s.Contagion.Value),
 			LastSeen:          s.Timestamp,
-			FusedRuptureIndex: s.FusedRuptureIndex,
+			FusedRuptureIndex: safeF64(s.FusedRuptureIndex),
 			HealthForecast:    s.HealthForecast,
 		})
 	}

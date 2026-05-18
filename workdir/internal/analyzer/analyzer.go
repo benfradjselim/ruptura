@@ -881,10 +881,16 @@ func (a *Analyzer) ForecastHealthScore(ref models.WorkloadRef) *models.HealthFor
 		}
 	}
 
+	safeFloat := func(f float64) float64 {
+		if math.IsNaN(f) || math.IsInf(f, 0) {
+			return 0
+		}
+		return f
+	}
 	return &models.HealthForecast{
 		Trend:              trend,
-		In15Min:            math.Round(in15*10) / 10,
-		In30Min:            math.Round(in30*10) / 10,
+		In15Min:            safeFloat(math.Round(in15*10) / 10),
+		In30Min:            safeFloat(math.Round(in30*10) / 10),
 		CriticalETAMinutes: critETA,
 		ConfidenceWindow:   n,
 	}
