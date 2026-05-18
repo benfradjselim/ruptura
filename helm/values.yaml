@@ -133,6 +133,10 @@ securityContext:
   capabilities:
     drop: [ALL]
 
+# -- Cluster Prometheus URL. When set, seeded as a persistent datasource on every startup.
+# Example: "http://prometheus-server.monitoring.svc.cluster.local:80"
+prometheusURL: ""
+
 # -- Kafka broker list for event streaming (optional). Leave empty for in-process bus.
 kafka:
   brokers: ""

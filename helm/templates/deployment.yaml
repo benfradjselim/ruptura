@@ -76,6 +76,10 @@ spec:
             {{- end }}
             - name: RUPTURA_AUTODISCOVERY
               value: {{ .Values.autodiscovery.enabled | default false | quote }}
+            {{- if .Values.prometheusURL }}
+            - name: RUPTURA_PROMETHEUS_URL
+              value: {{ .Values.prometheusURL | quote }}
+            {{- end }}
             - name: GOMEMLIMIT
               value: {{ .Values.goMemLimit | default "419430400" | quote }}
           startupProbe:

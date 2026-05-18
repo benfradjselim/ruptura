@@ -364,6 +364,7 @@ jobs:
             --set "podAnnotations.deploy/ui-sha=${{ github.sha }}" \
             --set ui.service.type=NodePort \
             --set ui.nodePort=31469 \
+            --set prometheusURL="http://prometheus-server.monitoring.svc.cluster.local:80" \
             --kubeconfig /tmp/kubeconfig \
             --atomic \
             --timeout 10m

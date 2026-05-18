@@ -36,16 +36,17 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.0.10"
+const version = "7.0.11"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
-	Port        int
-	OTLPPort    int
-	StoragePath string
-	APIKey      string
-	Edition     string // "community" (default) or "autopilot"
-	ShowVersion bool
+	Port          int
+	OTLPPort      int
+	StoragePath   string
+	APIKey        string
+	Edition       string // "community" (default) or "autopilot"
+	ShowVersion   bool
+	PrometheusURL string // cluster Prometheus URL; if set, seeded as a persistent datasource
 }
 
 func parseFlags(args []string) (Config, error) {
@@ -56,9 +57,13 @@ func parseFlags(args []string) (Config, error) {
 	fs.StringVar(&cfg.StoragePath, "storage", "/var/lib/ruptura/data", "storage directory")
 	fs.StringVar(&cfg.APIKey, "api-key", "", "API bearer token")
 	fs.BoolVar(&cfg.ShowVersion, "version", false, "print version and exit")
+	fs.StringVar(&cfg.PrometheusURL, "prometheus-url", "", "cluster Prometheus URL to seed as default datasource")
 	err := fs.Parse(args)
 	if cfg.APIKey == "" {
 		cfg.APIKey = os.Getenv("RUPTURA_API_KEY")
+	}
+	if cfg.PrometheusURL == "" {
+		cfg.PrometheusURL = os.Getenv("RUPTURA_PROMETHEUS_URL")
 	}
 	if cfg.Edition == "" {
 		if e := os.Getenv("RUPTURA_EDITION"); e != "" {
@@ -351,23 +356,40 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	defer scraperMgr.Stop()
 	handlers.SetScraper(scraperMgr)
 
-	// Seed a self-scrape datasource on first boot so the scrape engine has something to show.
-	if existing, _ := store.ListDatasources(); len(existing) == 0 {
-		now := time.Now()
-		selfDS := scraper.DatasourceConfig{
-			ID:                "self-ruptura-metrics",
-			Name:              "Ruptura Engine (self)",
-			Type:              scraper.TypeDirect,
-			URL:               fmt.Sprintf("http://localhost:%d/metrics", cfg.Port),
+	// Seed built-in datasources. Each is idempotent — existing user configs are not overwritten.
+	seedDS := func(ds scraper.DatasourceConfig) {
+		if _, ok := scraperMgr.Get(ds.ID); ok {
+			return // already loaded from storage
+		}
+		if err := scraperMgr.Put(ds); err != nil {
+			logger.Default.Warn("seed datasource failed", "id", ds.ID, "err", err)
+		}
+	}
+
+	now := time.Now()
+	seedDS(scraper.DatasourceConfig{
+		ID:                "self-ruptura-metrics",
+		Name:              "Ruptura Engine (self)",
+		Type:              scraper.TypeDirect,
+		URL:               fmt.Sprintf("http://localhost:%d/metrics", cfg.Port),
+		Enabled:           true,
+		ScrapeIntervalSec: 30,
+		WorkloadKey:       "ruptura/Deployment/ruptura",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	})
+
+	if cfg.PrometheusURL != "" {
+		seedDS(scraper.DatasourceConfig{
+			ID:                "prometheus-cluster",
+			Name:              "Prometheus (cluster)",
+			Type:              scraper.TypePrometheus,
+			URL:               cfg.PrometheusURL,
 			Enabled:           true,
 			ScrapeIntervalSec: 30,
-			WorkloadKey:       "ruptura/Deployment/ruptura",
 			CreatedAt:         now,
 			UpdatedAt:         now,
-		}
-		if err := scraperMgr.Put(selfDS); err != nil {
-			logger.Default.Warn("seed datasource failed", "err", err)
-		}
+		})
 	}
 
 	handlers.SetReady(true)
