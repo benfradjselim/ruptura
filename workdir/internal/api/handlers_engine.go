@@ -105,15 +105,15 @@ func (h *Handlers) handleTopology(w http.ResponseWriter, r *http.Request) {
 				Label:       label,
 				Namespace:   ns,
 				Kind:        kind,
-				HealthScore: s.HealthScore.Value,
-				FusedR:      s.FusedRuptureIndex,
+				HealthScore: safeF64(s.HealthScore.Value),
+				FusedR:      safeF64(s.FusedRuptureIndex),
 				State:       snapshotState(s),
-				Stress:      s.Stress.Value,
-				Fatigue:     s.Fatigue.Value,
-				Contagion:   s.Contagion.Value,
-				Mood:        s.Mood.Value,
-				Velocity:    s.Velocity.Value,
-				Entropy:     s.Entropy.Value,
+				Stress:      safeF64(s.Stress.Value),
+				Fatigue:     safeF64(s.Fatigue.Value),
+				Contagion:   safeF64(s.Contagion.Value),
+				Mood:        safeF64(s.Mood.Value),
+				Velocity:    safeF64(s.Velocity.Value),
+				Entropy:     safeF64(s.Entropy.Value),
 			}
 			resp.Nodes = append(resp.Nodes, n)
 			snapList = append(snapList, snapEntry{id: id, node: n})
