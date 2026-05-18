@@ -1,0 +1,50 @@
+name: Deploy metrics-server
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Install metrics-server → kube-system
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+      - uses: azure/setup-helm@v4
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.K3S_KUBECONFIG }}
+        run: |
+          mkdir -p ~/.kube
+          echo "${KUBECONFIG_B64}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl cluster-info
+
+      - name: Add metrics-server Helm repo
+        run: |
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo update
+
+      - name: Install metrics-server
+        run: |
+          # k3s uses self-signed kubelet TLS — must pass --kubelet-insecure-tls
+          helm upgrade --install metrics-server metrics-server/metrics-server \
+            --namespace kube-system \
+            --set args[0]="--kubelet-insecure-tls" \
+            --wait --timeout=3m
+          echo "metrics-server deployed."
+          kubectl get pods -n kube-system -l app.kubernetes.io/name=metrics-server
+
+      - name: Smoke-test
+        run: |
+          # Wait for metrics to be available (can take ~60s on first start)
+          for i in $(seq 1 12); do
+            if kubectl top pods -n ruptura-lab 2>/dev/null; then
+              echo "metrics-server is ready"
+              break
+            fi
+            echo "Waiting for metrics-server... ($i/12)"
+            sleep 10
+          done
