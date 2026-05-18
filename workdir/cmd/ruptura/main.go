@@ -26,6 +26,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/fusion"
 	"github.com/benfradjselim/ruptura/internal/history"
 	"github.com/benfradjselim/ruptura/internal/ingest"
+	"github.com/benfradjselim/ruptura/internal/k8smetrics"
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/predictor"
 	"github.com/benfradjselim/ruptura/internal/scraper"
@@ -36,7 +37,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.0.12"
+const version = "7.0.13"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -290,6 +291,15 @@ func runWithContext(ctx context.Context, cfg Config) error {
 			}
 		}
 	}()
+
+	// k8s metrics-server poller — provides pod CPU/memory signals directly via the
+	// metrics.k8s.io API. Falls back silently when metrics-server is not installed.
+	if poller, err := k8smetrics.New(pipelineEngine, 30*time.Second); err == nil {
+		logger.Default.Info("k8s metrics-server poller active — injecting pod CPU/memory signals")
+		go poller.Run(ctx)
+	} else {
+		logger.Default.Info("k8s metrics-server poller skipped", "reason", err.Error())
+	}
 
 	// Try to build a real Kubernetes actuator (only works inside a K8s pod).
 	// If not in-cluster, the provider silently no-ops instead of failing startup.
