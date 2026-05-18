@@ -53,15 +53,19 @@ func promQueries(namespace string) map[string]string {
 	}
 
 	return map[string]string{
-		// CPU utilisation as % of request (proxy for stress)
+		// CPU utilisation as % of 1 core — prefer "% of request" when kube-state-metrics
+		// resource requests are available; fall back to raw core-seconds/s × 100 otherwise.
+		// The `or` clause ensures non-zero values even on clusters without kube-state-metrics.
 		"stress": fmt.Sprintf(
-			`100 * sum(rate(container_cpu_usage_seconds_total{%scontainer!="",container!="POD"}[2m])) by (namespace,pod) / on(namespace,pod) group_left() sum(kube_pod_container_resource_requests{%sresource="cpu",container!=""}) by (namespace,pod)`,
-			nsFilter, nsFilter,
+			`100 * sum(rate(container_cpu_usage_seconds_total{%scontainer!="",container!="POD"}[2m])) by (namespace,pod) / on(namespace,pod) group_left() sum(kube_pod_container_resource_requests{%sresource="cpu",container!=""}) by (namespace,pod) `+
+				`or 100 * sum(rate(container_cpu_usage_seconds_total{%scontainer!="",container!="POD"}[2m])) by (namespace,pod)`,
+			nsFilter, nsFilter, nsFilter,
 		),
-		// Memory utilisation as % of request
+		// Memory utilisation — prefer "% of request"; fall back to working-set MiB × 100.
 		"pressure": fmt.Sprintf(
-			`100 * sum(container_memory_working_set_bytes{%scontainer!="",container!="POD"}) by (namespace,pod) / on(namespace,pod) group_left() sum(kube_pod_container_resource_requests{%sresource="memory",container!=""}) by (namespace,pod)`,
-			nsFilter, nsFilter,
+			`100 * sum(container_memory_working_set_bytes{%scontainer!="",container!="POD"}) by (namespace,pod) / on(namespace,pod) group_left() sum(kube_pod_container_resource_requests{%sresource="memory",container!=""}) by (namespace,pod) `+
+				`or sum(container_memory_working_set_bytes{%scontainer!="",container!="POD"}) by (namespace,pod) / 1048576`,
+			nsFilter, nsFilter, nsFilter,
 		),
 		// Container restart count (monotonic — pipeline tracks delta)
 		"fatigue": fmt.Sprintf(
