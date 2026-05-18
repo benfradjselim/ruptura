@@ -36,7 +36,7 @@
     { id: 'map',      label: 'Topology', icon: '⎋' },
     { id: 'alerts',   label: 'Alerts',   icon: '◉' },
     { id: 'engine',   label: 'Engine',   icon: '⚙' },
-    { id: 'nodes',    label: 'Nodes',    icon: '◫' },
+    { id: 'nodes',    label: 'Cluster',  icon: '◫' },
     { id: 'settings', label: 'Settings', icon: '⊞' },
   ]
 </script>
