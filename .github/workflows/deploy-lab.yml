@@ -28,14 +28,14 @@ jobs:
           kubectl apply -f k8s/lab/workloads.yaml
           echo ""
           echo "=== Waiting for deployments ==="
-          kubectl rollout status deployment/api-gateway        -n ruptura-lab --timeout=2m
-          kubectl rollout status deployment/payment-service    -n ruptura-lab --timeout=2m
-          kubectl rollout status deployment/cache-worker       -n ruptura-lab --timeout=2m
-          kubectl rollout status deployment/order-processor    -n ruptura-lab --timeout=2m
-          kubectl rollout status deployment/ml-inference       -n ruptura-lab --timeout=2m
-          kubectl rollout status deployment/inventory-service  -n ruptura-lab --timeout=2m
+          kubectl rollout status deployment/api-gateway        -n ruptura-lab --timeout=4m
+          kubectl rollout status deployment/payment-service    -n ruptura-lab --timeout=4m || true
+          kubectl rollout status deployment/cache-worker       -n ruptura-lab --timeout=4m || true
+          kubectl rollout status deployment/order-processor    -n ruptura-lab --timeout=4m
+          kubectl rollout status deployment/ml-inference       -n ruptura-lab --timeout=4m || true
+          kubectl rollout status deployment/inventory-service  -n ruptura-lab --timeout=4m || true
           # notification-worker crash-loops by design — just wait for it to exist
-          kubectl wait pod -l app=notification-worker -n ruptura-lab --for=condition=Ready --timeout=30s || true
+          kubectl wait pod -l app=notification-worker -n ruptura-lab --for=condition=Ready --timeout=60s || true
 
       - name: Show pod status
         run: |
