@@ -35,26 +35,23 @@ type Poller struct {
 }
 
 // New creates a Poller using the pod's in-cluster ServiceAccount credentials.
-// Returns a non-nil error when not running inside a k8s pod or when metrics-server
-// is unavailable. The caller should skip the poller in that case.
+// Returns a non-nil error only when not running inside a k8s pod.
+// If metrics-server is unavailable, the poller starts anyway and logs errors
+// per cycle at Debug level — it will pick up metrics as soon as metrics-server
+// becomes ready.
 func New(pipeline MetricPipeline, interval time.Duration, namespaces ...string) (*Poller, error) {
 	apiBase, token, client, err := inClusterCreds()
 	if err != nil {
 		return nil, err
 	}
-	p := &Poller{
+	return &Poller{
 		apiBase:    apiBase,
 		token:      token,
 		client:     client,
 		pipeline:   pipeline,
 		interval:   interval,
 		namespaces: namespaces,
-	}
-	// Probe metrics-server availability with a quick check.
-	if err := p.probe(); err != nil {
-		return nil, fmt.Errorf("k8smetrics: metrics-server not available: %w", err)
-	}
-	return p, nil
+	}, nil
 }
 
 // Run starts the polling loop. Blocks until ctx is cancelled.
@@ -71,12 +68,6 @@ func (p *Poller) Run(ctx context.Context) {
 			}
 		}
 	}
-}
-
-// probe does a single lightweight request to confirm metrics-server is installed.
-func (p *Poller) probe() error {
-	_, err := p.listPodMetrics("kube-system")
-	return err
 }
 
 func (p *Poller) poll() error {

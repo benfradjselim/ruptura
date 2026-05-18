@@ -29,6 +29,25 @@ jobs:
 
       - name: Install metrics-server
         run: |
+          # k3s ships with a metrics-server ServiceAccount pre-installed (not Helm-managed).
+          # Annotate any conflicting resources so Helm can adopt them.
+          for resource in serviceaccount/metrics-server clusterrole/system:aggregated-metrics-reader \
+            clusterrole/system:metrics-server clusterrolebinding/metrics-server:system:auth-delegator \
+            clusterrolebinding/system:metrics-server rolebinding/metrics-server-auth-reader \
+            apiservice/v1beta1.metrics.k8s.io; do
+            kind=$(echo "$resource" | cut -d/ -f1)
+            name=$(echo "$resource" | cut -d/ -f2)
+            ns_flag=""
+            [ "$kind" = "serviceaccount" ] || [ "$kind" = "rolebinding" ] && ns_flag="-n kube-system"
+            kubectl annotate "$kind" $ns_flag "$name" \
+              meta.helm.sh/release-name=metrics-server \
+              meta.helm.sh/release-namespace=kube-system \
+              --overwrite 2>/dev/null || true
+            kubectl label "$kind" $ns_flag "$name" \
+              app.kubernetes.io/managed-by=Helm \
+              --overwrite 2>/dev/null || true
+          done
+
           # k3s uses self-signed kubelet TLS — must pass --kubelet-insecure-tls
           helm upgrade --install metrics-server metrics-server/metrics-server \
             --namespace kube-system \

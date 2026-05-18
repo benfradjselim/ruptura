@@ -2,8 +2,8 @@ apiVersion: v2
 name: ruptura
 description: Predictive workload health platform for Kubernetes — detect ruptures before they happen
 type: application
-version: 0.8.5
-appVersion: "7.0.13"
+version: 0.8.6
+appVersion: "7.0.14"
 keywords:
   - observability
   - kubernetes
