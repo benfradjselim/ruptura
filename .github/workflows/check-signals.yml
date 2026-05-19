@@ -1,0 +1,39 @@
+name: Check Ruptura signals
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Query live KPI signals
+    runs-on: ubuntu-latest
+    env:
+      RUPTURA_API_KEY: ${{ secrets.RUPTURA_API_KEY }}
+      NODE_IP: "185.229.225.115"
+      API_PORT: "31468"
+    steps:
+      - name: Fleet workloads & KPIs
+        run: |
+          echo "=== Ruptura health ==="
+          curl -sf "http://${NODE_IP}:${API_PORT}/api/v2/health" | python3 -m json.tool
+
+          echo ""
+          echo "=== Datasources ==="
+          curl -sf \
+            -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
+            "http://${NODE_IP}:${API_PORT}/api/v2/datasources" | python3 -m json.tool
+
+          echo ""
+          echo "=== Fleet workloads (all KPIs) ==="
+          curl -sf \
+            -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
+            "http://${NODE_IP}:${API_PORT}/api/v2/fleet" | python3 -m json.tool || \
+          curl -sf \
+            -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
+            "http://${NODE_IP}:${API_PORT}/api/v2/ruptures" | python3 -m json.tool
+
+          echo ""
+          echo "=== Recent ruptures/forecasts ==="
+          curl -sf \
+            -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
+            "http://${NODE_IP}:${API_PORT}/api/v2/ruptures" | python3 -m json.tool
