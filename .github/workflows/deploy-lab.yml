@@ -23,6 +23,10 @@ jobs:
           chmod 600 ~/.kube/config
           kubectl cluster-info
 
+      - name: Clean up evicted and failed pods
+        run: |
+          kubectl delete pods -n ruptura-lab --field-selector=status.phase=Failed --ignore-not-found=true || true
+
       - name: Apply lab workloads
         run: |
           kubectl apply -f k8s/lab/workloads.yaml
