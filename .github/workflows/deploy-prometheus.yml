@@ -30,14 +30,74 @@ jobs:
       - name: Deploy Prometheus
         run: |
           kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+          # k3s embeds cAdvisor inside kubelet (port 10250, self-signed TLS).
+          # The standard prometheus chart cadvisor job must use insecure_skip_verify.
+          # We also add kube-state-metrics to track restart counts and resource requests.
+          cat > /tmp/prom-values.yaml <<'EOF'
+          server:
+            service:
+              type: ClusterIP
+            persistentVolume:
+              enabled: false
+            # Allow Prometheus to read kubelet metrics (nodes/metrics RBAC resource)
+            rbac:
+              create: true
+
+          alertmanager:
+            enabled: false
+          prometheus-pushgateway:
+            enabled: false
+          prometheus-node-exporter:
+            enabled: false
+
+          kube-state-metrics:
+            enabled: true
+
+          # k3s-compatible cAdvisor + kubelet scrape configs
+          extraScrapeConfigs: |
+            - job_name: kubernetes-cadvisor
+              scheme: https
+              tls_config:
+                insecure_skip_verify: true
+              bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              kubernetes_sd_configs:
+                - role: node
+              relabel_configs:
+                - action: labelmap
+                  regex: __meta_kubernetes_node_label_(.+)
+                - target_label: __metrics_path__
+                  replacement: /metrics/cadvisor
+                - source_labels: [__address__]
+                  regex: "([^:]+)(?::\\d+)?"
+                  target_label: __address__
+                  replacement: "${1}:10250"
+              metric_relabel_configs:
+                - action: keep
+                  source_labels: [__name__]
+                  regex: "container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_start_time_seconds"
+                - action: drop
+                  source_labels: [container]
+                  regex: "(POD|)"
+            - job_name: kubernetes-kubelet
+              scheme: https
+              tls_config:
+                insecure_skip_verify: true
+              bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              kubernetes_sd_configs:
+                - role: node
+              relabel_configs:
+                - action: labelmap
+                  regex: __meta_kubernetes_node_label_(.+)
+                - source_labels: [__address__]
+                  regex: "([^:]+)(?::\\d+)?"
+                  target_label: __address__
+                  replacement: "${1}:10250"
+          EOF
+
           helm upgrade --install prometheus prometheus-community/prometheus \
             --namespace monitoring \
-            --set server.service.type=ClusterIP \
-            --set server.persistentVolume.enabled=false \
-            --set alertmanager.enabled=false \
-            --set pushgateway.enabled=false \
-            --set nodeExporter.enabled=true \
-            --set kube-state-metrics.enabled=true \
+            --values /tmp/prom-values.yaml \
             --wait --timeout=5m
           echo "Prometheus deployed."
           kubectl get pods -n monitoring
