@@ -125,6 +125,8 @@ type workloadState struct {
 	healthHistory *utils.CircularBuffer
 	// Restart count
 	restartCount float64
+	// Last restart count observed from pipeline (to detect increments)
+	lastRestartMetric float64
 	// Accumulated fatigue — v5.0 dissipative formula
 	fatigue float64
 	// v5.0 fatigue config (defaults applied at creation)
@@ -226,8 +228,33 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 
 	// --- Stress Index ---
 	// S = α·CPU + β·RAM + γ·Latency + δ·Errors + ε·Timeouts
+	//
+	// Accept pre-computed KPI names ("stress", "pressure") as sensor proxies when
+	// raw sensor names ("cpu_percent", "memory_percent") are absent. This handles
+	// both the Prometheus scraper path (stress = CPU% of request, 0–100) and the
+	// k8smetrics poller path (stress = CPU cores, 0–n; pressure = memory MiB, 0–n).
 	cpu := getMetric(metrics, "cpu_percent")
+	if cpu == 0 {
+		if s := getMetric(metrics, "stress"); s > 0 {
+			if s > 1 {
+				cpu = s / 100.0 // Prometheus: stress as % of CPU request
+			} else {
+				cpu = s // k8smetrics: stress as fraction of a core
+			}
+		}
+	}
 	ram := getMetric(metrics, "memory_percent")
+	if ram == 0 {
+		if p := getMetric(metrics, "pressure"); p > 0 {
+			if p > 1 {
+				// Prometheus or k8smetrics: pressure as MiB or %
+				// Divide by 100 to normalise to 0–1 (e.g., 75 MiB → 0.75, 80% → 0.80).
+				ram = p / 100.0
+			} else {
+				ram = p
+			}
+		}
+	}
 	latency := getMetric(metrics, "load_avg_1") // use load as latency proxy
 	errors := getMetric(metrics, "error_rate")
 	timeouts := getMetric(metrics, "timeout_rate")
@@ -236,6 +263,15 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 	stress = utils.Clamp(stress, 0, 1)
 
 	ws.stressHistory.Push(stress)
+
+	// --- Fatigue boost from restart counter (Prometheus "fatigue" metric) ---
+	// Each new restart increments fatigue by 0.15, capped at 1.
+	if rawRestarts := getMetric(metrics, "fatigue"); rawRestarts > ws.lastRestartMetric {
+		delta := rawRestarts - ws.lastRestartMetric
+		ws.fatigue = utils.Clamp(ws.fatigue+0.15*delta, 0, 1)
+		ws.restartCount += delta
+		ws.lastRestartMetric = rawRestarts
+	}
 
 	// --- Fatigue (v5.0 — Dissipative) ---
 	// F_t = max(0, F_{t−1} + (S_t − R_threshold) − λ_eff)
