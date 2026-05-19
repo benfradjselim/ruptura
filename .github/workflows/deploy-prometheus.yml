@@ -37,7 +37,8 @@ jobs:
           cat > /tmp/prom-values.yaml <<'EOF'
           server:
             service:
-              type: ClusterIP
+              type: NodePort
+              nodePort: 30090
             persistentVolume:
               enabled: false
             # Allow Prometheus to read kubelet metrics (nodes/metrics RBAC resource)
