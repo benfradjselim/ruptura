@@ -32,7 +32,7 @@ spec:
           httpGet: {path: /, port: 80}
           periodSeconds: 15
 ---
-# 2. payment-service — CPU stressed (stress-ng burning ~80% of limit)
+# 2. payment-service — CPU stressed (~80% of limit via tight dd loop)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -49,13 +49,14 @@ spec:
     spec:
       containers:
       - name: payment-service
-        image: polinux/stress
-        args: ["--cpu", "2", "--timeout", "99999s"]
+        image: busybox:1.36
+        command: ["sh", "-c"]
+        args: ["while true; do dd if=/dev/urandom of=/dev/null bs=1M count=200 2>/dev/null; done"]
         resources:
           requests: {cpu: "100m", memory: "64Mi"}
           limits:   {cpu: "250m", memory: "128Mi"}
 ---
-# 3. cache-worker — memory pressure (fills ~85% of limit)
+# 3. cache-worker — memory pressure (holds ~80Mi of the 96Mi limit)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -72,8 +73,9 @@ spec:
     spec:
       containers:
       - name: cache-worker
-        image: polinux/stress
-        args: ["--vm", "1", "--vm-bytes", "48M", "--vm-keep", "--timeout", "99999s"]
+        image: busybox:1.36
+        command: ["sh", "-c"]
+        args: ["dd if=/dev/zero bs=1M count=75 of=/dev/shm/mem 2>/dev/null; echo 'memory held'; while true; do sleep 60; done"]
         resources:
           requests: {cpu: "30m", memory: "64Mi"}
           limits:   {cpu: "100m", memory: "96Mi"}
@@ -141,8 +143,13 @@ spec:
     spec:
       containers:
       - name: ml-inference
-        image: polinux/stress
-        args: ["--cpu", "1", "--vm", "1", "--vm-bytes", "80M", "--vm-keep", "--timeout", "99999s"]
+        image: busybox:1.36
+        command: ["sh", "-c"]
+        args:
+        - |
+          dd if=/dev/zero bs=1M count=80 of=/dev/shm/mem 2>/dev/null
+          echo 'memory held, starting cpu loop'
+          while true; do dd if=/dev/urandom of=/dev/null bs=1M count=200 2>/dev/null; done
         resources:
           requests: {cpu: "150m", memory: "128Mi"}
           limits:   {cpu: "350m", memory: "192Mi"}
