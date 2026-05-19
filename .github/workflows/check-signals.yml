@@ -27,13 +27,29 @@ jobs:
           echo "=== Fleet workloads (all KPIs) ==="
           curl -sf \
             -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
-            "http://${NODE_IP}:${API_PORT}/api/v2/fleet" | python3 -m json.tool || \
-          curl -sf \
-            -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
-            "http://${NODE_IP}:${API_PORT}/api/v2/ruptures" | python3 -m json.tool
+            "http://${NODE_IP}:${API_PORT}/api/v2/fleet" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+workloads = data if isinstance(data, list) else data.get('workloads', [])
+print(f\"{'Workload':<50} {'stress':>7} {'pressure':>9} {'fatigue':>8} {'health':>7}\")
+print('-' * 85)
+for w in sorted(workloads, key=lambda x: x.get('health_score', 100)):
+    name = w.get('workload_key') or w.get('name') or w.get('id') or '?'
+    print(f\"{name:<50} {w.get('stress',0):>7.1f} {w.get('pressure',0):>9.1f} {w.get('fatigue',0):>8.1f} {w.get('health_score',0):>7.1f}\")
+"
 
           echo ""
           echo "=== Recent ruptures/forecasts ==="
           curl -sf \
             -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
-            "http://${NODE_IP}:${API_PORT}/api/v2/ruptures" | python3 -m json.tool
+            "http://${NODE_IP}:${API_PORT}/api/v2/ruptures" | python3 -m json.tool | head -60
+
+          echo ""
+          echo "=== ruptura-lab KPIs (payment-service / cache-worker / ml-inference) ==="
+          for workload in payment-service cache-worker ml-inference notification-worker; do
+            echo "--- ${workload} ---"
+            curl -sf \
+              -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
+              "http://${NODE_IP}:${API_PORT}/api/v2/rupture/ruptura-lab/Deployment/${workload}" \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({k:v for k,v in d.items() if k in ['stress','pressure','fatigue','health_score','mood','entropy','velocity']}, indent=2))" 2>/dev/null || echo "(no data yet)"
+          done
