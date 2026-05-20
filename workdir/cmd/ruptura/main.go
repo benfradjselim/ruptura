@@ -37,7 +37,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.0.17"
+const version = "7.0.18"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -268,9 +268,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					if hr := predictorEngine.RuptureIndex(host, "health_score"); hr > metricR {
 						metricR = hr
 					}
-					if metricR > 0 {
-						fusionEngine.SetMetricR(host, metricR, now)
-					}
+					fusionEngine.SetMetricR(host, metricR, now)
 
 					// Annotate snapshot with current FusedR before persisting.
 					var fusedR float64

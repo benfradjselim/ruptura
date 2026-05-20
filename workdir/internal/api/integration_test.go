@@ -39,7 +39,7 @@ func TestIntegration_RuptureWorkload(t *testing.T) {
 	}
 
 	// Simulate the production ticker: set MetricR + LogR in fusion BEFORE storing snapshot.
-	// FusedR requires >=2 signals; logR=0.5 simulates a modest burst event.
+	// FusedR accepts 1–3 signals; logR=0.5 simulates a concurrent burst event.
 	now := time.Now()
 	fusionEng := fusion.NewEngine()
 	fusionEng.SetMetricR(ref.Key(), 2.5, now)

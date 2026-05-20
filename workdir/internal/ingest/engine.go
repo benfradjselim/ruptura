@@ -266,9 +266,9 @@ func (e *Engine) handleRemoteWrite(w http.ResponseWriter, r *http.Request) {
 		for _, lbl := range ts.Labels {
 			switch lbl.Name {
 			case "__name__":
-				name = lbl.Value
+				name = strings.Map(sanitizeLabelRune, lbl.Value)
 			case "host", "instance":
-				host = lbl.Value
+				host = strings.Map(sanitizeLabelRune, lbl.Value)
 			case "namespace":
 				workload.Namespace = lbl.Value
 			case "deployment":
@@ -518,4 +518,13 @@ func (e *Engine) checkCardinality(host, name string) bool {
 // IngestCounts returns the total number of metrics, logs, and traces ingested since startup.
 func (e *Engine) IngestCounts() (metrics, logs, traces int64) {
 	return atomic.LoadInt64(&e.metricsCount), atomic.LoadInt64(&e.logsCount), atomic.LoadInt64(&e.tracesCount)
+}
+
+// sanitizeLabelRune strips colons from label values to prevent compound-key injection
+// (host + ":" + metric) in the predictor and fusion engines.
+func sanitizeLabelRune(r rune) rune {
+	if r == ':' {
+		return '_'
+	}
+	return r
 }

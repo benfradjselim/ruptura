@@ -1,17 +1,17 @@
 <script>
-  import { onDestroy } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
   import { swr } from '../lib/cache.js'
 
   const { data: fleetStore, refresh } = swr('fleet', () => api.fleet().then(r => r.data), 15_000)
 
   let error = null
-  let interval = setInterval(refresh, 15_000)
+  let interval = null
 
-  // Subscribe to errors separately so the template stays clean.
   let fleet = null
   const unsub = fleetStore.subscribe(v => { fleet = v })
 
+  onMount(() => { interval = setInterval(refresh, 15_000) })
   onDestroy(() => { clearInterval(interval); unsub() })
 
   function stateClass(state) {

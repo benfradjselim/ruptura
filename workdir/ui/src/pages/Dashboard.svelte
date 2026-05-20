@@ -26,7 +26,7 @@
   }
 
   const kpiCache = swr('dashboard:kpis', () => api.kpis(host).then(r => r.data || {}), 15_000)
-  kpiCache.data.subscribe(v => { if (v !== null) liveKpis = v })
+  const kpiUnsub = kpiCache.data.subscribe(v => { if (v !== null) liveKpis = v })
 
   async function loadKPIs() { kpiCache.refresh() }
 
@@ -107,6 +107,7 @@
   onDestroy(() => {
     if (wsClient) wsClient.close()
     clearInterval(pollTimer)
+    kpiUnsub()
   })
 
   async function ackAlert(id) {

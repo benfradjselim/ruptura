@@ -12,6 +12,7 @@ import (
 )
 
 const staleThreshold = 5 * time.Minute
+const maxHosts = 10_000
 
 type Engine struct {
 	mu    sync.RWMutex
@@ -38,6 +39,9 @@ func NewEngine() *Engine {
 
 func (e *Engine) getHost(host string) *hostData {
 	if _, ok := e.hosts[host]; !ok {
+		if len(e.hosts) >= maxHosts {
+			return nil
+		}
 		e.hosts[host] = &hostData{}
 	}
 	return e.hosts[host]
@@ -46,25 +50,28 @@ func (e *Engine) getHost(host string) *hostData {
 func (e *Engine) SetMetricR(host string, r float64, ts time.Time) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	h := e.getHost(host)
-	h.metricVal = r
-	h.metricTs = ts
+	if h := e.getHost(host); h != nil {
+		h.metricVal = r
+		h.metricTs = ts
+	}
 }
 
 func (e *Engine) SetLogR(host string, r float64, ts time.Time) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	h := e.getHost(host)
-	h.logVal = r
-	h.logTs = ts
+	if h := e.getHost(host); h != nil {
+		h.logVal = r
+		h.logTs = ts
+	}
 }
 
 func (e *Engine) SetTraceR(host string, r float64, ts time.Time) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	h := e.getHost(host)
-	h.traceVal = r
-	h.traceTs = ts
+	if h := e.getHost(host); h != nil {
+		h.traceVal = r
+		h.traceTs = ts
+	}
 }
 
 func (e *Engine) FusedR(host string) (float64, time.Time, error) {
@@ -80,23 +87,8 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 	e.mu.RUnlock()
 
 	// Use local data for computations
-	
-	// Lag check
-	latest := data.metricTs
-	if data.logTs.After(latest) { latest = data.logTs }
-	if data.traceTs.After(latest) { latest = data.traceTs }
-	
-	if !data.metricTs.IsZero() && latest.Sub(data.metricTs) > 30*time.Second {
-		return 0, time.Time{}, fmt.Errorf("fusion: signal lag too large for host %s", host)
-	}
-	if !data.logTs.IsZero() && latest.Sub(data.logTs) > 30*time.Second {
-		return 0, time.Time{}, fmt.Errorf("fusion: signal lag too large for host %s", host)
-	}
-	if !data.traceTs.IsZero() && latest.Sub(data.traceTs) > 30*time.Second {
-		return 0, time.Time{}, fmt.Errorf("fusion: signal lag too large for host %s", host)
-	}
 
-	// Staleness check: ignore signals older than staleThreshold
+	// Staleness check: zero out stale signals first so lag check only fires on fresh signals.
 	now := time.Now()
 	if !data.metricTs.IsZero() && now.Sub(data.metricTs) > staleThreshold {
 		data.metricTs = time.Time{}
@@ -109,6 +101,21 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 	if !data.traceTs.IsZero() && now.Sub(data.traceTs) > staleThreshold {
 		data.traceTs = time.Time{}
 		data.traceVal = 0
+	}
+
+	// Lag check: only among still-fresh signals.
+	latest := data.metricTs
+	if data.logTs.After(latest) { latest = data.logTs }
+	if data.traceTs.After(latest) { latest = data.traceTs }
+
+	if !data.metricTs.IsZero() && latest.Sub(data.metricTs) > 30*time.Second {
+		return 0, time.Time{}, fmt.Errorf("fusion: signal lag too large for host %s", host)
+	}
+	if !data.logTs.IsZero() && latest.Sub(data.logTs) > 30*time.Second {
+		return 0, time.Time{}, fmt.Errorf("fusion: signal lag too large for host %s", host)
+	}
+	if !data.traceTs.IsZero() && latest.Sub(data.traceTs) > 30*time.Second {
+		return 0, time.Time{}, fmt.Errorf("fusion: signal lag too large for host %s", host)
 	}
 
 	// Insufficient check
@@ -233,7 +240,7 @@ func dominantPipeline(d hostData) string {
 	var bestVal float64
 	if !d.metricTs.IsZero() && d.metricVal > bestVal { bestVal = d.metricVal; best = "metrics" }
 	if !d.logTs.IsZero() && d.logVal > bestVal      { bestVal = d.logVal;    best = "logs"    }
-	if !d.traceTs.IsZero() && d.traceVal > bestVal  {                         best = "traces"  }
+	if !d.traceTs.IsZero() && d.traceVal > bestVal  { bestVal = d.traceVal;  best = "traces"  }
 	return best
 }
 

@@ -2,7 +2,10 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -47,6 +50,10 @@ func (h *Handlers) handleCreateDatasource(w http.ResponseWriter, r *http.Request
 	}
 	if cfg.URL == "" {
 		writeError(w, http.StatusBadRequest, "url is required")
+		return
+	}
+	if err := validateDatasourceURL(cfg.URL); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if cfg.Type == "" {
@@ -126,6 +133,10 @@ func (h *Handlers) handleTestDatasource(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 			return
 		}
+		if err := validateDatasourceURL(cfg.URL); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	count, errMsg := h.scraper.Test(cfg)
@@ -137,6 +148,40 @@ func (h *Handlers) handleTestDatasource(w http.ResponseWriter, r *http.Request) 
 		result["error"] = errMsg
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+// validateDatasourceURL rejects non-http(s) schemes and private/link-local addresses (SSRF prevention).
+func validateDatasourceURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("URL scheme must be http or https, got %q", u.Scheme)
+	}
+	hostname := u.Hostname()
+	addrs, err := net.LookupHost(hostname)
+	if err != nil {
+		// treat unresolvable as safe — scraper will fail at fetch time
+		return nil
+	}
+	private := []string{
+		"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+		"127.0.0.0/8", "169.254.0.0/16", "::1/128", "fc00::/7",
+	}
+	for _, a := range addrs {
+		ip := net.ParseIP(a)
+		if ip == nil {
+			continue
+		}
+		for _, cidr := range private {
+			_, block, _ := net.ParseCIDR(cidr)
+			if block.Contains(ip) {
+				return fmt.Errorf("datasource URL resolves to a private or link-local address")
+			}
+		}
+	}
+	return nil
 }
 
 // generateDSID creates a stable ID from a URL and type.

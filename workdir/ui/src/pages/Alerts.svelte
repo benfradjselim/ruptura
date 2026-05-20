@@ -23,7 +23,7 @@
 <div class="page">
   <div class="header">
     <h1>Alerts</h1>
-    <button class="btn" on:click={load}>Refresh</button>
+    <button class="btn" on:click={refresh}>Refresh</button>
   </div>
 
   {#if error}
