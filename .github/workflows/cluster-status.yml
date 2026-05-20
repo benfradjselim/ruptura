@@ -1,0 +1,36 @@
+name: Cluster status check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  status:
+    name: Check cluster pod state
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.K3S_KUBECONFIG }}
+        run: |
+          mkdir -p ~/.kube
+          echo "${KUBECONFIG_B64}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Cluster-wide pod summary
+        run: |
+          echo "=== All pods (all namespaces) ==="
+          kubectl get pods --all-namespaces -o wide
+          echo ""
+          echo "=== Node status ==="
+          kubectl get nodes -o wide
+          echo ""
+          echo "=== Node resource usage ==="
+          kubectl top nodes 2>/dev/null || echo "(metrics-server unavailable)"
+          echo ""
+          echo "=== Disk pressure / memory pressure events ==="
+          kubectl get events --all-namespaces --field-selector reason=Evicted --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || echo "no eviction events"
+          echo ""
+          echo "=== Ruptura service NodePorts ==="
+          kubectl get svc --all-namespaces | grep -E "NodePort|NAME" || true
