@@ -55,7 +55,7 @@ spec:
           requests: {cpu: "100m", memory: "64Mi"}
           limits:   {cpu: "250m", memory: "128Mi"}
 ---
-# 3. cache-worker — memory pressure (fills ~85% of limit)
+# 3. cache-worker — memory pressure (fills ~55% of limit, stays stable)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -73,7 +73,7 @@ spec:
       containers:
       - name: cache-worker
         image: polinux/stress
-        args: ["--vm", "1", "--vm-bytes", "100M", "--vm-keep", "--timeout", "99999s"]
+        args: ["--vm", "1", "--vm-bytes", "70M", "--vm-keep", "--timeout", "99999s"]
         resources:
           requests: {cpu: "30m", memory: "64Mi"}
           limits:   {cpu: "100m", memory: "128Mi"}
@@ -142,12 +142,14 @@ spec:
       containers:
       - name: ml-inference
         image: polinux/stress
-        args: ["--cpu", "2", "--vm", "1", "--vm-bytes", "180M", "--vm-keep", "--timeout", "99999s"]
+        args: ["--cpu", "1", "--vm", "1", "--vm-bytes", "150M", "--vm-keep", "--timeout", "99999s"]
         resources:
           requests: {cpu: "150m", memory: "128Mi"}
           limits:   {cpu: "350m", memory: "256Mi"}
 ---
-# 7. inventory-service — gradual memory leak simulation (restarts every ~5min from OOM)
+# 7. inventory-service — gradual memory leak simulation (restarts every ~3min from OOM)
+# Writes to /dev/shm (tmpfs, RAM-backed) so allocations count toward the cgroup memory
+# limit and get cleaned up immediately on pod death — no disk accumulation.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -170,12 +172,13 @@ spec:
         - -c
         - |
           echo 'starting inventory-service'
-          # Allocate memory in 5MB chunks every 10s until OOM kill
+          # Allocate memory in 5MB chunks every 10s until OOM kill.
+          # /dev/shm is tmpfs: counts toward cgroup memory limit, zero disk I/O.
           i=0
           while true; do
             i=$((i+1))
-            dd if=/dev/zero bs=5M count=1 2>/dev/null | cat > /tmp/leak_$i
-            echo "allocated chunk $i ($(du -sh /tmp/leak_* 2>/dev/null | tail -1))"
+            dd if=/dev/zero bs=5M count=1 2>/dev/null > /dev/shm/leak_$i
+            echo "allocated chunk $i"
             sleep 10
           done
         resources:
