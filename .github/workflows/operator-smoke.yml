@@ -58,14 +58,17 @@ jobs:
           chmod +x /usr/local/bin/operator-sdk
           operator-sdk version
 
-      # ── Create cluster ───────────────────────────────────────────────────────
-      - name: Create k3d cluster
+      # ── Create local registry + cluster ─────────────────────────────────────
+      - name: Create k3d registry and cluster
         run: |
+          k3d registry create registry.localhost --port 5000
+          echo "127.0.0.1 k3d-registry.localhost" | sudo tee -a /etc/hosts
           k3d cluster create ruptura-smoke \
             --agents 1 \
             --wait \
             --timeout 120s \
-            --k3s-arg "--disable=traefik@server:0"
+            --k3s-arg "--disable=traefik@server:0" \
+            --registry-use k3d-registry.localhost:5000
           kubectl cluster-info
 
       # ── Install OLM ─────────────────────────────────────────────────────────
@@ -83,21 +86,21 @@ jobs:
             --select-optional suite=operatorframework \
             --select-optional name=community
 
-      # ── Build bundle image locally and load into k3d ─────────────────────────
-      - name: Build & load bundle image
+      # ── Build and push bundle image to local registry ───────────────────────
+      - name: Build & push bundle image
         run: |
-          BUNDLE_IMG="ruptura-operator-bundle:smoke"
+          BUNDLE_IMG="k3d-registry.localhost:5000/ruptura-operator-bundle:smoke"
           docker build -t "${BUNDLE_IMG}" ./bundle
-          k3d image import "${BUNDLE_IMG}" -c ruptura-smoke
+          docker push "${BUNDLE_IMG}"
           echo "bundle_img=${BUNDLE_IMG}" >> "$GITHUB_ENV"
 
-      # ── Build operator image and load into k3d ────────────────────────────────
-      - name: Build & load operator image
+      # ── Build and push operator image to local registry ──────────────────────
+      - name: Build & push operator image
         run: |
-          OP_IMG="ruptura-operator:smoke"
+          OP_IMG="k3d-registry.localhost:5000/ruptura-operator:smoke"
           docker build -t "${OP_IMG}" ./workdir/operator
-          k3d image import "${OP_IMG}" -c ruptura-smoke
-          # Patch CSV to use local image tag (no registry pull)
+          docker push "${OP_IMG}"
+          # Patch CSV to reference the local operator image
           sed -i "s|ghcr.io/benfradjselim/ruptura-operator:[^\"]*|${OP_IMG}|g" \
             bundle/manifests/ruptura-operator.clusterserviceversion.yaml
 
