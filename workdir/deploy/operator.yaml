@@ -107,7 +107,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/component: operator
-    app.kubernetes.io/version: "0.6.7"
+    app.kubernetes.io/version: "0.8.9"
 spec:
   replicas: 1
   selector:
@@ -119,7 +119,7 @@ spec:
       labels:
         app.kubernetes.io/name: ruptura
         app.kubernetes.io/component: operator
-        app.kubernetes.io/version: "0.6.7"
+        app.kubernetes.io/version: "0.8.9"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
@@ -130,7 +130,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: ruptura-operator
-          image: ghcr.io/benfradjselim/ruptura-operator:v0.6.7
+          image: ghcr.io/benfradjselim/ruptura-operator:v0.8.9
           imagePullPolicy: IfNotPresent
           args: ["--interval=30s", "--metrics-addr=:9090"]
           ports:

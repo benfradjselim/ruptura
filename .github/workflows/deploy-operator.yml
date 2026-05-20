@@ -1,0 +1,49 @@
+name: Deploy operator to lab
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Operator version tag (e.g. v0.8.9)"
+        required: false
+        default: "v0.8.9"
+
+jobs:
+  deploy:
+    name: Apply operator to k3s lab
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v7
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.K3S_KUBECONFIG }}
+        run: |
+          mkdir -p ~/.kube
+          echo "${KUBECONFIG_B64}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl cluster-info
+
+      - name: Create ruptura-system namespace
+        run: kubectl create namespace ruptura-system --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply CRD
+        run: kubectl apply -f workdir/deploy/crd/rupturainstances.ruptura.io.yaml
+
+      - name: Apply RBAC + operator deployment
+        run: kubectl apply -f workdir/deploy/operator.yaml
+
+      - name: Wait for operator rollout
+        run: |
+          kubectl rollout status deployment/ruptura-operator \
+            -n ruptura-system --timeout=3m
+
+      - name: Show operator pod
+        run: |
+          kubectl get pods -n ruptura-system -o wide
+          kubectl get deployment ruptura-operator -n ruptura-system
