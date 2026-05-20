@@ -117,8 +117,18 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 	if !data.logTs.IsZero() { count++ }
 	if !data.traceTs.IsZero() { count++ }
 
-	if count < 2 {
-		return 0, time.Time{}, fmt.Errorf("fusion: insufficient signals for host %s", host)
+	if count == 0 {
+		return 0, time.Time{}, fmt.Errorf("fusion: no signals for host %s", host)
+	}
+
+	// Single-signal fast path — k8s metric-only workloads (no OTLP logs/traces).
+	if count == 1 {
+		if !data.metricTs.IsZero() {
+			return data.metricVal, data.metricTs, nil
+		} else if !data.logTs.IsZero() {
+			return data.logVal, data.logTs, nil
+		}
+		return data.traceVal, data.traceTs, nil
 	}
 
 	// Conflict check
@@ -175,8 +185,18 @@ func (e *Engine) fusedR(data *hostData) (float64, bool) {
 	if !d.metricTs.IsZero() { count++ }
 	if !d.logTs.IsZero() { count++ }
 	if !d.traceTs.IsZero() { count++ }
-	if count < 2 {
+	if count == 0 {
 		return 0, false
+	}
+
+	// Single-signal fast path.
+	if count == 1 {
+		if !d.metricTs.IsZero() {
+			return d.metricVal, true
+		} else if !d.logTs.IsZero() {
+			return d.logVal, true
+		}
+		return d.traceVal, true
 	}
 
 	var val float64

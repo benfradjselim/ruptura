@@ -176,15 +176,24 @@ spec:
         - sh
         - -c
         - |
-          echo 'starting inventory-service'
-          # Allocate memory in 5MB chunks every 10s until OOM kill
-          i=0
+          echo 'starting inventory-service — exponential memory leak'
+          # Phase 1 (slow baseline): 1MB every 30s — establishes CAILR stable slope
+          for i in $(seq 1 6); do
+            dd if=/dev/zero bs=1M count=1 of=/tmp/leak_$i 2>/dev/null
+            echo "baseline chunk $i"
+            sleep 30
+          done
+          # Phase 2 (accelerating): chunk size doubles each iteration — CAILR burst >> stable
+          chunk=2
+          j=7
           while true; do
-            i=$((i+1))
-            dd if=/dev/zero bs=2M count=1 2>/dev/null | cat > /tmp/leak_$i
-            echo "allocated chunk $i ($(du -sh /tmp/leak_* 2>/dev/null | tail -1))"
-            sleep 20
+            dd if=/dev/zero bs=${chunk}M count=1 of=/tmp/leak_$j 2>/dev/null
+            echo "accel chunk $j size=${chunk}MB total=$(du -sh /tmp 2>/dev/null | cut -f1)"
+            chunk=$((chunk * 2))
+            [ $chunk -gt 24 ] && chunk=24
+            j=$((j+1))
+            sleep 30
           done
         resources:
           requests: {cpu: "10m", memory: "32Mi"}
-          limits:   {cpu: "50m", memory: "96Mi"}
+          limits:   {cpu: "50m", memory: "256Mi"}

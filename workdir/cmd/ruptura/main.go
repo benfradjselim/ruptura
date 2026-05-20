@@ -37,7 +37,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.0.15"
+const version = "7.0.16"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -242,15 +242,36 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					ref := models.WorkloadRefFromKey(host)
 					snap := analyzerEngine.Update(ref, rawMetrics)
 
+					// Feed each raw metric into the predictor ensemble first so that
+					// health_score CAILR is current when we compute metricR below.
+					for metric, val := range rawMetrics {
+						predictorEngine.Feed(host, metric, val, now)
+					}
+					// Also feed the composite KPI signals.
+					predictorEngine.Feed(host, "health_score", snap.HealthScore.Value, now)
+					predictorEngine.Feed(host, "stress", snap.Stress.Value, now)
+					predictorEngine.Feed(host, "fatigue", snap.Fatigue.Value, now)
+
 					// Feed metricR into fusion BEFORE storing snapshot so FusedR is current.
+					// Primary: CAILR on the raw pipeline metric (fatigue/stress/cpu_percent…)
+					// Secondary: CAILR on health_score decline from the predictor ensemble —
+					// fires when health_score is dropping faster recently than its long-term
+					// trend, which is a leading indicator of impending failure.
 					metricName := pickPrimaryMetric(rawMetrics)
 					var metricR float64
 					if metricName != "" {
 						if r, err := pipelineEngine.RuptureIndex(host, metricName); err == nil {
 							metricR = r
-							fusionEngine.SetMetricR(host, r, now)
 						}
 					}
+					// Health-score decline detector: use whichever R is larger.
+					if hr := predictorEngine.RuptureIndex(host, "health_score"); hr > metricR {
+						metricR = hr
+					}
+					if metricR > 0 {
+						fusionEngine.SetMetricR(host, metricR, now)
+					}
+
 					// Annotate snapshot with current FusedR before persisting.
 					var fusedR float64
 					if fr, _, err := fusionEngine.FusedR(host); err == nil {
@@ -265,15 +286,6 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					// v6.4: near-miss tracking + fingerprint recording (requires FusedR).
 					analyzerEngine.UpdateFusedR(ref, fusedR)
 					analyzerEngine.MaybeRecordFingerprint(snap, fusedR)
-
-					// Feed each raw metric into the predictor ensemble.
-					for metric, val := range rawMetrics {
-						predictorEngine.Feed(host, metric, val, now)
-					}
-					// Also feed the composite KPI signals.
-					predictorEngine.Feed(host, "health_score", snap.HealthScore.Value, now)
-					predictorEngine.Feed(host, "stress", snap.Stress.Value, now)
-					predictorEngine.Feed(host, "fatigue", snap.Fatigue.Value, now)
 
 					// Record an explain entry for any workload in warning or worse state.
 					if fusedR >= 1.5 {
@@ -442,7 +454,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 
 // pickPrimaryMetric returns the best available metric name for RuptureIndex computation.
 func pickPrimaryMetric(metrics map[string]float64) string {
-	preferred := []string{"cpu_percent", "memory_percent", "latency_p99", "error_rate", "request_rate"}
+	// k8smetrics poller injects "fatigue" (restart count), "stress" (cpu), "pressure" (mem).
+	// Prometheus scraper also injects these. Prefer them alongside classic sensor names.
+	preferred := []string{"fatigue", "stress", "cpu_percent", "memory_percent", "latency_p99", "error_rate", "request_rate"}
 	for _, name := range preferred {
 		if _, ok := metrics[name]; ok {
 			return name

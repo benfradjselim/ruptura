@@ -69,13 +69,16 @@ func TestFusion_conflictDetected(t *testing.T) {
 	// Conflict detected, logged but no error.
 }
 
-func TestFusion_insufficientSignals_zero(t *testing.T) {
+func TestFusion_singleSignal_returnsMetricR(t *testing.T) {
 	e := NewEngine()
-	e.SetMetricR("h1", 1.0, time.Now())
-	
-	_, _, err := e.FusedR("h1")
-	if err == nil {
-		t.Error("expected error for insufficient signals, got nil")
+	e.SetMetricR("h1", 2.5, time.Now())
+
+	val, _, err := e.FusedR("h1")
+	if err != nil {
+		t.Fatalf("unexpected error with single metricR signal: %v", err)
+	}
+	if math.Abs(val-2.5) > 1e-6 {
+		t.Errorf("expected FusedR=2.5 with single signal, got %.3f", val)
 	}
 }
 
@@ -220,7 +223,7 @@ func TestFusion_StateByWorkload_Unknown(t *testing.T) {
 	}
 }
 
-func TestFusion_StateByWorkload_InsufficientSignals(t *testing.T) {
+func TestFusion_StateByWorkload_SingleSignal(t *testing.T) {
 	e := NewEngine()
 	now := time.Now()
 	e.SetMetricR("ns/Deployment/lonely", 2.0, now)
@@ -229,8 +232,8 @@ func TestFusion_StateByWorkload_InsufficientSignals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// FusedR should be 0 when only one signal available
-	if st.FusedR != 0 {
-		t.Errorf("expected FusedR=0 with single signal, got %.3f", st.FusedR)
+	// Single-signal path: FusedR == metricR directly.
+	if math.Abs(st.FusedR-2.0) > 1e-6 {
+		t.Errorf("expected FusedR=2.0 with single metricR signal, got %.3f", st.FusedR)
 	}
 }
