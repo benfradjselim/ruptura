@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
   import { token, kpis, alerts, wsConnected } from '../lib/store.js'
+  import { swr } from '../lib/cache.js'
   import KpiGauge from '../lib/KpiGauge.svelte'
   import Sparkline from '../lib/Sparkline.svelte'
 
@@ -24,12 +25,10 @@
     } catch {}
   }
 
-  async function loadKPIs() {
-    try {
-      const r = await api.kpis(host)
-      liveKpis = r.data || {}
-    } catch {}
-  }
+  const kpiCache = swr('dashboard:kpis', () => api.kpis(host).then(r => r.data || {}), 15_000)
+  kpiCache.data.subscribe(v => { if (v !== null) liveKpis = v })
+
+  async function loadKPIs() { kpiCache.refresh() }
 
   // Metrics where value is already in 0-100 % range
   const PCT_METRICS = new Set(['cpu_percent','memory_percent','disk_percent'])

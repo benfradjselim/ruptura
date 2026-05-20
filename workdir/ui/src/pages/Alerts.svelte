@@ -1,32 +1,23 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
+  import { swr, invalidate } from '../lib/cache.js'
 
-  let alertList = [], loading = true, error = ''
-
-  async function load() {
-    loading = true
-    try {
-      const r = await api.alerts()
-      alertList = r.data || []
-    } catch (e) {
-      error = e.message
-    } finally {
-      loading = false
-    }
-  }
+  const { data: alertStore, refresh } = swr('alerts', () => api.alerts().then(r => r.data || []), 15_000)
+  let alertList = []
+  let error = ''
+  const unsub = alertStore.subscribe(v => { if (v !== null) alertList = v })
+  onDestroy(unsub)
 
   async function ack(id) {
     await api.alertAck(id).catch(() => {})
-    load()
+    invalidate('alerts'); refresh()
   }
 
   async function del(id) {
     await api.alertDelete(id).catch(() => {})
-    load()
+    invalidate('alerts'); refresh()
   }
-
-  onMount(load)
 </script>
 
 <div class="page">
@@ -35,9 +26,7 @@
     <button class="btn" on:click={load}>Refresh</button>
   </div>
 
-  {#if loading}
-    <p class="muted">Loading…</p>
-  {:else if error}
+  {#if error}
     <p class="err">{error}</p>
   {:else if alertList.length === 0}
     <p class="muted">No alerts</p>

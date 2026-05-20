@@ -1,29 +1,18 @@
 <script>
-  import { onMount, onDestroy } from 'svelte'
+  import { onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
+  import { swr } from '../lib/cache.js'
 
-  let fleet = null
+  const { data: fleetStore, refresh } = swr('fleet', () => api.fleet().then(r => r.data), 15_000)
+
   let error = null
-  let loading = true
-  let interval
+  let interval = setInterval(refresh, 15_000)
 
-  async function load() {
-    try {
-      const res = await api.fleet()
-      fleet = res.data
-      error = null
-    } catch (e) {
-      error = e.message
-    } finally {
-      loading = false
-    }
-  }
+  // Subscribe to errors separately so the template stays clean.
+  let fleet = null
+  const unsub = fleetStore.subscribe(v => { fleet = v })
 
-  onMount(() => {
-    load()
-    interval = setInterval(load, 15000)
-  })
-  onDestroy(() => clearInterval(interval))
+  onDestroy(() => { clearInterval(interval); unsub() })
 
   function stateClass(state) {
     if (state === 'healthy') return 'healthy'
@@ -49,9 +38,7 @@
     <p class="subtitle">All monitored hosts — live health matrix</p>
   </div>
 
-  {#if loading}
-    <div class="loading">Loading fleet data...</div>
-  {:else if error}
+  {#if error}
     <div class="error">{error}</div>
   {:else if fleet}
     <!-- Summary Cards -->
@@ -120,6 +107,8 @@
     {:else}
       <div class="empty">No hosts reporting yet. Deploy Ruptura agents to monitored nodes.</div>
     {/if}
+  {:else}
+    <div class="loading">Loading fleet data…</div>
   {/if}
 </div>
 
