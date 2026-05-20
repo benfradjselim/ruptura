@@ -116,7 +116,7 @@ jobs:
         run: |
           # Prometheus is reachable inside the cluster at this DNS name.
           # Ruptura's scraper runs server-side so it uses the cluster-internal URL.
-          PROM_URL="http://prometheus-server.monitoring.svc.cluster.local:80"
+          PROM_URL="http://185.229.225.115:30090"
 
           PAYLOAD=$(cat <<EOF
           {

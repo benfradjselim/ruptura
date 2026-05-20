@@ -58,7 +58,7 @@ jobs:
               "id":   "prometheus-ruptura-lab",
               "name": "Prometheus (ruptura-lab)",
               "type": "prometheus",
-              "url":  "http://prometheus-server.monitoring.svc.cluster.local:80",
+              "url":  "http://185.229.225.115:30090",
               "enabled": true,
               "scrape_interval_seconds": 30,
               "namespace": "ruptura-lab"
