@@ -236,3 +236,14 @@ properties:
       provider:
         name: Ruptura
         url: https://ruptura.dev
+---
+schema: olm.bundle
+name: ruptura-operator.v7.0.18
+package: ruptura-operator
+image: ghcr.io/benfradjselim/ruptura-operator-bundle:v7.0.18
+replaces: ruptura-operator.vv1alpha1
+properties:
+  - type: olm.package
+    value:
+      packageName: ruptura-operator
+      version: 7.0.18
