@@ -32,11 +32,26 @@ jobs:
       - name: Create ruptura-system namespace
         run: kubectl create namespace ruptura-system --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Create GHCR pull secret
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password="${GHCR_TOKEN}" \
+            --namespace=ruptura-system \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Apply CRD
         run: kubectl apply -f workdir/deploy/crd/rupturainstances.ruptura.io.yaml
 
       - name: Apply RBAC + operator deployment
-        run: kubectl apply -f workdir/deploy/operator.yaml
+        run: |
+          # Inject imagePullSecrets into the operator Deployment before applying
+          kubectl apply -f workdir/deploy/operator.yaml
+          kubectl patch deployment ruptura-operator -n ruptura-system --type=json \
+            -p='[{"op":"add","path":"/spec/template/spec/imagePullSecrets","value":[{"name":"ghcr-pull-secret"}]}]'
 
       - name: Wait for operator rollout
         run: |

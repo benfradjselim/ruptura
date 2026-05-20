@@ -128,6 +128,8 @@ spec:
       serviceAccountName: ruptura-operator
       securityContext:
         runAsNonRoot: true
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: ruptura-operator
           image: ghcr.io/benfradjselim/ruptura-operator:v0.8.9
