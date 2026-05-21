@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"math"
 	"sync"
 	"time"
 
@@ -46,10 +45,19 @@ func (c *CAILR) RuptureIndex() float64 {
 	if c.stable.n < 3 || c.burst.n < 3 {
 		return 0
 	}
-	if math.Abs(c.stable.Alpha) < 1e-9 {
+	// Guard: stable slope must be meaningfully positive — flat or declining baselines
+	// produce nonsense ratios. 1e-5 is ~10x the typical noise floor observed in tests.
+	if c.stable.Alpha <= 1e-5 {
 		return 0
 	}
-	return c.burst.Alpha / c.stable.Alpha
+	r := c.burst.Alpha / c.stable.Alpha
+	if r < 0 {
+		return 0
+	}
+	if r > 10.0 {
+		return 10.0
+	}
+	return r
 }
 
 // IsAccelerating returns true when the rupture index exceeds the canonical threshold (R > 3).
