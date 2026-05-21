@@ -41,9 +41,19 @@ jobs:
               nodePort: 30090
             persistentVolume:
               enabled: false
-            # Allow Prometheus to read kubelet metrics (nodes/metrics RBAC resource)
             rbac:
               create: true
+            # Push scraped metrics to Ruptura ingest (no auth — cluster-internal port 4317)
+            remoteWrite:
+              - url: http://ruptura-otlp.ruptura-system.svc.cluster.local:4317/api/v2/write
+                queue_config:
+                  max_samples_per_send: 1000
+                  batch_send_deadline: 5s
+                  max_shards: 4
+                write_relabel_configs:
+                  - source_labels: [__name__]
+                    regex: "container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_start_time_seconds|kube_pod_container_status_restarts_total|kube_deployment_status_replicas.*|kube_pod_status_phase"
+                    action: keep
 
           alertmanager:
             enabled: false
