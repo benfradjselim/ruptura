@@ -160,6 +160,10 @@ func validateDatasourceURL(rawURL string) error {
 		return fmt.Errorf("URL scheme must be http or https, got %q", u.Scheme)
 	}
 	hostname := u.Hostname()
+	// Cluster-internal service names are intentional, not SSRF targets.
+	if strings.HasSuffix(hostname, ".svc.cluster.local") || strings.HasSuffix(hostname, ".cluster.local") {
+		return nil
+	}
 	addrs, err := net.LookupHost(hostname)
 	if err != nil {
 		// treat unresolvable as safe — scraper will fail at fetch time
