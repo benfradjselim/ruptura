@@ -1,7 +1,7 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  name: ruptura-operator.v0.6.9
+  name: ruptura-operator.v0.8.9
   namespace: placeholder
   annotations:
     alm-examples: |-
@@ -25,8 +25,8 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Monitoring,Logging & Tracing
-    containerImage: ghcr.io/benfradjselim/ruptura-operator:v0.6.9
-    createdAt: "2026-05-06T00:00:00Z"
+    containerImage: ghcr.io/benfradjselim/ruptura-operator:v0.8.9
+    createdAt: "2026-05-20T00:00:00Z"
     description: >-
       Predictive workload health platform for Kubernetes — detect ruptures before they happen.
     operatorframework.io/suggested-namespace: ruptura-system
@@ -87,11 +87,12 @@ spec:
     Send OTLP metrics to port 4317, query the REST API on port 8080.
 
   maturity: alpha
-  version: 0.6.9
+  version: 0.8.9
+  replaces: ruptura-operator.v0.6.9
 
   relatedImages:
     - name: ruptura-operator
-      image: ghcr.io/benfradjselim/ruptura-operator:v0.6.9
+      image: ghcr.io/benfradjselim/ruptura-operator:v0.8.9
     - name: ruptura
       image: ghcr.io/benfradjselim/ruptura:v7.0.18
 
@@ -243,7 +244,7 @@ spec:
                 labels:
                   app.kubernetes.io/name: ruptura
                   app.kubernetes.io/component: operator
-                  app.kubernetes.io/version: "0.6.9"
+                  app.kubernetes.io/version: "0.8.9"
                 annotations:
                   prometheus.io/scrape: "true"
                   prometheus.io/port: "9090"
@@ -254,7 +255,7 @@ spec:
                   runAsNonRoot: true
                 containers:
                   - name: ruptura-operator
-                    image: ghcr.io/benfradjselim/ruptura-operator:v0.6.9
+                    image: ghcr.io/benfradjselim/ruptura-operator:v0.8.9
                     imagePullPolicy: IfNotPresent
                     args: ["--interval=30s", "--metrics-addr=:9090"]
                     ports:
