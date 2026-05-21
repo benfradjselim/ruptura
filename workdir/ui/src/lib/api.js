@@ -160,4 +160,15 @@ export const api = {
     return req('GET', '/traces?' + params.toString())
   },
   traceGet: (traceID) => req('GET', `/traces/${encodeURIComponent(traceID)}`),
+
+  // ── Database / Retention ───────────────────────────────────────────────────
+  retentionGet:  ()    => req('GET', '/config/retention'),
+  retentionSave: (cfg) => req('PUT', '/config/retention', cfg),
+  purge: (type, before) => {
+    const params = new URLSearchParams()
+    if (type)   params.set('type', type)
+    if (before) params.set('before', before)
+    const qs = params.toString()
+    return req('DELETE', '/ingest/purge' + (qs ? '?' + qs : ''))
+  },
 }

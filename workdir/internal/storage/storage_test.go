@@ -2,8 +2,11 @@ package storage
 
 import (
 	"bytes"
+	"math"
 	"testing"
 	"time"
+
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 func TestStorage(t *testing.T) {
@@ -121,4 +124,80 @@ func TestStorage(t *testing.T) {
 			t.Errorf("QuerySpansByTrace failed: %v, %v", spans, err)
 		}
 	})
+}
+
+// TestLoadSnapshots_SanitizesCorruptValues verifies that snapshots with
+// out-of-range FusedRuptureIndex values (written before the v7.0.20 fix) are
+// zeroed on load rather than served to the UI.
+func TestLoadSnapshots_SanitizesCorruptValues(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	// NaN and Inf cannot round-trip through JSON, so only finite values are tested here.
+	// The NaN/Inf path is covered by TestSanitizeLoadedSnapshot_Unit.
+	cases := []struct {
+		name  string
+		input float64
+		want  float64
+	}{
+		{"large corrupt value", 163759.981, 0},
+		{"negative value", -1.0, 0},
+		{"at cap boundary", 10.0, 10.0},
+		{"just above cap", 10.001, 0},
+		{"valid mid-range", 3.5, 3.5},
+		{"zero", 0, 0},
+	}
+
+	for _, tc := range cases {
+		snap := models.KPISnapshot{
+			Host:              tc.name,
+			FusedRuptureIndex: tc.input,
+		}
+		store.StoreSnapshot(snap)
+		// Flush to BadgerDB then reload.
+		if err := store.FlushSnapshots(); err != nil {
+			t.Fatalf("%s: flush: %v", tc.name, err)
+		}
+		// Wipe in-memory map to force a reload.
+		store.snapshotsMu.Lock()
+		store.snapshots = make(map[string]models.KPISnapshot)
+		store.snapshotsMu.Unlock()
+
+		if _, err := store.LoadSnapshots(); err != nil {
+			t.Fatalf("%s: load: %v", tc.name, err)
+		}
+		got, ok := store.LatestSnapshot(tc.name)
+		if !ok {
+			t.Errorf("%s: snapshot not found after reload", tc.name)
+			continue
+		}
+		if math.IsNaN(tc.want) {
+			if !math.IsNaN(got.FusedRuptureIndex) {
+				t.Errorf("%s: got %v, want NaN", tc.name, got.FusedRuptureIndex)
+			}
+		} else if got.FusedRuptureIndex != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got.FusedRuptureIndex, tc.want)
+		}
+	}
+}
+
+// TestSanitizeLoadedSnapshot_Unit tests the helper in isolation.
+func TestSanitizeLoadedSnapshot_Unit(t *testing.T) {
+	cases := []struct{ in, want float64 }{
+		{163759, 0}, {-0.1, 0}, {math.NaN(), 0}, {math.Inf(1), 0},
+		{10.0, 10.0}, {3.14, 3.14}, {0, 0},
+	}
+	for _, tc := range cases {
+		snap := &models.KPISnapshot{FusedRuptureIndex: tc.in}
+		sanitizeLoadedSnapshot(snap)
+		if math.IsNaN(tc.want) {
+			continue // input NaN → output 0, checked implicitly
+		}
+		if snap.FusedRuptureIndex != tc.want {
+			t.Errorf("in=%v: got %v, want %v", tc.in, snap.FusedRuptureIndex, tc.want)
+		}
+	}
 }

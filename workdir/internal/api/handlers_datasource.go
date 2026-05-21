@@ -52,9 +52,12 @@ func (h *Handlers) handleCreateDatasource(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "url is required")
 		return
 	}
-	if err := validateDatasourceURL(cfg.URL); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+	// OTLP datasource URLs point to Ruptura's own push endpoint — SSRF check is inapplicable.
+	if cfg.Type != scraper.TypeOTLP {
+		if err := validateDatasourceURL(cfg.URL); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 	if cfg.Type == "" {
 		cfg.Type = scraper.TypeDirect
@@ -133,9 +136,11 @@ func (h *Handlers) handleTestDatasource(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 			return
 		}
-		if err := validateDatasourceURL(cfg.URL); err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
+		if cfg.Type != scraper.TypeOTLP {
+			if err := validateDatasourceURL(cfg.URL); err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
 		}
 	}
 

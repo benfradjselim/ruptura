@@ -155,10 +155,18 @@
           </div>
         {/if}
 
+        {#if form.type === 'otlp'}
+          <div class="info-box">
+            <strong>OTLP — push-based.</strong> Your apps or otel-collector push logs and traces to Ruptura's OTLP port.
+            Enter Ruptura's own NodePort address so the connection test can verify reachability:
+            <code>http://&lt;node-public-ip&gt;:31470</code>
+          </div>
+        {/if}
+
         <div class="form-grid">
           <label class="field">
             <span>Name *</span>
-            <input type="text" bind:value={form.name} placeholder="My Prometheus" />
+            <input type="text" bind:value={form.name} placeholder={form.type === 'otlp' ? 'My OTLP Source' : 'My Prometheus'} />
           </label>
           <label class="field">
             <span>Type *</span>
@@ -170,35 +178,40 @@
           </label>
           <label class="field wide">
             <span>URL *</span>
-            <input type="url" bind:value={form.url} placeholder="http://prometheus:9090" />
+            <input type="url" bind:value={form.url}
+              placeholder={form.type === 'otlp' ? 'http://node-public-ip:31470' : 'http://prometheus:9090'} />
           </label>
-          <label class="field">
-            <span>Scrape interval (s)</span>
-            <input type="number" min="5" max="300" bind:value={form.scrape_interval} />
-          </label>
-          <label class="field">
-            <span>Auth type</span>
-            <select bind:value={form.auth_type}>
-              <option value="none">None</option>
-              <option value="basic">Basic Auth</option>
-              <option value="bearer">Bearer Token</option>
-            </select>
-          </label>
-          {#if form.auth_type === 'basic'}
+          {#if form.type !== 'otlp'}
             <label class="field">
-              <span>Username</span>
-              <input type="text" bind:value={form.username} />
-            </label>
-            <label class="field">
-              <span>Password</span>
-              <input type="password" bind:value={form.password} />
+              <span>Scrape interval (s)</span>
+              <input type="number" min="5" max="300" bind:value={form.scrape_interval} />
             </label>
           {/if}
-          {#if form.auth_type === 'bearer'}
-            <label class="field wide">
-              <span>Bearer token</span>
-              <input type="password" bind:value={form.token} />
+          {#if form.type !== 'otlp'}
+            <label class="field">
+              <span>Auth type</span>
+              <select bind:value={form.auth_type}>
+                <option value="none">None</option>
+                <option value="basic">Basic Auth</option>
+                <option value="bearer">Bearer Token</option>
+              </select>
             </label>
+            {#if form.auth_type === 'basic'}
+              <label class="field">
+                <span>Username</span>
+                <input type="text" bind:value={form.username} />
+              </label>
+              <label class="field">
+                <span>Password</span>
+                <input type="password" bind:value={form.password} />
+              </label>
+            {/if}
+            {#if form.auth_type === 'bearer'}
+              <label class="field wide">
+                <span>Bearer token</span>
+                <input type="password" bind:value={form.token} />
+              </label>
+            {/if}
           {/if}
         </div>
 
@@ -287,4 +300,11 @@
   .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-test { background: #0f3460; border: 1px solid #0284c7; color: #38bdf8; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
   .btn-del  { background: transparent; border: 1px solid #b91c1c; color: #ef4444; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+
+  .info-box {
+    background: #0c2340; border: 1px solid #1d4ed8; border-radius: 7px;
+    padding: 0.6rem 0.85rem; font-size: 0.82rem; color: #93c5fd;
+    margin-bottom: 0.75rem; line-height: 1.5;
+  }
+  .info-box code { background: #0f172a; border-radius: 4px; padding: 1px 5px; font-family: monospace; }
 </style>

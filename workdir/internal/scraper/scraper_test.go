@@ -241,3 +241,63 @@ func TestDatasourceConfig_CustomInterval(t *testing.T) {
 		t.Errorf("expected 60s, got %v", cfg.scrapeInterval())
 	}
 }
+
+// ── OTLP datasource tests ─────────────────────────────────────────────────────
+
+// TestManager_OTLPNoScrapeLoop verifies that an OTLP datasource does not start
+// a scrape goroutine (it is push-based and has no polling loop).
+func TestManager_OTLPNoScrapeLoop(t *testing.T) {
+	m := New(nil, nil)
+	cfg := DatasourceConfig{
+		ID:      "otlp-test",
+		Type:    TypeOTLP,
+		URL:     "http://127.0.0.1:31470",
+		Enabled: true,
+	}
+	m.startDS(&cfg)
+
+	m.mu.RLock()
+	state, ok := m.ds["otlp-test"]
+	m.mu.RUnlock()
+
+	if !ok {
+		t.Fatal("OTLP datasource not registered")
+	}
+	if state.status != "push-only" {
+		t.Errorf("expected status push-only, got %q", state.status)
+	}
+}
+
+// TestManager_OTLPTest_Unreachable verifies that Test() for an OTLP datasource
+// returns an error string when the endpoint is unreachable.
+func TestManager_OTLPTest_Unreachable(t *testing.T) {
+	m := New(nil, nil)
+	cfg := DatasourceConfig{
+		Type: TypeOTLP,
+		// Use a port that is almost certainly not bound.
+		URL: "http://127.0.0.1:19999",
+	}
+	_, errMsg := m.Test(cfg)
+	if errMsg == "" {
+		t.Error("expected error for unreachable OTLP endpoint, got none")
+	}
+}
+
+// TestManager_OTLPTest_Reachable verifies that Test() succeeds when the endpoint accepts TCP.
+func TestManager_OTLPTest_Reachable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	m := New(nil, nil)
+	cfg := DatasourceConfig{
+		Type: TypeOTLP,
+		URL:  "http://" + srv.Listener.Addr().String(),
+	}
+	count, errMsg := m.Test(cfg)
+	if errMsg != "" {
+		t.Errorf("unexpected error: %s", errMsg)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 scraped metrics for OTLP, got %d", count)
+	}
+}

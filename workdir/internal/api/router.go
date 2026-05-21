@@ -72,6 +72,8 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/sim/inject", h.handleSimInject).Methods("POST")
 
 	api.HandleFunc("/config/weights", h.handleConfigWeights).Methods("GET", "POST")
+	api.HandleFunc("/config/retention", h.handleRetentionConfig).Methods("GET", "PUT")
+	api.HandleFunc("/ingest/purge", h.handlePurge).Methods("DELETE")
 
 	api.HandleFunc("/history", h.handleHistory).Methods("GET")
 	api.HandleFunc("/history/{workload:.+}", h.handleHistory).Methods("GET")

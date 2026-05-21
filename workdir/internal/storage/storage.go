@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,11 +25,47 @@ const (
 	KPIsTTL        = 2 * 24 * time.Hour  // 2 days (compacted to 5m tier after 2h)
 )
 
+// RetentionConfig controls per-data-type TTL applied to new writes.
+// Zero values fall back to the default TTL constants.
+type RetentionConfig struct {
+	MetricsDays   int `json:"metrics_days"`   // 0 → default 2
+	LogsDays      int `json:"logs_days"`       // 0 → default 30
+	TracesDays    int `json:"traces_days"`     // 0 → default 30
+	SnapshotsDays int `json:"snapshots_days"`  // 0 → default 2
+}
+
+func (c RetentionConfig) metricsTTL() time.Duration {
+	if c.MetricsDays > 0 {
+		return time.Duration(c.MetricsDays) * 24 * time.Hour
+	}
+	return MetricsTTL
+}
+func (c RetentionConfig) logsTTL() time.Duration {
+	if c.LogsDays > 0 {
+		return time.Duration(c.LogsDays) * 24 * time.Hour
+	}
+	return LogsTTL
+}
+func (c RetentionConfig) tracesTTL() time.Duration {
+	if c.TracesDays > 0 {
+		return time.Duration(c.TracesDays) * 24 * time.Hour
+	}
+	return LogsTTL // same default as logs
+}
+func (c RetentionConfig) snapshotsTTL() time.Duration {
+	if c.SnapshotsDays > 0 {
+		return time.Duration(c.SnapshotsDays) * 24 * time.Hour
+	}
+	return KPIsTTL
+}
+
 // Store wraps Badger with typed key helpers
 type Store struct {
 	db            *badger.DB
 	snapshotsMu   sync.RWMutex
 	snapshots     map[string]models.KPISnapshot // host → latest snapshot (in-memory)
+	retentionMu   sync.RWMutex
+	retention     RetentionConfig
 }
 
 // Open opens (or creates) the Badger database at path.
@@ -99,6 +136,19 @@ func (s *Store) AllSnapshots() []models.KPISnapshot {
 	return result
 }
 
+// sanitizeLoadedSnapshot caps out-of-range rupture index values that may have been
+// written before the v7.0.20 CAILR guard fix. Any finite value above 10.0 is
+// treated as corrupt pre-fix data and reset to 0 so the UI is not misled on startup.
+func sanitizeLoadedSnapshot(snap *models.KPISnapshot) {
+	capR := func(v float64) float64 {
+		if math.IsNaN(v) || math.IsInf(v, 0) || v > 10.0 || v < 0 {
+			return 0
+		}
+		return v
+	}
+	snap.FusedRuptureIndex = capR(snap.FusedRuptureIndex)
+}
+
 // LoadSnapshots restores in-memory snapshots from BadgerDB on startup.
 // This ensures continuity across pod restarts and version upgrades — the analyzer
 // sees the last known state immediately rather than starting cold.
@@ -109,6 +159,7 @@ func (s *Store) LoadSnapshots() (int, error) {
 		if err := json.Unmarshal(val, &snap); err != nil {
 			return nil // skip corrupt entries
 		}
+		sanitizeLoadedSnapshot(&snap)
 		s.snapshotsMu.Lock()
 		if snap.Host != "" {
 			s.snapshots[snap.Host] = snap
@@ -135,14 +186,18 @@ func (s *Store) FlushSnapshots() error {
 	}
 	s.snapshotsMu.RUnlock()
 
+	s.retentionMu.RLock()
+	snapTTL := s.retention.snapshotsTTL()
+	s.retentionMu.RUnlock()
+
 	for _, snap := range snaps {
 		key := "snapshot:" + snap.Host
-		if err := s.set(key, snap, KPIsTTL); err != nil {
+		if err := s.set(key, snap, snapTTL); err != nil {
 			return fmt.Errorf("flush snapshot %s: %w", snap.Host, err)
 		}
 		if !snap.Workload.IsEmpty() {
 			wKey := "snapshot:" + snap.Workload.Key()
-			if err := s.set(wKey, snap, KPIsTTL); err != nil {
+			if err := s.set(wKey, snap, snapTTL); err != nil {
 				return fmt.Errorf("flush snapshot workload %s: %w", snap.Workload.Key(), err)
 			}
 		}
@@ -153,6 +208,137 @@ func (s *Store) FlushSnapshots() error {
 // Close shuts the database
 func (s *Store) Close() error {
 	return s.db.Close()
+}
+
+// --- Retention config ---
+
+// LoadRetentionConfig restores the retention config from BadgerDB on startup.
+func (s *Store) LoadRetentionConfig() {
+	var cfg RetentionConfig
+	if err := s.get("config:retention", &cfg); err != nil {
+		return // use defaults
+	}
+	s.retentionMu.Lock()
+	s.retention = cfg
+	s.retentionMu.Unlock()
+}
+
+// GetRetentionConfig returns the current retention configuration.
+func (s *Store) GetRetentionConfig() RetentionConfig {
+	s.retentionMu.RLock()
+	defer s.retentionMu.RUnlock()
+	return s.retention
+}
+
+// SetRetentionConfig persists the retention config and applies it immediately to new writes.
+func (s *Store) SetRetentionConfig(cfg RetentionConfig) error {
+	s.retentionMu.Lock()
+	s.retention = cfg
+	s.retentionMu.Unlock()
+	return s.set("config:retention", cfg, 0)
+}
+
+// --- Purge ---
+
+// PurgeData deletes raw ingested data by type. When before is nil, all data of that
+// type is removed. When before is set, only records with timestamps older than before
+// are deleted. Returns the number of deleted records (-1 when using prefix-drop).
+func (s *Store) PurgeData(dataType string, before *time.Time) (int, error) {
+	prefixes := purgePrefix(dataType)
+
+	if before == nil {
+		// Fast path: use DropPrefix for full-type purge.
+		for _, p := range prefixes {
+			if err := s.db.DropPrefix([]byte(p)); err != nil {
+				return 0, fmt.Errorf("drop prefix %q: %w", p, err)
+			}
+		}
+		if dataType == "snapshots" {
+			s.snapshotsMu.Lock()
+			s.snapshots = make(map[string]models.KPISnapshot)
+			s.snapshotsMu.Unlock()
+		}
+		return -1, nil // count unknown for DropPrefix
+	}
+
+	// Slow path: iterate and delete records older than before.
+	var total int
+	for _, p := range prefixes {
+		n, err := s.purgeByPrefixBefore(p, *before)
+		if err != nil {
+			return total, err
+		}
+		total += n
+	}
+	return total, nil
+}
+
+// purgePrefix maps a data type string to its BadgerDB key prefixes.
+func purgePrefix(dataType string) []string {
+	switch dataType {
+	case "metrics":
+		return []string{"m:"}
+	case "logs":
+		return []string{"l:"}
+	case "traces":
+		return []string{"sp:"}
+	case "snapshots":
+		return []string{"snapshot:"}
+	default: // "all"
+		return []string{"m:", "l:", "sp:"}
+	}
+}
+
+// purgeByPrefixBefore iterates keys under prefix and deletes those whose timestamp
+// (last colon-separated segment) is before the given threshold. Uses 500-key batches
+// to avoid exceeding Badger transaction size limits.
+func (s *Store) purgeByPrefixBefore(prefix string, before time.Time) (int, error) {
+	threshold := before.UnixNano()
+	var total int
+	const batchSize = 500
+	for {
+		var toDelete [][]byte
+		err := s.db.View(func(txn *badger.Txn) error {
+			opts := badger.DefaultIteratorOptions
+			opts.PrefetchValues = false
+			it := txn.NewIterator(opts)
+			defer it.Close()
+			pfx := []byte(prefix)
+			for it.Seek(pfx); it.ValidForPrefix(pfx) && len(toDelete) < batchSize; it.Next() {
+				k := it.Item().KeyCopy(nil)
+				keyStr := string(k)
+				idx := strings.LastIndexByte(keyStr, ':')
+				if idx < 0 {
+					continue
+				}
+				nanos, err := strconv.ParseInt(keyStr[idx+1:], 10, 64)
+				if err != nil || nanos >= threshold {
+					continue
+				}
+				toDelete = append(toDelete, k)
+			}
+			return nil
+		})
+		if err != nil || len(toDelete) == 0 {
+			return total, err
+		}
+		err = s.db.Update(func(txn *badger.Txn) error {
+			for _, k := range toDelete {
+				if err := txn.Delete(k); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return total, err
+		}
+		total += len(toDelete)
+		if len(toDelete) < batchSize {
+			break
+		}
+	}
+	return total, nil
 }
 
 // RunGC runs value log garbage collection
@@ -254,7 +440,10 @@ func tsKey(prefix string, ts time.Time) string {
 func (s *Store) PutMetric(host, metric string, ts time.Time, value float64) error {
 	prefix := fmt.Sprintf("m:%s:%s:", host, metric)
 	key := tsKey(prefix, ts)
-	return s.set(key, value, MetricsTTL)
+	s.retentionMu.RLock()
+	ttl := s.retention.metricsTTL()
+	s.retentionMu.RUnlock()
+	return s.set(key, value, ttl)
 }
 
 // GetMetric retrieves a single metric value
@@ -594,7 +783,10 @@ func sanitizeKeySegment(s string) string {
 func (s *Store) SaveLog(service string, entry interface{}, ts time.Time) error {
 	prefix := fmt.Sprintf("l:%s:", sanitizeKeySegment(service))
 	key := tsKey(prefix, ts)
-	return s.set(key, entry, LogsTTL)
+	s.retentionMu.RLock()
+	ttl := s.retention.logsTTL()
+	s.retentionMu.RUnlock()
+	return s.set(key, entry, ttl)
 }
 
 // QueryLogs returns log entries for a service in the given time range (newest first, up to limit).
@@ -669,7 +861,10 @@ func (s *Store) QueryAllLogs(from, to time.Time, limit int) ([]json.RawMessage, 
 // SaveSpan persists a trace span
 func (s *Store) SaveSpan(span interface{}, traceID, spanID string) error {
 	key := fmt.Sprintf("sp:%s:%s", sanitizeKeySegment(traceID), sanitizeKeySegment(spanID))
-	return s.set(key, span, LogsTTL) // reuse 30d TTL
+	s.retentionMu.RLock()
+	ttl := s.retention.tracesTTL()
+	s.retentionMu.RUnlock()
+	return s.set(key, span, ttl)
 }
 
 // QuerySpansByTrace returns all spans for a trace ID

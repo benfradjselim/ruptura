@@ -4,6 +4,7 @@ import (
     "bytes"
     "net/http"
     "net/http/httptest"
+    "strings"
     "testing"
     "time"
 
@@ -12,6 +13,7 @@ import (
     "github.com/benfradjselim/ruptura/internal/analyzer"
     "github.com/benfradjselim/ruptura/internal/correlator"
     "github.com/benfradjselim/ruptura/internal/fusion"
+    "github.com/benfradjselim/ruptura/internal/scraper"
     "github.com/benfradjselim/ruptura/internal/telemetry"
 )
 
@@ -422,4 +424,55 @@ func TestEngineStorageEndpoint(t *testing.T) {
             t.Error("response missing badger section")
         }
     })
+}
+
+// TestHandleCreateDatasource_OTLPSkipsSSRF verifies that creating an OTLP datasource
+// with a private IP URL is accepted (SSRF check must not apply to push-based endpoints).
+func TestHandleCreateDatasource_OTLPSkipsSSRF(t *testing.T) {
+    met := telemetry.NewRegistry("test")
+    hc := telemetry.NewHealthChecker()
+    h := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+    // Use a real scraper.Manager with no pipeline/store so Put() works without I/O.
+    h.SetScraper(scraper.New(nil, nil))
+    h.SetReady(true)
+    router := h.NewRouter()
+
+    body := `{"type":"otlp","url":"http://10.0.0.1:31470","name":"otlp-test","enabled":true}`
+    req, _ := http.NewRequest("POST", "/api/v2/datasources", strings.NewReader(body))
+    req.Header.Set("Content-Type", "application/json")
+    w := httptest.NewRecorder()
+    router.ServeHTTP(w, req)
+
+    if w.Code != http.StatusCreated {
+        t.Errorf("expected 201 for OTLP datasource with private IP, got %d: %s", w.Code, w.Body.String())
+    }
+}
+
+// TestValidateDatasourceURL_BlocksPrivateIP confirms the SSRF guard still works
+// for non-OTLP datasource types when a private IP is supplied.
+func TestValidateDatasourceURL_BlocksPrivateIP(t *testing.T) {
+    privateURLs := []string{
+        "http://192.168.1.1/metrics",
+        "http://10.0.0.5/metrics",
+        "http://172.16.0.1/metrics",
+        "http://127.0.0.1/metrics",
+    }
+    for _, u := range privateURLs {
+        if err := validateDatasourceURL(u); err == nil {
+            t.Errorf("expected SSRF error for %s, got none", u)
+        }
+    }
+}
+
+// TestValidateDatasourceURL_AllowsClusterDNS confirms cluster-internal hostnames bypass SSRF.
+func TestValidateDatasourceURL_AllowsClusterDNS(t *testing.T) {
+    clusterURLs := []string{
+        "http://prometheus-server.monitoring.svc.cluster.local:80",
+        "http://ruptura-otlp.ruptura-system.svc.cluster.local:4317",
+    }
+    for _, u := range clusterURLs {
+        if err := validateDatasourceURL(u); err != nil {
+            t.Errorf("unexpected error for cluster-local URL %s: %v", u, err)
+        }
+    }
 }

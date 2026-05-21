@@ -6,11 +6,23 @@
   let users = [], activeTab = 'users', loading = false
   let newUser = { username: '', password: '', role: 'viewer' }, creating = false, createErr = ''
 
+  // Database / Retention state
+  let retention = { metrics_days: 2, logs_days: 30, traces_days: 30, snapshots_days: 2 }
+  let retentionSaving = false, retentionMsg = ''
+  let purgeType = 'all', purgeBefore = '', purging = false, purgeMsg = '', purgeErr = ''
+  let purgeConfirm = false
+
   async function loadUsers() {
     loading = true
     const r = await api.users().catch(() => ({ data: [] }))
     users = r.data || []
     loading = false
+  }
+
+  async function loadRetention() {
+    const r = await api.retentionGet().catch(() => null)
+    if (r?.data) retention = { ...retention, ...r.data }
+    else if (r) retention = { ...retention, ...r }
   }
 
   async function createUser() {
@@ -31,13 +43,49 @@
     loadUsers()
   }
 
+  async function saveRetention() {
+    retentionSaving = true; retentionMsg = ''
+    try {
+      await api.retentionSave(retention)
+      retentionMsg = 'Saved'
+      setTimeout(() => retentionMsg = '', 2500)
+    } catch (e) {
+      retentionMsg = 'Error: ' + (e.message || 'unknown')
+    } finally {
+      retentionSaving = false
+    }
+  }
+
+  async function doPurge() {
+    if (!purgeConfirm) { purgeConfirm = true; return }
+    purging = true; purgeMsg = ''; purgeErr = ''; purgeConfirm = false
+    try {
+      const before = purgeBefore ? new Date(purgeBefore).toISOString() : undefined
+      const r = await api.purge(purgeType, before)
+      const d = r?.data ?? r
+      const count = d?.deleted
+      purgeMsg = count === 'all' || count === -1
+        ? `All ${purgeType} data purged.`
+        : `Purged ${count} record(s).`
+    } catch (e) {
+      purgeErr = 'Purge failed: ' + (e.message || 'unknown')
+    } finally {
+      purging = false
+    }
+  }
+
+  function cancelPurge() { purgeConfirm = false }
+
   async function logout() {
     await api.logout().catch(() => {})
     token.set('')
     user.set(null)
   }
 
-  onMount(loadUsers)
+  onMount(() => {
+    loadUsers()
+    loadRetention()
+  })
 </script>
 
 <div class="page">
@@ -47,7 +95,8 @@
   </div>
 
   <div class="tabs">
-    <button class:active={activeTab==='users'} on:click={() => activeTab='users'}>Users</button>
+    <button class:active={activeTab==='users'}    on:click={() => activeTab='users'}>Users</button>
+    <button class:active={activeTab==='database'} on:click={() => activeTab='database'}>Database</button>
   </div>
 
   {#if activeTab === 'users'}
@@ -93,6 +142,81 @@
       {/if}
     </div>
   {/if}
+
+  {#if activeTab === 'database'}
+    <!-- Retention configuration -->
+    <div class="card">
+      <h2>Data Retention</h2>
+      <p class="muted" style="margin:0 0 0.75rem">How long raw ingested data is kept. Applied to new writes immediately after saving.</p>
+      <div class="retention-grid">
+        <label class="field">
+          <span>Metrics (days)</span>
+          <input type="number" min="1" max="365" bind:value={retention.metrics_days} class="inp narrow"/>
+          <small>Default: 2</small>
+        </label>
+        <label class="field">
+          <span>Logs (days)</span>
+          <input type="number" min="1" max="365" bind:value={retention.logs_days} class="inp narrow"/>
+          <small>Default: 30</small>
+        </label>
+        <label class="field">
+          <span>Traces (days)</span>
+          <input type="number" min="1" max="365" bind:value={retention.traces_days} class="inp narrow"/>
+          <small>Default: 30</small>
+        </label>
+        <label class="field">
+          <span>KPI Snapshots (days)</span>
+          <input type="number" min="1" max="365" bind:value={retention.snapshots_days} class="inp narrow"/>
+          <small>Default: 2</small>
+        </label>
+      </div>
+      <div class="form-row" style="margin-top:0.75rem">
+        <button class="btn-primary" on:click={saveRetention} disabled={retentionSaving}>
+          {retentionSaving ? 'Saving…' : 'Save Retention'}
+        </button>
+        {#if retentionMsg}
+          <span class="msg" class:err={retentionMsg.startsWith('Error')}>{retentionMsg}</span>
+        {/if}
+      </div>
+    </div>
+
+    <!-- Purge -->
+    <div class="card" style="margin-top:0.75rem">
+      <h2>Purge Raw Data</h2>
+      <p class="muted" style="margin:0 0 0.75rem">
+        Permanently delete raw ingested data from BadgerDB. KPI snapshots and computed results are not affected unless you select "KPI Snapshots".
+      </p>
+      <div class="form-row">
+        <label class="field-inline">
+          <span>Data type</span>
+          <select bind:value={purgeType} class="inp">
+            <option value="all">All raw data (metrics + logs + traces)</option>
+            <option value="metrics">Metrics only</option>
+            <option value="logs">Logs only</option>
+            <option value="traces">Traces only</option>
+            <option value="snapshots">KPI Snapshots</option>
+          </select>
+        </label>
+        <label class="field-inline">
+          <span>Before date <small>(leave empty = purge all)</small></span>
+          <input type="date" bind:value={purgeBefore} class="inp"/>
+        </label>
+      </div>
+      <div class="form-row" style="margin-top:0.75rem">
+        {#if !purgeConfirm}
+          <button class="btn-danger" on:click={doPurge} disabled={purging}>
+            {purging ? 'Purging…' : 'Purge'}
+          </button>
+        {:else}
+          <span class="warn-text">This cannot be undone. Are you sure?</span>
+          <button class="btn-danger" on:click={doPurge} disabled={purging}>Yes, purge now</button>
+          <button class="btn-ghost" on:click={cancelPurge}>Cancel</button>
+        {/if}
+      </div>
+      {#if purgeMsg}<p class="ok-msg">{purgeMsg}</p>{/if}
+      {#if purgeErr}<p class="err">{purgeErr}</p>{/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -106,8 +230,12 @@
   .tabs button.active { background: #0284c7; border-color: #0284c7; color: #fff; }
   .form-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
   .inp { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 5px; font-size: 0.85rem; }
+  .inp.narrow { width: 80px; }
   .btn-primary { background: #0284c7; border: none; color: #fff; padding: 0.4rem 0.75rem; border-radius: 5px; cursor: pointer; font-size: 0.85rem; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-ghost { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 0.35rem 0.75rem; border-radius: 5px; cursor: pointer; font-size: 0.85rem; }
+  .btn-danger { background: #b91c1c; border: none; color: #fff; padding: 0.4rem 0.75rem; border-radius: 5px; cursor: pointer; font-size: 0.85rem; }
+  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-sm { background: #334155; border: none; color: #e2e8f0; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
   .btn-sm.danger { background: #b91c1c; color: #fff; }
   table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -119,5 +247,14 @@
   .role-badge.role-admin { background: #1e3a5f; color: #60a5fa; }
   .role-badge.role-operator { background: #1a2f1a; color: #4ade80; }
   .muted { color: #64748b; font-size: 0.85rem; }
-  .err { color: #f87171; font-size: 0.8rem; }
+  .err { color: #f87171; font-size: 0.8rem; margin: 0.25rem 0 0; }
+  .ok-msg { color: #4ade80; font-size: 0.85rem; margin: 0.25rem 0 0; }
+  .msg { font-size: 0.85rem; }
+  .msg.err { color: #f87171; }
+  .warn-text { color: #fbbf24; font-size: 0.85rem; }
+  .retention-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; }
+  .field { display: flex; flex-direction: column; gap: 0.25rem; }
+  .field-inline { display: flex; flex-direction: column; gap: 0.2rem; }
+  .field span, .field-inline span { font-size: 0.8rem; color: #94a3b8; }
+  small { font-size: 0.72rem; color: #475569; }
 </style>

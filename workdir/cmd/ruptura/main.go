@@ -37,7 +37,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.0.21"
+const version = "7.0.22"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -152,6 +152,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	} else {
 		logger.Default.Info("snapshots restored", "count", n)
 	}
+
+	// Restore user-configured retention policy (applies TTL to all new writes).
+	store.LoadRetentionConfig()
 
 	// Periodic BadgerDB maintenance: value-log GC (reclaim deleted/expired vlog space)
 	// + SST compaction (compact raw→5m→1h tiers, evict expired keys from SSTables).

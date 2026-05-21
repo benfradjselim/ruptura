@@ -3,7 +3,9 @@ package scraper
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -169,6 +171,9 @@ func (m *Manager) Delete(id string) error {
 // Test performs a single scrape of the given config without persisting or running a loop.
 // Returns (count of mapped metrics, error string).
 func (m *Manager) Test(cfg DatasourceConfig) (int, string) {
+	if cfg.Type == TypeOTLP {
+		return testOTLPConnectivity(cfg.URL)
+	}
 	samples, err := m.runScrape(&cfg)
 	if err != nil {
 		return 0, err.Error()
@@ -176,11 +181,33 @@ func (m *Manager) Test(cfg DatasourceConfig) (int, string) {
 	return len(samples), ""
 }
 
+// testOTLPConnectivity checks that the OTLP endpoint (Ruptura's own NodePort) is reachable via TCP.
+func testOTLPConnectivity(rawURL string) (int, string) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return 0, "invalid URL: " + err.Error()
+	}
+	host := u.Host
+	if host == "" {
+		return 0, "URL must include host:port"
+	}
+	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
+	if err != nil {
+		return 0, fmt.Sprintf("OTLP endpoint unreachable: %v", err)
+	}
+	conn.Close()
+	return 0, ""
+}
+
 // startDS registers state and launches the scrape goroutine.
 func (m *Manager) startDS(cfg *DatasourceConfig) {
+	st := "pending"
+	if cfg.Type == TypeOTLP {
+		st = "push-only"
+	}
 	state := &dsState{
 		cfg:    *cfg,
-		status: "pending",
+		status: st,
 		cancel: make(chan struct{}),
 	}
 	m.mu.Lock()
@@ -189,6 +216,9 @@ func (m *Manager) startDS(cfg *DatasourceConfig) {
 
 	if !cfg.Enabled {
 		return
+	}
+	if cfg.Type == TypeOTLP {
+		return // push-based: clients push to Ruptura's OTLP port; no poll loop needed
 	}
 	go m.scrapeLoop(state)
 }
