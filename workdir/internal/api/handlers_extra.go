@@ -90,6 +90,7 @@ func (h *Handlers) handleRupture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.enrichSnapshot(&snap)
+	sanitizeSnapshot(&snap)
 	writeJSON(w, http.StatusOK, snap)
 }
 
@@ -106,6 +107,29 @@ func (h *Handlers) handleDataflow(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// sanitizeSnapshot replaces NaN/Inf float64 values with 0 so json.Marshal never
+// returns UnsupportedValueError when returning full KPISnapshot payloads.
+func sanitizeSnapshot(s *models.KPISnapshot) {
+	for _, k := range []*models.KPI{
+		&s.Stress, &s.Fatigue, &s.Mood, &s.Pressure,
+		&s.Humidity, &s.Contagion, &s.Resilience, &s.Entropy,
+		&s.Velocity, &s.HealthScore, &s.Throughput,
+	} {
+		k.Value = safeF64(k.Value)
+	}
+	s.FusedRuptureIndex = safeF64(s.FusedRuptureIndex)
+	if s.HealthForecast != nil {
+		s.HealthForecast.In15Min = safeF64(s.HealthForecast.In15Min)
+		s.HealthForecast.In30Min = safeF64(s.HealthForecast.In30Min)
+	}
+	if s.PatternMatch != nil {
+		s.PatternMatch.Similarity = safeF64(s.PatternMatch.Similarity)
+	}
+	if s.Business != nil {
+		s.Business.SLOBurnVelocity = safeF64(s.Business.SLOBurnVelocity)
+	}
+}
+
 // handleRuptures returns all KPISnapshots for all known hosts.
 func (h *Handlers) handleRuptures(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {
@@ -119,6 +143,7 @@ func (h *Handlers) handleRuptures(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	for i := range snapshots {
 		h.enrichSnapshot(&snapshots[i])
+		sanitizeSnapshot(&snapshots[i])
 		key := snapshots[i].Host
 		if snapshots[i].Workload.Namespace != "" {
 			key = snapshots[i].Workload.Namespace + "/" + snapshots[i].Workload.Kind + "/" + snapshots[i].Workload.Name
@@ -150,6 +175,7 @@ func (h *Handlers) handleRuptureByWorkload3(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	h.enrichSnapshot(&snap)
+	sanitizeSnapshot(&snap)
 	writeJSON(w, http.StatusOK, snap)
 }
 
@@ -180,6 +206,7 @@ func (h *Handlers) handleRuptureByWorkload(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	h.enrichSnapshot(&snap)
+	sanitizeSnapshot(&snap)
 	writeJSON(w, http.StatusOK, snap)
 }
 
