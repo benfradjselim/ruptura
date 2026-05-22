@@ -3,8 +3,9 @@
   import {
     fetchDataflow, fetchDatasources, createDatasource,
     updateDatasource, deleteDatasource, testDatasource, testDatasourceById,
+    fetchRetention, saveRetention, purgeData,
   } from '../lib/api'
-  import type { DataflowStats, DatasourceStatus, CreateDatasourceRequest } from '../lib/api'
+  import type { DataflowStats, DatasourceStatus, CreateDatasourceRequest, RetentionConfig } from '../lib/api'
 
   interface LocalDS extends DatasourceStatus {
     _dirty: boolean
@@ -31,6 +32,51 @@
   let loadError = ''
   let activeSection = 'datasources'
   let dataflow: DataflowStats | null = null
+
+  // Database / Retention state
+  let retention: RetentionConfig = { metrics_days: 2, logs_days: 30, traces_days: 30, snapshots_days: 2 }
+  let retentionSaving = false
+  let retentionMsg = ''
+  let purgeType = 'all'
+  let purgeBefore = ''
+  let purging = false
+  let purgeMsg = ''
+  let purgeErr = ''
+  let purgeConfirm = false
+
+  async function loadRetention() {
+    try { retention = await fetchRetention() } catch { /* use defaults */ }
+  }
+
+  async function doSaveRetention() {
+    retentionSaving = true; retentionMsg = ''
+    try {
+      await saveRetention(retention)
+      retentionMsg = 'Saved'
+      setTimeout(() => retentionMsg = '', 2500)
+    } catch (e: unknown) {
+      retentionMsg = 'Error: ' + (e instanceof Error ? e.message : 'unknown')
+    } finally {
+      retentionSaving = false
+    }
+  }
+
+  async function doPurge() {
+    if (!purgeConfirm) { purgeConfirm = true; return }
+    purging = true; purgeMsg = ''; purgeErr = ''; purgeConfirm = false
+    try {
+      const before = purgeBefore ? new Date(purgeBefore).toISOString() : undefined
+      const r = await purgeData(purgeType, before)
+      const count = r.deleted
+      purgeMsg = count === 'all' || count === -1
+        ? `All ${purgeType} data purged.`
+        : `Purged ${count} record(s).`
+    } catch (e: unknown) {
+      purgeErr = 'Purge failed: ' + (e instanceof Error ? e.message : 'unknown')
+    } finally {
+      purging = false
+    }
+  }
   let dataflowInterval: ReturnType<typeof setInterval>
 
   let showAddForm = false
@@ -160,6 +206,7 @@
   onMount(() => {
     loadSources()
     pollDataflow()
+    loadRetention()
     dataflowInterval = setInterval(pollDataflow, 10_000)
   })
 
@@ -178,6 +225,7 @@
       {#each [
         ['datasources', '⊕ Data Sources'],
         ['dataflow',    '⟳ Ingest Stats'],
+        ['database',    '◫ Database'],
         ['general',     '⊞ General'],
         ['about',       '◈ About'],
       ] as [id, label]}
@@ -236,15 +284,18 @@
                   <select class="ds-type-sel" bind:value={src.type} on:change={() => markDirty(src)}>
                     <option value="prometheus">Prometheus</option>
                     <option value="direct_metrics">Direct /metrics</option>
-                    <option value="otlp">OTLP (info only)</option>
+                    <option value="otlp">OTLP (push)</option>
                   </select>
                   <input
                     class="ds-endpoint"
                     bind:value={src.url}
-                    placeholder="http://host:port"
+                    placeholder={src.type === 'otlp' ? 'http://node-public-ip:31470' : 'http://host:port'}
                     on:input={() => markDirty(src)}
                   />
                 </div>
+                {#if src.type === 'otlp'}
+                  <div class="otlp-hint">Push-based — your apps push logs/traces to Ruptura's OTLP NodePort. Enter <code>http://&lt;node-public-ip&gt;:31470</code> to enable the connectivity test.</div>
+                {/if}
 
                 {#if src.type === 'prometheus'}
                   <div class="ds-extra">
@@ -366,6 +417,79 @@
         {:else}
           <div class="loading-hint">Fetching ingest stats…</div>
         {/if}
+
+      <!-- ── DATABASE ── -->
+      {:else if activeSection === 'database'}
+        <div class="section-header">
+          <h2>Data Retention</h2>
+          <p>How long raw ingested data is kept. Applied to new writes immediately after saving.</p>
+        </div>
+
+        <div class="retention-grid">
+          <label class="ret-field">
+            <span class="ret-label">Metrics (days)</span>
+            <input class="pref-input" type="number" min="1" max="365" bind:value={retention.metrics_days} />
+            <span class="ret-hint">Default: 2</span>
+          </label>
+          <label class="ret-field">
+            <span class="ret-label">Logs (days)</span>
+            <input class="pref-input" type="number" min="1" max="365" bind:value={retention.logs_days} />
+            <span class="ret-hint">Default: 30</span>
+          </label>
+          <label class="ret-field">
+            <span class="ret-label">Traces (days)</span>
+            <input class="pref-input" type="number" min="1" max="365" bind:value={retention.traces_days} />
+            <span class="ret-hint">Default: 30</span>
+          </label>
+          <label class="ret-field">
+            <span class="ret-label">KPI Snapshots (days)</span>
+            <input class="pref-input" type="number" min="1" max="365" bind:value={retention.snapshots_days} />
+            <span class="ret-hint">Default: 2</span>
+          </label>
+        </div>
+        <div class="db-row">
+          <button class="btn-save-inline" on:click={doSaveRetention} disabled={retentionSaving}>
+            {retentionSaving ? 'Saving…' : 'Save Retention'}
+          </button>
+          {#if retentionMsg}
+            <span class="ret-msg" class:ret-err={retentionMsg.startsWith('Error')}>{retentionMsg}</span>
+          {/if}
+        </div>
+
+        <div class="section-header" style="margin-top:1rem">
+          <h2>Purge Raw Data</h2>
+          <p>Permanently delete raw data from BadgerDB. KPI snapshots and computed results are unaffected unless you select "KPI Snapshots".</p>
+        </div>
+
+        <div class="purge-row">
+          <label class="ret-field">
+            <span class="ret-label">Data type</span>
+            <select class="ds-type-sel" bind:value={purgeType}>
+              <option value="all">All raw data (metrics + logs + traces)</option>
+              <option value="metrics">Metrics only</option>
+              <option value="logs">Logs only</option>
+              <option value="traces">Traces only</option>
+              <option value="snapshots">KPI Snapshots</option>
+            </select>
+          </label>
+          <label class="ret-field">
+            <span class="ret-label">Before date <small>(empty = purge all)</small></span>
+            <input class="pref-input" type="date" bind:value={purgeBefore} />
+          </label>
+        </div>
+        <div class="db-row">
+          {#if !purgeConfirm}
+            <button class="btn-danger" on:click={doPurge} disabled={purging}>
+              {purging ? 'Purging…' : 'Purge'}
+            </button>
+          {:else}
+            <span class="warn-text">This cannot be undone. Are you sure?</span>
+            <button class="btn-danger" on:click={doPurge} disabled={purging}>Yes, purge now</button>
+            <button class="btn-cancel" on:click={() => purgeConfirm = false}>Cancel</button>
+          {/if}
+        </div>
+        {#if purgeMsg}<p class="ok-msg">{purgeMsg}</p>{/if}
+        {#if purgeErr}<p class="err-msg">{purgeErr}</p>{/if}
 
       <!-- ── GENERAL ── -->
       {:else if activeSection === 'general'}
@@ -798,6 +922,42 @@
   }
   .pref-input:not([readonly]):focus { border-color: var(--purple); }
   .pref-input[readonly] { opacity: 0.6; cursor: default; }
+
+  /* otlp hint */
+  .otlp-hint {
+    font-size: 11px;
+    color: var(--cyan);
+    background: rgba(6,182,212,0.06);
+    border: 1px solid rgba(6,182,212,0.2);
+    border-radius: 6px;
+    padding: 7px 12px;
+    line-height: 1.5;
+  }
+  .otlp-hint code { font-family: 'JetBrains Mono', monospace; font-size: 10px; background: var(--surface3); padding: 1px 4px; border-radius: 3px; }
+
+  /* database / retention */
+  .retention-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .ret-field { display: flex; flex-direction: column; gap: 4px; }
+  .ret-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .ret-hint { font-size: 10px; color: var(--muted); opacity: 0.7; }
+  .db-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .purge-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .ret-msg { font-size: 12px; }
+  .ret-msg.ret-err { color: var(--red); }
+  .btn-danger {
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.4);
+    color: var(--red);
+    padding: 5px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .btn-danger:disabled { opacity: 0.5; cursor: default; }
+  .warn-text { font-size: 12px; color: var(--yellow); }
+  .ok-msg { font-size: 12px; color: var(--green); margin: 0; }
+  .err-msg { font-size: 12px; color: var(--red); margin: 0; }
 
   /* about */
   .about-body { display: flex; flex-direction: column; gap: 20px; }

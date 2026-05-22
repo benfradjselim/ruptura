@@ -715,6 +715,37 @@ export function testDatasourceById(id: string) {
   return post<TestDatasourceResult>(`/api/v2/datasources/${encodeURIComponent(id)}/test`, {})
 }
 
+// ── Database / Retention ──────────────────────────────────────────────────
+
+export interface RetentionConfig {
+  metrics_days:   number
+  logs_days:      number
+  traces_days:    number
+  snapshots_days: number
+}
+
+export function fetchRetention(): Promise<RetentionConfig> {
+  return get<RetentionConfig>('/api/v2/config/retention')
+}
+
+export function saveRetention(cfg: RetentionConfig): Promise<RetentionConfig> {
+  return put<RetentionConfig>('/api/v2/config/retention', cfg)
+}
+
+export async function purgeData(type: string, before?: string): Promise<{ deleted: number | string }> {
+  const params = new URLSearchParams()
+  params.set('type', type)
+  if (before) params.set('before', before)
+  const res = await fetch(`/api/v2/ingest/purge?${params}`, { method: 'DELETE' })
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text().catch(() => res.statusText)
+    throw new Error(`${res.status} — ${text}`)
+  }
+  const json = await res.json().catch(() => ({})) as { data?: { deleted?: number | string }, deleted?: number | string }
+  const d = json.data ?? json
+  return { deleted: d.deleted ?? -1 }
+}
+
 export function openEventStream(
   onEvent: (e: RuptureEvent) => void,
   opts?: { namespace?: string; minFusedR?: number },
