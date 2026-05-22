@@ -50,7 +50,7 @@ vi.mock('../../lib/api', () => ({
   fetchFleet: vi.fn(),
 }))
 
-const EMPTY_FLEET = { hosts: [] }
+const EMPTY_FLEET = { total_hosts: 0, healthy_hosts: 0, degraded_hosts: 0, critical_hosts: 0, hosts: [] }
 
 beforeEach(() => {
   vi.clearAllMocks()
