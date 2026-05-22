@@ -134,7 +134,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: ruptura-operator
-          image: ghcr.io/benfradjselim/ruptura-operator:v0.6.7
+          image: ghcr.io/benfradjselim/ruptura-operator:v0.7.0
           imagePullPolicy: IfNotPresent
           args: ["--interval=30s", "--metrics-addr=:9090"]
           ports:
