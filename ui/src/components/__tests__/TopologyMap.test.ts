@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/svelte'
 import TopologyMap from '../TopologyMap.svelte'
-import { fetchTopology } from '../../lib/api'
+import { fetchTopology, fetchFleet } from '../../lib/api'
 import type { TopologyNode, TopologyEdge } from '../../lib/api'
 
 function makeNode(overrides: Partial<TopologyNode> & { id: string }): TopologyNode {
@@ -47,12 +47,15 @@ const GRAPH_WITH_DATA = {
 
 vi.mock('../../lib/api', () => ({
   fetchTopology: vi.fn(),
+  fetchFleet: vi.fn(),
 }))
 
+const EMPTY_FLEET = { hosts: [] }
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(fetchTopology).mockResolvedValue(EMPTY_GRAPH)
+  vi.mocked(fetchFleet).mockResolvedValue(EMPTY_FLEET)
 })
 
 describe('TopologyMap', () => {
