@@ -81,18 +81,11 @@ jobs:
 
           echo ""
           echo "=== Fleet KPIs ==="
+          printf 'import sys,json\ndata=json.load(sys.stdin)\nws=data if isinstance(data,list) else data.get("workloads",[])\nprint(f"{\"Workload\":<55} {\"stress\":>7} {\"pressure\":>9} {\"fatigue\":>8} {\"health\":>7}")\nprint("-"*90)\nfor w in sorted(ws,key=lambda x:x.get("health_score",100)):\n  name=w.get("workload_key") or w.get("name") or w.get("id") or "?"\n  print(f"{name:<55} {w.get(\"stress\",0):>7.1f} {w.get(\"pressure\",0):>9.1f} {w.get(\"fatigue\",0):>8.1f} {w.get(\"health_score\",0):>7.1f}")\n' > /tmp/fmt_fleet.py
           curl -sf \
             -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
-            "http://${NODE_IP}:${API_PORT}/api/v2/fleet" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-workloads = data if isinstance(data, list) else data.get('workloads', [])
-print(f\"{'Workload':<55} {'stress':>7} {'pressure':>9} {'fatigue':>8} {'health':>7}\")
-print('-' * 90)
-for w in sorted(workloads, key=lambda x: x.get('health_score', 100)):
-    name = w.get('workload_key') or w.get('name') or w.get('id') or '?'
-    print(f\"{name:<55} {w.get('stress',0):>7.1f} {w.get('pressure',0):>9.1f} {w.get('fatigue',0):>8.1f} {w.get('health_score',0):>7.1f}\")
-" 2>/dev/null || curl -sf \
+            "http://${NODE_IP}:${API_PORT}/api/v2/fleet" | python3 /tmp/fmt_fleet.py 2>/dev/null || \
+            curl -sf \
             -H "Authorization: Bearer ${RUPTURA_API_KEY}" \
             "http://${NODE_IP}:${API_PORT}/api/v2/fleet" | python3 -m json.tool | head -80
 
