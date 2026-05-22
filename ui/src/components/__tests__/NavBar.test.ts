@@ -24,7 +24,7 @@ describe('NavBar', () => {
     expect(getByText('Fleet')).toBeInTheDocument()
     expect(getByText('Topology')).toBeInTheDocument()
     expect(getByText('Engine')).toBeInTheDocument()
-    expect(getByText('Nodes')).toBeInTheDocument()
+    expect(getByText('Cluster')).toBeInTheDocument()
   })
 
   it('marks the active route link', () => {
