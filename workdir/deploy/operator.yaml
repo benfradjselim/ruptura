@@ -42,6 +42,10 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list", "watch"]
+  # List and delete evicted/failed pods to prevent restart loops
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
   # OpenShift Routes (no-op on vanilla K8s — API simply won't be present)
   - apiGroups: ["route.openshift.io"]
     resources: ["routes"]

@@ -202,3 +202,36 @@ func (c *k8sClient) patchFinalizers(inst RupturaInstance, finalizers []string) e
 }
 
 func isNotFound(err error) bool { return err == errNotFound }
+
+// patchAnnotation sets or removes a single annotation on a RupturaInstance via
+// merge-patch. Pass value="" to remove the key (serialised as JSON null).
+func (c *k8sClient) patchAnnotation(inst RupturaInstance, key, value string) error {
+	var annValue interface{}
+	if value != "" {
+		annValue = value
+	}
+	body, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"annotations": map[string]interface{}{key: annValue},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s",
+		inst.Metadata.Namespace, inst.Metadata.Name)
+	req, _ := http.NewRequest(http.MethodPatch, c.host+path, bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/merge-patch+json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("patchAnnotation %s → %d", path, resp.StatusCode)
+	}
+	return nil
+}

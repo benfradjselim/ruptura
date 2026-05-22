@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fakeServer builds a test HTTP server that records PATCH/DELETE calls and
@@ -255,6 +256,170 @@ func TestDelete_404IsSuccess(t *testing.T) {
 	})
 	if err := c.delete("/apis/apps/v1/namespaces/ns/deployments/gone"); err != nil {
 		t.Fatalf("expected 404 to be treated as success, got: %v", err)
+	}
+}
+
+// ── cleanupEvictedPods ───────────────────────────────────────────────────────
+
+func TestCleanupEvictedPods_DeletesFailedPods(t *testing.T) {
+	pods := PodList{
+		Items: []Pod{
+			{Metadata: ObjectMeta{Name: "ruptura-abc"}, Status: PodStatus{Phase: "Failed", Reason: "Evicted"}},
+			{Metadata: ObjectMeta{Name: "ruptura-def"}, Status: PodStatus{Phase: "Running"}},
+		},
+	}
+	podsJSON, _ := json.Marshal(pods)
+	deleted := []string{}
+
+	c := fakeServer(t, map[string]http.HandlerFunc{
+		"/api/v1/namespaces/ns/pods": func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(podsJSON)
+		},
+		"/api/v1/namespaces/ns/pods/ruptura-abc": func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodDelete {
+				deleted = append(deleted, "ruptura-abc")
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		},
+		"/api/v1/namespaces/ns/pods/ruptura-def": func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodDelete {
+				deleted = append(deleted, "ruptura-def")
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		},
+	})
+
+	count, err := cleanupEvictedPods(c, "ns", "ri")
+	if err != nil {
+		t.Fatalf("cleanupEvictedPods returned error: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 pod deleted, got %d", count)
+	}
+	if len(deleted) != 1 || deleted[0] != "ruptura-abc" {
+		t.Errorf("expected only ruptura-abc to be deleted, got %v", deleted)
+	}
+}
+
+func TestCleanupEvictedPods_NoPods(t *testing.T) {
+	podsJSON, _ := json.Marshal(PodList{})
+	c := fakeServer(t, map[string]http.HandlerFunc{
+		"/api/v1/namespaces/ns/pods": func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(podsJSON)
+		},
+	})
+	count, err := cleanupEvictedPods(c, "ns", "ri")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 deleted, got %d", count)
+	}
+}
+
+// ── reconcile: eviction cooldown ─────────────────────────────────────────────
+
+func TestReconcile_EvictionStorm_ScalesToZero(t *testing.T) {
+	pods := PodList{
+		Items: []Pod{
+			{Metadata: ObjectMeta{Name: "p1"}, Status: PodStatus{Phase: "Failed", Reason: "Evicted"}},
+			{Metadata: ObjectMeta{Name: "p2"}, Status: PodStatus{Phase: "Failed", Reason: "Evicted"}},
+			{Metadata: ObjectMeta{Name: "p3"}, Status: PodStatus{Phase: "Failed", Reason: "Evicted"}},
+		},
+	}
+	podsJSON, _ := json.Marshal(pods)
+
+	var deploymentReplicas float64 = -1
+	annotationSet := ""
+
+	inst := makeInstance("ri", "ruptura-system")
+
+	c := fakeServer(t, map[string]http.HandlerFunc{
+		"/api/v1/namespaces/ruptura-system/pods": func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(podsJSON)
+		},
+		"/apis/apps/v1/namespaces/ruptura-system/deployments/ri": func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPatch {
+				var body map[string]interface{}
+				_ = json.NewDecoder(r.Body).Decode(&body)
+				if spec, ok := body["spec"].(map[string]interface{}); ok {
+					if r, ok := spec["replicas"].(float64); ok {
+						deploymentReplicas = r
+					}
+				}
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		},
+		"/apis/ruptura.io/v1alpha1/namespaces/ruptura-system/rupturainstances/ri": func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPatch {
+				var body map[string]interface{}
+				_ = json.NewDecoder(r.Body).Decode(&body)
+				if meta, ok := body["metadata"].(map[string]interface{}); ok {
+					if ann, ok := meta["annotations"].(map[string]interface{}); ok {
+						if v, ok := ann[evictionCooldownAnnotation].(string); ok {
+							annotationSet = v
+						}
+					}
+				}
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		},
+	})
+
+	if err := reconcile(context.Background(), c, inst, false); err != nil {
+		t.Fatalf("reconcile returned error: %v", err)
+	}
+	if deploymentReplicas != 0 {
+		t.Errorf("expected replicas=0 during eviction storm, got %v", deploymentReplicas)
+	}
+	if annotationSet == "" {
+		t.Error("expected eviction cooldown annotation to be set")
+	}
+}
+
+func TestReconcile_CooldownActive_SkipsRecreate(t *testing.T) {
+	// Instance already has an active cooldown annotation.
+	inst := makeInstance("ri", "ruptura-system")
+	inst.Metadata.Annotations = map[string]string{
+		evictionCooldownAnnotation: time.Now().Add(2 * time.Minute).UTC().Format(time.RFC3339),
+	}
+	// Empty pod list — no new evictions.
+	podsJSON, _ := json.Marshal(PodList{})
+
+	var deploymentReplicas float64 = 1 // expect it to remain 0 after apply
+
+	c := fakeServer(t, map[string]http.HandlerFunc{
+		"/api/v1/namespaces/ruptura-system/pods": func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(podsJSON)
+		},
+		"/apis/apps/v1/namespaces/ruptura-system/deployments/ri": func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPatch {
+				var body map[string]interface{}
+				_ = json.NewDecoder(r.Body).Decode(&body)
+				if spec, ok := body["spec"].(map[string]interface{}); ok {
+					if r, ok := spec["replicas"].(float64); ok {
+						deploymentReplicas = r
+					}
+				}
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		},
+	})
+
+	if err := reconcile(context.Background(), c, inst, false); err != nil {
+		t.Fatalf("reconcile returned error: %v", err)
+	}
+	if deploymentReplicas != 0 {
+		t.Errorf("expected replicas=0 during active cooldown, got %v", deploymentReplicas)
 	}
 }
 

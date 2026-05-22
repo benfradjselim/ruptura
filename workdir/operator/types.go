@@ -243,3 +243,19 @@ type DeploymentWithStatus struct {
 		AvailableReplicas int32 `json:"availableReplicas"`
 	} `json:"status"`
 }
+
+// Pod, PodList, and PodStatus are used to detect and clean up evicted pods.
+type Pod struct {
+	Metadata ObjectMeta `json:"metadata"`
+	Status   PodStatus  `json:"status"`
+}
+
+type PodList struct {
+	Items    []Pod    `json:"items"`
+	Metadata ListMeta `json:"metadata"`
+}
+
+type PodStatus struct {
+	Phase  string `json:"phase,omitempty"`
+	Reason string `json:"reason,omitempty"`
+}

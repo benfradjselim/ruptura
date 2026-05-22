@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 )
 
@@ -14,6 +15,14 @@ const (
 	managedByLabel     = "app.kubernetes.io/managed-by"
 	instanceLabel      = "app.kubernetes.io/instance"
 	finalizer          = "ruptura.io/cleanup"
+
+	// eviction cooldown: when >= evictionThreshold evicted pods are found in a
+	// single reconcile cycle, the operator scales the Deployment to 0 replicas
+	// for evictionCooldownDuration to stop the k8s controller from re-creating
+	// pods on a node that is still under resource pressure.
+	evictionCooldownAnnotation = "ruptura.io/eviction-cooldown-until"
+	evictionCooldownDuration   = 3 * time.Minute
+	evictionThreshold          = 3
 )
 
 // hasFinalizer reports whether inst already carries our finalizer.
@@ -63,6 +72,31 @@ func cleanup(c *k8sClient, inst RupturaInstance, isOCP bool) error {
 	return c.patchFinalizers(inst, removeFinalizer(inst))
 }
 
+// cleanupEvictedPods lists all pods for the instance and deletes any in
+// Failed/Evicted state. Returns the number of pods deleted.
+func cleanupEvictedPods(c *k8sClient, ns, instanceName string) (int, error) {
+	selector := url.QueryEscape(instanceLabel + "=" + instanceName)
+	var pods PodList
+	if err := c.get(fmt.Sprintf("/api/v1/namespaces/%s/pods?labelSelector=%s", ns, selector), &pods); err != nil {
+		return 0, fmt.Errorf("list pods: %w", err)
+	}
+	deleted := 0
+	for _, pod := range pods.Items {
+		if pod.Status.Phase != "Failed" && pod.Status.Reason != "Evicted" {
+			continue
+		}
+		podPath := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", ns, pod.Metadata.Name)
+		if err := c.delete(podPath); err != nil {
+			logError("delete evicted pod failed", "pod", pod.Metadata.Name, "err", err)
+			continue
+		}
+		logInfo("deleted evicted pod", "instance", instanceName, "pod", pod.Metadata.Name,
+			"phase", pod.Status.Phase, "reason", pod.Status.Reason)
+		deleted++
+	}
+	return deleted, nil
+}
+
 // reconcile drives a single RupturaInstance toward its desired state.
 // It is idempotent: server-side apply handles create-or-update for all resources.
 func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bool) error {
@@ -85,6 +119,46 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	ns := inst.Metadata.Namespace
 	name := inst.Metadata.Name
 
+	// Always remove evicted/failed pod objects first so they don't accumulate
+	// and skew quota or status checks.
+	evicted, _ := cleanupEvictedPods(c, ns, name)
+	if evicted > 0 {
+		logInfo("cleaned evicted pods", "name", name, "count", evicted)
+	}
+
+	// Resolve eviction-cooldown state from the instance annotation.
+	inCooldown := false
+	cooldownUntil := ""
+	if v, ok := inst.Metadata.Annotations[evictionCooldownAnnotation]; ok && v != "" {
+		cooldownUntil = v
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			if time.Now().Before(t) {
+				inCooldown = true
+				logInfo("eviction cooldown active — holding replicas at 0", "name", name, "until", v)
+			} else {
+				// Cooldown expired — clear the annotation.
+				if err2 := c.patchAnnotation(inst, evictionCooldownAnnotation, ""); err2 != nil {
+					logError("clear eviction cooldown annotation failed", "name", name, "err", err2)
+				}
+				cooldownUntil = ""
+				logInfo("eviction cooldown expired, resuming normal reconcile", "name", name)
+			}
+		}
+	}
+
+	// Enter cooldown when a burst of evictions was just cleaned up this cycle.
+	if !inCooldown && evicted >= evictionThreshold {
+		until := time.Now().Add(evictionCooldownDuration).UTC().Format(time.RFC3339)
+		if err := c.patchAnnotation(inst, evictionCooldownAnnotation, until); err != nil {
+			logError("set eviction cooldown annotation failed", "name", name, "err", err)
+		} else {
+			cooldownUntil = until
+			inCooldown = true
+			logInfo("eviction storm detected — scaling to 0 for cooldown",
+				"name", name, "evicted", evicted, "until", until)
+		}
+	}
+
 	image := inst.Spec.Image
 	if image == "" {
 		image = defaultImage
@@ -100,6 +174,11 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	replicas := inst.Spec.Replicas
 	if replicas < 1 {
 		replicas = 1
+	}
+	if inCooldown {
+		// Scale to 0 so the Deployment controller stops creating pods while the
+		// node is under resource pressure.
+		replicas = 0
 	}
 
 	labels := map[string]string{
@@ -126,7 +205,12 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 		}
 	}
 
-	return updateStatus(c, inst)
+	phaseOverride, message := "", ""
+	if inCooldown {
+		phaseOverride = "Pending"
+		message = fmt.Sprintf("eviction storm detected; scaled to 0, resuming at %s", cooldownUntil)
+	}
+	return updateStatus(c, inst, phaseOverride, message)
 }
 
 func reconcileServiceAccount(c *k8sClient, ns string, labels map[string]string) error {
@@ -326,7 +410,7 @@ func reconcileRoute(c *k8sClient, ns, name string, labels map[string]string) err
 	return c.apply(path, route)
 }
 
-func updateStatus(c *k8sClient, inst RupturaInstance) error {
+func updateStatus(c *k8sClient, inst RupturaInstance, phaseOverride, message string) error {
 	ns := inst.Metadata.Namespace
 	name := inst.Metadata.Name
 
@@ -334,13 +418,17 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 	depPath := fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s", ns, name)
 	_ = c.get(depPath, &dep)
 
-	phase := "Running"
-	if dep.Status.ReadyReplicas == 0 {
-		phase = "Pending"
+	phase := phaseOverride
+	if phase == "" {
+		phase = "Running"
+		if dep.Status.ReadyReplicas == 0 {
+			phase = "Pending"
+		}
 	}
 
 	status := RupturaInstanceStatus{
 		Phase:              phase,
+		Message:            message,
 		ReadyReplicas:      dep.Status.ReadyReplicas,
 		AvailableReplicas:  dep.Status.AvailableReplicas,
 		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
