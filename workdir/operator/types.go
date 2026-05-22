@@ -87,10 +87,11 @@ type PodTemplateSpec struct {
 }
 
 type PodSpec struct {
-	ServiceAccountName string      `json:"serviceAccountName,omitempty"`
+	ServiceAccountName string              `json:"serviceAccountName,omitempty"`
+	PriorityClassName  string              `json:"priorityClassName,omitempty"`
 	SecurityContext    *PodSecurityContext `json:"securityContext,omitempty"`
-	Containers         []Container `json:"containers"`
-	Volumes            []Volume    `json:"volumes,omitempty"`
+	Containers         []Container         `json:"containers"`
+	Volumes            []Volume            `json:"volumes,omitempty"`
 }
 
 type PodSecurityContext struct {

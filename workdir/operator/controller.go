@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultImage       = "ghcr.io/benfradjselim/ruptura:v7.0.18"
+	defaultImage       = "ghcr.io/benfradjselim/ruptura:v7.0.23"
 	defaultStorageSize = "10Gi"
 	defaultEdition     = "community"
 	appLabel           = "app.kubernetes.io/name"
@@ -273,7 +273,7 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition string, replicas
 	resources := spec.Resources
 	if len(resources.Requests) == 0 && len(resources.Limits) == 0 {
 		resources = ResourceRequirements{
-			Requests: map[string]string{"cpu": "100m", "memory": "128Mi"},
+			Requests: map[string]string{"cpu": "50m", "memory": "64Mi"},
 			Limits:   map[string]string{"cpu": "1000m", "memory": "512Mi"},
 		}
 	}
@@ -307,6 +307,7 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition string, replicas
 				},
 				Spec: PodSpec{
 					ServiceAccountName: "ruptura-instance",
+					PriorityClassName:  "system-cluster-critical",
 					SecurityContext: &PodSecurityContext{
 						RunAsNonRoot: true,
 						RunAsUser:    65532,
