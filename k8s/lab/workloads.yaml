@@ -53,7 +53,7 @@ spec:
         command: ["sh", "-c"]
         args: ["while true; do dd if=/dev/urandom of=/dev/null bs=1M count=200 2>/dev/null; done"]
         resources:
-          requests: {cpu: "100m", memory: "64Mi"}
+          requests: {cpu: "50m", memory: "32Mi"}
           limits:   {cpu: "250m", memory: "128Mi"}
 ---
 # 3. cache-worker — memory pressure (holds ~80Mi of the 96Mi limit)
@@ -77,7 +77,7 @@ spec:
         command: ["sh", "-c"]
         args: ["dd if=/dev/zero bs=1M count=75 of=/dev/shm/mem 2>/dev/null; echo 'memory held'; while true; do sleep 60; done"]
         resources:
-          requests: {cpu: "30m", memory: "64Mi"}
+          requests: {cpu: "30m", memory: "32Mi"}
           limits:   {cpu: "100m", memory: "96Mi"}
 ---
 # 4. notification-worker — crash loop (exits with error every ~45s → high fatigue KPI)
@@ -151,7 +151,7 @@ spec:
           echo 'memory held, starting cpu loop'
           while true; do dd if=/dev/urandom of=/dev/null bs=1M count=200 2>/dev/null; done
         resources:
-          requests: {cpu: "150m", memory: "128Mi"}
+          requests: {cpu: "100m", memory: "64Mi"}
           limits:   {cpu: "350m", memory: "192Mi"}
 ---
 # 7. inventory-service — gradual memory leak simulation (restarts every ~5min from OOM)
