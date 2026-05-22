@@ -355,9 +355,9 @@ jobs:
             --set service.nodePorts.api=31468 \
             --set service.nodePorts.otlp=30298 \
             --set persistence.size=5Gi \
-            --set resources.limits.memory=2Gi \
-            --set resources.requests.memory=256Mi \
-            --set-string goMemLimit="1700MiB" \
+            --set resources.limits.memory=512Mi \
+            --set resources.requests.memory=64Mi \
+            --set-string goMemLimit="400MiB" \
             --set "podAnnotations.deploy/commit=${{ github.sha }}" \
             --set ui.enabled=true \
             --set "ui.image.tag=${{ needs.docker-ui.outputs.ui-tag }}" \
