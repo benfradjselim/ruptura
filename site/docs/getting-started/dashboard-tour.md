@@ -1,109 +1,168 @@
 # Dashboard Tour
 
-Ruptura ships a self-contained web UI served at `http://<host>:8080`. No Grafana, no external tools — open a browser and it's ready. The screenshots below were captured from a live instance with four synthetic workloads running simultaneously.
+Ruptura v7 ships a Svelte 4 SPA served by a dedicated `ruptura-ui` pod at `http://<host>:31469`. The UI connects to the `ruptura-engine` REST API via an nginx reverse proxy — no Grafana, no external tools.
 
 ---
 
 ## Fleet overview
 
-When you first open the dashboard you see the full fleet at a glance.
+The Fleet view is your starting point — a live grid of every tracked workload.
 
-![Dashboard fleet overview](../assets/screenshots/dashboard-overview.png)
-
-**What you're looking at:**
+**What each card shows:**
 
 | Area | What it shows |
 |------|--------------|
-| **Sidebar** | Every tracked workload with its HealthScore circle and FusedR badge. Colour transitions from green → yellow → red as health degrades. |
-| **Fleet Health card** | Average HealthScore across all workloads — 62 here, flagged as `degraded`. |
-| **Pending Actions** | Actions waiting for human approval (Tier-2). |
-| **Rupture State** | Current highest-severity state across the fleet. |
-| **Live Data Flow** | Animated pipeline diagram — Prom → Logs → Traces → Ingest → Analyze → Fusion → Fingerprint → Actions → Explain. |
-| **Heatmap** | 10 KPI signals × all workloads, colour-coded by value. |
+| **Health ring** | Actual KPI value (0–100) with colour: green → yellow → red as health degrades |
+| **10 signal mini-bars** | One bar per KPI signal (Stress, Fatigue, Mood, Pressure, Humidity, Contagion, Resilience, Entropy, Velocity, Throughput) |
+| **FusedR badge** | Current Fused Rupture Index — the composite risk score |
+| **Calibration progress** | `calibrating` badge appears during the first data-collection window; rupture predictions are suppressed until calibration completes |
+| **Rupture warning** | `⚠ Critical in ~12m` when HealthScore forecast is heading toward critical |
 
-The status bar at the bottom shows `4 total · 4 calibrating · 0 critical`. During the first calibration window signals are computed and stored but rupture predictions are suppressed — `calibrating` badges appear on each workload.
-
----
-
-## KPI signals — per-workload breakdown
-
-Click any workload to drill into its signal panel. This is `production/deployment/payment-api` running a cascade-failure pattern:
-
-![KPI Signals panel — payment-api](../assets/screenshots/dashboard-kpi-signals.png)
-
-The 9 gauge cards map directly to Ruptura's composite signal formulas:
-
-| Signal | Value | Meaning |
-|--------|-------|---------|
-| **STRESS** | 0.661 🔴 | High real-time load — CPU, RAM, latency, errors accumulating |
-| **FATIGUE** | 1.000 🔴 | Stress has been sustained long enough to push to maximum burnout |
-| **MOOD** | 0.316 | System well-being low — throughput vs error ratio degraded |
-| **PRESSURE** | 0.500 🟡 | Rate-of-change of stress rising — storm building |
-| **CONTAGION** | 0.646 🔴 | Cross-service propagation — error wave spreading from payment-db |
-| **VELOCITY** | 1.000 🔴 | HealthScore degrading at maximum rate |
-| **RESILIENCE** | 0.000 | No recovery capacity — fatigue + contagion have consumed it |
-| **HUMIDITY** | 0.019 | Error/timeout density low despite high stress (cascade not yet error-heavy) |
-| **ENTROPY** | 0.003 | Behavior is predictably bad, not chaotic |
-
-Fatigue at 1.000 + Velocity at 1.000 + Resilience at 0.000 is the signature of a workload approaching a hard failure — it has been under sustained load, it is getting worse fast, and it has no buffer left to absorb further spikes.
+The Fleet header shows the live rupture counter, updating over SSE without polling.
 
 ---
 
-## Timeseries — signal history
+## KPI signals — per-workload detail
 
-Switch to the **Timeseries** tab to see how signals evolved over time:
+Click any workload card to open the detail panel. The **Signals** tab shows all 10 KPI gauges:
 
-![Timeseries chart — HealthScore and Stress](../assets/screenshots/dashboard-timeseries.png)
+| Signal | Measures |
+|--------|----------|
+| **Stress** | CPU + latency burst |
+| **Fatigue** | Cumulative baseline deviation (long-term wear) |
+| **Mood** | Log error/warn sentiment ratio |
+| **Pressure** | Memory + disk saturation |
+| **Humidity** | Forecast variance — how predictable behavior is |
+| **Contagion** | Error propagation from upstream services |
+| **Resilience** | Recovery speed after spikes |
+| **Entropy** | Internal signal disorder |
+| **Velocity** | Request rate acceleration |
+| **Throughput** | Data volume processed per cycle |
 
-The chart shows **HealthScore** (green, 0–100 scale) and **Stress** (red, 0–1 scale) over the last ~2 minutes. Toggle any of the 9 signal chips at the top to overlay them. The HealthScore line holds flat early while the sim ramps up, then drops sharply — this is the cascade pattern taking hold.
+Each signal shows `value`, `state` (ok / warning / critical), and `trend` (rising / falling / stable).
 
----
-
-## Comparing workloads — slow-burn vs cascade
-
-Here is `production/deployment/order-service` running a slow-burn pattern side-by-side for comparison:
-
-![order-service — slow-burn pattern](../assets/screenshots/dashboard-order-service.png)
-
-| Signal | payment-api (cascade) | order-service (slow-burn) |
-|--------|----------------------|--------------------------|
-| STRESS | 0.661 🔴 | 0.445 🟡 |
-| FATIGUE | 1.000 🔴 | 1.000 🔴 |
-| PRESSURE | 0.500 🟡 | 0.667 🟡 |
-| CONTAGION | 0.646 🔴 | 0.123 |
-| VELOCITY | 1.000 🔴 | 0.127 |
-
-The slow-burn signature: fatigue reaches maximum (sustained load over time) but velocity stays low (degradation is gradual, not accelerating) and contagion is minimal (self-contained, no cascade). The cascade signature is the opposite: high contagion + maximum velocity — a fast, spreading failure.
+Also visible on this tab: **PatternMatch** warning (cosine similarity ≥ 0.85 against prior rupture fingerprints), **Business Signals** (`slo_burn_velocity`, `blast_radius`, `recovery_debt`), and the **Explain** panel with narrative + formula breakdown.
 
 ---
 
-## Running this yourself
+## History tab
 
-Start a local Ruptura instance and inject a simulation pattern in under a minute:
+Switch to **History** to see how signals evolved over time. Toggle any of the 12 signal chips to overlay them on the Chart.js time-series. Useful for spotting the exact moment a cascade took hold versus a slow-burn pattern building gradually.
+
+---
+
+## Forecast tab
+
+The **Forecast** tab projects HealthScore **+15 and +30 minutes** forward using the 5-model ensemble (CA-ILR, ARIMA, Holt-Winters, MAD, EWMA). When the projected score is heading toward critical, `critical_eta_minutes` is surfaced — the card shows "⚠ Critical in ~12m".
+
+---
+
+## Predictions tab
+
+The **Predictions** tab shows per-metric ensemble outputs — individual model votes and the current model weights. Weights are re-computed every 60s based on actual prediction error.
+
+---
+
+## Events tab
+
+Live SSE rupture/recovery log for the workload. Every FusedR threshold crossing fires in real time.
+
+---
+
+## Actions tab
+
+Approve or reject pending Tier-2 actions (suggested by the action engine when FusedR is 3.0–5.0). Tier-1 actions (FusedR ≥ 5.0) execute automatically subject to safety gates.
+
+---
+
+## Kubernetes tab
+
+Pod list, replica count, resource requests/limits, and labels for the workload's underlying Kubernetes resources.
+
+---
+
+## Topology view
+
+The **Topology** page renders the service dependency graph derived from OTLP traces.
+
+- **Click a node** → health bar + current FusedR for that service
+- **Click an edge** → call rate, error rate, P99 latency for that service-to-service link
+
+The graph updates as new trace data arrives — new services and edges appear automatically.
+
+---
+
+## Engine view
+
+The **Engine** page shows Ruptura's own runtime stats:
+
+- Analyzer state (last tick time, workload count)
+- Ingest rates (metrics/s, logs/s, traces/s)
+- Cumulative data flow counters
+- BadgerDB storage usage and GC stats
+
+---
+
+## Cluster / Nodes view
+
+The **Nodes** page shows Kubernetes node health — CPU, memory, and disk pressure per node, sourced from the k8smetrics poller.
+
+---
+
+## Alerts view
+
+Active and resolved alert feed across all workloads, with severity, timestamp, and the FusedR value at trigger time.
+
+---
+
+## Settings
+
+### Datasources tab
+
+Register and test data sources:
+
+- **Prometheus** — remote-write endpoint configuration, namespace scoping
+- **OTLP** — configure the push endpoint (TCP connectivity test); incoming signals are attributed to the configured namespace
+
+### Ingest Stats tab
+
+Live totals: metrics received, logs received, traces received, parse errors, active workloads.
+
+### Database tab
+
+Per-signal-type data retention configuration (days). Purge controls:
+
+- **Purge by type** — delete all data for a specific signal type
+- **Purge by date** — delete data older than a given date
+- **Purge all** — full data reset (requires confirmation)
+
+---
+
+## Quick install
+
+Deploy Ruptura on Kubernetes and inject synthetic workloads in under two minutes:
 
 ```bash
-# Start Ruptura
-docker run -d --name ruptura -p 8080:8080 \
-  ghcr.io/benfradjselim/ruptura:6.8.4
+helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
+  --namespace ruptura-system \
+  --create-namespace \
+  --set apiKey=$(openssl rand -hex 32)
 
-# Open the dashboard
-open http://localhost:8080
-
-# Inject a cascade-failure pattern
-ruptura-sim inject \
-  --pattern cascade-failure \
-  --workload production/deployment/payment-api \
-  --origin production/deployment/payment-db \
-  --target http://localhost:8080 \
-  --duration 10m
+# Dashboard:   http://<node-ip>:31469/
+# Engine API:  http://<node-ip>:31468/api/v2/health
+# OTLP ingest: http://<node-ip>:31470/api/v2/write
 ```
 
-Add more patterns in parallel to see how the fleet heatmap fills up and the fleet health score drops across multiple workloads simultaneously.
-
-Available patterns: `cascade-failure` · `memory-leak` · `traffic-surge` · `slow-burn`
+Inject the five built-in synthetic workload profiles immediately:
 
 ```bash
-ruptura-sim patterns
+python3 scripts/simulate.py
+# Sends 5 workloads every 5s:
+#   gateway        — stable/healthy
+#   order-service  — slow-burn CPU stress
+#   payment-api    — error bursts every 2 min
+#   cache-worker   — traffic spikes every 3 min
+#   ml-inference   — noisy/calibrating new workload
 ```
 
-→ Full reference: [Embedded Dashboard →](../architecture/dashboard.md)
+→ Full reference: [Architecture →](../architecture/overview.md)

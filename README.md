@@ -19,10 +19,19 @@ Ruptura detects workload ruptures before they cause outages — using the Fused 
 
 | Version | Date | Status |
 |---------|------|--------|
+| v7.0.23 | 2026-05-22 | ✅ Released — predictor CAILR cap fix, FusedR credibility, Settings Database tab |
+| v7.0.22 | 2026-05-22 | ✅ Released — OTLP datasource activation, FusedR sanitize on load, SSRF bypass for OTLP |
+| v7.0.21 | 2026-05-21 | ✅ Released — PurgeData type=all fix, data retention API & UI |
+| v7.0.20 | 2026-05-21 | ✅ Released — CAILR 10.0 cap, BadgerDB snapshot sanitize |
+| v7.0.19 | 2026-05-20 | ✅ Released — TopologyMap fetchFleet fix, NavBar Cluster label |
+| v7.0.18 | 2026-05-20 | ✅ Released — release-ui Docker artifact fix, workflow YAML parse fixes |
+| v7.0.17 | 2026-05-19 | ✅ Released — remote-write host label for pipeline indexing |
+| v7.0.16 | 2026-05-18 | ✅ Released — ruptura-lab simulator workloads, k8smetrics poller |
+| v7.0.15 | 2026-05-17 | ✅ Released — k8s node metrics, cluster health view |
+| v7.0.10 | 2026-05-16 | ✅ Released — datasource manager, OTLP namespace scoping |
+| v7.0.5 | 2026-05-16 | ✅ Released — OTLP logs/traces ingest, topology from spans, pattern matching |
 | v7.0.4 | 2026-05-15 | ✅ Released — OTLP NodePort 31470 exposed, workload simulator |
-| v7.0.3 | 2026-05-15 | ✅ Released — JSON crash fix, real PNG logo, topology overhaul, health scores per workload |
-| v7.0.2 | 2026-05-15 | ✅ Released — 10-signal bars, light/dark mode, dataflow stats, all backend APIs wired |
-| v7.0.1 | 2026-05-15 | ✅ Released — ruptura-ui pod, logo, calibrating state, Settings & Alerts pages |
+| v7.0.3 | 2026-05-15 | ✅ Released — JSON crash fix, topology overhaul, health scores per workload |
 | v7.0.0 | 2026-05-15 | ✅ Released — v7 architecture: separate UI pod, SSE, k8s metadata, node health |
 | v6.8.13 | 2026-05-13 | ✅ Released — log/trace ingest counters, Live Data Flow, ruptura-ctl v1.0.0 |
 
@@ -30,6 +39,7 @@ Ruptura detects workload ruptures before they cause outages — using the Fused 
 
 | Version | Date | Status |
 |---------|------|--------|
+| ruptura-operator v0.7.0 | 2026-05-22 | ✅ Released — eviction-loop protection, priority class, reduced defaults |
 | ruptura-operator v0.6.9 | 2026-05-07 | 🔄 Submitted to Red Hat OperatorHub |
 | ruptura-operator v0.6.8 | 2026-05-07 | ✅ Merged into OperatorHub community-operators |
 
@@ -182,7 +192,7 @@ Svelte 4 SPA with nginx reverse proxy — light/dark mode toggle, full SSE integ
 | **Engine** | Runtime stats, analyzer state, ingest rates, cumulative data flow, BadgerDB storage |
 | **Alerts** | Active / resolved alert feed |
 | **Nodes** | K8s node health — CPU, memory, disk pressure |
-| **Settings** | Data sources, Ingest Stats (live totals), preferences |
+| **Settings** | Data sources (Prometheus + OTLP), Ingest Stats (live totals), **Database** (retention days per signal type, purge by type/date) |
 
 ---
 
