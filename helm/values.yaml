@@ -34,7 +34,7 @@ ui:
   enabled: false
   image:
     repository: ghcr.io/benfradjselim/ruptura-ui
-    tag: ""         # defaults to Chart.appVersion
+    tag: "ui-v1.0.1"
     pullPolicy: Always
   port: 80
   service:
