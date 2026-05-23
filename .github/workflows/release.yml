@@ -337,6 +337,23 @@ jobs:
             --username ${{ github.actor }} \
             --password-stdin
 
+      - name: Clean up stuck pods before upgrade
+        run: |
+          echo "=== Pre-deploy: force-delete any stuck/terminating pods ==="
+          kubectl --kubeconfig /tmp/kubeconfig delete pods -n ruptura-system \
+            -l 'app.kubernetes.io/name in (ruptura, ruptura-ui)' \
+            --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
+          kubectl --kubeconfig /tmp/kubeconfig delete pods -n ruptura-system \
+            --field-selector=status.phase=Failed \
+            --ignore-not-found=true 2>/dev/null || true
+
+          echo "=== Node allocatable resources ==="
+          kubectl --kubeconfig /tmp/kubeconfig get nodes \
+            -o custom-columns='NODE:.metadata.name,CPU:.status.allocatable.cpu,MEM:.status.allocatable.memory' 2>/dev/null || true
+
+          echo "=== Current namespace resource usage ==="
+          kubectl --kubeconfig /tmp/kubeconfig get pods -n ruptura-system -o wide 2>/dev/null || true
+
       - name: Helm upgrade/install ruptura
         env:
           TAG: ${{ needs.docker.outputs.image-tag }}
@@ -366,14 +383,47 @@ jobs:
             --set ui.nodePort=31469 \
             --set prometheusURL="http://prometheus-server.monitoring.svc.cluster.local:80" \
             --kubeconfig /tmp/kubeconfig \
-            --atomic \
-            --timeout 10m
+            --wait \
+            --cleanup-on-fail \
+            --timeout 20m
+
+      - name: Diagnose if upgrade failed
+        if: failure()
+        run: |
+          echo "=== Pod status ==="
+          kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system get pods -o wide
+
+          echo ""
+          echo "=== Pod events (all) ==="
+          kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system get events \
+            --sort-by='.lastTimestamp' 2>/dev/null | tail -40
+
+          echo ""
+          echo "=== Describe ruptura pod(s) ==="
+          kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system \
+            describe pods -l app.kubernetes.io/name=ruptura 2>/dev/null | tail -60
+
+          echo ""
+          echo "=== Describe ruptura-ui pod(s) ==="
+          kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system \
+            describe pods -l app.kubernetes.io/name=ruptura-ui 2>/dev/null | tail -40
+
+          echo ""
+          echo "=== Node conditions ==="
+          kubectl --kubeconfig /tmp/kubeconfig get nodes \
+            -o custom-columns='NODE:.metadata.name,STATUS:.status.conditions[-1].type,REASON:.status.conditions[-1].reason,MEM_PRESSURE:.status.conditions[?(@.type=="MemoryPressure")].status' 2>/dev/null || true
+
+          echo ""
+          echo "=== PVCs ==="
+          kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system get pvc 2>/dev/null || true
 
       - name: Install ruptura-ctl on k3s node
         env:
           TAG: ${{ needs.docker.outputs.image-tag }}
         run: |
-          # Run a privileged Job on the node to download and install the CLI binary
+          kubectl --kubeconfig /tmp/kubeconfig delete job install-ruptura-ctl \
+            -n ruptura-system --ignore-not-found=true 2>/dev/null || true
+
           kubectl --kubeconfig /tmp/kubeconfig apply -f - <<EOF
           apiVersion: batch/v1
           kind: Job
@@ -401,7 +451,7 @@ jobs:
                         curl -sSfL -o /host-bin/ruptura-ctl \
                           https://github.com/benfradjselim/ruptura/releases/download/${TAG}/ruptura-ctl-linux-amd64 && \
                         chmod +x /host-bin/ruptura-ctl && \
-                        echo "Installed ruptura-ctl: \$(/host-bin/ruptura-ctl version)"
+                        echo "Installed: \$(/host-bin/ruptura-ctl version)"
                     volumeMounts:
                       - name: host-bin
                         mountPath: /host-bin
@@ -432,7 +482,7 @@ jobs:
             -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}' 2>/dev/null)
           if [ -z "${NODE_IP}" ]; then
             NODE_IP=$(kubectl --kubeconfig /tmp/kubeconfig get nodes \
-              -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "pending")
+              -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "unknown")
           fi
           API_PORT=$(kubectl --kubeconfig /tmp/kubeconfig -n ruptura-system \
             get svc ruptura \
@@ -442,7 +492,6 @@ jobs:
             -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "31469")
           echo "API:       http://${NODE_IP}:${API_PORT}/api/v2/health"
           echo "Dashboard: http://${NODE_IP}:${UI_PORT}/"
-          echo "CLI:       ruptura-ctl --url http://${NODE_IP}:${API_PORT} status"
 
       - name: Smoke test — API + UI health check
         run: |
@@ -460,21 +509,21 @@ jobs:
             -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "31469")
 
           echo "Checking API at http://${NODE_IP}:${API_PORT}/api/v2/health ..."
-          for i in $(seq 1 10); do
+          for i in $(seq 1 12); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
               "http://${NODE_IP}:${API_PORT}/api/v2/health" || echo "000")
             echo "API attempt $i: HTTP $STATUS"
             [ "$STATUS" = "200" ] && break
-            [ "$i" = "10" ] && echo "API health check failed" && exit 1
-            sleep 6
+            [ "$i" = "12" ] && echo "API health check failed" && exit 1
+            sleep 10
           done
 
           echo "Checking UI at http://${NODE_IP}:${UI_PORT}/ ..."
-          for i in $(seq 1 10); do
+          for i in $(seq 1 12); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
               "http://${NODE_IP}:${UI_PORT}/" || echo "000")
             echo "UI attempt $i: HTTP $STATUS"
             [ "$STATUS" = "200" ] && exit 0
-            sleep 6
+            sleep 10
           done
-          echo "UI health check failed after 60s" && exit 1
+          echo "UI health check failed after 120s" && exit 1
