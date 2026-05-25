@@ -48,6 +48,8 @@ A confirmed rupture means FusedR crossed a threshold and stayed there. The card 
 
 ## Fleet view
 
+![Fleet overview — 22 workloads, all in critical/warning state](../assets/screenshots/fleet-overview.png)
+
 The Fleet page is your top-level situational awareness view. Each card shows:
 
 | Element | What it means |
@@ -73,6 +75,8 @@ The SSE live rupture counter in the header updates in real time without polling.
 ---
 
 ## Workload detail — Signals tab
+
+![Signals tab — payment-api in critical rupture, all 10 KPI gauges visible](../assets/screenshots/workload-signals.png)
 
 Click any card to open the detail drawer. The **Signals** tab shows all 10 KPI gauges with their current value and state name.
 
@@ -169,6 +173,8 @@ This is the early-warning phase. FusedR is 2.0 and rising — Ruptura will alert
 
 ## History tab
 
+![History tab — time-series chart with Health and Stress overlaid](../assets/screenshots/workload-history.png)
+
 Time-series chart for any signal over the workload's stored history. Toggle signal chips to overlay multiple signals. Useful for:
 
 - **Slow-burn detection**: flat stress but rising fatigue over hours
@@ -178,6 +184,8 @@ Time-series chart for any signal over the workload's stored history. Toggle sign
 ---
 
 ## Forecast tab
+
+![Forecast tab — HealthScore projection with configurable horizon](../assets/screenshots/workload-forecast.png)
 
 Projects HealthScore +15 and +30 minutes using the 5-model ensemble (CA-ILR, ARIMA, Holt-Winters, MAD, EWMA). When the trajectory is heading toward critical, `critical_eta_minutes` is populated and `⚠ Critical in ~Xm` appears on the card.
 
@@ -193,6 +201,8 @@ Per-metric model outputs: each of the 5 models shows its current prediction and 
 
 ## Events tab
 
+![Events tab — live SSE rupture/recovery log](../assets/screenshots/workload-events.png)
+
 Live SSE rupture/recovery log. Each entry includes:
 - Timestamp
 - FusedR at trigger time
@@ -202,6 +212,8 @@ Live SSE rupture/recovery log. Each entry includes:
 ---
 
 ## Actions tab
+
+![Actions tab — suggested remediations with approve/reject controls](../assets/screenshots/workload-actions.png)
 
 Tier-2 actions (FusedR 3.0–5.0) appear here for human approval. Each action shows:
 - Recommended action (scale / restart / cordon)
@@ -216,6 +228,8 @@ Tier-1 actions (FusedR ≥ 5.0) execute automatically if the `autopilot` edition
 
 ## Topology view
 
+![Topology view — 22-node service dependency graph, color-coded by health state](../assets/screenshots/topology-view.png)
+
 Service dependency graph from OTLP trace spans. Only populated when OTLP traces are flowing.
 
 - **Click a node** → health bar + current FusedR
@@ -226,6 +240,8 @@ The graph builds automatically from span data — no configuration needed.
 ---
 
 ## Engine view
+
+![Engine view — v7.0.23, runtime stats, ingest rates, BadgerDB storage](../assets/screenshots/engine-view.png)
 
 Ruptura runtime diagnostics:
 
@@ -259,6 +275,8 @@ K8s node health from the k8smetrics poller: CPU, memory, disk pressure per node.
 
 ## Alerts view
 
+![Alerts view — 1000 active WARNING alerts across workloads](../assets/screenshots/alerts-view.png)
+
 Live alert feed from the anomaly detectors. Each alert shows:
 
 ```
@@ -277,6 +295,8 @@ Two independent detectors must agree before an alert becomes `critical`. This el
 ## Settings
 
 ### Datasources tab
+
+![Settings — Datasources tab with Prometheus and self-scrape configured](../assets/screenshots/settings-datasources.png)
 
 Currently active in the lab:
 
