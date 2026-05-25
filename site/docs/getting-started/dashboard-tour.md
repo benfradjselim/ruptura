@@ -10,16 +10,22 @@ Every workload passes through three phases. Understanding them is key to reading
 
 ### Phase 1 — Calibrating
 
+![Fleet card in calibrating state — gray CAL badge, "Building baseline…" progress indicator](../assets/screenshots/fleet-calibrating.png)
+
 ```
-status: "calibrating"   calibration_progress: 45   calibration_eta_minutes: 13
+status: "calibrating"   calibration_progress: 32   calibration_eta_minutes: 16
 ```
 
 When Ruptura first sees a workload it needs roughly **30 minutes of history** to build adaptive baselines (Welford online statistics per metric). During calibration:
 
-- The health ring shows the current raw KPI value but is bordered in **gray**
-- A progress bar and ETA appear under the workload name: `Calibrating… 45% · ~13 min`
+- The card shows a **`CAL` badge** (gray/muted) instead of a health ring color
+- A "Building baseline…" progress indicator and ETA appear on the card
 - FusedR is computed but **rupture alerts are suppressed** — a single noisy startup spike will not page anyone
 - All 10 signals are visible and updating every 15 s
+
+![Workload detail during calibration — blue banner with progress, all signal baselines undefined](../assets/screenshots/workload-calibrating-detail.png)
+
+Opening the detail drawer shows a prominent blue banner: **"Calibrating baseline — 32% complete · ETA 16m"**. The Signals tab renders all 10 KPI tiles but marks baselines as undefined until the window is complete.
 
 This is the correct behavior. Ruptura is learning what "normal" looks like for this specific workload before it starts predicting.
 
