@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - v6.1
+      - v7
     paths:
       - 'site/**'
 

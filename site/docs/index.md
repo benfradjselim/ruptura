@@ -281,14 +281,18 @@ Svelte 4 SPA with nginx reverse proxy — light/dark mode toggle, full SSE integ
 
 ## Current Release
 
-**v7.0.4** — OTLP NodePort exposed, workload simulator.
+**v7.0.23** — OTLP datasource activation, FusedR credibility fix, cluster hardening.
 
 | Version | Date | Status |
 |---------|------|--------|
+| v7.0.23 | 2026-05-22 | ✅ Released — UI endpoint crash fixes, simulator host label, CI stability |
+| v7.0.22 | 2026-05-22 | ✅ Released — OTLP datasource TCP-dial test, SSRF bypass for push endpoints, FusedR cap on load |
+| v7.0.21 | 2026-05-20 | ✅ Released — workload lifecycle phases (calibrating/active/rupture) in UI |
+| v7.0.20 | 2026-05-19 | ✅ Released — CA-ILR cap fix, pre-deploy pod cleanup, 20-minute deploy timeout |
+| v7.0.10 | 2026-05-17 | ✅ Released — Database tab (per-type retention, purge controls), Settings overhaul |
+| v7.0.5 | 2026-05-16 | ✅ Released — Actions tab Tier-2 approve/reject, emergency stop button |
 | v7.0.4 | 2026-05-15 | ✅ Released — OTLP NodePort 31470 exposed, workload simulator |
-| v7.0.3 | 2026-05-15 | ✅ Released — JSON crash fix, real PNG logo, topology overhaul, health scores per workload |
-| v7.0.2 | 2026-05-15 | ✅ Released — 10-signal bars, light/dark mode, dataflow stats, all backend APIs wired |
-| v7.0.1 | 2026-05-15 | ✅ Released — ruptura-ui pod, logo, calibrating state, Settings & Alerts pages |
+| v7.0.3 | 2026-05-15 | ✅ Released — JSON crash fix, topology overhaul, health scores per workload |
 | v7.0.0 | 2026-05-15 | ✅ Released — v7 architecture: separate UI pod, SSE, k8s metadata, node health |
 | v6.8.13 | 2026-05-13 | ✅ Released — log/trace ingest counters, Live Data Flow, ruptura-ctl v1.0.0 |
 
@@ -296,7 +300,8 @@ Svelte 4 SPA with nginx reverse proxy — light/dark mode toggle, full SSE integ
 
 | Version | Date | Status |
 |---------|------|--------|
-| ruptura-operator v0.6.9 | 2026-05-07 | 🔄 Submitted to Red Hat OperatorHub |
+| ruptura-operator v0.7.0 | 2026-05-22 | ✅ Released — eviction-loop protection, 3-pod threshold, 3-minute cooldown |
+| ruptura-operator v0.6.9 | 2026-05-07 | ✅ Released — submitted to Red Hat OperatorHub |
 | ruptura-operator v0.6.8 | 2026-05-07 | ✅ Merged into OperatorHub community-operators |
 
 [Full changelog →](community/roadmap.md) · [Getting Started →](getting-started/installation.md) · [Dashboard Tour →](getting-started/dashboard-tour.md) · [Architecture →](architecture/index.md)

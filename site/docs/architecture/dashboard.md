@@ -1,98 +1,198 @@
-# Embedded Dashboard
+# Dashboard Architecture
 
-Ruptura ships a self-contained web dashboard served directly by the Go binary. No Grafana, no external server, no CDN — open a browser and go.
+Ruptura v7 ships the dashboard as a **separate `ruptura-ui` pod** — a Svelte 4 SPA served by nginx. This decouples UI deploys from engine deploys and eliminates the `go:embed` rebuild cycle that v6 required.
 
-## Accessing the dashboard
+---
 
-```bash
-# Local / Docker
-open http://localhost:8080
+## Two-pod separation
 
-# Kubernetes
-kubectl port-forward svc/ruptura 8080:80 -n ruptura-system
-open http://localhost:8080
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        ruptura-system                            │
+│                                                                  │
+│   ┌─────────────────────────┐   ┌──────────────────────────┐    │
+│   │     ruptura-engine      │   │       ruptura-ui          │    │
+│   │      (Go binary)        │   │   (Svelte 4 + nginx)      │    │
+│   │                         │   │                            │    │
+│   │  :8080  REST API        │◄──│  /api/* → proxy_pass       │    │
+│   │  :4317  OTLP gRPC       │   │  injects Authorization     │    │
+│   │  :8080  OTLP HTTP       │   │  :80  SPA (index.html)     │    │
+│   └─────────────────────────┘   └──────────────────────────┘    │
+│          NodePort 31468                 NodePort 31469            │
+│          NodePort 31470 (OTLP)                                    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-The dashboard is served at `/` by the same binary that runs the REST API. No additional configuration is required.
+| Service | Port | What it serves |
+|---------|------|----------------|
+| `ruptura-engine` | 31468 | REST API — `/api/v2/*` |
+| `ruptura-ui` | 31469 | Svelte SPA + nginx proxy |
+| `ruptura-engine` | 31470 | OTLP ingest — `/api/v2/write`, `/otlp/v1/*` |
+
+The UI pod never talks to the engine directly from the browser. All API calls from the browser go to `http://<node-ip>:31469/api/...`, which nginx proxy-passes to `http://ruptura-engine:8080/api/...` inside the cluster. This means:
+
+- No CORS issues — the browser always talks to the same origin
+- The API key is injected by nginx as a `proxy_set_header Authorization` when the Helm `apiKey` value is set
+- The engine never needs to be NodePort-exposed to the browser
+
+---
+
+## nginx configuration
+
+The nginx config (`helm/templates/ui-configmap.yaml`) has two routing rules:
+
+```nginx
+# SSE stream — disable buffering so events flow in real time
+location /api/v2/events {
+    proxy_pass         http://ruptura-engine:8080;
+    proxy_buffering    off;
+    proxy_cache        off;
+    proxy_read_timeout 3600s;
+    proxy_set_header   Authorization "Bearer ${API_KEY}";
+}
+
+# All other API calls
+location /api/ {
+    proxy_pass       http://ruptura-engine:8080;
+    proxy_set_header Authorization "Bearer ${API_KEY}";
+}
+
+# SPA — serve index.html for all non-asset paths
+location / {
+    root       /usr/share/nginx/html;
+    try_files  $uri $uri/ /index.html;
+}
+```
+
+The `proxy_buffering off` on the SSE route is what makes the live rupture counter and the Events tab work — nginx cannot buffer a never-ending stream.
+
+---
+
+## Svelte 4 SPA structure
+
+The UI is a standard Vite + Svelte 4 build. Built assets are copied into the nginx image at `COPY dist/ /usr/share/nginx/html/` during the Docker build.
+
+Key routing and state:
+
+| Route | Component | Data source |
+|-------|-----------|-------------|
+| `/` (Fleet) | `FleetView.svelte` | `GET /api/v2/fleet` every 15 s |
+| `/workload/:ns/:kind/:name` | `WorkloadDrawer.svelte` | `GET /api/v2/kpi/snapshot/:ns/:workload` |
+| `/topology` | `TopologyMap.svelte` | `GET /api/v2/topology` |
+| `/engine` | `EngineView.svelte` | `GET /api/v2/health`, `GET /api/v2/engine/stats` |
+| `/alerts` | `AlertsView.svelte` | `GET /api/v2/alerts` |
+| `/nodes` | `NodesView.svelte` | `GET /api/v2/nodes` |
+| `/settings` | `SettingsView.svelte` | `GET /api/v2/datasources` |
+
+SSE connection (`GET /api/v2/events`) is opened once at app boot and kept alive. The header rupture counter increments in real time from the SSE stream without any additional polling.
+
+---
+
+## Workload lifecycle phases in the UI
+
+The UI reflects three distinct engine states for each workload:
+
+### Phase 1 — Calibrating
+
+When a workload is first seen, the engine needs ~30 minutes of signal history to build adaptive Welford baselines. During this window:
+
+- The health ring is **gray-bordered** regardless of the current KPI value
+- A progress bar and ETA render under the workload name: `Calibrating… 45% · ~13 min`
+- The FusedR badge is **gray**
+- All 10 signal bars are visible and updating every 15 s
+- Rupture alerts are **suppressed** — a single startup spike cannot page anyone
+
+The API fields driving this state:
+
+```json
+{
+  "status": "calibrating",
+  "calibration_progress": 45,
+  "calibration_eta_minutes": 13
+}
+```
+
+### Phase 2 — Active (alerting enabled)
+
+Once calibration completes, the full prediction stack is live:
+
+- Health ring border changes to **green / yellow / red** based on HealthScore
+- FusedR badge colors: green < 1.5 · yellow 1.5–3.0 · orange 3.0–5.0 · red ≥ 5.0
+- `⚠ Critical in ~Xm` appears on the card when `critical_eta_minutes` is set
+- Tier-2 and Tier-1 actions can fire
+- Pattern-match warnings appear on the Signals tab when cosine similarity ≥ 0.85 against a prior rupture fingerprint
+
+### Phase 3 — Rupture
+
+FusedR crossed a threshold and held:
+
+- Card background turns red
+- A rupture event is logged in the Events tab (SSE fires immediately)
+- The action engine evaluates and executes or suggests remediation
+- The Signals tab shows the full named-state vocabulary (`panic`, `burnout`, `pandemic`, etc.)
+
+---
+
+## Signal state vocabulary
+
+Each of the 10 KPI signals maps its numeric value (0–1) to a named state. These names appear in tooltips, the Signals tab, and the Events feed.
+
+| Signal | States (low → high) |
+|--------|---------------------|
+| Stress | `calm` · `nervous` · `stressed` · `panic` |
+| Fatigue | `fresh` · `tired` · `exhausted` · `burnout` |
+| Mood | `happy` · `neutral` · `unhappy` · `depressed` |
+| Contagion | `contained` · `spreading` · `epidemic` · `pandemic` |
+| Resilience | `strong` · `recovering` · `fragile` · `critical` |
+| Pressure | `comfortable` · `rising` · `heavy` · `critical` |
+| Humidity | `dry` · `humid` · `stormy` |
+| Entropy | `ordered` · `mixed` · `chaotic` |
+| Velocity | `steady` · `accelerating` · `surging` |
+| Throughput | `low` · `normal` · `high` · `flood` |
+
+---
+
+## Light / dark mode
+
+The Svelte app stores the preference in `localStorage` and toggles a CSS class on `<html>`. nginx serves a static asset — no server involvement. The toggle is in the top-right corner of the header.
+
+---
+
+## SSE live events
+
+```
+GET /api/v2/events
+Authorization: Bearer <key>
+
+data: {"type":"rupture","workload":"payment-api","fused_r":21.97,"threshold":"emergency","ts":"2026-05-25T14:02:11Z"}
+
+data: {"type":"recovery","workload":"order-service","fused_r":0.82,"ts":"2026-05-25T14:08:55Z"}
+```
+
+The engine emits one event per rupture/recovery. The UI header counter and the Events tab both consume this stream. No WebSocket — SSE is unidirectional and reconnects automatically on disconnect.
+
+---
 
 ## Air-gap compatibility
 
-All assets are embedded in the binary at compile time via `go:embed`:
+Because nginx serves the built Svelte bundle from the container image and all API calls are same-origin proxied, there are no external CDN dependencies. The dashboard works in fully air-gapped clusters with no egress.
 
-| Asset | Source | Purpose |
-|-------|--------|---------|
-| `index.html` | `internal/ui/static/` | Single-page application shell |
-| `vendor/chart.min.js` | bundled locally | Chart rendering (no CDN) |
-| `vendor/alpine.min.js` | bundled locally | Reactive UI (no CDN) |
-| `ruptura-icon.png` | bundled locally | Brand icon in topbar |
+Fonts are bundled inside the Docker image at build time — no Google Fonts fetch at runtime.
 
-Fonts (`Inter`, `JetBrains Mono`) are loaded non-blocking via `<link rel="preload">` with a `<noscript>` fallback. If Google Fonts is unreachable (air-gapped environment), the system UI font stack is used automatically — the dashboard remains fully functional.
+---
 
-## Layout
+## Build pipeline
 
 ```
-┌─ topbar (logo · workload selector · edition badge · refresh) ─────────┐
-│                                                                         │
-│  sidebar          center panel              right panel                 │
-│  ─────────        ─────────────             ───────────                 │
-│  Workload list    KPI signal grid           Action log                  │
-│  FusedR badges    FusedR heatmap            Pending approvals           │
-│  Health bars      HealthScore timeline      Emergency stop              │
-│                   Health forecast           Narrative explain           │
-│                   SLO widget                                            │
-└─────────────────────────────────────────────────────────────────────────┘
+workdir/web/          ← Svelte 4 source
+  src/
+    lib/              ← reusable components
+    routes/           ← page components
+    stores/           ← Svelte stores (fleet state, SSE)
+  vite.config.ts
+
+docker build          → copies dist/ into nginx:alpine image
+helm package          → ruptura-ui Deployment references ghcr.io/benfradjselim/ruptura-ui:<tag>
 ```
 
-## Panels
-
-### Fused Rupture Index heatmap
-
-Colour-coded cells per workload × time interval. Cell colour maps directly to FusedR thresholds:
-
-| Colour | FusedR | State |
-|--------|--------|-------|
-| Green | < 1.5 | Stable / Elevated |
-| Yellow | 1.5 – 3.0 | Warning |
-| Orange | 3.0 – 5.0 | Critical |
-| Red | ≥ 5.0 | Emergency |
-
-### Per-workload signal timelines
-
-Sparkline charts for all 10 KPI signals (`stress`, `fatigue`, `mood`, `pressure`, `humidity`, `contagion`, `resilience`, `entropy`, `velocity`, `health_score`) over a rolling 30-minute window. Signals are fetched from `GET /api/v2/kpi/{signal}/{namespace}/{workload}`.
-
-### HealthScore forecast
-
-Displays `health_forecast` from the snapshot: current score, trend direction (`improving` / `stable` / `degrading`), projected values at 15 min and 30 min, and `critical_eta_minutes` when degrading.
-
-### SLO widget
-
-Shows `slo_burn_velocity` (error budget burn rate relative to the SLO contract), `blast_radius` (downstream dependency count), and `recovery_debt` (near-miss count over 7 days).
-
-### Action log
-
-Lists all pending and recently resolved actions from `GET /api/v2/actions`. Each entry shows workload, tier, recommended action, and confidence score. Approve and Reject buttons call `POST /api/v2/actions/{id}/approve` and `POST /api/v2/actions/{id}/reject` respectively.
-
-!!! note "Community edition"
-    In `community` edition, the Approve button is visible but calls return `402 Payment Required`. Switch to `autopilot` edition (`RUPTURA_EDITION=autopilot`) to enable full action execution.
-
-### Emergency stop
-
-A dedicated button in the right panel calls `POST /api/v2/actions/emergency-stop` to immediately halt all automated Tier-1 action execution. A toast notification confirms the call.
-
-### Narrative explain panel
-
-Clicking any rupture event in the heatmap or action log opens the narrative panel, which fetches `GET /api/v2/explain/{id}/narrative` and displays the structured English explanation:
-
-> "payment-api has been accumulating fatigue for 72h (fatigue 0.81). A contagion wave from payment-db propagated via the payment-api→payment-db call edge and pushed FusedR from 1.8 to 4.2 in 18 minutes. This is a cascade rupture, not an isolated spike. Recommended action: scale payment-api by 2 replicas."
-
-## Auto-refresh
-
-The dashboard polls the API every **15 seconds** by default. The refresh interval and API base URL are configurable via the topbar settings icon. All fetch calls include the `Authorization: Bearer` header when an API key is configured.
-
-## Authentication
-
-If `RUPTURA_API_KEY` is set, the dashboard prompts for the key on first load and stores it in `sessionStorage`. The key is sent as `Authorization: Bearer <key>` on every API call. Clearing the session (closing the tab) clears the stored key.
-
-## Source
-
-The dashboard source lives at `workdir/internal/ui/static/index.html`. It is a single self-contained HTML file — no build step, no bundler, no Node.js required. Changes take effect on the next binary build (`go build ./cmd/ruptura`).
+The engine image and UI image are built and pushed independently. A UI-only change (CSS fix, new chart) does not require rebuilding the Go binary.

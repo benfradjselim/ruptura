@@ -43,7 +43,7 @@ nav:
     - index.md
     - Pipelines: architecture/pipelines.md
     - Fusion Engine: architecture/fusion-engine.md
-    - Embedded Dashboard: architecture/dashboard.md
+    - Dashboard Architecture: architecture/dashboard.md
     - Operator: architecture/operator.md
   - CLI:
     - Reference: cli/rupturactl.md

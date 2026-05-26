@@ -4,7 +4,24 @@ Get Ruptura running and observing your workloads in under 5 minutes.
 
 ## Step 1 — Start Ruptura
 
-=== "Docker (fastest)"
+=== "Kubernetes / Helm (recommended)"
+
+    ```bash
+    export RUPTURA_API_KEY=$(openssl rand -hex 32)
+
+    helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
+      --namespace ruptura-system \
+      --create-namespace \
+      --set apiKey=$RUPTURA_API_KEY
+    ```
+
+    | Endpoint | URL |
+    |----------|-----|
+    | Dashboard | `http://<node-ip>:31469/` |
+    | Engine API | `http://<node-ip>:31468/api/v2/health` |
+    | OTLP ingest | `http://<node-ip>:31470/api/v2/write` |
+
+=== "Docker"
 
     ```bash
     export RUPTURA_API_KEY=$(openssl rand -hex 32)
@@ -15,26 +32,17 @@ Get Ruptura running and observing your workloads in under 5 minutes.
       -p 4317:4317 \
       -v ruptura-data:/var/lib/ruptura/data \
       -e RUPTURA_API_KEY=$RUPTURA_API_KEY \
-      ghcr.io/benfradjselim/ruptura:6.8.4
-    ```
-
-=== "Kubernetes / Helm"
-
-    ```bash
-    export RUPTURA_API_KEY=$(openssl rand -hex 32)
-
-    helm install ruptura helm \
-      --namespace ruptura-system \
-      --create-namespace \
-      --set apiKey=$RUPTURA_API_KEY
-
-    kubectl port-forward svc/ruptura 8080:80 -n ruptura-system &
+      ghcr.io/benfradjselim/ruptura:v7.0.23
     ```
 
 ## Step 2 — Verify health
 
 ```bash
-curl http://localhost:8080/api/v2/health
+# Kubernetes
+curl http://<node-ip>:31468/api/v2/health
+
+# Docker
+curl http://<node-ip>:31468/api/v2/health
 ```
 
 Expected response:
@@ -62,7 +70,7 @@ curl -Lo ruptura-ctl \
   https://github.com/benfradjselim/ruptura/releases/latest/download/ruptura-ctl-linux-amd64
 chmod +x ruptura-ctl && sudo mv ruptura-ctl /usr/local/bin/
 
-export RUPTURA_URL=http://localhost:8080
+export RUPTURA_URL=http://<node-ip>:31468
 export RUPTURA_API_KEY=$API_KEY
 ruptura-ctl status
 ```
@@ -77,7 +85,7 @@ See [CLI Reference →](../cli/rupturactl.md) for Kubernetes, OpenShift, and in-
 
     ```yaml
     remote_write:
-      - url: http://localhost:8080/api/v2/write
+      - url: http://<node-ip>:31468/api/v2/write
         authorization:
           credentials: <your-api-key>
     ```
@@ -87,7 +95,7 @@ See [CLI Reference →](../cli/rupturactl.md) for Kubernetes, OpenShift, and in-
     ```yaml
     exporters:
       otlphttp:
-        endpoint: http://localhost:4317
+        endpoint: http://<node-ip>:31470
         headers:
           Authorization: "Bearer <your-api-key>"
     ```
@@ -101,7 +109,7 @@ See [CLI Reference →](../cli/rupturactl.md) for Kubernetes, OpenShift, and in-
     # For quick testing, Ruptura auto-generates state from synthetic load after startup.
     # Use the /api/v2/ruptures endpoint to see discovered workloads.
     curl -s -H "Authorization: Bearer $API_KEY" \
-      http://localhost:8080/api/v2/ruptures | python3 -m json.tool
+      http://<node-ip>:31468/api/v2/ruptures | python3 -m json.tool
     ```
 
 ## Step 5 — Query the Fused Rupture Index
@@ -109,11 +117,11 @@ See [CLI Reference →](../cli/rupturactl.md) for Kubernetes, OpenShift, and in-
 ```bash
 # All workloads
 curl -s -H "Authorization: Bearer $API_KEY" \
-  http://localhost:8080/api/v2/ruptures | python3 -m json.tool
+  http://<node-ip>:31468/api/v2/ruptures | python3 -m json.tool
 
 # Specific workload (namespace/name)
 curl -s -H "Authorization: Bearer $API_KEY" \
-  http://localhost:8080/api/v2/rupture/default/payment-api | python3 -m json.tool
+  http://<node-ip>:31468/api/v2/rupture/default/payment-api | python3 -m json.tool
 ```
 
 Example response:
@@ -141,7 +149,7 @@ Example response:
 for sig in stress fatigue mood pressure humidity contagion resilience entropy velocity health_score; do
   echo -n "$sig: "
   curl -s -H "Authorization: Bearer $API_KEY" \
-    "http://localhost:8080/api/v2/kpi/$sig/default/payment-api" | \
+    "http://<node-ip>:31468/api/v2/kpi/$sig/default/payment-api" | \
     python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d.get('value','?'):.3f} ({d.get('state','?')})\")"
 done
 ```
@@ -151,11 +159,11 @@ done
 ```bash
 # All workloads
 curl -s -H "Authorization: Bearer $API_KEY" \
-  http://localhost:8080/api/v2/anomalies | python3 -m json.tool
+  http://<node-ip>:31468/api/v2/anomalies | python3 -m json.tool
 
 # Filter by time window
 curl -s -H "Authorization: Bearer $API_KEY" \
-  "http://localhost:8080/api/v2/anomalies?since=2026-05-01T00:00:00Z"
+  "http://<node-ip>:31468/api/v2/anomalies?since=2026-05-01T00:00:00Z"
 ```
 
 ## Step 8 — Read the narrative explain
@@ -163,7 +171,7 @@ curl -s -H "Authorization: Bearer $API_KEY" \
 ```bash
 # Get a rupture ID from /api/v2/ruptures, then:
 curl -s -H "Authorization: Bearer $API_KEY" \
-  http://localhost:8080/api/v2/explain/<rupture_id>/narrative
+  http://<node-ip>:31468/api/v2/explain/<rupture_id>/narrative
 ```
 
 Response example:
@@ -192,7 +200,7 @@ curl -s -X POST \
     "end": "2026-05-01T14:30:00Z",
     "reason": "planned rolling deploy"
   }' \
-  http://localhost:8080/api/v2/suppressions
+  http://<node-ip>:31468/api/v2/suppressions
 ```
 
 ---
@@ -202,7 +210,7 @@ curl -s -X POST \
 Point Grafana at Ruptura's Prometheus endpoint:
 
 ```
-Datasource URL: http://ruptura:8080/api/v2/metrics
+Datasource URL: http://<node-ip>:31468/api/v2/metrics
 ```
 
 Import the bundled dashboard:

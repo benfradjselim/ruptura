@@ -2,6 +2,43 @@
 
 ## Released
 
+### v7.0.24 — 2026-05-26 ✅
+
+| Item | Detail |
+|------|--------|
+| **FusedR cap fix** | `rupture.Index()` capped at 10.0 — eliminates astronomic values (e.g. 257,000) when alphaStable ≈ epsilon |
+| **Named signal states in UI** | Signals tab now shows named state labels (panic / burnout / pandemic / critical) instead of "undefined" |
+
+### v7.0.23 — 2026-05-22 ✅
+
+| Item | Detail |
+|------|--------|
+| **UI endpoint crash fixes** | All Fleet, Topology, Engine, Alerts endpoints handle empty/malformed JSON without crashing |
+| **Simulator host label** | `simulate.py` sends correct `host` label so pipeline indexes by workload key |
+| **CI stability** | Pre-deploy pod cleanup, `--cleanup-on-fail`, 20-minute timeout, failure diagnostics step |
+
+### v7.0.22 — 2026-05-22 ✅
+
+| Item | Detail |
+|------|--------|
+| **OTLP datasource activation** | Registering an OTLP datasource now TCP-dials the endpoint to verify reachability |
+| **SSRF bypass for OTLP** | SSRF validation skipped for `type=otlp` — push endpoints are Ruptura's own NodePort |
+| **FusedR startup corruption fix** | Snapshots loaded from BadgerDB are sanitized: values > 10.0 reset to 0 before serving |
+
+### v7.0.21 — 2026-05-20 ✅
+
+| Item | Detail |
+|------|--------|
+| **Workload lifecycle phases** | Fleet cards show Calibrating (CAL badge + progress), Active, and Rupture states distinctly |
+| **Calibration banner** | Detail drawer shows "Calibrating baseline — X% complete · ETA Ym" while baselines build |
+
+### v7.0.10 — 2026-05-17 ✅
+
+| Item | Detail |
+|------|--------|
+| **Database tab** | Settings → Database: per-signal-type retention config, purge by type/date/all |
+| **Actions tab** | Fleet → Actions: Tier-2 approve/reject with confidence score, emergency stop button |
+
 ### v7.0.4 — 2026-05-15 ✅
 
 | Item | Detail |
@@ -57,9 +94,8 @@
 
 | Item | Detail |
 |------|--------|
-| **Embedded web dashboard** | Self-contained Svelte UI served by the Go binary — no external dependencies. Chart.js and Alpine.js vendored locally; font loading non-blocking with noscript fallback. Works fully in air-gapped environments. |
-| **Dashboard panels** | Fused Rupture Index heatmap, per-workload signal timelines, action log with approve/reject/emergency-stop, narrative explain panel, SLO widget, health forecast. |
-| **Air-gap safe** | All assets (`vendor/alpine.min.js`, `vendor/chart.min.js`, embedded PNG logo) served from the binary via `go:embed`. No CDN required. |
+| **First dashboard** | Initial Fleet view with FusedR heatmap, per-workload signal timelines, action log, narrative explain panel, SLO widget, health forecast. Superseded by the v7.0 Svelte 4 SPA (ruptura-ui pod). |
+| **Foundation** | Established the dashboard architecture and panel design that v7 builds upon. |
 
 ### ruptura-operator v0.6.9 — 2026-05-07 🔄
 
