@@ -7,11 +7,17 @@ import (
 
 const epsilon = 1e-6
 
-// Index computes R(t) = |alphaBurst| / max(|alphaStable|, epsilon).
-// SPECS.md §3.2 (WP §6.3).
+// Index computes R(t) = |alphaBurst| / max(|alphaStable|, epsilon), capped at 10.0.
+// The cap prevents numerically degenerate ratios (alphaStable ≈ ε) from producing
+// astronomic values — above Emergency tier (≥5.0) there is no additional operational
+// meaning. SPECS.md §3.2 (WP §6.3).
 func Index(alphaBurst, alphaStable float64) float64 {
 	denom := math.Max(math.Abs(alphaStable), epsilon)
-	return math.Abs(alphaBurst) / denom
+	r := math.Abs(alphaBurst) / denom
+	if r > 10.0 {
+		return 10.0
+	}
+	return r
 }
 
 // TTF computes time-to-failure: (thetaCritical - current) / alphaBurst.

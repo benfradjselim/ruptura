@@ -15,10 +15,10 @@ func TestIndex_stable(t *testing.T) {
 }
 
 func TestIndex_epsilon(t *testing.T) {
+	// alphaStable=0 → denom=ε, raw ratio=1e6; cap clamps to 10.0.
 	r := rupture.Index(1.0, 0.0)
-	want := 1.0 / 1e-6
-	if r != want {
-		t.Fatalf("want %f, got %f", want, r)
+	if r != 10.0 {
+		t.Fatalf("want 10.0 (cap), got %f", r)
 	}
 }
 

@@ -641,11 +641,11 @@
                     </div>
                     <div class="kpi-row">
                       <span class="kpi-name">{key}</span>
-                      <span class="kpi-val" class:ok={kpi.state==='ok'} class:warn={kpi.state==='warning'} class:crit={kpi.state==='critical'}>
+                      <span class="kpi-val">
                         {kpi.value.toFixed(2)}
                       </span>
                     </div>
-                    <div class="kpi-trend {kpi.trend}">{kpi.trend}</div>
+                    <div class="kpi-state-label">{kpi.state ?? ''}</div>
                   </div>
                 {/if}
               {/each}
@@ -1046,9 +1046,7 @@
   .kpi-val.ok { color: var(--green); }
   .kpi-val.warn { color: var(--yellow); }
   .kpi-val.crit { color: var(--red); }
-  .kpi-trend { font-size: 9px; color: var(--muted); margin-top: 2px; }
-  .kpi-trend.rising { color: var(--red); }
-  .kpi-trend.falling { color: var(--green); }
+  .kpi-state-label { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: lowercase; letter-spacing: 0.02em; }
 
   /* explain */
   .explain-section { margin-top: 4px; }
