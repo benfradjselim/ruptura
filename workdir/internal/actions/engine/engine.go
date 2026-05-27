@@ -34,19 +34,20 @@ type RuptureEvent struct {
 }
 
 type ActionRecommendation struct {
-	ID         string
-	EventID    string
-	Host       string
-	Namespace  string     // K8s namespace for kubernetes provider
-	Kind       string     // Deployment|StatefulSet|DaemonSet
-	NodeName   string     // Node name for cordon actions
-	ActionType string     // "scale"|"restart"|"cordon"|"alert"|"notify"|"page"|"custom"
-	Tier       ActionTier
-	Confidence float64
-	R          float64 // rupture index at time of recommendation
-	ScaleDelta int     // replica delta for "scale" action; defaults to +1 when zero
-	Approved   bool
-	Timestamp  time.Time
+	ID         string     `json:"id"`
+	EventID    string     `json:"event_id"`
+	Host       string     `json:"host"`
+	Namespace  string     `json:"namespace"`
+	Kind       string     `json:"kind"`
+	NodeName   string     `json:"node_name,omitempty"`
+	ActionType string     `json:"action_type"`
+	Tier       ActionTier `json:"tier"`
+	Confidence float64    `json:"confidence"`
+	R          float64    `json:"r"`
+	ScaleDelta int        `json:"scale_delta"`
+	Approved   bool       `json:"approved"`
+	Executed   bool       `json:"executed"`
+	Timestamp  time.Time  `json:"timestamp"`
 }
 
 type ActionEngine interface {
@@ -171,6 +172,19 @@ func (e *Engine) Approve(id string) bool {
 	for i := range e.queue {
 		if e.queue[i].ID == id {
 			e.queue[i].Approved = true
+			return true
+		}
+	}
+	return false
+}
+
+// MarkExecuted marks an action as executed (Tier-1 auto-execution).
+func (e *Engine) MarkExecuted(id string) bool {
+	e.queueMu.Lock()
+	defer e.queueMu.Unlock()
+	for i := range e.queue {
+		if e.queue[i].ID == id {
+			e.queue[i].Executed = true
 			return true
 		}
 	}

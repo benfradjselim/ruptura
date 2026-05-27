@@ -473,12 +473,21 @@ export function fetchHistory(wlRef: string) {
 
 export interface Action {
   id: string
+  event_id: string
   host: string
-  tier: number
+  namespace: string
   kind: string
-  description: string
-  created_at: string
+  node_name?: string
+  action_type: string
+  tier: number
+  confidence: number
+  r: number
+  scale_delta: number
+  approved: boolean
+  executed: boolean
+  timestamp: string
   state: 'pending' | 'approved' | 'rejected' | 'executed'
+  description: string
 }
 
 export function fetchActions() {

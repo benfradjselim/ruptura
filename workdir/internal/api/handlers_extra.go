@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -379,6 +380,25 @@ func (h *Handlers) handleForecast(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// actionResp is the wire format for action recommendations returned to the UI.
+// It extends ActionRecommendation with computed state/description fields.
+type actionResp struct {
+	engine.ActionRecommendation
+	State       string `json:"state"`
+	Description string `json:"description"`
+}
+
+func toActionResp(a engine.ActionRecommendation) actionResp {
+	state := "pending"
+	if a.Executed {
+		state = "executed"
+	} else if a.Approved {
+		state = "approved"
+	}
+	desc := fmt.Sprintf("%s on %s", a.ActionType, a.Host)
+	return actionResp{ActionRecommendation: a, State: state, Description: desc}
+}
+
 // handleActions returns action recommendations or handles action operations.
 func (h *Handlers) handleActions(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -394,23 +414,24 @@ func (h *Handlers) handleActions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.engine == nil {
-		writeJSON(w, http.StatusOK, []interface{}{})
+		writeJSON(w, http.StatusOK, []actionResp{})
 		return
 	}
 
 	switch r.Method {
 	case http.MethodGet:
 		if id == "" {
-			actions := h.engine.PendingActions()
-			if actions == nil {
-				actions = []engine.ActionRecommendation{}
+			raw := h.engine.PendingActions()
+			resp := make([]actionResp, len(raw))
+			for i, a := range raw {
+				resp[i] = toActionResp(a)
 			}
-			writeJSON(w, http.StatusOK, actions)
+			writeJSON(w, http.StatusOK, resp)
 			return
 		}
 		for _, a := range h.engine.PendingActions() {
 			if a.ID == id {
-				writeJSON(w, http.StatusOK, a)
+				writeJSON(w, http.StatusOK, toActionResp(a))
 				return
 			}
 		}

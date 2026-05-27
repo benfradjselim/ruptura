@@ -5,6 +5,7 @@
     fetchFleet, fetchRuptures, fetchHistory, fetchActions,
     fetchWorkloadK8s, approveAction, rejectAction,
     fetchExplain, fetchPredictions, fetchLogs, emergencyStop, fetchForecast,
+    fetchEngineStatus,
   } from '../lib/api'
   import type {
     FleetHost, RuptureSnapshot, HistoryPoint, Action,
@@ -44,6 +45,7 @@
   let showWeights = false
   let suppressionDefaultWorkload = ''
   let emergencyStopping = false
+  let edition = 'community'
 
   // chart refs
   let tsCanvas: HTMLCanvasElement
@@ -398,6 +400,7 @@
 
   onMount(() => {
     loadFleet()
+    fetchEngineStatus().then(s => { edition = s.edition }).catch(() => {})
     refreshTimer = setInterval(loadFleet, 10_000)
     startSSE()
   })
@@ -826,15 +829,26 @@
               <div class="action-card" class:tier1={action.tier === 1}>
                 <div class="action-hdr">
                   <span class="action-tier">Tier {action.tier}</span>
-                  <span class="action-kind">{action.kind}</span>
-                  <span class="action-state" class:pending={action.state==='pending'}>{action.state}</span>
+                  <span class="action-kind">{action.action_type}</span>
+                  {#if action.tier === 1}
+                    {#if edition === 'autopilot'}
+                      <span class="action-badge autopilot">Auto-executing</span>
+                    {:else}
+                      <span class="action-badge community">Autopilot Edition</span>
+                    {/if}
+                  {/if}
+                  <span class="action-state" class:pending={action.state==='pending'} class:executed={action.state==='executed'} class:approved={action.state==='approved'}>{action.state}</span>
                 </div>
                 <div class="action-desc">{action.description}</div>
                 <div class="action-host">{action.host}</div>
-                {#if action.state === 'pending'}
+                {#if action.state === 'pending' && (action.tier !== 1 || edition === 'autopilot')}
                   <div class="action-btns">
                     <button class="btn-approve" on:click={() => handleApprove(action.id)}>✓ Approve</button>
                     <button class="btn-reject"  on:click={() => handleReject(action.id)}>✕ Reject</button>
+                  </div>
+                {:else if action.state === 'pending' && action.tier === 1 && edition !== 'autopilot'}
+                  <div class="action-btns">
+                    <button class="btn-reject" on:click={() => handleReject(action.id)}>✕ Dismiss</button>
                   </div>
                 {/if}
               </div>
@@ -1159,6 +1173,11 @@
   .action-kind { font-size: 12px; font-weight: 600; }
   .action-state { font-size: 10px; color: var(--muted); margin-left: auto; }
   .action-state.pending { color: var(--yellow); }
+  .action-state.approved { color: var(--green); }
+  .action-state.executed { color: var(--cyan, #06b6d4); }
+  .action-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .action-badge.autopilot { background: rgba(0,229,160,0.12); color: var(--green); }
+  .action-badge.community { background: rgba(168,85,247,0.12); color: var(--purple); cursor: default; }
   .action-desc { font-size: 13px; margin-bottom: 4px; }
   .action-host { font-size: 10px; color: var(--muted); font-family: monospace; margin-bottom: 8px; }
   .action-btns { display: flex; gap: 8px; }

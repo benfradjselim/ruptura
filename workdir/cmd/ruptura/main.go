@@ -37,7 +37,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.0.24"
+const version = "7.0.25"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -323,11 +323,44 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	} else {
 		logger.Default.Info("kubernetes actuator unavailable (not in-cluster) — K8s actions will be queued only", "reason", err.Error())
 	}
-	_ = providers.NewKubernetesProviderWithActuator(k8sActuator) // registered; used by action dispatcher
+	k8sProvider := providers.NewKubernetesProviderWithActuator(k8sActuator)
 
 	actionEngine, err := engine.New(nil, bus)
 	if err != nil {
 		return fmt.Errorf("init action engine failed: %w", err)
+	}
+
+	// Tier-1 auto-execute: autopilot edition only.
+	// Every 15s, approve and execute any Tier-1 actions that haven't been executed yet.
+	if cfg.Edition == "autopilot" {
+		go func() {
+			ticker := time.NewTicker(15 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if actionEngine.IsEmergencyStopped() {
+						continue
+					}
+					for _, a := range actionEngine.PendingActions() {
+						if a.Tier != engine.Tier1 || a.Executed {
+							continue
+						}
+						actionEngine.Approve(a.ID)
+						execCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+						if err := k8sProvider.Execute(execCtx, a); err != nil {
+							logger.Default.Warn("tier-1 action execute failed", "id", a.ID, "err", err)
+						} else {
+							actionEngine.MarkExecuted(a.ID)
+							logger.Default.Info("tier-1 action executed", "id", a.ID, "action_type", a.ActionType, "host", a.Host)
+						}
+						cancel()
+					}
+				}
+			}
+		}()
 	}
 
 	// Forward critical anomaly events from the alerter channel to the action engine.
