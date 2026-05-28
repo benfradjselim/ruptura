@@ -382,14 +382,27 @@ can run as a sidecar alongside any community engine instance.
 
 4 passing tests: valid license, expired license, tampered token, no license.
 
-**⚠️ CRITICAL — must do before shipping:**
-The public key in `internal/license/license.go` is a **placeholder**:
+**Real keypair is generated and embedded.** `deploy/license.pub` is committed.
+`deploy/license.key` is gitignored — store it in a secrets manager.
+
+---
+
+### Tier A1 — License issuer tool ✅ DONE
+
+**File:** `cmd/ruptura-issue-license/main.go`
+
+Go-native JWT signer — replaces `generate-license.sh` when the `step` CLI is unavailable.
+
+```bash
+go run ./cmd/ruptura-issue-license \
+  -org "acme-corp" \
+  -features "autopilot,multi_tenant,multi_cluster" \
+  -key ./deploy/license.key \
+  -clusters 5 \
+  -days 365
 ```
-REPLACE_WITH_REAL_EC_P256_PUBLIC_KEY
-```
-Run `./deploy/generate-keypair.sh` on a secure machine to generate the real keypair.
-Copy `license.pub` content into `internal/license/license.go`.
-Store `license.key` in a secrets manager — **never commit it**.
+
+Outputs the signed JWT to stdout. Pass it as `RUPTURA_LICENSE_KEY`.
 
 ---
 
@@ -411,14 +424,71 @@ autopilot sidecar can call directly.
 
 ---
 
-### Multi-tenant stub ✅ SCAFFOLDED (not implemented)
+### Tier B1 — Multi-tenant reverse proxy ✅ DONE (auth isolation)
 
-**File:** `internal/multitenant/tenant.go`
+**Files:** `internal/multitenant/tenant.go`, `internal/proxy/proxy.go`
 
-- In-memory `Store` with `Create`, `Resolve`, `Get`, `Delete`, `List`
-- `StoragePrefix(tenantID)` returns `"t:<id>:"` BadgerDB prefix
-- License-gated via `license.Has("multi_tenant")`
-- **Not wired into any API yet** — this is a data-model stub only
+- Reverse proxy listens on `:8090` (env `RUPTURA_PROXY_ADDR`)
+- Resolves `Authorization: Bearer <tenant-key>` → rewrites to master key → forwards to community engine
+- Master key passes through directly (operators can use the proxy for all API calls)
+- Adds `X-Ruptura-Tenant` / `X-Ruptura-Tenant-Name` headers for future storage hooks
+- Admin endpoints (master key only):
+  - `POST /api/v2/tenants` — create tenant, returns generated API key
+  - `GET  /api/v2/tenants` — list tenants
+  - `DELETE /api/v2/tenants/{id}` — remove tenant
+- License-gated: `multi_tenant` feature required
+- Started automatically by `ruptura-autopilot` when licensed
+
+**Data isolation note:** full BadgerDB key-prefix isolation is deferred. Current
+isolation is at the auth layer only. `StoragePrefix(tenantID)` is wired and ready
+for a future storage hook in the community engine.
+
+---
+
+### Tier C1 — Multi-cluster federation agent ✅ DONE
+
+**Files:** `internal/federation/agent.go`, `cmd/ruptura-agent/main.go`
+
+Standalone binary that runs as a sidecar inside each **remote** cluster.
+
+- Polls `GET /api/v2/fleet` from the local engine every 30s (env `RUPTURA_POLL_INTERVAL`)
+- Pushes FusedR + KPI snapshots to the central engine via `POST /otlp/v1/metrics`
+- Prefixes each workload's `host.name` with `RUPTURA_CLUSTER_NAME/` so the central
+  engine stores remote workloads separately (e.g. `eu-west-1/default/Deployment/api`)
+- Also sets `ruptura.cluster` and `ruptura.workload` resource attributes
+- License-gated: `multi_cluster` feature required
+- No K8s permissions needed; no shared storage with the engine
+
+**Env vars:**
+```
+RUPTURA_LICENSE_KEY      — must include multi_cluster
+RUPTURA_CLUSTER_NAME     — unique name for this cluster (required)
+RUPTURA_CENTRAL_URL      — base URL of the central engine (required)
+RUPTURA_CENTRAL_API_KEY  — API key for the central engine
+RUPTURA_LOCAL_URL        — local engine URL (default http://localhost:8080)
+RUPTURA_POLL_INTERVAL    — push interval in seconds (default 30)
+```
+
+---
+
+### Tier C2 — Central fleet view ✅ DONE
+
+**Files:** `internal/proxy/clusters.go`, `internal/proxy/ui/clusters.html`
+
+Served by the autopilot proxy at `:8090`.
+
+- `GET /clusters` — standalone HTML dashboard (dark theme, no build step, embedded in binary)
+  - API key input stored in `sessionStorage`
+  - Status bar: cluster count, total workloads, healthy/degraded/critical, worst FusedR
+  - Cluster cards with FusedR bar (green <3 / yellow 3–6 / red 6+) and state pills
+  - Click card → workload drill-down table with full KPI columns
+- `GET /api/v2/clusters` — JSON cluster summaries (master key required)
+- `GET /api/v2/clusters/{name}/workloads` — JSON workload list for one cluster
+
+**Detection logic:** a host pushed by `ruptura-agent` has `clusterName/namespace/kind/name`
+(3+ slashes). Local workloads have at most 2 slashes. Local workloads appear as `_local`.
+
+3 unit tests covering `remoteCluster`, `groupByCluster`, `workloadsForCluster`.
 
 ---
 
@@ -426,9 +496,10 @@ autopilot sidecar can call directly.
 
 **File:** `cmd/ruptura-autopilot/main.go`
 
-- `./ruptura-autopilot` — starts with license check, launches autopilot executor if licensed
+- `./ruptura-autopilot` — starts with license check; launches autopilot executor if
+  `autopilot` licensed; starts multi-tenant proxy if `multi_tenant` licensed
 - `./ruptura-autopilot license` — prints license info (org, features, expiry, max clusters)
-- Reads `RUPTURA_ENGINE_URL`, `RUPTURA_API_KEY`, `RUPTURA_LICENSE_KEY`
+- Reads `RUPTURA_ENGINE_URL`, `RUPTURA_API_KEY`, `RUPTURA_LICENSE_KEY`, `RUPTURA_PROXY_ADDR`
 
 ---
 
@@ -436,51 +507,47 @@ autopilot sidecar can call directly.
 
 **`deploy/generate-keypair.sh`** — generates EC P-256 signing keypair.
 Run once on a secure machine. Outputs `license.key` (private, never commit) and
-`license.pub` (embed into `internal/license/license.go`).
+`license.pub` (embed into `internal/license/license.go`). **Already run — real key embedded.**
 
 **`deploy/generate-license.sh`** — issues signed JWT licenses for customers.
-Usage: `LICENSE_PRIVATE_KEY=./license.key ./generate-license.sh "acme-corp" "autopilot,multi_tenant" 5 365`
-Requires `step` CLI (`brew install step`).
+Requires `step` CLI. Use `cmd/ruptura-issue-license` instead if `step` is unavailable.
+
+**`deploy/license.pub`** — committed. The matching private key is gitignored.
 
 **`.github/workflows/ci.yml`** — runs `go test ./...` + cross-compiles for
 `linux/amd64`, `linux/arm64`, `darwin/arm64` on every push to `main`.
-Needs a `COMMUNITY_REPO_TOKEN` Actions secret to check out the community engine.
+`COMMUNITY_REPO_TOKEN` Actions secret is set.
 
 ---
 
 ### What to Do Next (in priority order)
 
-**Step 1 — Generate real keypair and embed public key** (10 minutes)
-```bash
-cd /path/to/Ruptura-autopilot
-./deploy/generate-keypair.sh ./deploy
-# Then copy deploy/license.pub into internal/license/license.go
-# Store deploy/license.key in your secrets manager
-```
+**Step 1 — Tier B2: per-tenant RBAC**
+Add `admin` / `operator` / `viewer` roles to the tenant model.
+- `admin`: full access including action approval
+- `operator`: can approve/reject, cannot change config
+- `viewer`: read-only
+Wire role enforcement into the proxy middleware.
 
-**Step 2 — Issue yourself a dev license** (5 minutes)
-```bash
-LICENSE_PRIVATE_KEY=./deploy/license.key \
-  ./deploy/generate-license.sh "ruptura-dev" "autopilot,multi_tenant,multi_cluster" 1 365
-# Set output as RUPTURA_LICENSE_KEY and test: ./ruptura-autopilot license
-```
+**Step 2 — Tier B3: tenant-scoped dashboard**
+The community dashboard at `:31469` shows all workloads. A tenant operator
+should only see their own. Options:
+- Serve a filtered UI from the proxy (easiest — query fleet and strip cross-tenant hosts)
+- Add a UI route `/tenant-dashboard` served by the proxy, similar to `/clusters`
 
-**Step 3 — Wire multi-tenant into API** (Tier B1)
-Add tenant middleware to the community engine's router. Each request resolves its
-tenant from the bearer token via `multitenant.Store.Resolve(apiKey)`. All storage
-reads/writes use `multitenant.StoragePrefix(tenant.ID)` as a key prefix.
-This requires adding an HTTP middleware to `workdir/internal/api/` — either in the
-community repo (with an extension hook) or by running a reverse proxy in the
-autopilot process.
+**Step 3 — Tier A3: audit log**
+Every action taken (auto or manual), every approve/reject, every config change.
+Append-only, stored in BadgerDB with `auditlog:` prefix.
+`GET /api/v2/audit?from=&to=&limit=` endpoint in the proxy.
+Required by enterprise security teams before first paid sale.
 
-**Step 4 — Add `COMMUNITY_REPO_TOKEN` Actions secret** to the private repo
-Go to: Settings → Secrets and variables → Actions → New repository secret
-Name: `COMMUNITY_REPO_TOKEN`, value: a GitHub PAT with `repo` scope on `benfradjselim/ruptura`.
-This unblocks the CI build.
+**Step 4 — Tier C3: cross-cluster correlation**
+If service A in cluster-1 and service B in cluster-2 rupture simultaneously, surface it.
+Extend the central engine's topology builder with cross-cluster edges.
 
-**Step 5 — Multi-cluster federation agent** (Tier C1)
-New binary: `cmd/ruptura-agent/` — lightweight, sends FusedR snapshots to central engine via OTLP push.
+**Step 5 — Tier D: premium dashboard catalog**
+Prebuilt dashboard templates (JSON-defined panels). Drag-and-drop builder. White-labeling.
 
 ---
 
-*Last updated: 2026-05-27 | Community frozen at: v7.0.25 | Private repo: github.com/benfradjselim/Ruptura-autopilot @ main*
+*Last updated: 2026-05-28 | Community frozen at: v7.0.25 | Private repo: github.com/benfradjselim/Ruptura-autopilot @ main*
