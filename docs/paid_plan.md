@@ -335,4 +335,152 @@ If the private repo already exists when you read this, look for `internal/licens
 
 ---
 
-*Last updated: 2026-05-26 | Community frozen at: v7.0.25 | Next paid milestone: Tier A (licensing + Tier-1 autopilot)*
+---
+
+## 9. What Has Already Been Done in the Private Repo
+
+> **Read this before writing any code in `Ruptura-autopilot`.** Everything below exists
+> and is pushed to `main`. Do not re-implement — continue from here.
+
+### Private repo: `github.com/benfradjselim/Ruptura-autopilot`
+
+Clone side-by-side with the community repo:
+```bash
+git clone https://github.com/benfradjselim/ruptura
+git clone https://github.com/benfradjselim/Ruptura-autopilot
+```
+
+The `go.mod` uses a `replace` directive so the autopilot module imports the community
+engine locally:
+```
+replace github.com/benfradjselim/ruptura => ../ruptura/workdir
+```
+
+**Important architectural note discovered during setup:**
+Go's `internal/` package visibility rule prevents the autopilot module from directly
+importing `github.com/benfradjselim/ruptura/internal/...` packages. The executor
+therefore communicates with the community engine via its **HTTP API** rather than
+in-process function calls. This is actually a better design — the autopilot process
+can run as a sidecar alongside any community engine instance.
+
+---
+
+### Tier A1 — Licensing layer ✅ DONE
+
+**File:** `internal/license/license.go`
+
+- Offline JWT verification using **EC P-256** (air-gap compatible, no phone-home)
+- Feature flags: `autopilot`, `multi_tenant`, `multi_cluster`, `dash_catalog`, `ocp_operator`
+- `license.Has("autopilot")` — check before enabling any paid feature
+- `license.OrgName()` — returns licensed org or `"community"` if unlicensed
+- `license.ExpiresAt()`, `license.DaysUntilExpiry()` — expiry tracking
+- `license.MaxClusters()` — cluster count limit from JWT
+- Expiry warnings at ≤7 days; hard fail at 0 days
+- Reads from `RUPTURA_LICENSE_KEY` env var
+
+**File:** `internal/license/license_test.go`
+
+4 passing tests: valid license, expired license, tampered token, no license.
+
+**⚠️ CRITICAL — must do before shipping:**
+The public key in `internal/license/license.go` is a **placeholder**:
+```
+REPLACE_WITH_REAL_EC_P256_PUBLIC_KEY
+```
+Run `./deploy/generate-keypair.sh` on a secure machine to generate the real keypair.
+Copy `license.pub` content into `internal/license/license.go`.
+Store `license.key` in a secrets manager — **never commit it**.
+
+---
+
+### Tier A2 — Tier-1 auto-execution ✅ DONE (HTTP-API mode)
+
+**File:** `internal/autopilot/executor.go`
+
+- Polls `GET /api/v2/actions` every 15 seconds
+- Finds Tier-1 actions where `state == "pending"` and `approved == false`
+- Calls `POST /api/v2/actions/{id}/approve` for each
+- License-gated: `New()` returns error if `license.Has("autopilot") == false`
+- Configured via `RUPTURA_ENGINE_URL` (default `http://localhost:8080`) and `RUPTURA_API_KEY`
+
+Note: execution of the actual K8s action (scale/restart/cordon) still happens inside
+the community engine after the approve call — the engine's `RUPTURA_EDITION=autopilot`
+goroutine fires. For full autopilot-only execution bypassing the edition gate, the
+next step is to add a dedicated execute endpoint to the community engine that the
+autopilot sidecar can call directly.
+
+---
+
+### Multi-tenant stub ✅ SCAFFOLDED (not implemented)
+
+**File:** `internal/multitenant/tenant.go`
+
+- In-memory `Store` with `Create`, `Resolve`, `Get`, `Delete`, `List`
+- `StoragePrefix(tenantID)` returns `"t:<id>:"` BadgerDB prefix
+- License-gated via `license.Has("multi_tenant")`
+- **Not wired into any API yet** — this is a data-model stub only
+
+---
+
+### Entrypoint ✅ DONE
+
+**File:** `cmd/ruptura-autopilot/main.go`
+
+- `./ruptura-autopilot` — starts with license check, launches autopilot executor if licensed
+- `./ruptura-autopilot license` — prints license info (org, features, expiry, max clusters)
+- Reads `RUPTURA_ENGINE_URL`, `RUPTURA_API_KEY`, `RUPTURA_LICENSE_KEY`
+
+---
+
+### Tooling ✅ DONE
+
+**`deploy/generate-keypair.sh`** — generates EC P-256 signing keypair.
+Run once on a secure machine. Outputs `license.key` (private, never commit) and
+`license.pub` (embed into `internal/license/license.go`).
+
+**`deploy/generate-license.sh`** — issues signed JWT licenses for customers.
+Usage: `LICENSE_PRIVATE_KEY=./license.key ./generate-license.sh "acme-corp" "autopilot,multi_tenant" 5 365`
+Requires `step` CLI (`brew install step`).
+
+**`.github/workflows/ci.yml`** — runs `go test ./...` + cross-compiles for
+`linux/amd64`, `linux/arm64`, `darwin/arm64` on every push to `main`.
+Needs a `COMMUNITY_REPO_TOKEN` Actions secret to check out the community engine.
+
+---
+
+### What to Do Next (in priority order)
+
+**Step 1 — Generate real keypair and embed public key** (10 minutes)
+```bash
+cd /path/to/Ruptura-autopilot
+./deploy/generate-keypair.sh ./deploy
+# Then copy deploy/license.pub into internal/license/license.go
+# Store deploy/license.key in your secrets manager
+```
+
+**Step 2 — Issue yourself a dev license** (5 minutes)
+```bash
+LICENSE_PRIVATE_KEY=./deploy/license.key \
+  ./deploy/generate-license.sh "ruptura-dev" "autopilot,multi_tenant,multi_cluster" 1 365
+# Set output as RUPTURA_LICENSE_KEY and test: ./ruptura-autopilot license
+```
+
+**Step 3 — Wire multi-tenant into API** (Tier B1)
+Add tenant middleware to the community engine's router. Each request resolves its
+tenant from the bearer token via `multitenant.Store.Resolve(apiKey)`. All storage
+reads/writes use `multitenant.StoragePrefix(tenant.ID)` as a key prefix.
+This requires adding an HTTP middleware to `workdir/internal/api/` — either in the
+community repo (with an extension hook) or by running a reverse proxy in the
+autopilot process.
+
+**Step 4 — Add `COMMUNITY_REPO_TOKEN` Actions secret** to the private repo
+Go to: Settings → Secrets and variables → Actions → New repository secret
+Name: `COMMUNITY_REPO_TOKEN`, value: a GitHub PAT with `repo` scope on `benfradjselim/ruptura`.
+This unblocks the CI build.
+
+**Step 5 — Multi-cluster federation agent** (Tier C1)
+New binary: `cmd/ruptura-agent/` — lightweight, sends FusedR snapshots to central engine via OTLP push.
+
+---
+
+*Last updated: 2026-05-27 | Community frozen at: v7.0.25 | Private repo: github.com/benfradjselim/Ruptura-autopilot @ main*
