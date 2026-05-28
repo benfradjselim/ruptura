@@ -2,6 +2,17 @@
 
 ## Released
 
+### v7.0.25 — 2026-05-27 ✅
+
+| Item | Detail |
+|------|--------|
+| **Actions API snake_case fix** | `ActionRecommendation` now serialises as `id`, `host`, `action_type` etc. — eliminates "undefined" values in the Actions tab |
+| **Computed state + description** | API wraps each action with a `state` field (`pending` / `approved` / `executed`) and human-readable `description` |
+| **Tier-1 autopilot teaser** | Tier-1 actions visible in community with "Autopilot Edition" badge; approve returns HTTP 402 with upgrade hint |
+| **Tier-1 auto-execute** | When `RUPTURA_EDITION=autopilot`: Tier-1 actions are auto-approved and executed every 15s via the K8s actuator |
+| **Helm RBAC for autopilot** | `rbac.yaml` adds patch/update on Deployments, StatefulSets, and Nodes when `edition: autopilot` |
+| **`MarkExecuted` tracking** | Engine tracks execution state; executed actions show as `state: executed` rather than disappearing |
+
 ### v7.0.24 — 2026-05-26 ✅
 
 | Item | Detail |
