@@ -32,7 +32,7 @@ actions:
 - isolate:  apply NetworkPolicy to block ingress/egress
 ```
 
-The action engine uses the same service account as Ruptura itself (see RBAC in the Helm chart). The ClusterRole grants `get/list/watch` on Deployments, StatefulSets, Pods, Nodes — **write permissions are not included by default**. To enable K8s remediation actions, add `update/patch` verbs to the ClusterRole.
+The action engine uses the same service account as Ruptura itself (see RBAC in the Helm chart). The ClusterRole grants `get/list/watch` on Deployments, StatefulSets, Pods, and Nodes in all editions. **When `edition: autopilot` is set**, the Helm chart automatically adds `patch/update` verbs on Deployments, StatefulSets, DaemonSets, and Nodes — no manual ClusterRole editing required.
 
 ### Webhook
 
@@ -93,6 +93,26 @@ Emit metric: rpt_actions_total{type,tier,outcome}
 ```
 
 ## Approving a suggested action
+
+Actions are returned with snake_case fields and a computed `state`:
+
+```json
+[
+  {
+    "id": "abc123-alert",
+    "host": "production/Deployment/order-service",
+    "action_type": "alert",
+    "tier": 2,
+    "confidence": 0.75,
+    "r": 3.8,
+    "approved": false,
+    "executed": false,
+    "state": "pending",
+    "description": "alert on production/Deployment/order-service",
+    "timestamp": "2026-05-27T10:00:00Z"
+  }
+]
+```
 
 ```bash
 # List pending actions
