@@ -3,7 +3,7 @@ name: Operator — Build & Publish
 on:
   push:
     tags:
-      - "v6.*"
+      - "v[0-9]*"
   workflow_dispatch:
     inputs:
       tag:
