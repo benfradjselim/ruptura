@@ -103,6 +103,9 @@ jobs:
           # Patch CSV to reference the local operator image
           sed -i "s|ghcr.io/benfradjselim/ruptura-operator:[^\"]*|${OP_IMG}|g" \
             bundle/manifests/ruptura-operator.clusterserviceversion.yaml
+          # Remove replaces: field — fresh cluster has no prior version, OLM would block
+          sed -i '/^  replaces:/d' \
+            bundle/manifests/ruptura-operator.clusterserviceversion.yaml
 
       # ── Deploy operator via OLM ───────────────────────────────────────────────
       - name: Deploy operator
