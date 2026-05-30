@@ -112,7 +112,7 @@ jobs:
             --namespace operators \
             --timeout 5m
           kubectl -n operators wait deployment \
-            --selector "app.kubernetes.io/name=ruptura-operator" \
+            --selector "app.kubernetes.io/name=ruptura,app.kubernetes.io/component=operator" \
             --for=condition=Available \
             --timeout=120s
 

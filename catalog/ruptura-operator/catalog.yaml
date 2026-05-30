@@ -14,6 +14,8 @@ schema: olm.channel
 name: stable
 package: ruptura-operator
 entries:
+  - name: ruptura-operator.v0.9.1
+    replaces: ruptura-operator.v0.8.9
   - name: ruptura-operator.v0.8.9
     replaces: ruptura-operator.v0.7.1
   - name: ruptura-operator.v0.7.1
@@ -30,6 +32,8 @@ schema: olm.channel
 name: alpha
 package: ruptura-operator
 entries:
+  - name: ruptura-operator.v0.9.1
+    replaces: ruptura-operator.v0.8.9
   - name: ruptura-operator.v0.8.9
     replaces: ruptura-operator.v0.7.1
   - name: ruptura-operator.v0.7.1
@@ -410,6 +414,75 @@ properties:
         capabilities: Basic Install
         categories: Monitoring,Logging & Tracing
         containerImage: ghcr.io/benfradjselim/ruptura-operator:v0.8.9
+        description: Predictive workload health platform for Kubernetes.
+        displayName: Ruptura Operator
+        repository: https://github.com/benfradjselim/ruptura
+        support: https://github.com/benfradjselim/ruptura/issues
+        com.redhat.openshift.versions: v4.12-v4.16
+      apiServiceDefinitions: {}
+      crdDescriptions:
+        owned:
+          - description: Manages the full lifecycle of a Ruptura deployment.
+            displayName: Ruptura Instance
+            kind: RupturaInstance
+            name: rupturainstances.ruptura.io
+            version: v1alpha1
+      description: >-
+        Predictive workload health platform for Kubernetes.
+        Detects ruptures before they happen.
+      displayName: Ruptura Operator
+      installModes:
+        - supported: true
+          type: OwnNamespace
+        - supported: true
+          type: SingleNamespace
+        - supported: false
+          type: MultiNamespace
+        - supported: true
+          type: AllNamespaces
+      keywords:
+        - monitoring
+        - observability
+        - kubernetes
+        - sre
+        - anomaly-detection
+      links:
+        - name: Documentation
+          url: https://ruptura.dev/docs
+        - name: GitHub
+          url: https://github.com/benfradjselim/ruptura
+      maintainers:
+        - email: benfradjselim@gmail.com
+          name: Ruptura Maintainers
+      maturity: alpha
+      minKubeVersion: 1.25.0
+      provider:
+        name: Ruptura
+        url: https://ruptura.dev
+---
+schema: olm.bundle
+name: ruptura-operator.v0.9.1
+package: ruptura-operator
+image: ghcr.io/benfradjselim/ruptura-operator-bundle:v0.9.1
+channels:
+  - name: stable
+  - name: alpha
+properties:
+  - type: olm.gvk
+    value:
+      group: ruptura.io
+      kind: RupturaInstance
+      version: v1alpha1
+  - type: olm.package
+    value:
+      packageName: ruptura-operator
+      version: 0.9.1
+  - type: olm.csv.metadata
+    value:
+      annotations:
+        capabilities: Basic Install
+        categories: Monitoring,Logging & Tracing
+        containerImage: ghcr.io/benfradjselim/ruptura-operator:v0.9.1
         description: Predictive workload health platform for Kubernetes.
         displayName: Ruptura Operator
         repository: https://github.com/benfradjselim/ruptura
