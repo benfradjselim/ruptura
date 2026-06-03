@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -315,6 +316,24 @@ func runWithContext(ctx context.Context, cfg Config) error {
 				return
 			case now := <-ticker.C:
 				for _, host := range pipelineEngine.AllHosts() {
+					// When k8s discovery is active, skip Prometheus-scraped metrics for
+					// workloads that are not in the informer's known set. This prevents
+					// the Prometheus poller from re-registering deleted workloads via
+					// historical Prometheus data and defeating the stale-workload GC.
+					if inf != nil {
+						parts := strings.SplitN(host, "/", 3)
+						if len(parts) == 3 {
+							kind := parts[1]
+							if kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" {
+								k8sKnownMu.RLock()
+								known := k8sKnown[host]
+								k8sKnownMu.RUnlock()
+								if !known {
+									continue
+								}
+							}
+						}
+					}
 					rawMetrics := pipelineEngine.LatestByHost(host)
 					if len(rawMetrics) == 0 {
 						continue
@@ -507,7 +526,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		URL:               fmt.Sprintf("http://localhost:%d/metrics", cfg.Port),
 		Enabled:           true,
 		ScrapeIntervalSec: 30,
-		WorkloadKey:       "ruptura/Deployment/ruptura",
+		WorkloadKey:       "ruptura-system/Deployment/ruptura",
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	})
