@@ -209,6 +209,51 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		logger.Default.Info("k8s auto-discovery active — watching Deployments/StatefulSets/DaemonSets")
 		inf = disc
 		go disc.Run(ctx, analyzerEngine.RegisterWorkload, analyzerEngine.UnregisterWorkload)
+
+		// Workload GC: remove stale snapshots for workloads deleted from the cluster.
+		// LoadSnapshots() restores ALL persisted snapshots on startup, including those
+		// for workloads that were deleted while the engine was offline. The informer
+		// only sends ADDED events for current workloads, so stale ones never get an
+		// UnregisterWorkload call. This goroutine reconciles every 60s.
+		go func() {
+			// First tick after 30s — gives the informer LIST phase time to complete.
+			timer := time.NewTimer(30 * time.Second)
+			defer timer.Stop()
+			ticker := time.NewTicker(60 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-timer.C:
+				case <-ticker.C:
+				}
+				current := make(map[string]bool)
+				for _, ref := range analyzerEngine.AllWorkloadRefs() {
+					current[ref.Key()] = true
+					// Also index by bare host string for legacy snapshots.
+					if ref.Namespace != "" && ref.Name != "" {
+						current[ref.Namespace+"/"+ref.Name] = true
+					}
+				}
+				var purged int
+				for _, snap := range store.AllSnapshots() {
+					canonical := snap.Workload.Key()
+					if canonical == "" || canonical == "default/host/" {
+						canonical = snap.Host
+					}
+					if canonical == "" || current[canonical] || current[snap.Host] {
+						continue
+					}
+					analyzerEngine.UnregisterWorkload(snap.Workload)
+					store.DeleteSnapshot(snap.Host, canonical)
+					purged++
+				}
+				if purged > 0 {
+					logger.Default.Info("workload gc: removed stale workloads", "count", purged)
+				}
+			}
+		}()
 	} else {
 		logger.Default.Info("k8s auto-discovery skipped (not in-cluster)", "reason", err.Error())
 	}

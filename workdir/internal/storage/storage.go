@@ -407,6 +407,20 @@ func (s *Store) delete(key string) error {
 	})
 }
 
+// DeleteSnapshot removes a stale workload's snapshot from the in-memory cache and BadgerDB.
+// Accepts one or more keys (e.g. bare host string and workload-ref key) so both
+// alias entries are removed in a single call.
+func (s *Store) DeleteSnapshot(keys ...string) {
+	s.snapshotsMu.Lock()
+	for _, k := range keys {
+		delete(s.snapshots, k)
+	}
+	s.snapshotsMu.Unlock()
+	for _, k := range keys {
+		_ = s.delete("snapshot:" + k)
+	}
+}
+
 // listByPrefix returns all values under a given key prefix
 func (s *Store) listByPrefix(prefix string, dest func(key, val []byte) error) error {
 	return s.db.View(func(txn *badger.Txn) error {
