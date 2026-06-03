@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -203,18 +204,50 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		}
 	}
 
+	// k8sKnown tracks only workloads discovered via the k8s informer. The
+	// analyzer's workload registry also includes telemetry-driven workloads
+	// (re-added by the Prometheus poller from historical data), so we cannot
+	// use AllWorkloadRefs() for GC decisions.
+	var (
+		k8sKnown   = map[string]bool{}
+		k8sKnownMu sync.RWMutex
+	)
+	registerK8s := func(ref models.WorkloadRef) {
+		k8sKnownMu.Lock()
+		k8sKnown[ref.Key()] = true
+		if ref.Namespace != "" && ref.Name != "" {
+			k8sKnown[ref.Namespace+"/"+ref.Name] = true
+		}
+		k8sKnownMu.Unlock()
+		analyzerEngine.RegisterWorkload(ref)
+	}
+	unregisterK8s := func(ref models.WorkloadRef) {
+		k8sKnownMu.Lock()
+		delete(k8sKnown, ref.Key())
+		if ref.Namespace != "" && ref.Name != "" {
+			delete(k8sKnown, ref.Namespace+"/"+ref.Name)
+		}
+		k8sKnownMu.Unlock()
+		analyzerEngine.UnregisterWorkload(ref)
+	}
+
 	// k8s workload auto-discovery — no-op when not running inside a cluster.
 	var inf *discovery.Informer
 	if disc, err := discovery.NewInformer(); err == nil {
 		logger.Default.Info("k8s auto-discovery active — watching Deployments/StatefulSets/DaemonSets")
 		inf = disc
-		go disc.Run(ctx, analyzerEngine.RegisterWorkload, analyzerEngine.UnregisterWorkload)
+		go disc.Run(ctx, registerK8s, unregisterK8s)
 
 		// Workload GC: remove stale snapshots for workloads deleted from the cluster.
 		// LoadSnapshots() restores ALL persisted snapshots on startup, including those
 		// for workloads that were deleted while the engine was offline. The informer
 		// only sends ADDED events for current workloads, so stale ones never get an
 		// UnregisterWorkload call. This goroutine reconciles every 60s.
+		//
+		// We compare against k8sKnown (informer-only set) rather than
+		// analyzerEngine.AllWorkloadRefs(), because the Prometheus scraper
+		// re-registers deleted workloads that still have historical Prometheus
+		// data — which would otherwise defeat the GC.
 		go func() {
 			// First tick after 30s — gives the informer LIST phase time to complete.
 			timer := time.NewTimer(30 * time.Second)
@@ -228,14 +261,13 @@ func runWithContext(ctx context.Context, cfg Config) error {
 				case <-timer.C:
 				case <-ticker.C:
 				}
-				current := make(map[string]bool)
-				for _, ref := range analyzerEngine.AllWorkloadRefs() {
-					current[ref.Key()] = true
-					// Also index by bare host string for legacy snapshots.
-					if ref.Namespace != "" && ref.Name != "" {
-						current[ref.Namespace+"/"+ref.Name] = true
-					}
+				k8sKnownMu.RLock()
+				current := make(map[string]bool, len(k8sKnown))
+				for k := range k8sKnown {
+					current[k] = true
 				}
+				k8sKnownMu.RUnlock()
+
 				var purged int
 				for _, snap := range store.AllSnapshots() {
 					canonical := snap.Workload.Key()
