@@ -39,7 +39,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.0.25"
+const version = "7.0.27"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -331,6 +331,18 @@ func runWithContext(ctx context.Context, cfg Config) error {
 								if !known {
 									continue
 								}
+							}
+						} else if len(parts) == 1 {
+							// Bare-host name (no namespace prefix). When k8s discovery has
+							// populated k8sKnown, skip hosts that don't match any known
+							// workload — prevents historical Prometheus metrics for deleted
+							// workloads from continuously re-registering stale entries.
+							k8sKnownMu.RLock()
+							knownCount := len(k8sKnown)
+							known := k8sKnown[host] || k8sKnown["default/"+host]
+							k8sKnownMu.RUnlock()
+							if knownCount > 0 && !known {
+								continue
 							}
 						}
 					}
