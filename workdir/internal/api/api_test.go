@@ -82,14 +82,14 @@ func TestAPI(t *testing.T) {
             t.Errorf("expected 200, got %d", w.Code)
         }
     })
-    t.Run("ApproveBlockedInCommunityEdition", func(t *testing.T) {
-        // edition defaults to "" which is treated as community — approve must return 402.
+    t.Run("ApproveAllowedInCommunityEdition", func(t *testing.T) {
+        // Approve is open in all editions — engine is nil so we get 200 (empty list), not 402.
         req, _ := http.NewRequest("POST", "/api/v2/actions/abc123/approve", nil)
         req.Header.Set("Authorization", "Bearer token")
         w := httptest.NewRecorder()
         router.ServeHTTP(w, req)
-        if w.Code != http.StatusPaymentRequired {
-            t.Errorf("expected 402 in community edition, got %d", w.Code)
+        if w.Code == http.StatusPaymentRequired {
+            t.Errorf("community edition must not return 402 on approve — gate was removed")
         }
     })
     t.Run("ApproveAllowedInAutopilotEdition", func(t *testing.T) {
