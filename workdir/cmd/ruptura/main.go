@@ -32,6 +32,7 @@ import (
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/predictor"
 	"github.com/benfradjselim/ruptura/internal/scraper"
+	"github.com/benfradjselim/ruptura/internal/sim"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
 	"github.com/benfradjselim/ruptura/pkg/logger"
@@ -50,6 +51,7 @@ type Config struct {
 	Edition       string // "community" (default) or "autopilot"
 	ShowVersion   bool
 	PrometheusURL string // cluster Prometheus URL; if set, seeded as a persistent datasource
+	Demo          bool   // seed 7 days of synthetic history + start live sim on startup
 }
 
 func parseFlags(args []string) (Config, error) {
@@ -61,6 +63,7 @@ func parseFlags(args []string) (Config, error) {
 	fs.StringVar(&cfg.APIKey, "api-key", "", "API bearer token")
 	fs.BoolVar(&cfg.ShowVersion, "version", false, "print version and exit")
 	fs.StringVar(&cfg.PrometheusURL, "prometheus-url", "", "cluster Prometheus URL to seed as default datasource")
+	fs.BoolVar(&cfg.Demo, "demo", false, "seed 7 days of synthetic history and start live simulator on startup")
 	err := fs.Parse(args)
 	if cfg.APIKey == "" {
 		cfg.APIKey = os.Getenv("RUPTURA_API_KEY")
@@ -74,6 +77,9 @@ func parseFlags(args []string) (Config, error) {
 		} else {
 			cfg.Edition = "community"
 		}
+	}
+	if !cfg.Demo {
+		cfg.Demo = os.Getenv("RUPTURA_DEMO") == "true" || os.Getenv("RUPTURA_DEMO") == "1"
 	}
 	return cfg, err
 }
@@ -572,6 +578,77 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	logger.Default.Info("listening", "addr", srv.Addr, "otlp", otlpAddr)
+
+	// Demo mode: seed 7 days of synthetic baseline then run live simulator.
+	// Workloads are pre-calibrated so predictions show immediately on first page load.
+	if cfg.Demo {
+		go func() {
+			base := fmt.Sprintf("http://localhost:%d", cfg.Port)
+			// Wait for the server to accept connections (up to 5s).
+			ready := false
+			for i := 0; i < 100; i++ {
+				time.Sleep(50 * time.Millisecond)
+				resp, err := http.Get(base + "/api/v2/health")
+				if err == nil {
+					resp.Body.Close()
+					ready = true
+					break
+				}
+			}
+			if !ready {
+				logger.Default.Warn("demo mode: server did not come up in time — skipping seed")
+				return
+			}
+			logger.Default.Info("demo mode: seeding 7-day synthetic baseline for 8 workloads…")
+
+			demoWorkloads := []struct {
+				host    string
+				pattern string
+			}{
+				{"demo/Deployment/payment-api", sim.PatternSlowBurn},
+				{"demo/Deployment/auth-service", sim.PatternSlowBurn},
+				{"demo/Deployment/cache-worker", sim.PatternMemoryLeak},
+				{"demo/Deployment/ml-inference", sim.PatternTrafficSurge},
+				{"demo/Deployment/order-service", sim.PatternSlowBurn},
+				{"demo/Deployment/notification-svc", sim.PatternSlowBurn},
+				{"demo/Deployment/payment-db", sim.PatternCascadeFailure},
+				{"demo/Deployment/api-gateway", sim.PatternTrafficSurge},
+			}
+
+			// Seed 96 ticks instantly (no sleep) to satisfy calibration requirement.
+			seedCfg := sim.Config{
+				Target:   base,
+				APIKey:   cfg.APIKey,
+				Interval: 0,
+			}
+			for _, w := range demoWorkloads {
+				ref := models.WorkloadRefFromHost(w.host)
+				seedCfg.Workload = w.host
+				seedCfg.Pattern = w.pattern
+				if err := sim.Seed(seedCfg, 96); err != nil {
+					logger.Default.Warn("demo seed failed", "workload", w.host, "err", err)
+				}
+				// Force baseline-ready even if some ticks failed.
+				analyzerEngine.SeedBaseline(ref)
+			}
+			logger.Default.Info("demo mode: baseline ready — starting live simulator")
+
+			// Run live simulator indefinitely in background.
+			for _, w := range demoWorkloads {
+				go func(host, pattern string) {
+					liveCfg := sim.Config{
+						Target:   base,
+						APIKey:   cfg.APIKey,
+						Workload: host,
+						Pattern:  pattern,
+						Duration: 30 * 24 * time.Hour,
+						Interval: 15 * time.Second,
+					}
+					_ = sim.Run(liveCfg)
+				}(w.host, w.pattern)
+			}
+		}()
+	}
 
 	select {
 	case <-ctx.Done():

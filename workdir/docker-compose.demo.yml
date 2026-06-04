@@ -1,0 +1,39 @@
+---
+# Ruptura Community Edition — 5-minute demo (no Kubernetes cluster required)
+#
+# Usage:
+#   docker compose -f docker-compose.demo.yml up
+#
+# Then open: http://localhost:8080
+#
+# What you get:
+#   - 8 synthetic workloads (payment-api, auth-service, cache-worker, ml-inference, …)
+#   - 7-day pre-seeded baseline so predictions and health scores show immediately
+#   - Live simulator running in the background (slow-burn + memory-leak patterns)
+#   - Full action recommendation and approval workflow
+#
+# All data is synthetic. No cluster credentials are required.
+services:
+  ruptura:
+    image: ghcr.io/benfradjselim/ruptura:latest
+    container_name: ruptura-demo
+    ports:
+      - "8080:8080"
+      - "4317:4317"
+    environment:
+      RUPTURA_DEMO: "true"
+      RUPTURA_EDITION: "community"
+      # Optional: set an API key to protect the demo instance
+      # RUPTURA_API_KEY: "changeme"
+    volumes:
+      - ruptura-demo-data:/var/lib/ruptura/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v2/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  ruptura-demo-data:

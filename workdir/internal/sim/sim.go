@@ -75,6 +75,24 @@ func Run(cfg Config) error {
 	return nil
 }
 
+// Seed runs n ticks instantly (no sleep) to pre-populate the engine's baseline.
+// Used by demo mode to skip the 24h calibration window. Returns the first error
+// encountered, or nil if all ticks succeeded.
+func Seed(cfg Config, n int) error {
+	rand.Seed(time.Now().UnixNano()) //nolint:staticcheck // Go <1.20 compat
+	gen, err := patternGenerator(cfg.Pattern)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < n; i++ {
+		metrics := gen(i, cfg)
+		if err := send(cfg.Target, cfg.APIKey, cfg.Workload, metrics); err != nil {
+			return fmt.Errorf("seed tick %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
 type generatorFn func(tick int, cfg Config) map[string]float64
 
 func patternGenerator(name string) (generatorFn, error) {

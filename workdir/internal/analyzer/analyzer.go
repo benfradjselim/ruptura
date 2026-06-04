@@ -958,6 +958,17 @@ func (a *Analyzer) RegisterWorkload(ref models.WorkloadRef) {
 	ws.pendingTelemetry = true
 }
 
+// SeedBaseline marks a workload's adaptive baseline as ready immediately,
+// bypassing the normal 96-observation (24h) calibration window.
+// Used by demo mode so predictions are available from first page load.
+func (a *Analyzer) SeedBaseline(ref models.WorkloadRef) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	ws := a.getOrCreate(ref)
+	ws.observationCount = 96
+	ws.baselineReady = true
+}
+
 // UnregisterWorkload removes a workload that was deleted from the cluster.
 // Existing snapshots and telemetry history are discarded.
 func (a *Analyzer) UnregisterWorkload(ref models.WorkloadRef) {

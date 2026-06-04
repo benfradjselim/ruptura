@@ -404,15 +404,6 @@ func (h *Handlers) handleActions(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	// Edition gate: approve is restricted to autopilot regardless of engine state.
-	if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/approve") && h.edition != "autopilot" {
-		writeJSON(w, http.StatusPaymentRequired, map[string]string{
-			"error":   "action execution requires the Autopilot edition",
-			"upgrade": "set RUPTURA_EDITION=autopilot to enable automated and manual action approval",
-		})
-		return
-	}
-
 	if h.engine == nil {
 		writeJSON(w, http.StatusOK, []actionResp{})
 		return
