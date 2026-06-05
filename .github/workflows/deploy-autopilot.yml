@@ -25,29 +25,75 @@ jobs:
           chmod 600 /tmp/kubeconfig
           kubectl --kubeconfig /tmp/kubeconfig cluster-info
 
+      - name: Find autopilot deployment
+        id: find
+        run: |
+          echo "=== All namespaces ==="
+          kubectl --kubeconfig /tmp/kubeconfig get namespaces
+
+          echo ""
+          echo "=== Deployments matching 'autopilot' across all namespaces ==="
+          kubectl --kubeconfig /tmp/kubeconfig get deployments -A | grep -i autopilot || echo "(none found)"
+
+          echo ""
+          echo "=== All deployments ==="
+          kubectl --kubeconfig /tmp/kubeconfig get deployments -A
+
+          # Find the namespace — prefer user input if it exists, else search
+          NS="${{ github.event.inputs.namespace }}"
+          if ! kubectl --kubeconfig /tmp/kubeconfig get namespace "${NS}" 2>/dev/null; then
+            # Fallback: find any namespace with an autopilot deployment
+            NS=$(kubectl --kubeconfig /tmp/kubeconfig get deployments -A \
+              -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\n"}{end}' \
+              | grep -i autopilot | awk '{print $1}' | head -1)
+            echo "Discovered namespace: ${NS}"
+          fi
+
+          if [ -z "${NS}" ]; then
+            echo "ERROR: Could not find autopilot deployment in any namespace"
+            kubectl --kubeconfig /tmp/kubeconfig get pods -A | grep -i autopilot || true
+            exit 1
+          fi
+
+          # Find the deployment name
+          DEPLOY=$(kubectl --kubeconfig /tmp/kubeconfig get deployments -n "${NS}" \
+            -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep -i autopilot | head -1)
+          if [ -z "${DEPLOY}" ]; then
+            DEPLOY=$(kubectl --kubeconfig /tmp/kubeconfig get deployments -n "${NS}" \
+              -o jsonpath='{.items[0].metadata.name}')
+          fi
+
+          echo "ns=${NS}" >> "$GITHUB_OUTPUT"
+          echo "deploy=${DEPLOY}" >> "$GITHUB_OUTPUT"
+          echo "Using: namespace=${NS} deployment=${DEPLOY}"
+
       - name: Set autopilot image
         run: |
           TAG="${{ github.event.inputs.tag }}"
-          NS="${{ github.event.inputs.namespace }}"
+          NS="${{ steps.find.outputs.ns }}"
+          DEPLOY="${{ steps.find.outputs.deploy }}"
           IMAGE="ghcr.io/benfradjselim/ruptura-autopilot:${TAG}"
 
-          echo "Deploying ${IMAGE} to ${NS}..."
+          echo "Deploying ${IMAGE} to ${NS}/${DEPLOY}..."
 
-          # Try updating the proxy container in the autopilot deployment
-          kubectl --kubeconfig /tmp/kubeconfig \
-            set image deployment/ruptura-autopilot \
-            autopilot="${IMAGE}" \
-            proxy="${IMAGE}" \
-            -n "${NS}" 2>/dev/null || \
-          kubectl --kubeconfig /tmp/kubeconfig \
-            set image deployment/ruptura-autopilot \
-            ruptura-autopilot="${IMAGE}" \
-            -n "${NS}"
+          # Get container names in this deployment
+          CONTAINERS=$(kubectl --kubeconfig /tmp/kubeconfig get deployment "${DEPLOY}" \
+            -n "${NS}" -o jsonpath='{.spec.template.spec.containers[*].name}')
+          echo "Containers: ${CONTAINERS}"
+
+          # Build set-image args for all containers
+          ARGS=""
+          for c in ${CONTAINERS}; do
+            ARGS="${ARGS} ${c}=${IMAGE}"
+          done
 
           kubectl --kubeconfig /tmp/kubeconfig \
-            rollout status deployment/ruptura-autopilot \
+            set image deployment/"${DEPLOY}" ${ARGS} -n "${NS}"
+
+          kubectl --kubeconfig /tmp/kubeconfig \
+            rollout status deployment/"${DEPLOY}" \
             -n "${NS}" --timeout=5m
 
       - name: Show pod status
         run: |
-          kubectl --kubeconfig /tmp/kubeconfig get pods -n "${{ github.event.inputs.namespace }}" -o wide || true
+          kubectl --kubeconfig /tmp/kubeconfig get pods -n "${{ steps.find.outputs.ns }}" -o wide || true
