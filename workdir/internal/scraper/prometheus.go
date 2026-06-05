@@ -54,17 +54,18 @@ func promQueries(namespace string) map[string]string {
 
 	return map[string]string{
 		// CPU utilisation as % of 1 core — prefer "% of request" when kube-state-metrics
-		// resource requests are available; fall back to raw core-seconds/s × 100 otherwise.
-		// The `or` clause ensures non-zero values even on clusters without kube-state-metrics.
+		// resource requests are available; fall back to raw core-seconds/s.
+		// Capped at 100 via min() so over-requested workloads don't saturate signals.
 		"stress": fmt.Sprintf(
-			`100 * sum(rate(container_cpu_usage_seconds_total{%scontainer!="",container!="POD"}[2m])) by (namespace,pod) / on(namespace,pod) group_left() sum(kube_pod_container_resource_requests{%sresource="cpu",container!=""}) by (namespace,pod) `+
-				`or 100 * sum(rate(container_cpu_usage_seconds_total{%scontainer!="",container!="POD"}[2m])) by (namespace,pod)`,
+			`min(100, 100 * sum(rate(container_cpu_usage_seconds_total{%scontainer!="",container!="POD"}[2m])) by (namespace,pod) / on(namespace,pod) group_left() sum(kube_pod_container_resource_requests{%sresource="cpu",container!=""}) by (namespace,pod)) `+
+				`or min(100, 100 * sum(rate(container_cpu_usage_seconds_total{%scontainer!="",container!="POD"}[2m])) by (namespace,pod))`,
 			nsFilter, nsFilter, nsFilter,
 		),
-		// Memory utilisation — prefer "% of request"; fall back to working-set MiB × 100.
+		// Memory utilisation — prefer "% of request"; fall back to working-set MiB.
+		// Capped at 100 so memory-overcommitted pods don't permanently saturate pressure.
 		"pressure": fmt.Sprintf(
-			`100 * sum(container_memory_working_set_bytes{%scontainer!="",container!="POD"}) by (namespace,pod) / on(namespace,pod) group_left() sum(kube_pod_container_resource_requests{%sresource="memory",container!=""}) by (namespace,pod) `+
-				`or sum(container_memory_working_set_bytes{%scontainer!="",container!="POD"}) by (namespace,pod) / 1048576`,
+			`min(100, 100 * sum(container_memory_working_set_bytes{%scontainer!="",container!="POD"}) by (namespace,pod) / on(namespace,pod) group_left() sum(kube_pod_container_resource_requests{%sresource="memory",container!=""}) by (namespace,pod)) `+
+				`or min(100, sum(container_memory_working_set_bytes{%scontainer!="",container!="POD"}) by (namespace,pod) / 1048576)`,
 			nsFilter, nsFilter, nsFilter,
 		),
 		// Container restart count (monotonic — pipeline tracks delta)
@@ -72,25 +73,37 @@ func promQueries(namespace string) map[string]string {
 			`sum(kube_pod_container_status_restarts_total{%scontainer!=""}) by (namespace,pod)`,
 			nsFilter,
 		),
-		// HTTP 5xx error rate as percentage
-		"mood": fmt.Sprintf(
-			`100 * sum(rate(http_requests_total{%scode=~"5.."}[2m])) by (namespace,pod) / (sum(rate(http_requests_total{%s}[2m])) by (namespace,pod) + 1)`,
+		// HTTP 5xx error rate as a 0–1 fraction (named "error_rate" so the analyzer
+		// stress and mood formulas can read it directly — NOT the old "mood" key).
+		"error_rate": fmt.Sprintf(
+			`sum(rate(http_requests_total{%scode=~"5.."}[2m])) by (namespace,pod) / (sum(rate(http_requests_total{%s}[2m])) by (namespace,pod) + 1)`,
 			nsFilter, nsFilter,
 		),
-		// HTTP request rate
-		"velocity": fmt.Sprintf(
+		// HTTP request rate in requests/second (named "request_rate" for analyzer).
+		"request_rate": fmt.Sprintf(
 			`sum(rate(http_requests_total{%s}[2m])) by (namespace,pod)`,
 			nsFilter,
 		),
-		// Goroutine count → entropy
-		"entropy": fmt.Sprintf(
-			`sum(go_goroutines{%s}) by (namespace,pod)`,
+		// Process uptime in seconds — feeds the mood numerator so non-HTTP workloads
+		// don't score mood = 0 (which produced "depressed" on healthy infra pods).
+		"uptime_seconds": fmt.Sprintf(
+			`sum(process_uptime_seconds{%s}) by (namespace,pod)`,
 			nsFilter,
 		),
-		// Active connections → humidity
-		"humidity": fmt.Sprintf(
-			`sum(process_open_fds{%s}) by (namespace,pod)`,
+		// Goroutine count normalized by a typical ceiling (500) → 0–1 entropy proxy.
+		"entropy": fmt.Sprintf(
+			`min(1, sum(go_goroutines{%s}) by (namespace,pod) / 500)`,
 			nsFilter,
+		),
+		// Open file descriptors normalized by a soft limit (1000) → 0–1 humidity proxy.
+		"humidity": fmt.Sprintf(
+			`min(1, sum(process_open_fds{%s}) by (namespace,pod) / 1000)`,
+			nsFilter,
+		),
+		// Pod availability — unavailable replicas / desired replicas → 0–1 resilience input.
+		"availability_drop": fmt.Sprintf(
+			`clamp_max(sum(kube_deployment_status_replicas_unavailable{%s}) by (namespace,deployment) / (sum(kube_deployment_spec_replicas{%s}) by (namespace,deployment) + 1), 1)`,
+			nsFilter, nsFilter,
 		),
 	}
 }

@@ -12,9 +12,9 @@ func TestStressStates(t *testing.T) {
 		want string
 	}{
 		{0.1, "calm"},
-		{0.4, "nervous"},
-		{0.7, "stressed"},
-		{0.9, "panic"},
+		{0.4, "elevated"},
+		{0.7, "high"},
+		{0.9, "critical"},
 	}
 	for _, tc := range tests {
 		if got := stressState(tc.s); got != tc.want {
@@ -28,10 +28,10 @@ func TestFatigueStates(t *testing.T) {
 		f    float64
 		want string
 	}{
-		{0.2, "rested"},
-		{0.4, "tired"},
-		{0.7, "exhausted"},
-		{0.9, "burnout"},
+		{0.2, "nominal"},
+		{0.4, "elevated"},
+		{0.7, "high"},
+		{0.9, "degraded"},
 	}
 	for _, tc := range tests {
 		if got := fatigueState(tc.f); got != tc.want {
@@ -120,10 +120,10 @@ func TestHumidityStates(t *testing.T) {
 		h    float64
 		want string
 	}{
-		{0.05, "dry"},
+		{0.05, "low"},
 		{0.2, "humid"},
-		{0.4, "very_humid"},
-		{0.6, "storm"},
+		{0.4, "elevated"},
+		{0.6, "saturated"},
 	}
 	for _, tc := range tests {
 		if got := humidityState(tc.h); got != tc.want {
@@ -139,8 +139,8 @@ func TestContagionStates(t *testing.T) {
 	}{
 		{0.1, "low"},
 		{0.4, "moderate"},
-		{0.7, "epidemic"},
-		{0.9, "pandemic"},
+		{0.7, "cascading"},
+		{0.9, "critical"},
 	}
 	for _, tc := range tests {
 		if got := contagionState(tc.c); got != tc.want {
@@ -154,11 +154,11 @@ func TestMoodStates(t *testing.T) {
 		m    float64
 		want string
 	}{
-		{0.9, "happy"},
+		{0.9, "healthy"},
 		{0.6, "content"},
 		{0.4, "neutral"},
-		{0.2, "sad"},
-		{0.05, "depressed"},
+		{0.2, "low-traffic"},
+		{0.05, "no-signal"},
 	}
 	for _, tc := range tests {
 		if got := moodState(tc.m); got != tc.want {
@@ -172,7 +172,7 @@ func TestPressureStates(t *testing.T) {
 		p    float64
 		want string
 	}{
-		{0.8, "storm_approaching"},
+		{0.8, "at-risk"},
 		{0.6, "rising"},
 		{0.5, "stable"},
 		{0.3, "improving"},

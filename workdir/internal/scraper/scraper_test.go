@@ -16,11 +16,11 @@ func TestMapMetric_ExactMatch(t *testing.T) {
 		{"cpu_percent", "stress"},
 		{"memory_usage_percent", "pressure"},
 		{"restart_count", "fatigue"},
-		{"request_rate", "velocity"},
+		{"request_rate", "request_rate"},
 		{"goroutine_count", "entropy"},
 		{"queue_depth", "humidity"},
 		{"health_score", "health_score"},
-		{"http_error_rate", "mood"},
+		{"http_error_rate", "error_rate"},
 	}
 	for _, c := range cases {
 		got := MapMetric(c.in)
@@ -35,10 +35,10 @@ func TestMapMetric_SubstringFallback(t *testing.T) {
 		{"container_cpu_usage_total", "stress"},
 		{"container_memory_bytes", "pressure"},
 		{"pod_restarts_total", "fatigue"},
-		{"http_error_rate_total", "mood"},
+		{"http_error_rate_total", "error_rate"},
 		{"go_goroutines_total", "entropy"},
 		{"queue_pending_jobs", "humidity"},
-		{"request_rate_p99", "velocity"},
+		{"request_rate_p99", "request_rate"},
 		{"data_throughput_bytes", "throughput"},
 	}
 	for _, c := range cases {
@@ -55,12 +55,14 @@ func TestMapMetric_Unknown(t *testing.T) {
 	}
 }
 
-func TestNormalizeValue_MoodInversion(t *testing.T) {
-	// mood = 1 - error_rate*100 (when error_rate is 0-1)
-	got := NormalizeValue("mood", 0.05) // 5% error rate
-	want := 95.0
-	if got != want {
-		t.Errorf("NormalizeValue(mood, 0.05) = %v, want %v", got, want)
+func TestNormalizeValue_ErrorRateFraction(t *testing.T) {
+	// 0-1 fraction passes through unchanged
+	if got := NormalizeValue("error_rate", 0.05); got != 0.05 {
+		t.Errorf("NormalizeValue(error_rate, 0.05) = %v, want 0.05", got)
+	}
+	// 0-100 percentage is converted to fraction
+	if got := NormalizeValue("error_rate", 5.0); got != 0.05 {
+		t.Errorf("NormalizeValue(error_rate, 5.0) = %v, want 0.05", got)
 	}
 }
 

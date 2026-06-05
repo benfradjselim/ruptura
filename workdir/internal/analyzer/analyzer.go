@@ -243,6 +243,9 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 			}
 		}
 	}
+	if cpu > 1.0 {
+		cpu = 1.0 // cap: over-provisioned containers can report > 100% of request
+	}
 	ram := getMetric(metrics, "memory_percent")
 	if ram == 0 {
 		if p := getMetric(metrics, "pressure"); p > 0 {
@@ -301,13 +304,15 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 	ws.timeoutHistory.Push(timeouts)
 
 	restarts := ws.restartCount + 1 // always at least 1 to avoid division by zero
-	// Denominator: errors × timeouts × restarts with ε protecting against zero
-	denominator := errors*timeouts*restarts + epsilon
-	rawMood := (ws.uptime * (requests + epsilon)) / denominator
-	// Log-normalize: log(1 + rawMood) / log(1 + expectedMax)
-	// expectedMax ≈ uptime(86400s) × throughput(1) / epsilon ≈ 8.64e14 → use log ceiling 35
 	const moodLogCeiling = 35.0
-	mood := utils.Clamp(math.Log1p(rawMood)/moodLogCeiling, 0, 1)
+	var mood float64
+	if uptime == 0 && requests == 0 && errors == 0 {
+		mood = 0.5 // no HTTP/uptime signals — neutral rather than depressed
+	} else {
+		denominator := errors*timeouts*restarts + epsilon
+		rawMood := (ws.uptime * (requests + epsilon)) / denominator
+		mood = utils.Clamp(math.Log1p(rawMood)/moodLogCeiling, 0, 1)
+	}
 
 	// --- Atmospheric Pressure (EWMA z-score, ported from composites engine) ---
 	lat := getMetric(metrics, "latency")
@@ -692,40 +697,40 @@ func stressState(s float64) string {
 	case s < 0.3:
 		return "calm"
 	case s < 0.6:
-		return "nervous"
+		return "elevated"
 	case s < 0.8:
-		return "stressed"
+		return "high"
 	default:
-		return "panic"
+		return "critical"
 	}
 }
 
 func fatigueState(f float64) string {
 	switch {
 	case f < 0.3:
-		return "rested"
+		return "nominal"
 	case f < 0.6:
-		return "tired"
+		return "elevated"
 	case f < 0.8:
-		return "exhausted"
+		return "high"
 	default:
-		return "burnout"
+		return "degraded"
 	}
 }
 
 func moodState(m float64) string {
-	// m is normalized [0,1]; 1.0 = happy
+	// m is normalized [0,1]; 1.0 = healthy
 	switch {
 	case m > 0.75:
-		return "happy"
+		return "healthy"
 	case m > 0.50:
 		return "content"
 	case m > 0.25:
 		return "neutral"
 	case m > 0.10:
-		return "sad"
+		return "low-traffic"
 	default:
-		return "depressed"
+		return "no-signal"
 	}
 }
 
@@ -733,7 +738,7 @@ func pressureState(p float64) string {
 	// p is [0,1], 0.5 = stable, > 0.6 = rising
 	switch {
 	case p > 0.7:
-		return "storm_approaching"
+		return "at-risk"
 	case p > 0.55:
 		return "rising"
 	case p < 0.45:
@@ -746,13 +751,13 @@ func pressureState(p float64) string {
 func humidityState(h float64) string {
 	switch {
 	case h < 0.1:
-		return "dry"
+		return "low"
 	case h < 0.3:
 		return "humid"
 	case h < 0.5:
-		return "very_humid"
+		return "elevated"
 	default:
-		return "storm"
+		return "saturated"
 	}
 }
 
@@ -763,9 +768,9 @@ func contagionState(c float64) string {
 	case c < 0.6:
 		return "moderate"
 	case c < 0.8:
-		return "epidemic"
+		return "cascading"
 	default:
-		return "pandemic"
+		return "critical"
 	}
 }
 
@@ -785,13 +790,13 @@ func resilienceState(r float64) string {
 func entropyState(e float64) string {
 	switch {
 	case e < 0.1:
-		return "ordered"
+		return "stable"
 	case e < 0.3:
 		return "fluctuating"
 	case e < 0.6:
-		return "chaotic"
+		return "volatile"
 	default:
-		return "turbulent"
+		return "critical"
 	}
 }
 
