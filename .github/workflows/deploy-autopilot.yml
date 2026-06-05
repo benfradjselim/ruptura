@@ -1,0 +1,53 @@
+name: Deploy Autopilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Autopilot image tag to deploy (e.g. v7.1.30)"
+        required: true
+        default: "v7.1.30"
+      namespace:
+        description: "Kubernetes namespace where autopilot is deployed"
+        required: false
+        default: "ruptura-paid"
+
+jobs:
+  deploy:
+    name: kubectl set-image — ruptura-autopilot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/setup-kubectl@v4
+
+      - name: Write kubeconfig
+        run: |
+          echo "${{ secrets.K3S_KUBECONFIG }}" | base64 -d > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
+          kubectl --kubeconfig /tmp/kubeconfig cluster-info
+
+      - name: Set autopilot image
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          NS="${{ github.event.inputs.namespace }}"
+          IMAGE="ghcr.io/benfradjselim/ruptura-autopilot:${TAG}"
+
+          echo "Deploying ${IMAGE} to ${NS}..."
+
+          # Try updating the proxy container in the autopilot deployment
+          kubectl --kubeconfig /tmp/kubeconfig \
+            set image deployment/ruptura-autopilot \
+            autopilot="${IMAGE}" \
+            proxy="${IMAGE}" \
+            -n "${NS}" 2>/dev/null || \
+          kubectl --kubeconfig /tmp/kubeconfig \
+            set image deployment/ruptura-autopilot \
+            ruptura-autopilot="${IMAGE}" \
+            -n "${NS}"
+
+          kubectl --kubeconfig /tmp/kubeconfig \
+            rollout status deployment/ruptura-autopilot \
+            -n "${NS}" --timeout=5m
+
+      - name: Show pod status
+        run: |
+          kubectl --kubeconfig /tmp/kubeconfig get pods -n "${{ github.event.inputs.namespace }}" -o wide || true
