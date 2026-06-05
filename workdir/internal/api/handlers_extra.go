@@ -12,6 +12,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/actions/engine"
 	"github.com/benfradjselim/ruptura/internal/alerter"
 	apicontext "github.com/benfradjselim/ruptura/internal/context"
+	"github.com/benfradjselim/ruptura/internal/explain"
 	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/gorilla/mux"
 )
@@ -619,6 +620,13 @@ func (h *Handlers) handleExplain(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(r.URL.Path, "/narrative"):
 		narrative, err := h.explainer.NarrativeExplain(id)
 		if err != nil {
+			// No rupture record — synthesize a health narrative from the current snapshot.
+			if h.store != nil {
+				if snap, ok := h.store.LatestSnapshot(id); ok {
+					writeJSON(w, http.StatusOK, map[string]string{"narrative": explain.SynthesizeHealthNarrative(snap)})
+					return
+				}
+			}
 			writeError(w, http.StatusNotFound, err.Error())
 			return
 		}

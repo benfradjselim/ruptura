@@ -171,6 +171,67 @@ func (e *Engine) NarrativeExplain(id string) (string, error) {
 	return buildNarrative(rec), nil
 }
 
+// SynthesizeHealthNarrative generates a plain-text health narrative for any
+// workload from its current KPISnapshot, without requiring a rupture record.
+func SynthesizeHealthNarrative(snap models.KPISnapshot) string {
+	var b strings.Builder
+	workloadName := snap.Host
+	if !snap.Workload.IsEmpty() {
+		workloadName = snap.Workload.Name
+	}
+	health := snap.HealthScore.Value
+	switch {
+	case health >= 70:
+		fmt.Fprintf(&b, "%s is operating normally (health score %.0f/100).\n\n", workloadName, health)
+	case health >= 40:
+		fmt.Fprintf(&b, "%s shows degraded health (health score %.0f/100).\n\n", workloadName, health)
+	default:
+		fmt.Fprintf(&b, "%s is in a critical state (health score %.0f/100).\n\n", workloadName, health)
+	}
+
+	var elevated []string
+	if snap.Stress.Value > 0.6 {
+		elevated = append(elevated, fmt.Sprintf("CPU stress at %.0f%%", snap.Stress.Value*100))
+	}
+	if snap.Fatigue.Value > 0.5 {
+		elevated = append(elevated, fmt.Sprintf("fatigue at %.0f%%", snap.Fatigue.Value*100))
+	}
+	if snap.Pressure.Value > 0.6 {
+		elevated = append(elevated, fmt.Sprintf("memory pressure at %.0f%%", snap.Pressure.Value*100))
+	}
+	if snap.Humidity.Value > 0.5 {
+		elevated = append(elevated, fmt.Sprintf("queue depth at %.0f%%", snap.Humidity.Value*100))
+	}
+	if snap.Contagion.Value > 0.3 {
+		elevated = append(elevated, fmt.Sprintf("contagion signal at %.0f%%", snap.Contagion.Value*100))
+	}
+	if snap.Entropy.Value > 0.5 {
+		elevated = append(elevated, fmt.Sprintf("entropy at %.0f%%", snap.Entropy.Value*100))
+	}
+	if len(elevated) > 0 {
+		b.WriteString("Elevated signals:\n")
+		for _, s := range elevated {
+			fmt.Fprintf(&b, "  • %s\n", s)
+		}
+		b.WriteString("\n")
+	} else {
+		b.WriteString("All KPI signals are within normal bounds.\n\n")
+	}
+
+	fused := snap.FusedRuptureIndex
+	switch {
+	case fused < 1.0:
+		b.WriteString("No rupture risk detected. System is stable.")
+	case fused < 2.0:
+		fmt.Fprintf(&b, "Minor rupture risk (FusedR=%.2f). Continue monitoring.", fused)
+	case fused < 4.0:
+		fmt.Fprintf(&b, "Moderate rupture risk (FusedR=%.2f). Investigate elevated signals.", fused)
+	default:
+		fmt.Fprintf(&b, "High rupture risk (FusedR=%.2f). Immediate attention required.", fused)
+	}
+	return b.String()
+}
+
 // buildNarrative constructs the human-readable causal chain from a RuptureRecord.
 func buildNarrative(rec RuptureRecord) string {
 	snap := rec.KPISnapshot
