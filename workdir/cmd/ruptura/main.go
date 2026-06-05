@@ -359,15 +359,18 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					ref := models.WorkloadRefFromKey(host)
 					snap := analyzerEngine.Update(ref, rawMetrics)
 
-					// Feed each raw metric into the predictor ensemble first so that
-					// health_score CAILR is current when we compute metricR below.
-					for metric, val := range rawMetrics {
-						predictorEngine.Feed(host, metric, val, now)
-					}
-					// Also feed the composite KPI signals.
-					predictorEngine.Feed(host, "health_score", snap.HealthScore.Value, now)
+					// Feed only normalized KPI signals (all 0-1) to the predictor.
+					// Never feed rawMetrics here: those use different scales (e.g.
+					// cpu_percent=50 vs stress=0.35) and double-feeding the same key
+					// at the same x-coordinate corrupts the ILR slope estimator.
 					predictorEngine.Feed(host, "stress", snap.Stress.Value, now)
 					predictorEngine.Feed(host, "fatigue", snap.Fatigue.Value, now)
+					predictorEngine.Feed(host, "mood", snap.Mood.Value, now)
+					predictorEngine.Feed(host, "pressure", snap.Pressure.Value, now)
+					predictorEngine.Feed(host, "humidity", snap.Humidity.Value, now)
+					predictorEngine.Feed(host, "contagion", snap.Contagion.Value, now)
+					predictorEngine.Feed(host, "entropy", snap.Entropy.Value, now)
+					predictorEngine.Feed(host, "health_score", snap.HealthScore.Value, now)
 
 					// Feed metricR into fusion BEFORE storing snapshot so FusedR is current.
 					// Primary: CAILR on the raw pipeline metric (fatigue/stress/cpu_percent…)

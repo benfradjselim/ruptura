@@ -377,6 +377,12 @@ func (h *Handlers) handleForecast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Bounded KPI signals are always in [0,1]. Clamp forecast output to
+	// prevent corrupted ILR state from producing absurd extrapolations.
+	if boundedKPIs[metric] {
+		clampForecastResult(&result)
+	}
+
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -707,5 +713,38 @@ func (h *Handlers) handleConfigWeights(w http.ResponseWriter, r *http.Request) {
 		}
 		h.analyzer.SetWeightConfigs(cfgs)
 		writeJSON(w, http.StatusOK, map[string]interface{}{"applied": len(cfgs)})
+	}
+}
+
+// boundedKPIs lists KPI signals whose values are always in [0, 1].
+// Used to clamp forecast output so that a corrupted ILR slope cannot
+// produce absurd extrapolations visible in the UI.
+var boundedKPIs = map[string]bool{
+	"stress": true, "fatigue": true, "mood": true, "pressure": true,
+	"humidity": true, "contagion": true, "entropy": true,
+	"resilience": true, "velocity": true, "health_score": true,
+	"error_rate": true,
+}
+
+func clampForecastResult(r *models.ForecastResult) {
+	clamp01 := func(v float64) float64 {
+		if v < 0 {
+			return 0
+		}
+		if v > 1 {
+			return 1
+		}
+		return v
+	}
+	r.Current = clamp01(r.Current)
+	for i := range r.Points {
+		r.Points[i].Mean = clamp01(r.Points[i].Mean)
+		r.Points[i].Lower80 = clamp01(r.Points[i].Lower80)
+		r.Points[i].Upper80 = clamp01(r.Points[i].Upper80)
+		r.Points[i].Lower95 = clamp01(r.Points[i].Lower95)
+		r.Points[i].Upper95 = clamp01(r.Points[i].Upper95)
+	}
+	for i := range r.Models {
+		r.Models[i].Mean = clamp01(r.Models[i].Mean)
 	}
 }
