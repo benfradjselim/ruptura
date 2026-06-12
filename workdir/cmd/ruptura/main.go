@@ -26,6 +26,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/fusion"
 	"github.com/benfradjselim/ruptura/internal/history"
 	"github.com/benfradjselim/ruptura/internal/ingest"
+	pipelinelogs "github.com/benfradjselim/ruptura/internal/pipeline/logs"
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/predictor"
 	"github.com/benfradjselim/ruptura/internal/storage"
@@ -169,6 +170,8 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	sentSink := &busSentimentSink{bus: bus, ctx: ctx}
 	ingestEngine := ingest.New(pipelineEngine, logSink, nil, sentSink, fusionEngine)
 	ingestEngine.SetLogStore(store)
+	logPipelineEng := pipelinelogs.NewEngine(pipelineEngine)
+	ingestEngine.SetLogPipeline(logPipelineEng)
 	analyzerEngine := analyzer.NewAnalyzer()
 	analyzerEngine.SetTopology(topoBuilder)
 	if raw := os.Getenv("RUPTURA_WORKLOAD_WEIGHTS"); raw != "" {
@@ -190,6 +193,22 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	} else {
 		logger.Default.Info("k8s auto-discovery skipped (not in-cluster)", "reason", err.Error())
 	}
+
+	// Flush log pipeline buckets every 15 s so signals are emitted even when
+	// log volume is low and no new lines arrive to trigger auto-flush.
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				logPipelineEng.Flush()
+				return
+			case <-ticker.C:
+				logPipelineEng.Flush()
+			}
+		}
+	}()
 
 	// Pipe burst events into fusion as logR
 	go fusionEngine.StartLogWatcher(ctx, burstDet.Events())

@@ -142,17 +142,75 @@ func TestOTLPMetrics_sum(t *testing.T) {
 func TestOTLPLogs(t *testing.T) {
 	logs := &mockLogs{}
 	e := New(nil, logs, nil, nil, nil)
-	
+
 	body := `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"svc1"}}]},"scopeLogs":[{"logRecords":[{"body":{"stringValue":"err"},"timeUnixNano":"1000000000"}]}]}]}`
 	req := httptest.NewRequest("POST", "/otlp/v1/logs", strings.NewReader(body))
 	w := httptest.NewRecorder()
-	
+
 	e.handleOTLPLogs(w, req)
-	
+
 	if logs.lines != 1 {
 		t.Errorf("expected 1 log, got %d", logs.lines)
 	}
 }
+
+func TestOTLPLogs_LogPipeline(t *testing.T) {
+	burstSink := &mockLogs{}
+	pipelineSink := &mockLogs{}
+	e := New(nil, burstSink, nil, nil, nil)
+	e.SetLogPipeline(pipelineSink)
+
+	// Two log records for the same service — both sinks should receive both lines.
+	body := `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"svc1"}}]},"scopeLogs":[{"logRecords":[{"body":{"stringValue":"error: disk full"},"timeUnixNano":"1000000000"},{"body":{"stringValue":"warn: high memory"},"timeUnixNano":"2000000000"}]}]}]}`
+	req := httptest.NewRequest("POST", "/otlp/v1/logs", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	e.handleOTLPLogs(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+	if burstSink.lines != 2 {
+		t.Errorf("burst sink: expected 2 lines, got %d", burstSink.lines)
+	}
+	if pipelineSink.lines != 2 {
+		t.Errorf("log pipeline sink: expected 2 lines, got %d", pipelineSink.lines)
+	}
+}
+
+func TestOTLPLogs_LogPipeline_WorkloadKey(t *testing.T) {
+	type call struct{ service string; line string }
+	var calls []call
+	captureSink := &capturingLogSink{fn: func(svc string, line []byte, _ time.Time) {
+		calls = append(calls, call{svc, string(line)})
+	}}
+
+	e := New(nil, nil, nil, nil, nil)
+	e.SetLogPipeline(captureSink)
+
+	// Resource has k8s.deployment.name and k8s.namespace.name → workload key used
+	body := `{"resourceLogs":[{"resource":{"attributes":[{"key":"k8s.namespace.name","value":{"stringValue":"prod"}},{"key":"k8s.deployment.name","value":{"stringValue":"frontend"}},{"key":"service.name","value":{"stringValue":"frontend-svc"}}]},"scopeLogs":[{"logRecords":[{"body":{"stringValue":"started"},"timeUnixNano":"1000000000"}]}]}]}`
+	req := httptest.NewRequest("POST", "/otlp/v1/logs", strings.NewReader(body))
+	e.handleOTLPLogs(w(req), req)
+
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(calls))
+	}
+	// Pipeline should receive workload key, not raw service name
+	if calls[0].service != "prod/Deployment/frontend" {
+		t.Errorf("expected workload key 'prod/Deployment/frontend', got %q", calls[0].service)
+	}
+}
+
+type capturingLogSink struct {
+	fn func(service string, line []byte, ts time.Time)
+}
+
+func (c *capturingLogSink) IngestLine(service string, line []byte, ts time.Time) {
+	c.fn(service, line, ts)
+}
+
+func w(_ *http.Request) *httptest.ResponseRecorder { return httptest.NewRecorder() }
 
 func TestOTLPTraces_ok(t *testing.T) {
 	spans := &mockSpans{}

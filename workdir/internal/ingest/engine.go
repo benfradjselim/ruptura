@@ -53,6 +53,7 @@ type Ingestor interface {
 type Engine struct {
 	pipeline    metrics.MetricPipeline
 	logs        LogSink
+	logPipeline LogSink     // log metrics pipeline — emits log_error_rate / log_burst_index into metric pipeline
 	logStore    LogStoreSink
 	spans       SpanSink
 	sentiment   SentimentSink
@@ -85,6 +86,10 @@ func New(pipeline metrics.MetricPipeline, logs LogSink, spans SpanSink, sentimen
 
 // SetLogStore wires a durable storage backend for OTLP log persistence.
 func (e *Engine) SetLogStore(s LogStoreSink) { e.logStore = s }
+
+// SetLogPipeline wires a log-metrics pipeline that converts raw log lines into
+// log_error_rate and log_burst_index signals fed into the metric pipeline.
+func (e *Engine) SetLogPipeline(sink LogSink) { e.logPipeline = sink }
 
 // SetIngestHook registers a callback invoked once per ingested log or trace item.
 // Used to forward counts to the telemetry registry for Prometheus export.
@@ -364,6 +369,13 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 		if service == "" {
 			service = "unknown"
 		}
+		// Use the workload key (namespace/kind/name) so log metrics align with
+		// the metric pipeline's host namespace — falls back to service name when
+		// there is no k8s resource context (e.g. bare-metal, non-k8s services).
+		workloadKey := ref.Key()
+		if workloadKey == "" {
+			workloadKey = service
+		}
 		var pos, neg int
 		for _, sl := range rl.ScopeLogs {
 			for _, lr := range sl.LogRecords {
@@ -376,6 +388,9 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 
 				if e.logs != nil {
 					e.logs.IngestLine(service, []byte(body), ts)
+				}
+				if e.logPipeline != nil {
+					e.logPipeline.IngestLine(workloadKey, []byte(body), ts)
 				}
 
 				if e.logStore != nil {
