@@ -1,6 +1,7 @@
 {
   "name": "Ruptura Lab",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "runArgs": ["--privileged"],
   "features": {
     "ghcr.io/devcontainers/features/go:1": {
       "version": "1.22"
@@ -9,6 +10,9 @@
       "version": "latest",
       "helm": "latest",
       "minikube": "none"
+    },
+    "ghcr.io/devcontainers/features/k3s:1": {
+      "version": "latest"
     }
   },
   "onCreateCommand": "bash .devcontainer/on-create.sh",
