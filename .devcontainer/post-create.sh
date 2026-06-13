@@ -33,20 +33,21 @@ for NS in ruptura-system monitoring test-workloads; do
 done
 
 
-# ── 4. Build Ruptura image from source and import into k3s ───────────────────
-log "Building Ruptura image from source..."
-cd /workspaces/ruptura/workdir
-docker build -t ghcr.io/benfradjselim/ruptura:6.8.1 . 2>&1 | grep -E "^(Step|#|Successfully|ERROR)" || true
-log "Importing image into k3s containerd..."
-docker save ghcr.io/benfradjselim/ruptura:6.8.1 | sudo k3s ctr images import -
-docker rmi ghcr.io/benfradjselim/ruptura:6.8.1 2>/dev/null || true  # free Docker layer cache
-cd /workspaces/ruptura
+# ── 4. Update Ruptura manifest to latest image ───────────────────────────────
+log "Using pre-built image from ghcr.io (no Docker build needed)"
+# Point manifest at the latest published image
+sed -i 's|image: ghcr.io/benfradjselim/ruptura:.*|image: ghcr.io/benfradjselim/ruptura:v7|' \
+  workdir/deploy/central-deployment.yaml
 
 # ── 5. Deploy Ruptura ─────────────────────────────────────────────────────────
 log "Deploying Ruptura..."
 kubectl apply -f workdir/deploy/rbac.yaml
 kubectl apply -f workdir/deploy/configmap.yaml
 kubectl apply -f workdir/deploy/pvc.yaml
+# Generate a random API key for the lab
+kubectl create secret generic ruptura-secrets -n ruptura-system \
+  --from-literal=api-key=lab-secret-$(openssl rand -hex 8) \
+  --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f workdir/deploy/central-deployment.yaml
 
 # If local-path-provisioner is unavailable (e.g. fresh k3s before first reconcile),
