@@ -251,15 +251,17 @@ func TestTopologyEndpoint(t *testing.T) {
 }
 
 func TestConfigWeights(t *testing.T) {
+    const testKey = "test-weights-key"
     met := telemetry.NewRegistry("test")
     hc := telemetry.NewHealthChecker()
-    h := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, "")
+    h := New(nil, nil, nil, nil, nil, nil, nil, nil, met, hc, testKey)
     h.SetAnalyzer(analyzer.NewAnalyzer())
     h.SetReady(true)
     router := h.NewRouter()
 
     t.Run("GET returns empty list initially", func(t *testing.T) {
         req, _ := http.NewRequest("GET", "/api/v2/config/weights", nil)
+        req.Header.Set("Authorization", "Bearer "+testKey)
         w := httptest.NewRecorder()
         router.ServeHTTP(w, req)
         if w.Code != http.StatusOK {
@@ -271,6 +273,7 @@ func TestConfigWeights(t *testing.T) {
         body := bytes.NewBufferString(`[{"selector":"payments/*","stress":0.5,"fatigue":0.1,"mood":0.1,"pressure":0.1,"humidity":0.1,"contagion":0.1}]`)
         req, _ := http.NewRequest("POST", "/api/v2/config/weights", body)
         req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("Authorization", "Bearer "+testKey)
         w := httptest.NewRecorder()
         router.ServeHTTP(w, req)
         if w.Code != http.StatusOK {
@@ -280,6 +283,7 @@ func TestConfigWeights(t *testing.T) {
 
     t.Run("GET returns set configs", func(t *testing.T) {
         req, _ := http.NewRequest("GET", "/api/v2/config/weights", nil)
+        req.Header.Set("Authorization", "Bearer "+testKey)
         w := httptest.NewRecorder()
         router.ServeHTTP(w, req)
         if w.Code != http.StatusOK {
@@ -289,6 +293,7 @@ func TestConfigWeights(t *testing.T) {
 
     t.Run("POST with bad JSON returns 400", func(t *testing.T) {
         req, _ := http.NewRequest("POST", "/api/v2/config/weights", bytes.NewBufferString(`not-json`))
+        req.Header.Set("Authorization", "Bearer "+testKey)
         w := httptest.NewRecorder()
         router.ServeHTTP(w, req)
         if w.Code != http.StatusBadRequest {
