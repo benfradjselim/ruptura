@@ -513,10 +513,10 @@
               </div>
               <div class="fused-block">
                 <span class="fused-num" style="color:{fuseColor(snap.fused_rupture_index)}">
-                  {snap.fused_rupture_index.toFixed(3)}
+                  {(snap.fused_rupture_index ?? 0).toFixed(3)}
                 </span>
                 <span class="fused-label">FusedR</span>
-                <span class="fused-sub">{snap.fused_rupture_index < 1 ? 'normal' : snap.fused_rupture_index < 1.5 ? 'elevated' : snap.fused_rupture_index < 2.5 ? 'warning' : 'critical'}</span>
+                <span class="fused-sub">{(snap.fused_rupture_index ?? 0) < 1 ? 'normal' : (snap.fused_rupture_index ?? 0) < 1.5 ? 'elevated' : (snap.fused_rupture_index ?? 0) < 2.5 ? 'warning' : 'critical'}</span>
               </div>
               {#if snap.business}
                 {@const biz = snap.business}

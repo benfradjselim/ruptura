@@ -36,7 +36,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.0.3"
+const version = "7.1.0"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -137,7 +137,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("open storage failed: %w", err)
 	}
+	ctx, cancel := context.WithCancel(ctx)
 	defer store.Close()
+	defer cancel()
 
 	// Periodic BadgerDB value-log GC — prevents vlog files from accumulating and
 	// reclaims space from TTL-expired entries. Runs every 10 minutes; each pass
