@@ -1,0 +1,15 @@
+# Global code owners
+* @benfradjselim
+
+# Core engine
+/workdir/ @benfradjselim
+
+# Helm chart
+/helm/ @benfradjselim
+
+# Operator and bundle
+/bundle/ @benfradjselim
+/catalog/ @benfradjselim
+
+# UI
+/ui/ @benfradjselim
