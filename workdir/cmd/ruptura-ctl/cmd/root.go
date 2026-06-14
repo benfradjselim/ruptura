@@ -11,7 +11,7 @@ import (
 )
 
 // CTLVersion is the ruptura-ctl release version — versioned independently of the server.
-const CTLVersion = "1.1.0"
+const CTLVersion = "1.2.0"
 
 var (
 	cfgURL     string

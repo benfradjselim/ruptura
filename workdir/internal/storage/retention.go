@@ -73,7 +73,7 @@ func (s *Store) Compact() {
 		logger.Default.Error("compact raw->5m metrics", "err", err)
 	}
 	// raw → 5m (KPIs)
-	if err := s.compactTier("k:", "kr5:", 5*time.Minute, cutRaw, Rollup5mTTL); err != nil {
+	if err := s.compactTier("kpi:", "kr5:", 5*time.Minute, cutRaw, Rollup5mTTL); err != nil {
 		logger.Default.Error("compact raw->5m kpis", "err", err)
 	}
 	// 5m → 1h (metrics)
@@ -197,7 +197,7 @@ func mean(vals []float64) float64 {
 
 // RetentionStats returns counts of keys per tier for observability.
 func (s *Store) RetentionStats() map[string]int64 {
-	prefixes := []string{"m:", "k:", "r5:", "kr5:", "r1h:", "kr1h:"}
+	prefixes := []string{"m:", "kpi:", "r5:", "kr5:", "r1h:", "kr1h:"}
 	stats := make(map[string]int64, len(prefixes))
 	for _, pfx := range prefixes {
 		var count int64

@@ -13,8 +13,6 @@ func (h *Handlers) NewRouter() http.Handler {
 	// Root redirect removed — the v7 ruptura-ui pod serves the dashboard on its own NodePort.
 	// Probe endpoints are always public — k8s liveness/readiness probes carry no auth
 
-	r.HandleFunc("/timeline", h.handleTimeline).Methods("GET")
-
 	// Probe endpoints are always public — k8s liveness/readiness probes carry no auth
 	r.HandleFunc("/api/v2/health", h.handleHealth).Methods("GET")
 	r.HandleFunc("/api/v2/ready", h.handleReady).Methods("GET")
@@ -24,6 +22,7 @@ func (h *Handlers) NewRouter() http.Handler {
 	api := r.PathPrefix("/api/v2").Subrouter()
 	api.Use(h.authMiddleware)
 
+	api.HandleFunc("/timeline", h.handleTimeline).Methods("GET")
 	api.HandleFunc("/metrics", h.handleMetrics).Methods("GET")
 
 	api.HandleFunc("/write", h.handleWrite).Methods("POST")
