@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/benfradjselim/ruptura/main/assets/logo/ruptura-icon-256.png" alt="Ruptura" width="120" /><br><br>
-  <img src="https://img.shields.io/badge/version-6.8.2-0069ff?style=for-the-badge" alt="v6.8.2">
+  <img src="https://img.shields.io/badge/version-7.1.0-0069ff?style=for-the-badge" alt="v7.1.0">
   <img src="https://img.shields.io/badge/go-1.21+-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go 1.21+">
   <img src="https://img.shields.io/badge/license-Apache%202.0-green?style=for-the-badge" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/kubernetes-native-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" alt="Kubernetes Native">
@@ -171,7 +171,7 @@ docker run -d \
   -p 4317:4317 \
   -v ruptura-data:/var/lib/ruptura/data \
   -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-  ghcr.io/benfradjselim/ruptura:6.8.2
+  ghcr.io/benfradjselim/ruptura:7.1.0
 ```
 
 | Port | Purpose |
@@ -334,7 +334,7 @@ metadata:
   name: production
   namespace: ruptura-system
 spec:
-  image: ghcr.io/benfradjselim/ruptura:6.8.2   # optional — defaults to bundled version
+  image: ghcr.io/benfradjselim/ruptura:7.1.0   # optional — defaults to bundled version
   edition: community                             # community (read-only) | autopilot (full execution)
   storageSize: 20Gi                              # PVC size for BadgerDB (default: 10Gi)
   replicas: 1                                   # must be 1 — BadgerDB is single-writer
@@ -383,6 +383,16 @@ helm lint helm/
 ---
 
 ## Changelog
+
+### v7.1.0 (2026-06-14)
+- fix: constant-time password comparison in login handler (timing attack)
+- fix: deny mutating requests when RUPTURA_API_KEY is not configured
+- fix: /timeline endpoint moved inside authenticated subrouter
+- fix: /rollback edition gate (was missing, only /approve was gated)
+- fix: KPI compaction prefix corrected (kpi: was k:, history beyond 6h was always empty)
+- fix: GC goroutine shutdown order (context cancel before store close)
+- fix: null guard on fused_rupture_index in Fleet UI
+- feat: ruptura-ctl v1.2.0
 
 ### v6.8.2 — 2026-05-10
 - **OOMKill prevention**: BadgerDB defaults used 576 MB (MemTable 320 MB + BlockCache 256 MB), exceeding the 512 Mi container limit. Tuned to 8 MB × 2 tables + 32 MB block cache ≈ 60 MB total BadgerDB footprint.
@@ -482,6 +492,7 @@ helm lint helm/
 
 ```
 ruptura (application)
+v7.1.0 ✅  Security hardening · KPI compaction fix · GC shutdown order · Fleet UI null guard · ruptura-ctl v1.2.0
 v6.8.2 ✅  OOMKill prevention — BadgerDB memory tuning, periodic GC, GOMEMLIMIT
 v6.8.x ✅  Stable dashboard · fleet heatmap · workload identity
 v6.7.0 ✅  Embedded web dashboard — air-gap safe, vendor-local assets
@@ -492,12 +503,22 @@ v6.4.0 ✅  Rupture fingerprinting · business signal layer
 v6.3.0 ✅  Calibration warm-up · HealthScore ETA forecast · ruptura-sim
 v6.2.x ✅  Fused Rupture Index · workload-level signals · adaptive baselines · narrative explain
 v6.1.0 ✅  gRPC ingest · NATS/Kafka eventbus · adaptive ensemble · K8s operator
-v7.0.0 ⏳  multi-tenant (X-Org-ID) · Python SDK v2
+v7.2.0 ⏳  multi-tenant (X-Org-ID) · Python SDK v2
 
 ruptura-operator (Kubernetes Operator — OperatorHub)
 v0.6.7 ✅  First OperatorHub release — merged into community-operators
 v0.6.8 ✅  ServiceAccount fix · RBAC fix · upgrade graph — merged into community-operators
 ```
+
+---
+
+## Community
+
+Ruptura is built in the open and welcomes contributions, feedback, and discussion.
+
+- **GitHub Discussions**: [github.com/benfradjselim/ruptura/discussions](https://github.com/benfradjselim/ruptura/discussions) — questions, ideas, and community support
+- **Issues**: [github.com/benfradjselim/ruptura/issues](https://github.com/benfradjselim/ruptura/issues) — bug reports and feature requests
+- **CNCF Alignment**: Ruptura is designed to complement the CNCF observability ecosystem — ingesting from OpenTelemetry (graduated), exposing metrics to Prometheus (graduated), deploying via Helm (graduated), and operating on Kubernetes (graduated). A CNCF Sandbox proposal is in preparation.
 
 ---
 
