@@ -13,7 +13,11 @@ func (h *Handlers) authMiddleware(next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if h.apiKey == "" {
-			next.ServeHTTP(w, r)
+			if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+				next.ServeHTTP(w, r)
+				return
+			}
+			writeError(w, http.StatusServiceUnavailable, "RUPTURA_API_KEY is not configured")
 			return
 		}
 		auth := r.Header.Get("Authorization")

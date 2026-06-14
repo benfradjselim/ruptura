@@ -7,6 +7,7 @@ package api
 // endpoint shapes onto the existing storage and pipeline internals.
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"sort"
@@ -305,7 +306,7 @@ func (h *Handlers) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if h.apiKey != "" && creds.Password != h.apiKey {
+	if h.apiKey != "" && subtle.ConstantTimeCompare([]byte(creds.Password), []byte(h.apiKey)) != 1 {
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
