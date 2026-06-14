@@ -137,8 +137,8 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("open storage failed: %w", err)
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	defer store.Close()
+	defer cancel()
 
 	// Periodic BadgerDB value-log GC — prevents vlog files from accumulating and
 	// reclaims space from TTL-expired entries. Runs every 10 minutes; each pass
