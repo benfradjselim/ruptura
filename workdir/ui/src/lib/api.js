@@ -117,6 +117,26 @@ export const api = {
   // ── Fleet ──────────────────────────────────────────────────────────────────
   fleet: () => req('GET', '/fleet'),
 
+  // ── History ────────────────────────────────────────────────────────────────
+  history: (workload, from, to) => {
+    let path = workload ? `/history/${encodeURIComponent(workload)}` : '/history'
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to)   params.set('to', to)
+    const qs = params.toString()
+    return req('GET', path + (qs ? '?' + qs : ''))
+  },
+
+  // ── Ruptures ───────────────────────────────────────────────────────────────
+  ruptures:        ()       => req('GET', '/ruptures'),
+  rupture:         (host)   => req('GET', `/rupture/${encodeURIComponent(host)}`),
+  ruptureHistory:  (host)   => req('GET', `/rupture/${encodeURIComponent(host)}/history`),
+  ruptureProfile:  (host)   => req('GET', `/rupture/${encodeURIComponent(host)}/profile`),
+
+  // ── Forecast ───────────────────────────────────────────────────────────────
+  forecastWorkload: (metric, ns, workload) =>
+    req('GET', `/forecast/${encodeURIComponent(metric)}/${encodeURIComponent(ns)}/${encodeURIComponent(workload)}`),
+
   // ── Notifications ──────────────────────────────────────────────────────────
   notifications:        ()         => req('GET', '/notifications'),
   notificationCreate:   (ch)       => req('POST', '/notifications', ch),

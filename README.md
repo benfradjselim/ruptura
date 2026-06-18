@@ -8,6 +8,7 @@
   <img alt="Go version" src="https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
   <img alt="CNCF Sandbox" src="https://img.shields.io/badge/CNCF-Sandbox%20Applicant-0086FF">
+  <a href="https://codecov.io/gh/benfradjselim/ruptura"><img alt="Coverage" src="https://codecov.io/gh/benfradjselim/ruptura/branch/main/graph/badge.svg"></a>
   <img alt="GitHub release" src="https://img.shields.io/github/v/release/benfradjselim/ruptura">
 </p>
 

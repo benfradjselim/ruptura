@@ -1,6 +1,6 @@
 # Dashboard Tour
 
-Ruptura v7 ships a Svelte 4 SPA at `http://<node-ip>:31469`. Below is a full walkthrough grounded in the **live lab** running at [185.229.225.115:31469](http://185.229.225.115:31469) — five synthetic workloads are active and the engine is fully calibrated.
+Ruptura v7 ships a Svelte 4 SPA at `http://<node-ip>:31469`. Below is a full walkthrough grounded in the **live lab** running at [<YOUR_NODE_IP>:31469](http://<YOUR_NODE_IP>:31469) — five synthetic workloads are active and the engine is fully calibrated.
 
 ---
 

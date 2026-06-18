@@ -320,7 +320,7 @@ Inject synthetic workloads with distinct failure profiles to test the system imm
 
 ```bash
 python3 scripts/simulate.py [--host HOST] [--port PORT] [--interval SEC]
-# Default target: http://185.229.225.115:31470
+# Default target: http://<YOUR_NODE_IP>:31470
 
 # Workloads injected every 5s:
 #   gateway        — stable/healthy (CPU ~22%, err ~0.3%)

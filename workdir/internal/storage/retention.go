@@ -154,7 +154,10 @@ func (s *Store) compactTier(srcPrefix, destPrefix string, bucketSize time.Durati
 		keysByBucket[bk] = append(keysByBucket[bk], p.key)
 	}
 
-	// Write rollups and delete source keys
+	// Write rollups and delete source keys atomically.
+	// Using a single BadgerDB Update transaction ensures that if the process crashes
+	// between writing the rollup and deleting sources, we don't end up re-averaging
+	// already-averaged data on the next compaction run.
 	for bk, vals := range buckets {
 		avg := mean(vals)
 
@@ -163,14 +166,19 @@ func (s *Store) compactTier(srcPrefix, destPrefix string, bucketSize time.Durati
 		innerSeries := bk.seriesPrefix[len(srcPrefix):]
 		destKey := fmt.Sprintf("%s%s%020d", destPrefix, innerSeries, bk.floor.UnixNano())
 
-		// Write rollup
-		if err := s.set(destKey, avg, destTTL); err != nil {
-			logger.Default.Error("write rollup", "key", destKey, "err", err)
-			continue
-		}
-
-		// Delete source keys
+		// Atomic: write rollup + delete sources in ONE transaction to prevent
+		// double-averaging on crash-restart.
 		if err := s.db.Update(func(txn *badger.Txn) error {
+			// Write rollup entry
+			encoded, encErr := json.Marshal(avg)
+			if encErr != nil {
+				return encErr
+			}
+			entry := badger.NewEntry([]byte(destKey), encoded).WithTTL(destTTL)
+			if err := txn.SetEntry(entry); err != nil {
+				return err
+			}
+			// Delete all source keys in the same transaction
 			for _, k := range keysByBucket[bk] {
 				if err := txn.Delete([]byte(k)); err != nil && err != badger.ErrKeyNotFound {
 					return err
@@ -178,7 +186,7 @@ func (s *Store) compactTier(srcPrefix, destPrefix string, bucketSize time.Durati
 			}
 			return nil
 		}); err != nil {
-			logger.Default.Error("delete source keys", "key", destKey, "err", err)
+			logger.Default.Error("atomic compact", "dest_key", destKey, "src_count", len(keysByBucket[bk]), "err", err)
 		}
 	}
 	return nil

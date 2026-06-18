@@ -6,7 +6,15 @@ failure modes via the /api/v2/write endpoint (Prometheus remote-write JSON).
 Usage:
     python3 scripts/simulate.py [--host HOST] [--port PORT] [--interval SEC]
 
-Default target: http://185.229.225.115:31470
+Examples:
+    # Local dev (k3s NodePort default)
+    python3 scripts/simulate.py --host localhost --port 31470
+
+    # Remote cluster
+    python3 scripts/simulate.py --host <YOUR_NODE_IP> --port 31470
+
+    # Direct OTLP port (no NodePort)
+    python3 scripts/simulate.py --host localhost --port 4317
 
 Workloads:
   gateway          — stable, healthy, normal traffic
@@ -25,7 +33,7 @@ import time
 import urllib.request
 import urllib.error
 
-DEFAULT_HOST = "185.229.225.115"
+DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 31470
 DEFAULT_INTERVAL = 5  # seconds between pushes
 

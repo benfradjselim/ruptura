@@ -2,11 +2,12 @@
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/benfradjselim/ruptura/main/assets/logo/ruptura-icon-256.png" alt="Ruptura" width="120" /><br><br>
-  <img src="https://img.shields.io/badge/version-7.1.0-0069ff?style=for-the-badge" alt="v7.1.0">
-  <img src="https://img.shields.io/badge/go-1.21+-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go 1.21+">
+  <img src="https://img.shields.io/github/v/release/benfradjselim/ruptura?color=0069ff?style=for-the-badge" alt="v7.1.0">
+  <img src="https://img.shields.io/badge/go-1.22-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go 1.21+">
   <img src="https://img.shields.io/badge/license-Apache%202.0-green?style=for-the-badge" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/kubernetes-native-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" alt="Kubernetes Native">
   <img src="https://img.shields.io/badge/tests-passing-brightgreen?style=for-the-badge" alt="Tests Passing">
+  <a href="https://codecov.io/gh/benfradjselim/ruptura"><img src="https://img.shields.io/codecov/c/github/benfradjselim/ruptura?style=for-the-badge" alt="Coverage"></a>
 </p>
 
 <p align="center">

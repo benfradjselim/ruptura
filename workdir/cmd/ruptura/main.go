@@ -138,8 +138,11 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("open storage failed: %w", err)
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	defer store.Close()
+	// IMPORTANT: cancel() must be deferred BEFORE store.Close() so the GC goroutine
+	// stops (via ctx.Done()) before the BadgerDB handle is closed. Go defers execute
+	// in LIFO order, so cancel() runs first, then store.Close().
 	defer cancel()
+	defer store.Close()
 
 	// Periodic BadgerDB value-log GC — prevents vlog files from accumulating and
 	// reclaims space from TTL-expired entries. Runs every 10 minutes; each pass

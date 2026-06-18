@@ -46,7 +46,7 @@ jobs:
       - name: Wire ruptura-lab datasource into Ruptura
         env:
           RUPTURA_API_KEY: ${{ secrets.RUPTURA_API_KEY }}
-          NODE_IP: "185.229.225.115"
+          NODE_IP: "${NODE_IP}"
           API_PORT: "31468"
         run: |
           # Add ruptura-lab as a second Prometheus datasource scoped to that namespace
@@ -58,7 +58,7 @@ jobs:
               "id":   "prometheus-ruptura-lab",
               "name": "Prometheus (ruptura-lab)",
               "type": "prometheus",
-              "url":  "http://185.229.225.115:30090",
+              "url":  "http://${NODE_IP}:30090",
               "enabled": true,
               "scrape_interval_seconds": 30,
               "namespace": "ruptura-lab"

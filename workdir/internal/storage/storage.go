@@ -745,3 +745,82 @@ func (s *Store) QueryTraceList(service string, limit int) ([]TraceHeader, error)
 	}
 	return headers, nil
 }
+
+// --- Purge operations (used by DELETE /api/v2/ingest/purge) ---
+
+// PurgeMetrics deletes raw metric keys (prefix "m:") within the given time range.
+// If from is zero, purges from the beginning. If to is zero, purges up to now.
+// Returns the number of keys deleted.
+func (s *Store) PurgeMetrics(from, to time.Time) (int64, error) {
+	return s.purgeByPrefix("m:", from, to)
+}
+
+// PurgeKPIs deletes KPI keys (all tiers: kpi:, kr5:, kr1h:) within the time range.
+func (s *Store) PurgeKPIs(from, to time.Time) (int64, error) {
+	var total int64
+	for _, pfx := range []string{"kpi:", "kr5:", "kr1h:"} {
+		n, err := s.purgeByPrefix(pfx, from, to)
+		if err != nil {
+			return total, err
+		}
+		total += n
+	}
+	return total, nil
+}
+
+// purgeByPrefix deletes all keys with the given prefix whose embedded timestamp
+// falls within [from, to]. Timestamp is the last 20 characters of the key (nanoseconds).
+func (s *Store) purgeByPrefix(prefix string, from, to time.Time) (int64, error) {
+	var toDelete [][]byte
+
+	err := s.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		pfx := []byte(prefix)
+		for it.Seek(pfx); it.ValidForPrefix(pfx); it.Next() {
+			keyBytes := it.Item().KeyCopy(nil)
+			keyStr := string(keyBytes)
+			if len(keyStr) < len(prefix)+20 {
+				continue
+			}
+			var nanos int64
+			if _, err := fmt.Sscanf(keyStr[len(keyStr)-20:], "%d", &nanos); err != nil {
+				continue
+			}
+			ts := time.Unix(0, nanos)
+			if (!from.IsZero() && ts.Before(from)) || (!to.IsZero() && ts.After(to)) {
+				continue
+			}
+			toDelete = append(toDelete, keyBytes)
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	var deleted int64
+	// Delete in batches of 1000 to avoid large transactions.
+	for i := 0; i < len(toDelete); i += 1000 {
+		end := i + 1000
+		if end > len(toDelete) {
+			end = len(toDelete)
+		}
+		batch := toDelete[i:end]
+		if err := s.db.Update(func(txn *badger.Txn) error {
+			for _, k := range batch {
+				if err := txn.Delete(k); err != nil && err != badger.ErrKeyNotFound {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return deleted, err
+		}
+		deleted += int64(len(batch))
+	}
+	return deleted, nil
+}

@@ -26,6 +26,7 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/metrics", h.handleMetrics).Methods("GET")
 
 	api.HandleFunc("/write", h.handleWrite).Methods("POST")
+	api.HandleFunc("/ingest/purge", h.handleIngestPurge).Methods("DELETE")
 
 	// Host-based rupture routes (backward-compat)
 	api.HandleFunc("/rupture/{host}", h.handleRupture).Methods("GET")

@@ -2,14 +2,14 @@ name: CI
 
 on:
   push:
-    branches: ["v6.1", "v7", "main"]
+    branches: ["main"]
   pull_request:
-    branches: ["v6.1", "v7", "main"]
+    branches: ["main"]
 
 jobs:
-  # ── Go: build + test ──────────────────────────────────────────────────────
+  # ── Go: build + test + coverage ───────────────────────────────────────────
   go:
-    name: Go — Build & Test
+    name: Go — Build, Test & Coverage
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,11 +26,48 @@ jobs:
       - name: Build
         run: go build ./...
 
-      - name: Test (race detector)
-        run: go test -race -count=1 -timeout=120s ./...
+      - name: Test with coverage (race detector)
+        run: go test -race -count=1 -timeout=180s -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: go vet
         run: go vet ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./workdir/coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  # ── UI: sync version + build check ────────────────────────────────────────
+  ui:
+    name: UI — Version sync & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workdir/ui
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: workdir/ui/package-lock.json
+
+      - name: Sync UI version.json from Go const
+        working-directory: workdir
+        run: |
+          VERSION=$(grep 'const version' cmd/ruptura/main.go | sed 's/.*"\(.*\)".*/\1/')
+          echo "{\"version\":\"$VERSION\"}" > ui/public/version.json
+          echo "Synced version.json to $VERSION"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Svelte app
+        run: npm run build
 
   # ── Docker: build only (no push) ──────────────────────────────────────────
   docker-lint:

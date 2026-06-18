@@ -120,10 +120,17 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: ui/package-lock.json
+          cache-dependency-path: workdir/ui/package-lock.json
+          # workdir/ui is the active UI; ui/ at root is archived
+
+      - name: Sync UI version.json from Go const
+        run: |
+          VERSION=$(grep 'const version' workdir/cmd/ruptura/main.go | sed 's/.*"\(.*\)".*/\1/')
+          echo "{\"version\":\"$VERSION\"}" > workdir/ui/public/version.json
+          echo "Synced version.json to $VERSION"
 
       - name: Install & build Svelte app
-        working-directory: ui
+        working-directory: workdir/ui
         run: npm ci && npm run build
 
       - uses: docker/setup-buildx-action@v3
@@ -138,8 +145,8 @@ jobs:
       - name: Build and push ruptura-ui
         uses: docker/build-push-action@v5
         with:
-          context: ./ui
-          file: ./ui/Dockerfile
+          context: ./workdir/ui
+          file: ./workdir/ui/Dockerfile
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.UI_IMAGE }}:${{ steps.resolve-tag.outputs.tag }}

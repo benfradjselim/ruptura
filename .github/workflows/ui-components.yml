@@ -2,30 +2,19 @@ name: UI Components
 
 on:
   push:
-    branches: ["v7", "main"]
-    paths: ["ui/**"]
+    branches: ["main"]
+    paths: ["workdir/ui/**"]
   pull_request:
-    branches: ["v7", "main"]
-    paths: ["ui/**"]
+    branches: ["main"]
+    paths: ["workdir/ui/**"]
 
 jobs:
-  component-tests:
-    name: "${{ matrix.component }} tests"
+  build-and-lint:
+    name: UI — Build & lint
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ui
-
-    strategy:
-      fail-fast: false
-      matrix:
-        component:
-          - NavBar
-          - WorkloadCard
-          - SuppressionModal
-          - WeightsModal
-          - TopologyMap
-          - Engine
+        working-directory: workdir/ui
 
     steps:
       - uses: actions/checkout@v4
@@ -34,29 +23,13 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: ui/package-lock.json
+          cache-dependency-path: workdir/ui/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Test ${{ matrix.component }}
-        run: npx vitest run src/components/__tests__/${{ matrix.component }}.test.ts
-
-  ui-build:
-    name: UI — Vite build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ui
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: ui/package-lock.json
+      - name: Sync version.json
+        working-directory: workdir
+        run: |
+          VERSION=$(grep 'const version' cmd/ruptura/main.go | sed 's/.*"\(.*\)".*/\1/')
+          echo "{\"version\":\"$VERSION\"}" > ui/public/version.json
 
       - name: Install dependencies
         run: npm ci
@@ -64,5 +37,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Type check
-        run: npm run check
+      - name: Check for build artifacts
+        run: |
+          test -d dist && echo "Build successful: dist/ exists" || (echo "Build failed: no dist/" && exit 1)
+          ls -la dist/

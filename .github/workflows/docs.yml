@@ -4,10 +4,9 @@ on:
   push:
     branches:
       - main
-      - v6.1
-      - v7
     paths:
       - 'site/**'
+      - 'docs/**'
 
 permissions:
   contents: read
@@ -20,33 +19,37 @@ concurrency:
 
 jobs:
   build:
+    name: Build MkDocs site
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+    steps:
+      - uses: actions/checkout@v4
         with:
-          python-version: 3.11
+          fetch-depth: 0  # needed for git-revision-date-localized plugin
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Install dependencies
         run: pip install -r site/requirements.txt
 
       - name: Build site
-        run: cd site && mkdocs build
+        run: cd site && mkdocs build --strict
 
-      - name: Upload Pages artifact
+      - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./site/site
+          path: site/site
 
   deploy:
+    name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

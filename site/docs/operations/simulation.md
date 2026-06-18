@@ -18,7 +18,7 @@ Ruptura ships two ways to inject synthetic workloads: the **Python workload simu
 ```bash
 python3 scripts/simulate.py [--host HOST] [--port PORT] [--interval SEC]
 
-# Default target: http://185.229.225.115:31470
+# Default target: http://<YOUR_NODE_IP>:31470
 # Default interval: 5s between pushes
 ```
 

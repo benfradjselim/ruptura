@@ -8,7 +8,7 @@
 
 Ruptura detects workload ruptures before they cause outages — using the Fused Rupture Index™, 10 composite KPI signals with adaptive per-workload baselines, and an action engine that responds automatically with safety gates.
 
-→ **[Live dashboard](http://185.229.225.115:31469/)** · **[Getting Started →](getting-started/installation.md)**
+→ **[Getting Started →](getting-started/installation.md)** · **[GitHub](https://github.com/benfradjselim/ruptura)**
 
 ---
 

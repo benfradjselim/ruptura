@@ -1,16 +1,24 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
+  import { displayLabel, displayValue, displayUnit, signalClass } from '../lib/displayLabels.js'
 
   let fleet = null
   let error = null
   let loading = true
   let interval
+  let expandedWorkload = null
+  let activeTab = {}   // { workloadKey: 'signals'|'history'|'forecast' }
+  let historyData = {} // { workloadKey: [] }
+  let forecastData = {} // { workloadKey: {} }
+  let loadingDetail = {}
+
+  const SIGNAL_KEYS = ['stress', 'fatigue', 'mood', 'contagion', 'pressure', 'resilience']
 
   async function load() {
     try {
       const res = await api.fleet()
-      fleet = res.data
+      fleet = res
       error = null
     } catch (e) {
       error = e.message
@@ -19,204 +27,389 @@
     }
   }
 
+  async function expand(workload) {
+    const key = workload.key || workload.name
+    if (expandedWorkload === key) {
+      expandedWorkload = null
+      return
+    }
+    expandedWorkload = key
+    if (!activeTab[key]) activeTab[key] = 'signals'
+    loadTab(workload, activeTab[key])
+  }
+
+  async function loadTab(workload, tab) {
+    const key = workload.key || workload.name
+    activeTab[key] = tab
+    if (tab === 'history' && !historyData[key]) {
+      loadingDetail[key] = true
+      try {
+        const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        const res = await api.history(key, from)
+        historyData[key] = Array.isArray(res) ? res : (res.snapshots || [])
+      } catch { historyData[key] = [] }
+      loadingDetail[key] = false
+    }
+    if (tab === 'forecast' && !forecastData[key]) {
+      loadingDetail[key] = true
+      try {
+        const ns = workload.namespace || workload.workload?.namespace || 'default'
+        const name = workload.workload?.name || workload.name
+        const res = await api.forecastWorkload('health_score', ns, name)
+        forecastData[key] = res
+      } catch { forecastData[key] = { error: true } }
+      loadingDetail[key] = false
+    }
+    activeTab = { ...activeTab }
+  }
+
+  function stateClass(state) {
+    if (!state) return 'unknown'
+    const s = state.toLowerCase()
+    if (s === 'healthy' || s === 'excellent' || s === 'good') return 'healthy'
+    if (s === 'degraded' || s === 'fair') return 'degraded'
+    if (s === 'at-risk' || s === 'warning' || s === 'poor') return 'at-risk'
+    if (s === 'critical' || s === 'emergency' || s === 'rupture') return 'critical'
+    if (s === 'calibrating' || s === 'warming') return 'calibrating'
+    return 'unknown'
+  }
+
+  function healthPct(w) {
+    const v = w.health_score ?? w.kpis?.health_score ?? null
+    if (v == null) return null
+    return (v * 100).toFixed(0)
+  }
+
+  function riskScore(w) {
+    const r = w.fused_rupture_index ?? w.fused_r ?? null
+    if (r == null) return null
+    return (r * 10).toFixed(1)
+  }
+
+  function workloadLabel(w) {
+    if (w.workload) return `${w.workload.namespace}/${w.workload.name}`
+    return w.name || w.host || 'unknown'
+  }
+
+  function getSignal(w, key) {
+    if (w.signals) return w.signals[key]
+    if (w.kpis) return w.kpis[key]
+    return w[key]
+  }
+
   onMount(() => {
     load()
     interval = setInterval(load, 15000)
   })
   onDestroy(() => clearInterval(interval))
-
-  function stateClass(state) {
-    if (state === 'healthy') return 'healthy'
-    if (state === 'degraded') return 'degraded'
-    return 'critical'
-  }
-
-  function scoreColor(score) {
-    if (score >= 80) return '#22c55e'
-    if (score >= 60) return '#eab308'
-    if (score >= 40) return '#f97316'
-    return '#ef4444'
-  }
-
-  function bar(value, max = 100) {
-    return Math.min(100, (value / max) * 100).toFixed(1)
-  }
 </script>
 
-<div class="page">
-  <div class="page-header">
-    <h1>Fleet Overview</h1>
-    <p class="subtitle">All monitored hosts — live health matrix</p>
+<div class="fleet-page">
+  <div class="fleet-header">
+    <h1>Fleet</h1>
+    {#if fleet}
+      <span class="fleet-count">{fleet.hosts?.length ?? 0} workloads</span>
+    {/if}
   </div>
 
   {#if loading}
-    <div class="loading">Loading fleet data...</div>
+    <div class="fleet-loading">
+      <div class="spinner"></div>
+      <p>Loading fleet…</p>
+    </div>
+
   {:else if error}
-    <div class="error">{error}</div>
-  {:else if fleet}
-    <!-- Summary Cards -->
-    <div class="summary-row">
-      <div class="summary-card total">
-        <div class="s-num">{fleet.total_hosts}</div>
-        <div class="s-label">Total Hosts</div>
-      </div>
-      <div class="summary-card healthy">
-        <div class="s-num">{fleet.healthy_hosts}</div>
-        <div class="s-label">Healthy</div>
-      </div>
-      <div class="summary-card degraded">
-        <div class="s-num">{fleet.degraded_hosts}</div>
-        <div class="s-label">Degraded</div>
-      </div>
-      <div class="summary-card critical">
-        <div class="s-num">{fleet.critical_hosts}</div>
-        <div class="s-label">Critical</div>
+    <div class="fleet-error">
+      <p>⚠ Could not load fleet: {error}</p>
+      <button on:click={load}>Retry</button>
+    </div>
+
+  {:else if !fleet?.hosts?.length}
+    <!-- ITEM-017: Empty state -->
+    <div class="empty-state">
+      <div class="empty-icon">⏱</div>
+      <h2>Calibrating baselines</h2>
+      <p>
+        Ruptura is learning your workloads' normal behavior.
+        This typically takes <strong>5–15 minutes</strong> once telemetry is flowing.
+      </p>
+      <p class="empty-hint">
+        Send metrics via OTLP on port 4317 or Prometheus remote-write on <code>/api/v2/write</code>.
+      </p>
+      <div class="empty-actions">
+        <a href="https://benfradjselim.github.io/ruptura/getting-started/ingest/" target="_blank" rel="noopener">
+          Setup guide →
+        </a>
+        <button on:click={load}>Check again</button>
       </div>
     </div>
 
-    <!-- Host Grid -->
-    {#if fleet.hosts && fleet.hosts.length > 0}
-      <div class="host-grid">
-        {#each fleet.hosts as host}
-          <div class="host-card {stateClass(host.state)}">
-            <div class="host-header">
-              <span class="host-name">{host.host}</span>
-              <span class="state-badge {stateClass(host.state)}">{host.state}</span>
-            </div>
+  {:else}
+    <div class="workload-grid">
+      {#each fleet.hosts as w (w.key || w.name)}
+        {@const key = w.key || w.name}
+        {@const pct = healthPct(w)}
+        {@const risk = riskScore(w)}
+        {@const sc = stateClass(w.state)}
+        {@const expanded = expandedWorkload === key}
 
-            <div class="health-score-row">
-              <span class="hs-label">Health Score</span>
-              <span class="hs-value" style="color:{scoreColor(host.health_score)}">{host.health_score.toFixed(1)}</span>
+        <div class="workload-card {sc}" class:expanded>
+          <!-- Card header -->
+          <button class="card-header" on:click={() => expand(w)}>
+            <div class="card-identity">
+              <span class="state-dot {sc}"></span>
+              <span class="workload-name">{workloadLabel(w)}</span>
+              {#if w.state}
+                <span class="state-badge {sc}">{w.state}</span>
+              {/if}
             </div>
-            <div class="score-bar">
-              <div class="score-fill" style="width:{bar(host.health_score)}%;background:{scoreColor(host.health_score)}"></div>
+            <div class="card-scores">
+              {#if pct != null}
+                <div class="score-block">
+                  <span class="score-label">Reliability</span>
+                  <!-- ITEM-010: null guard on health_score -->
+                  <span class="score-value {signalClass('health_score', w.health_score ?? w.kpis?.health_score)}">{pct}%</span>
+                </div>
+              {:else}
+                <div class="score-block calibrating-pill">
+                  <span class="score-label">Calibrating</span>
+                </div>
+              {/if}
+              {#if risk != null}
+                <div class="score-block">
+                  <span class="score-label">Risk</span>
+                  <span class="score-value {signalClass('fused_r', w.fused_rupture_index ?? w.fused_r)}">{risk}</span>
+                </div>
+              {/if}
+              <span class="expand-icon">{expanded ? '▲' : '▼'}</span>
             </div>
+          </button>
 
-            <div class="kpi-mini-row">
-              <div class="kpi-mini">
-                <span class="kpi-mini-label">Stress</span>
-                <span class="kpi-mini-val" style="color:{scoreColor(100 - host.stress*100)}">{(host.stress*100).toFixed(0)}%</span>
-              </div>
-              <div class="kpi-mini">
-                <span class="kpi-mini-label">Fatigue</span>
-                <span class="kpi-mini-val" style="color:{scoreColor(100 - host.fatigue*100)}">{(host.fatigue*100).toFixed(0)}%</span>
-              </div>
-              <div class="kpi-mini">
-                <span class="kpi-mini-label">Contagion</span>
-                <span class="kpi-mini-val" style="color:{scoreColor(100 - host.contagion*100)}">{(host.contagion*100).toFixed(0)}%</span>
-              </div>
-              <div class="kpi-mini">
-                <span class="kpi-mini-label">Alerts</span>
-                <span class="kpi-mini-val" class:alert-count={host.active_alerts > 0}>{host.active_alerts}</span>
-              </div>
-            </div>
-
-            <div class="last-seen">
-              Last seen: {new Date(host.last_seen).toLocaleTimeString()}
-            </div>
+          <!-- Signal mini-bars (always visible) -->
+          <div class="signal-bars">
+            {#each SIGNAL_KEYS as sk}
+              {@const raw = getSignal(w, sk)}
+              {#if raw != null}
+                <div class="signal-bar-item" title="{displayLabel(sk)}: {displayValue(sk, raw)}{displayUnit(sk)}">
+                  <span class="signal-bar-label">{displayLabel(sk)}</span>
+                  <div class="signal-bar-track">
+                    <div class="signal-bar-fill {signalClass(sk, raw)}" style="width: {Math.min(raw * 100, 100)}%"></div>
+                  </div>
+                  <span class="signal-bar-val">{displayValue(sk, raw)}{displayUnit(sk)}</span>
+                </div>
+              {/if}
+            {/each}
           </div>
-        {/each}
-      </div>
-    {:else}
-      <div class="empty">No hosts reporting yet. Deploy Ruptura agents to monitored nodes.</div>
-    {/if}
+
+          <!-- Expanded detail tabs -->
+          {#if expanded}
+            <div class="card-detail">
+              <div class="tab-bar">
+                {#each ['signals', 'history', 'forecast'] as t}
+                  <button
+                    class="tab-btn"
+                    class:active={activeTab[key] === t}
+                    on:click={() => loadTab(w, t)}
+                  >{t.charAt(0).toUpperCase() + t.slice(1)}</button>
+                {/each}
+              </div>
+
+              {#if activeTab[key] === 'signals'}
+                <div class="signals-detail">
+                  {#each Object.entries(w.signals || w.kpis || {}) as [k, v]}
+                    {#if typeof v === 'number'}
+                      <div class="signal-row">
+                        <span class="signal-name">{displayLabel(k)}</span>
+                        <div class="signal-bar-track wide">
+                          <div class="signal-bar-fill {signalClass(k, v)}" style="width: {Math.min(v * 100, 100)}%"></div>
+                        </div>
+                        <span class="signal-val {signalClass(k, v)}">{displayValue(k, v)}{displayUnit(k)}</span>
+                      </div>
+                    {:else if v != null && typeof v === 'object' && v.value != null}
+                      <div class="signal-row">
+                        <span class="signal-name">{displayLabel(k)}</span>
+                        <div class="signal-bar-track wide">
+                          <div class="signal-bar-fill {signalClass(k, v.value)}" style="width: {Math.min(v.value * 100, 100)}%"></div>
+                        </div>
+                        <span class="signal-val {signalClass(k, v.value)}">{displayValue(k, v.value)}{displayUnit(k)}</span>
+                      </div>
+                    {/if}
+                  {/each}
+                </div>
+
+              {:else if activeTab[key] === 'history'}
+                {#if loadingDetail[key]}
+                  <div class="detail-loading"><div class="spinner sm"></div> Loading history…</div>
+                {:else if !historyData[key]?.length}
+                  <!-- ITEM-017: History empty state -->
+                  <div class="detail-empty">
+                    <p>No history yet — snapshots accumulate over time.</p>
+                    <p class="hint">Check back after a few hours of telemetry.</p>
+                  </div>
+                {:else}
+                  <div class="history-list">
+                    {#each historyData[key].slice(0, 20) as snap}
+                      <div class="history-row">
+                        <span class="history-time">{new Date(snap.timestamp || snap.ts).toLocaleTimeString()}</span>
+                        <span class="history-score {signalClass('health_score', snap.health_score)}">
+                          {snap.health_score != null ? (snap.health_score * 100).toFixed(0) + '%' : '—'}
+                        </span>
+                        <span class="history-fri {signalClass('fused_r', snap.fused_rupture_index ?? snap.fused_r)}">
+                          R={((snap.fused_rupture_index ?? snap.fused_r ?? 0) * 10).toFixed(1)}
+                        </span>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+
+              {:else if activeTab[key] === 'forecast'}
+                {#if loadingDetail[key]}
+                  <div class="detail-loading"><div class="spinner sm"></div> Loading forecast…</div>
+                {:else if forecastData[key]?.note}
+                  <!-- ITEM-017: Forecast calibrating empty state -->
+                  <div class="detail-calibrating">
+                    <div class="spinner sm"></div>
+                    <p>{forecastData[key].note}</p>
+                    <p class="hint">Forecasts become available after baseline calibration (~60 min).</p>
+                  </div>
+                {:else if forecastData[key]?.error}
+                  <div class="detail-empty"><p>Forecast not available for this workload yet.</p></div>
+                {:else if forecastData[key]?.points?.length}
+                  <div class="forecast-list">
+                    {#each forecastData[key].points as pt}
+                      <div class="forecast-row">
+                        <span class="forecast-offset">+{pt.offset_minutes}m</span>
+                        <div class="signal-bar-track wide">
+                          <div class="signal-bar-fill {signalClass('health_score', pt.mean)}"
+                               style="width: {Math.min((pt.mean ?? 0) * 100, 100)}%"></div>
+                        </div>
+                        <span class="forecast-val">{pt.mean != null ? (pt.mean * 100).toFixed(0) + '%' : '—'}</span>
+                      </div>
+                    {/each}
+                  </div>
+                {:else}
+                  <div class="detail-empty"><p>No forecast data available.</p></div>
+                {/if}
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/each}
+    </div>
   {/if}
 </div>
 
 <style>
-  .page { max-width: 1400px; }
-  .page-header { margin-bottom: 1.5rem; }
-  h1 { font-size: 1.5rem; font-weight: 700; color: #f1f5f9; margin-bottom: 0.25rem; }
-  .subtitle { color: #64748b; font-size: 0.9rem; }
+.fleet-page { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+.fleet-header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.5rem; }
+.fleet-header h1 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+.fleet-count { color: var(--text-secondary, #94a3b8); font-size: 0.875rem; }
 
-  .loading, .error, .empty { padding: 2rem; text-align: center; color: #64748b; }
-  .error { color: #ef4444; }
+/* Loading / error */
+.fleet-loading, .fleet-error { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 4rem; color: var(--text-secondary, #94a3b8); }
+.spinner { width: 24px; height: 24px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+.spinner.sm { width: 16px; height: 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-  .summary-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-  .summary-card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 1.25rem;
-    text-align: center;
-  }
-  .summary-card.healthy { border-color: #22c55e40; }
-  .summary-card.degraded { border-color: #eab30840; }
-  .summary-card.critical { border-color: #ef444440; }
-  .s-num { font-size: 2rem; font-weight: 800; color: #f1f5f9; }
-  .summary-card.healthy .s-num { color: #22c55e; }
-  .summary-card.degraded .s-num { color: #eab308; }
-  .summary-card.critical .s-num { color: #ef4444; }
-  .s-label { font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+/* Empty state */
+.empty-state { text-align: center; padding: 4rem 2rem; max-width: 480px; margin: 0 auto; }
+.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+.empty-state h2 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.75rem; }
+.empty-state p { color: var(--text-secondary, #94a3b8); margin: 0 0 0.5rem; line-height: 1.6; }
+.empty-hint { font-size: 0.875rem; }
+.empty-hint code { background: var(--surface, #1e2535); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.8em; }
+.empty-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap; }
+.empty-actions a, .empty-actions button { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; text-decoration: none; }
+.empty-actions a { background: var(--accent-cyan, #06b6d4); color: #000; font-weight: 600; }
+.empty-actions button { background: var(--surface, #1e2535); color: var(--text-primary, #f1f5f9); border: 1px solid var(--border, rgba(255,255,255,0.06)); }
 
-  .host-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1rem;
-  }
-  .host-card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 10px;
-    padding: 1.25rem;
-    transition: border-color 0.15s;
-  }
-  .host-card.healthy { border-left: 3px solid #22c55e; }
-  .host-card.degraded { border-left: 3px solid #eab308; }
-  .host-card.critical { border-left: 3px solid #ef4444; }
+/* Grid */
+.workload-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1rem; }
 
-  .host-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
-  }
-  .host-name { font-weight: 700; color: #f1f5f9; font-size: 1rem; }
-  .state-badge {
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .state-badge.healthy { background: #22c55e20; color: #22c55e; }
-  .state-badge.degraded { background: #eab30820; color: #eab308; }
-  .state-badge.critical { background: #ef444420; color: #ef4444; }
+/* Card */
+.workload-card { background: var(--surface, #141824); border: 1px solid var(--border, rgba(255,255,255,0.06)); border-radius: 8px; overflow: hidden; transition: border-color 0.15s; }
+.workload-card.healthy { border-left: 3px solid #22c55e; }
+.workload-card.degraded { border-left: 3px solid #f59e0b; }
+.workload-card.at-risk { border-left: 3px solid #f97316; }
+.workload-card.critical { border-left: 3px solid #ef4444; }
+.workload-card.calibrating { border-left: 3px solid #6366f1; }
+.workload-card.expanded { grid-column: 1 / -1; }
 
-  .health-score-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 0.3rem;
-  }
-  .hs-label { font-size: 0.75rem; color: #94a3b8; }
-  .hs-value { font-size: 1.4rem; font-weight: 700; }
+.card-header { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0.875rem 1rem; background: none; border: none; cursor: pointer; text-align: left; color: inherit; gap: 0.5rem; }
+.card-identity { display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1; }
+.state-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.state-dot.healthy { background: #22c55e; }
+.state-dot.degraded { background: #f59e0b; }
+.state-dot.at-risk { background: #f97316; }
+.state-dot.critical { background: #ef4444; animation: pulse-red 1.5s ease-in-out infinite; }
+.state-dot.calibrating { background: #6366f1; animation: pulse-indigo 2s ease-in-out infinite; }
+@keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes pulse-indigo { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.workload-name { font-weight: 600; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.state-badge { font-size: 0.7rem; padding: 0.15em 0.5em; border-radius: 999px; font-weight: 500; }
+.state-badge.healthy { background: rgba(34,197,94,0.15); color: #22c55e; }
+.state-badge.degraded { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.state-badge.at-risk { background: rgba(249,115,22,0.15); color: #f97316; }
+.state-badge.critical { background: rgba(239,68,68,0.15); color: #ef4444; }
+.state-badge.calibrating { background: rgba(99,102,241,0.15); color: #818cf8; }
 
-  .score-bar {
-    height: 6px;
-    background: #334155;
-    border-radius: 3px;
-    margin-bottom: 0.85rem;
-    overflow: hidden;
-  }
-  .score-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+.card-scores { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+.score-block { display: flex; flex-direction: column; align-items: flex-end; }
+.score-label { font-size: 0.65rem; color: var(--text-secondary, #94a3b8); text-transform: uppercase; letter-spacing: 0.05em; }
+.score-value { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.score-value.healthy { color: #22c55e; }
+.score-value.degraded { color: #f59e0b; }
+.score-value.at-risk { color: #f97316; }
+.score-value.critical { color: #ef4444; }
+.calibrating-pill { font-size: 0.75rem; color: #818cf8; }
+.expand-icon { color: var(--text-secondary, #94a3b8); font-size: 0.7rem; }
 
-  .kpi-mini-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-  }
-  .kpi-mini { text-align: center; }
-  .kpi-mini-label { display: block; font-size: 0.65rem; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
-  .kpi-mini-val { font-size: 0.9rem; font-weight: 700; color: #94a3b8; }
-  .kpi-mini-val.alert-count { color: #ef4444; }
+/* Signal bars */
+.signal-bars { display: flex; flex-direction: column; gap: 0.3rem; padding: 0 1rem 0.75rem; }
+.signal-bar-item { display: grid; grid-template-columns: 90px 1fr 42px; align-items: center; gap: 0.5rem; }
+.signal-bar-label { font-size: 0.7rem; color: var(--text-secondary, #94a3b8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.signal-bar-track { height: 4px; background: var(--surface-high, #1e2535); border-radius: 2px; overflow: hidden; }
+.signal-bar-track.wide { height: 6px; }
+.signal-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+.signal-bar-fill.healthy { background: #22c55e; }
+.signal-bar-fill.degraded { background: #f59e0b; }
+.signal-bar-fill.at-risk { background: #f97316; }
+.signal-bar-fill.critical { background: #ef4444; }
+.signal-bar-fill.muted { background: var(--text-muted, #475569); }
+.signal-bar-val { font-size: 0.7rem; font-variant-numeric: tabular-nums; text-align: right; color: var(--text-secondary, #94a3b8); }
 
-  .last-seen { font-size: 0.7rem; color: #475569; }
+/* Expanded detail */
+.card-detail { border-top: 1px solid var(--border, rgba(255,255,255,0.06)); padding: 1rem; }
+.tab-bar { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
+.tab-btn { padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--border, rgba(255,255,255,0.06)); background: none; color: var(--text-secondary, #94a3b8); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+.tab-btn.active { background: var(--accent-cyan, #06b6d4); color: #000; border-color: transparent; font-weight: 600; }
+
+.signals-detail { display: flex; flex-direction: column; gap: 0.5rem; }
+.signal-row { display: grid; grid-template-columns: 120px 1fr 60px; align-items: center; gap: 0.75rem; }
+.signal-name { font-size: 0.8rem; color: var(--text-secondary, #94a3b8); }
+.signal-val { font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.signal-val.healthy { color: #22c55e; }
+.signal-val.degraded { color: #f59e0b; }
+.signal-val.at-risk { color: #f97316; }
+.signal-val.critical { color: #ef4444; }
+
+.detail-loading { display: flex; align-items: center; gap: 0.75rem; padding: 1.5rem; color: var(--text-secondary, #94a3b8); font-size: 0.875rem; }
+.detail-empty { padding: 1.5rem; color: var(--text-secondary, #94a3b8); font-size: 0.875rem; }
+.detail-empty p { margin: 0 0 0.25rem; }
+.detail-empty .hint { font-size: 0.8rem; color: var(--text-muted, #475569); }
+.detail-calibrating { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2rem; text-align: center; color: var(--text-secondary, #94a3b8); }
+.detail-calibrating p { margin: 0; font-size: 0.875rem; }
+.detail-calibrating .hint { font-size: 0.8rem; color: var(--text-muted, #475569); }
+
+.history-list, .forecast-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.history-row, .forecast-row { display: grid; align-items: center; gap: 0.75rem; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.history-row { grid-template-columns: 70px 50px 60px; }
+.history-time { color: var(--text-secondary, #94a3b8); }
+.history-score, .history-fri { font-weight: 600; }
+.history-score.healthy { color: #22c55e; }
+.history-score.degraded { color: #f59e0b; }
+.history-score.critical { color: #ef4444; }
+.forecast-row { grid-template-columns: 50px 1fr 50px; }
+.forecast-offset { color: var(--text-secondary, #94a3b8); }
+.forecast-val { font-weight: 600; text-align: right; }
 </style>

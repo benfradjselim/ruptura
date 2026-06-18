@@ -123,7 +123,7 @@ jobs:
         if: ${{ github.event.inputs.skip_prometheus != 'true' }}
         env:
           RUPTURA_API_KEY: ${{ secrets.RUPTURA_API_KEY }}
-          NODE_IP: "185.229.225.115"
+          NODE_IP: "${NODE_IP}"
           API_PORT: "31468"
         run: |
           HTTP=$(curl -s -o /tmp/r.json -w "%{http_code}" \
@@ -134,7 +134,7 @@ jobs:
               "id":   "prometheus-cluster",
               "name": "Prometheus (cluster)",
               "type": "prometheus",
-              "url":  "http://185.229.225.115:30090",
+              "url":  "http://${NODE_IP}:30090",
               "enabled": true,
               "scrape_interval_seconds": 30,
               "namespace": "ruptura-lab"
