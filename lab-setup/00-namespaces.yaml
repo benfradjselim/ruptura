@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ruptura-system
+  labels:
+    app.kubernetes.io/managed-by: ruptura-lab
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/managed-by: ruptura-lab
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-apps
+  labels:
+    app.kubernetes.io/managed-by: ruptura-lab

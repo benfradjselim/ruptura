@@ -1,0 +1,449 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# Ruptura Lab — Synthetic Test Applications
+# 6 microservices with distinct health profiles designed to trigger all
+# Ruptura signal types: stable, degraded, memory leak, cascade failure,
+# CPU spike, and brand-new (calibrating).
+#
+# Each app exposes /metrics (Prometheus) and /healthz, and sends OTLP
+# to the otel-collector in the monitoring namespace.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── 1. gateway — STABLE, healthy baseline ──────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: test-apps
+  labels:
+    app: gateway
+    scenario: stable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+        workload: gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: gateway
+          image: ghcr.io/benfradjselim/ruptura-testapp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_NAME
+              value: "gateway"
+            - name: SCENARIO
+              value: "stable"
+            - name: LATENCY_P50_MS
+              value: "12"
+            - name: LATENCY_P99_MS
+              value: "45"
+            - name: ERROR_RATE
+              value: "0.001"
+            - name: CPU_LOAD
+              value: "0.15"
+            - name: MEMORY_MB
+              value: "128"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring.svc.cluster.local:4318"
+            - name: OTEL_SERVICE_NAME
+              value: "gateway"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "k8s.namespace.name=test-apps,k8s.deployment.name=gateway"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 200m
+              memory: 192Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: test-apps
+spec:
+  selector:
+    app: gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+# ── 2. order-service — DEGRADED, CPU stress + rising fatigue ───────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: test-apps
+  labels:
+    app: order-service
+    scenario: degraded
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+        workload: order-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: order-service
+          image: ghcr.io/benfradjselim/ruptura-testapp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_NAME
+              value: "order-service"
+            - name: SCENARIO
+              value: "degraded"
+            - name: LATENCY_P50_MS
+              value: "180"
+            - name: LATENCY_P99_MS
+              value: "950"
+            - name: ERROR_RATE
+              value: "0.04"
+            - name: CPU_LOAD
+              value: "0.72"
+            - name: MEMORY_MB
+              value: "290"
+            - name: MEMORY_LEAK_MB_PER_MIN
+              value: "8"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring.svc.cluster.local:4318"
+            - name: OTEL_SERVICE_NAME
+              value: "order-service"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "k8s.namespace.name=test-apps,k8s.deployment.name=order-service"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 600m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: test-apps
+spec:
+  selector:
+    app: order-service
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+# ── 3. payment-api — AT RISK, high error rate + contagion spread ───────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: test-apps
+  labels:
+    app: payment-api
+    scenario: at-risk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+        workload: payment-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: payment-api
+          image: ghcr.io/benfradjselim/ruptura-testapp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_NAME
+              value: "payment-api"
+            - name: SCENARIO
+              value: "at-risk"
+            - name: LATENCY_P50_MS
+              value: "420"
+            - name: LATENCY_P99_MS
+              value: "4200"
+            - name: ERROR_RATE
+              value: "0.18"
+            - name: CPU_LOAD
+              value: "0.88"
+            - name: MEMORY_MB
+              value: "410"
+            - name: DEPENDENCY_FAILURE_RATE
+              value: "0.25"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring.svc.cluster.local:4318"
+            - name: OTEL_SERVICE_NAME
+              value: "payment-api"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "k8s.namespace.name=test-apps,k8s.deployment.name=payment-api"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: 800m
+              memory: 640Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api
+  namespace: test-apps
+spec:
+  selector:
+    app: payment-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+# ── 4. cache-worker — SPIKE, sudden traffic surge (velocity burst) ──────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-worker
+  namespace: test-apps
+  labels:
+    app: cache-worker
+    scenario: spike
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cache-worker
+  template:
+    metadata:
+      labels:
+        app: cache-worker
+        workload: cache-worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: cache-worker
+          image: ghcr.io/benfradjselim/ruptura-testapp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_NAME
+              value: "cache-worker"
+            - name: SCENARIO
+              value: "spike"
+            - name: SPIKE_INTERVAL_SECONDS
+              value: "120"
+            - name: SPIKE_DURATION_SECONDS
+              value: "30"
+            - name: SPIKE_CPU_MULTIPLIER
+              value: "4.5"
+            - name: SPIKE_LATENCY_MULTIPLIER
+              value: "8.0"
+            - name: BASE_CPU_LOAD
+              value: "0.12"
+            - name: BASE_LATENCY_MS
+              value: "8"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring.svc.cluster.local:4318"
+            - name: OTEL_SERVICE_NAME
+              value: "cache-worker"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "k8s.namespace.name=test-apps,k8s.deployment.name=cache-worker"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cache-worker
+  namespace: test-apps
+spec:
+  selector:
+    app: cache-worker
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+# ── 5. ml-inference — CALIBRATING, brand new (no baseline history) ──────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-inference
+  namespace: test-apps
+  labels:
+    app: ml-inference
+    scenario: calibrating
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-inference
+  template:
+    metadata:
+      labels:
+        app: ml-inference
+        workload: ml-inference
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: ml-inference
+          image: ghcr.io/benfradjselim/ruptura-testapp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_NAME
+              value: "ml-inference"
+            - name: SCENARIO
+              value: "calibrating"
+            - name: LATENCY_P50_MS
+              value: "95"
+            - name: CPU_LOAD
+              value: "0.55"
+            - name: MEMORY_MB
+              value: "512"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring.svc.cluster.local:4318"
+            - name: OTEL_SERVICE_NAME
+              value: "ml-inference"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "k8s.namespace.name=test-apps,k8s.deployment.name=ml-inference"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: 600m
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-inference
+  namespace: test-apps
+spec:
+  selector:
+    app: ml-inference
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+# ── 6. db-proxy — HEALTHY, steady replica ─────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-proxy
+  namespace: test-apps
+  labels:
+    app: db-proxy
+    scenario: stable
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-proxy
+  template:
+    metadata:
+      labels:
+        app: db-proxy
+        workload: db-proxy
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: db-proxy
+          image: ghcr.io/benfradjselim/ruptura-testapp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_NAME
+              value: "db-proxy"
+            - name: SCENARIO
+              value: "stable"
+            - name: LATENCY_P50_MS
+              value: "4"
+            - name: LATENCY_P99_MS
+              value: "18"
+            - name: ERROR_RATE
+              value: "0.0005"
+            - name: CPU_LOAD
+              value: "0.08"
+            - name: MEMORY_MB
+              value: "96"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring.svc.cluster.local:4318"
+            - name: OTEL_SERVICE_NAME
+              value: "db-proxy"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "k8s.namespace.name=test-apps,k8s.deployment.name=db-proxy"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-proxy
+  namespace: test-apps
+spec:
+  selector:
+    app: db-proxy
+  ports:
+    - port: 8080
+      targetPort: 8080
