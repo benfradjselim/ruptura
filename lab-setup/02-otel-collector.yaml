@@ -14,6 +14,13 @@ data:
             endpoint: 0.0.0.0:4317
           http:
             endpoint: 0.0.0.0:4318
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: kube-state-metrics
+              scrape_interval: 15s
+              static_configs:
+                - targets: ["kube-state-metrics.monitoring.svc.cluster.local:8080"]
 
     processors:
       batch:
@@ -42,9 +49,14 @@ data:
               from: pod
 
     exporters:
-      # Forward to Ruptura OTLP endpoint
       otlphttp/ruptura:
-        endpoint: http://ruptura.ruptura-system.svc.cluster.local:8080
+        # Ruptura OTLP ingest port (HTTP, not gRPC) with custom paths
+        endpoint: http://ruptura.ruptura-system.svc.cluster.local:4317
+        metrics_endpoint: http://ruptura.ruptura-system.svc.cluster.local:4317/otlp/v1/metrics
+        logs_endpoint: http://ruptura.ruptura-system.svc.cluster.local:4317/otlp/v1/logs
+        traces_endpoint: http://ruptura.ruptura-system.svc.cluster.local:4317/otlp/v1/traces
+        encoding: json
+        compression: none
         tls:
           insecure: true
         retry_on_failure:
@@ -52,23 +64,19 @@ data:
           initial_interval: 5s
           max_elapsed_time: 30s
 
-      # Debug logging (disable in prod)
-      debug:
-        verbosity: basic
-
     service:
       pipelines:
         metrics:
-          receivers: [otlp]
+          receivers: [otlp, prometheus]
           processors: [memory_limiter, k8sattributes, batch]
           exporters: [otlphttp/ruptura]
         logs:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, batch]
+          processors: [memory_limiter, batch]
           exporters: [otlphttp/ruptura]
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, batch]
+          processors: [memory_limiter, batch]
           exporters: [otlphttp/ruptura]
 ---
 apiVersion: apps/v1
