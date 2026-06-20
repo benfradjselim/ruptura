@@ -269,17 +269,25 @@ func (s *Store) GetMetricRange(host, metric string, from, to time.Time) ([]TimeV
 	return res, nil
 }
 
-// GetKPIRange is a wrapper for backward compatibility
+// GetKPIRange returns KPI data for the given host/name window.
+// It first tries raw keys (kpi:{name}:{host}:); if the raw bucket is empty
+// because compaction has already promoted the data, it falls back to the
+// 5-minute rollup tier (kr5:{name}:{host}:).
 func (s *Store) GetKPIRange(host, name string, from, to time.Time) ([]TimeValue, error) {
 	samples, err := s.ListKPI(name, host, from, to)
 	if err != nil {
 		return nil, err
 	}
-	res := make([]TimeValue, len(samples))
-	for i, s := range samples {
-		res[i] = TimeValue{Timestamp: s.Timestamp, Value: s.Value}
+	if len(samples) > 0 {
+		res := make([]TimeValue, len(samples))
+		for i, sv := range samples {
+			res[i] = TimeValue{Timestamp: sv.Timestamp, Value: sv.Value}
+		}
+		return res, nil
 	}
-	return res, nil
+	// Raw data was compacted; try the 5-min rollup tier.
+	// KPI rollup keys mirror the raw schema: kr5:{name}:{host}:{ts}.
+	return s.rangeQuery(fmt.Sprintf("kr5:%s:%s:", name, host), from, to, 0)
 }
 
 // rangeQuery is a generic Seek-based range scan for backward compatibility

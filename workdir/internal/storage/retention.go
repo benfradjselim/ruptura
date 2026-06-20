@@ -44,15 +44,18 @@ func (s *Store) GetMetricRangeTiered(host, name string, from, to time.Time) ([]T
 }
 
 // GetKPIRangeTiered mirrors GetMetricRangeTiered for KPI series.
+// KPI rollup keys are stored as kr5:{name}:{host}:{ts} (name-first, matching
+// the raw kpi:{name}:{host}:{ts} schema), so host/name are swapped relative
+// to the metric rollup helper.
 func (s *Store) GetKPIRangeTiered(host, name string, from, to time.Time) ([]TimeValue, error) {
 	span := to.Sub(from)
 	switch {
 	case span <= 6*time.Hour:
 		return s.GetKPIRange(host, name, from, to)
 	case span <= 7*24*time.Hour:
-		return s.getRollup("kr5:", host, name, from, to)
+		return s.getRollup("kr5:", name, host, from, to)
 	default:
-		return s.getRollup("kr1h:", host, name, from, to)
+		return s.getRollup("kr1h:", name, host, from, to)
 	}
 }
 
