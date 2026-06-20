@@ -91,10 +91,11 @@
   }
 </script>
 
+<svelte:window on:keydown={handleKey} />
+
 {#if !$isLoggedIn}
   <Login />
 {:else}
-  <svelte:window on:keydown={handleKey} />
   <div class="layout">
     <aside class="sidebar">
       <div class="brand">
