@@ -6,11 +6,6 @@
 
   async function checkSetup() {
     try {
-      await api.health()
-      // Try a protected endpoint; if 401 with no users, offer setup
-    } catch {}
-    // Try setup — if it returns 409 (already configured), show login
-    try {
       const r = await api.setup('__probe__', '__probe__').catch(e => e)
       isSetup = r?.status !== 409
     } catch {}
@@ -24,7 +19,6 @@
       let data
       if (isSetup) {
         data = await api.setup(username, password)
-        // After setup, log in
         data = await api.login(username, password)
       } else {
         data = await api.login(username, password)
@@ -39,68 +33,255 @@
   }
 </script>
 
-<div class="login-wrap">
-  <div class="card">
-    <div class="logo">
-      <span class="logo-text">Ruptura</span>
-      <span class="logo-sub">Predictive Observability Platform</span>
+<!-- Müller-Brockmann: full-bleed, single column centred, large numeral as hero -->
+<div class="login-spread">
+  <!-- Left col: brand + large numeral FRI concept -->
+  <div class="login-left">
+    <div class="brand-mark">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <path d="M18 3L33 30H3L18 3Z" stroke="currentColor" stroke-width="2" fill="none"/>
+        <path d="M18 12L26 26H10L18 12Z" fill="currentColor" opacity="0.4"/>
+      </svg>
+      <span>Ruptura</span>
     </div>
+    <div class="hero-numeral" aria-hidden="true">0.0</div>
+    <p class="hero-label">Fused Rupture Index</p>
+    <p class="hero-sub">
+      Predictive AIOps for Kubernetes.<br>
+      Detects divergence hours before failure.
+    </p>
+    <ul class="feature-list">
+      <li><span class="dot healthy"></span>5-model adaptive ensemble</li>
+      <li><span class="dot accent"></span>10 composite KPI signals</li>
+      <li><span class="dot violet"></span>HealthScore forecast +30min</li>
+    </ul>
+  </div>
 
-    {#if isSetup}
-      <p class="hint">No admin account found. Create the first admin account below.</p>
-    {/if}
-
-    <form on:submit|preventDefault={submit}>
-      <label>
-        Username
-        <input bind:value={username} type="text" autocomplete="username" required placeholder="admin"/>
-      </label>
-      <label>
-        Password
-        <input bind:value={password} type="password" autocomplete="current-password" required placeholder="••••••••"/>
-      </label>
-      {#if error}
-        <p class="err">{error}</p>
+  <!-- Right col: login form -->
+  <div class="login-right">
+    <div class="form-card">
+      <h1>{isSetup ? 'Create admin account' : 'Sign in'}</h1>
+      {#if isSetup}
+        <p class="setup-hint">No admin account found. Create the first one.</p>
       {/if}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Please wait…' : isSetup ? 'Create account & sign in' : 'Sign in'}
-      </button>
-    </form>
+      <form on:submit|preventDefault={submit} novalidate>
+        <div class="field">
+          <label for="username">Username</label>
+          <input
+            id="username"
+            type="text"
+            bind:value={username}
+            autocomplete="username"
+            placeholder="admin"
+            required
+            spellcheck="false"
+          />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            bind:value={password}
+            autocomplete="current-password"
+            placeholder="••••••••"
+            required
+          />
+        </div>
+        {#if error}
+          <p class="error" role="alert">{error}</p>
+        {/if}
+        <button type="submit" class="submit-btn" disabled={loading}>
+          {loading ? 'Verifying…' : isSetup ? 'Create account' : 'Sign in'}
+        </button>
+      </form>
+      <p class="version-note">Community edition · v7</p>
+    </div>
   </div>
 </div>
 
 <style>
-  .login-wrap {
+  /* ── Layout: full-bleed split grid ── */
+  .login-spread {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     min-height: 100vh;
+    background: var(--bg, #0F172A);
+  }
+
+  /* ── Left: brand panel ── */
+  .login-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px 48px;
+    background: var(--surface, #1E293B);
+    border-right: 1px solid var(--border, rgba(148,163,184,0.10));
+  }
+
+  .brand-mark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent, #38BDF8);
+    margin-bottom: 64px;
+  }
+  .brand-mark svg { color: var(--accent, #38BDF8); }
+
+  /* Swiss big numeral — the signature move */
+  .hero-numeral {
+    font-family: "DM Mono", "Fira Code", monospace;
+    font-size: clamp(72px, 10vw, 120px);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--text, #E2E8F0);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 8px;
+    /* Optical ink alignment: nudge left by side-bearing */
+    margin-left: -4px;
+  }
+
+  .hero-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent, #38BDF8);
+    margin-bottom: 24px;
+  }
+
+  .hero-sub {
+    font-size: 14px;
+    line-height: 24px;
+    color: var(--text-2, #94A3B8);
+    margin-bottom: 40px;
+    max-width: 320px;
+  }
+
+  .feature-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .feature-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-2, #94A3B8);
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.healthy { background: var(--green, #22C55E); }
+  .dot.accent  { background: var(--accent, #38BDF8); }
+  .dot.violet  { background: var(--violet, #8B5CF6); }
+
+  /* ── Right: form panel ── */
+  .login-right {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #0f172a;
+    padding: 48px 32px;
+    background: var(--bg, #0F172A);
   }
-  .card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 12px;
-    padding: 2rem;
-    width: 340px;
+
+  .form-card {
+    width: 100%;
+    max-width: 360px;
   }
-  .logo { text-align: center; margin-bottom: 1.5rem; }
-  .logo-text { font-size: 2rem; font-weight: 800; color: #38bdf8; display: block; }
-  .logo-sub { font-size: 0.75rem; color: #64748b; }
-  label { display: block; margin-bottom: 1rem; font-size: 0.85rem; color: #94a3b8; }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text, #E2E8F0);
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .setup-hint {
+    font-size: 12px;
+    color: var(--amber, #F59E0B);
+    background: var(--amber-dim, rgba(245,158,11,0.10));
+    border: 1px solid rgba(245,158,11,0.20);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-3, #3F4D5C);
+    margin-bottom: 6px;
+  }
   input {
-    display: block; width: 100%; margin-top: 4px;
-    background: #0f172a; border: 1px solid #334155; border-radius: 6px;
-    color: #e2e8f0; padding: 0.5rem 0.75rem; font-size: 0.9rem;
-    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    background: var(--surface, #1E293B);
+    border: 1px solid var(--border-2, rgba(148,163,184,0.18));
+    border-radius: 4px;
+    color: var(--text, #E2E8F0);
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.12s;
   }
-  input:focus { outline: none; border-color: #38bdf8; }
-  button {
-    width: 100%; padding: 0.6rem; background: #0284c7; color: #fff;
-    border: none; border-radius: 6px; font-size: 0.9rem; font-weight: 600;
-    cursor: pointer; margin-top: 0.5rem;
+  input:focus { outline: none; border-color: var(--accent, #38BDF8); }
+  input::placeholder { color: var(--text-3, #3F4D5C); }
+
+  .error {
+    font-size: 12px;
+    color: var(--red, #EF4444);
+    background: var(--red-dim, rgba(239,68,68,0.10));
+    border: 1px solid rgba(239,68,68,0.20);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    line-height: 1.5;
   }
-  button:disabled { opacity: 0.6; cursor: not-allowed; }
-  .err { color: #f87171; font-size: 0.8rem; margin: 0.5rem 0; }
-  .hint { font-size: 0.8rem; color: #fbbf24; background: #1c1400; padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem; }
+
+  .submit-btn {
+    width: 100%;
+    padding: 11px;
+    background: var(--accent, #38BDF8);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.12s, opacity 0.12s;
+    margin-top: 8px;
+    letter-spacing: 0.01em;
+  }
+  .submit-btn:hover:not(:disabled) { background: #67CFFA; }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .version-note {
+    margin-top: 24px;
+    font-size: 11px;
+    color: var(--text-3, #3F4D5C);
+    text-align: center;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .login-spread { grid-template-columns: 1fr; }
+    .login-left { display: none; }
+    .login-right { padding: 32px 24px; min-height: 100vh; }
+  }
 </style>

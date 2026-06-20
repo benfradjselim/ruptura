@@ -77,11 +77,24 @@
       currentPage.set('dashboards')
     } catch {}
   }
+
+  // Grid overlay toggle — G key or button
+  function toggleGrid() {
+    document.body.classList.toggle('grid-on')
+  }
+
+  // Keyboard shortcut
+  function handleKey(e) {
+    if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey && !e.altKey && e.target.tagName !== 'INPUT') {
+      toggleGrid()
+    }
+  }
 </script>
 
 {#if !$isLoggedIn}
   <Login />
 {:else}
+  <svelte:window on:keydown={handleKey} />
   <div class="layout">
     <aside class="sidebar">
       <div class="brand">
@@ -151,6 +164,15 @@
       </div>
     </aside>
 
+    <!-- Grid overlay toggle (G key or button) -->
+    <button class="grid-toggle" on:click={toggleGrid} aria-label="Toggle grid overlay">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+        <rect x="0" y="0" width="4" height="4"/><rect x="6" y="0" width="4" height="4"/>
+        <rect x="0" y="6" width="4" height="4"/><rect x="6" y="6" width="4" height="4"/>
+      </svg>
+      Grid
+    </button>
+
     <main class="content">
       {#if $currentPage === 'dashboard'}
         <Dashboard />
@@ -183,86 +205,90 @@
 
 <style>
   :global(*) { box-sizing: border-box; margin: 0; padding: 0; }
-  :global(body) { background: #0f172a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
-  :global(input), :global(select) { outline: none; }
-  :global(input:focus), :global(select:focus) { border-color: #38bdf8 !important; }
+  :global(body) {
+    background: var(--bg, #0F172A); color: var(--text, #E2E8F0);
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    font-size: 13px; line-height: 24px; -webkit-font-smoothing: antialiased;
+  }
+  :global(input:focus), :global(select:focus) { outline: none; border-color: var(--accent, #38BDF8) !important; }
 
   .layout { display: flex; min-height: 100vh; }
 
   .sidebar {
-    width: 190px;
-    background: #1e293b;
-    border-right: 1px solid #334155;
-    display: flex;
-    flex-direction: column;
-    position: sticky;
-    top: 0;
-    height: 100vh;
-    flex-shrink: 0;
-    overflow-y: auto;
+    width: 184px;
+    background: var(--surface, #1E293B);
+    border-right: 1px solid var(--border, rgba(148,163,184,0.10));
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+    flex-shrink: 0; overflow-y: auto;
   }
 
   .brand {
-    display: flex; align-items: center; gap: 8px;
-    padding: 0.9rem 1rem 0.75rem;
-    border-bottom: 1px solid #334155;
+    display: flex; align-items: center; gap: 10px;
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid var(--border, rgba(148,163,184,0.10));
   }
   .brand-logo { display: flex; align-items: center; }
   .logo-icon  { width: 20px; height: 20px; }
-  .brand-text { font-size: 1.2rem; font-weight: 800; color: #38bdf8; line-height: 1; }
-  .brand-ver  { font-size: 0.6rem; color: #475569; font-weight: 600; margin-left: 3px; vertical-align: super; }
+  .brand-text { font-size: 15px; font-weight: 800; color: var(--accent, #38BDF8); line-height: 1; letter-spacing: -0.02em; }
+  .brand-ver  { font-size: 9px; color: var(--text-3, #3F4D5C); font-weight: 600; margin-left: 3px; vertical-align: super; font-family: "DM Mono", monospace; }
 
-  nav { display: flex; flex-direction: column; gap: 0; padding: 0.5rem 0; flex: 1; }
+  nav { display: flex; flex-direction: column; padding: 8px; flex: 1; gap: 2px; }
 
-  .nav-group { padding: 0 0.5rem 0.25rem; }
+  .nav-group { margin-bottom: 8px; }
   .nav-group-label {
-    display: block; font-size: 0.6rem; font-weight: 700;
-    color: #334155; text-transform: uppercase; letter-spacing: 0.08em;
-    padding: 0.6rem 0.75rem 0.2rem;
+    display: block; font-size: 9px; font-weight: 700;
+    color: var(--text-3, #3F4D5C); text-transform: uppercase; letter-spacing: 0.12em;
+    padding: 8px 8px 4px;
   }
 
   .nav-item {
-    display: flex; align-items: center; gap: 0.6rem; width: 100%;
-    background: transparent; border: none; color: #64748b;
-    padding: 0.45rem 0.75rem; border-radius: 6px;
-    cursor: pointer; font-size: 0.83rem; text-align: left;
-    transition: background 0.12s, color 0.12s;
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: transparent; border: none; color: var(--text-2, #94A3B8);
+    padding: 6px 8px; border-radius: 4px;
+    cursor: pointer; font-size: 12px; font-weight: 500; text-align: left;
+    transition: background 0.10s, color 0.10s; font-family: inherit; line-height: 1;
   }
-  .nav-item:hover  { background: #334155; color: #e2e8f0; }
-  .nav-item.active { background: #0f3460; color: #38bdf8; }
-
-  .nav-icon { width: 15px; height: 15px; flex-shrink: 0; }
+  .nav-item:hover  { background: var(--surface-2, #253045); color: var(--text, #E2E8F0); }
+  .nav-item.active { background: var(--accent-dim, rgba(56,189,248,0.12)); color: var(--accent, #38BDF8); }
+  .nav-icon { width: 13px; height: 13px; flex-shrink: 0; }
 
   .sidebar-footer {
-    padding: 0.75rem; border-top: 1px solid var(--border, #334155); margin-top: auto;
-    display: flex; flex-direction: column; gap: 6px;
+    padding: 8px; border-top: 1px solid var(--border, rgba(148,163,184,0.10)); margin-top: auto;
+    display: flex; flex-direction: column; gap: 4px;
   }
 
   .theme-toggle {
-    display: flex; align-items: center; gap: 6px;
-    width: 100%; background: var(--surface-2, #253045);
-    border: 1px solid var(--border, #334155);
-    color: var(--text-2, #94a3b8);
-    padding: 7px 10px; border-radius: 6px; cursor: pointer;
-    font-size: 0.78rem; text-align: left;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    display: flex; align-items: center; gap: 6px; width: 100%;
+    background: transparent; border: 1px solid var(--border, rgba(148,163,184,0.10));
+    color: var(--text-3, #3F4D5C); padding: 6px 8px; border-radius: 4px;
+    cursor: pointer; font-size: 11px; text-align: left; font-family: inherit;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
   }
-  .theme-toggle:hover {
-    background: var(--surface-3, #2D3A52);
-    color: var(--text, #e2e8f0);
-    border-color: var(--border-2, #475569);
-  }
-  .theme-toggle svg { width: 13px; height: 13px; flex-shrink: 0; }
-  .sec-btn {
-    display: flex; align-items: center; gap: 6px;
-    width: 100%; background: #1d1f2e; border: 1px solid #334155;
-    color: #94a3b8; padding: 7px 10px; border-radius: 6px; cursor: pointer;
-    font-size: 0.78rem; text-align: left; transition: all 0.15s;
-  }
-  .sec-btn:hover { background: #0f3460; border-color: #38bdf8; color: #38bdf8; }
-  .sec-icon { width: 13px; height: 13px; flex-shrink: 0; }
+  .theme-toggle:hover { background: var(--surface-2); color: var(--text-2); border-color: var(--border-2); }
+  .theme-toggle svg { width: 12px; height: 12px; flex-shrink: 0; }
 
-  .content {
-    flex: 1; padding: 1.5rem; overflow-y: auto;
+  .sec-btn {
+    display: flex; align-items: center; gap: 6px; width: 100%;
+    background: transparent; border: 1px solid var(--border, rgba(148,163,184,0.10));
+    color: var(--text-3, #3F4D5C); padding: 6px 8px; border-radius: 4px;
+    cursor: pointer; font-size: 11px; text-align: left; font-family: inherit;
+    transition: all 0.12s;
   }
+  .sec-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .sec-icon { width: 12px; height: 12px; flex-shrink: 0; }
+
+  /* Grid toggle button */
+  .grid-toggle {
+    position: fixed; bottom: 24px; right: 24px; z-index: 200;
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface-2); border: 1px solid var(--border-2);
+    color: var(--text-3); font-family: "DM Mono", monospace;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 6px 10px; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  }
+  .grid-toggle:hover { color: var(--text-2); border-color: var(--border-3); }
+  :global(body.grid-on) .grid-toggle { background: var(--accent); color: #000; border-color: transparent; }
+
+  .content { flex: 1; overflow-y: auto; min-width: 0; }
 </style>
