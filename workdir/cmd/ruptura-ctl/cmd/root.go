@@ -89,11 +89,9 @@ func newClient() *client.Client {
 }
 
 func ctx() context.Context {
-	// Use cfgTimeout so --timeout flag is respected everywhere.
-	// The cancel func is intentionally not deferred here — each command
-	// is short-lived and os.Exit() cleans up.
-	c, _ := context.WithTimeout(context.Background(), //nolint:govet
+	c, cancel := context.WithTimeout(context.Background(),
 		time.Duration(cfgTimeout)*time.Second)
+	go func() { <-c.Done(); cancel() }()
 	return c
 }
 

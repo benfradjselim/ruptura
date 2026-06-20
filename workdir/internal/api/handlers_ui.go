@@ -68,16 +68,17 @@ func kpiMap(s models.KPISnapshot) map[string]models.KPI {
 // ── /api/v2/fleet ─────────────────────────────────────────────────────────────
 
 type fleetHost struct {
-	Host              string                `json:"host"`
-	State             string                `json:"state"`
-	HealthScore       float64               `json:"health_score"`
-	Stress            float64               `json:"stress"`
-	Fatigue           float64               `json:"fatigue"`
-	Contagion         float64               `json:"contagion"`
-	ActiveAlerts      int                   `json:"active_alerts"`
-	LastSeen          time.Time             `json:"last_seen"`
-	FusedRuptureIndex float64               `json:"fused_rupture_index"`
-	HealthForecast    *models.HealthForecast `json:"health_forecast,omitempty"`
+	Host                string                 `json:"host"`
+	State               string                 `json:"state"`
+	HealthScore         float64                `json:"health_score"`
+	Stress              float64                `json:"stress"`
+	Fatigue             float64                `json:"fatigue"`
+	Contagion           float64                `json:"contagion"`
+	ActiveAlerts        int                    `json:"active_alerts"`
+	LastSeen            time.Time              `json:"last_seen"`
+	FusedRuptureIndex   float64                `json:"fused_rupture_index"`
+	CalibrationProgress int                    `json:"calibration_progress"`
+	HealthForecast      *models.HealthForecast `json:"health_forecast,omitempty"`
 }
 
 type fleetResponse struct {
@@ -89,6 +90,9 @@ type fleetResponse struct {
 }
 
 func snapshotState(snap models.KPISnapshot) string {
+	if snap.CalibrationProgress < 100 {
+		return "calibrating"
+	}
 	hs := snap.HealthScore.Value
 	if hs >= 70 {
 		return "healthy"
@@ -133,15 +137,16 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		}
 
 		resp.Hosts = append(resp.Hosts, fleetHost{
-			Host:              name,
-			State:             state,
-			HealthScore:       s.HealthScore.Value,
-			Stress:            s.Stress.Value,
-			Fatigue:           s.Fatigue.Value,
-			Contagion:         s.Contagion.Value,
-			LastSeen:          s.Timestamp,
-			FusedRuptureIndex: s.FusedRuptureIndex,
-			HealthForecast:    s.HealthForecast,
+			Host:                name,
+			State:               state,
+			HealthScore:         s.HealthScore.Value,
+			Stress:              s.Stress.Value,
+			Fatigue:             s.Fatigue.Value,
+			Contagion:           s.Contagion.Value,
+			LastSeen:            s.Timestamp,
+			FusedRuptureIndex:   s.FusedRuptureIndex,
+			CalibrationProgress: s.CalibrationProgress,
+			HealthForecast:      s.HealthForecast,
 		})
 	}
 

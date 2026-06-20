@@ -173,6 +173,12 @@
               {:else}
                 <div class="score-block calibrating-pill">
                   <span class="score-label">Calibrating</span>
+                  {#if (w.calibration_progress ?? 0) > 0}
+                    <div class="calib-bar-track" title="Calibration {w.calibration_progress}%">
+                      <div class="calib-bar-fill" style="width: {w.calibration_progress}%"></div>
+                    </div>
+                    <span class="calib-pct">{w.calibration_progress}%</span>
+                  {/if}
                 </div>
               {/if}
               {#if risk != null}
@@ -361,7 +367,10 @@
 .score-value.degraded { color: #f59e0b; }
 .score-value.at-risk { color: #f97316; }
 .score-value.critical { color: #ef4444; }
-.calibrating-pill { font-size: 0.75rem; color: #818cf8; }
+.calibrating-pill { font-size: 0.75rem; color: #818cf8; gap: 0.25rem; }
+.calib-bar-track { width: 60px; height: 4px; background: rgba(99,102,241,0.2); border-radius: 2px; overflow: hidden; }
+.calib-bar-fill { height: 100%; background: #818cf8; border-radius: 2px; transition: width 0.5s ease; }
+.calib-pct { font-size: 0.65rem; color: #818cf8; font-variant-numeric: tabular-nums; }
 .expand-icon { color: var(--text-secondary, #94a3b8); font-size: 0.7rem; }
 
 /* Signal bars */
