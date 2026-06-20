@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/spf13/cobra"
 )
 
