@@ -49,6 +49,17 @@ var healthCmd = &cobra.Command{
 		if health.RuptureDetection != "" {
 			fmt.Printf("  %-22s %s\n", dim("detection"), health.RuptureDetection)
 		}
+		fmt.Printf("  %-22s %s\n", dim("ctl version"), CTLVersion)
+
+		// Warn if ctl major version is behind the server
+		if health.Version != "" && CTLVersion != "" && health.Version != CTLVersion {
+			fmt.Printf("\n  %s  ruptura-ctl v%s is behind the server v%s\n",
+				yellow("⚠"), CTLVersion, health.Version)
+			fmt.Printf("  %s  Update with: %s\n",
+				dim("→"),
+				cyan("go install github.com/benfradjselim/ruptura/cmd/ruptura-ctl@latest"),
+			)
+		}
 
 		fmt.Println()
 		ingestHeader := bold("Ingestion Statistics")

@@ -89,7 +89,12 @@ func newClient() *client.Client {
 }
 
 func ctx() context.Context {
-	return context.Background()
+	// Use cfgTimeout so --timeout flag is respected everywhere.
+	// The cancel func is intentionally not deferred here — each command
+	// is short-lived and os.Exit() cleans up.
+	c, _ := context.WithTimeout(context.Background(), //nolint:govet
+		time.Duration(cfgTimeout)*time.Second)
+	return c
 }
 
 func fatal(err error) {

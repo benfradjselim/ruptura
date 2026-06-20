@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/spf13/cobra"
@@ -174,6 +175,27 @@ var statusCmd = &cobra.Command{
 	},
 }
 
+var statusWatchInterval int
+
 func init() {
 	rootCmd.AddCommand(statusCmd)
+	statusCmd.Flags().IntVarP(&statusWatchInterval, "watch", "w", 0,
+		"Refresh every N seconds (e.g. -w 5). 0 = run once.")
+}
+
+// runStatusOnce executes the status command body. Called directly or on a ticker when --watch is set.
+func runStatusWatch(cmd *cobra.Command) {
+	if statusWatchInterval <= 0 {
+		return
+	}
+	// Clear screen on each refresh
+	fmt.Print("\033[H\033[2J")
+	_ = statusCmd.RunE(cmd, nil)
+
+	ticker := time.NewTicker(time.Duration(statusWatchInterval) * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		fmt.Print("\033[H\033[2J")
+		_ = statusCmd.RunE(cmd, nil)
+	}
 }

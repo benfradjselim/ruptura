@@ -97,16 +97,11 @@ var getRupturesCmd = &cobra.Command{
 	Short:   "List all active rupture events",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c := newClient()
-		snaps, err := c.Snapshots(ctx())
+		// Use the dedicated /api/v2/ruptures endpoint — server-side filtered,
+		// much faster on large fleets than fetching all snapshots client-side.
+		active, err := c.Ruptures(ctx())
 		if err != nil {
 			return err
-		}
-		// filter to active ruptures (FusedR >= 1.5)
-		var active []models.KPISnapshot
-		for _, s := range snaps {
-			if s.FusedRuptureIndex >= 1.5 {
-				active = append(active, s)
-			}
 		}
 		if cfgOutput == "json" {
 			return printJSON(active)

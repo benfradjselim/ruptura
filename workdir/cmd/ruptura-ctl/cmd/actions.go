@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var cfgForce bool
+
 var actionsCmd = &cobra.Command{
 	Use:   "actions",
 	Short: "Manage Ruptura actions (list, approve, reject, emergency-stop)",
@@ -52,6 +54,18 @@ var actionsEmergencyStopCmd = &cobra.Command{
 	Use:   "emergency-stop",
 	Short: "Halt all Tier-1 automatic actions globally",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !cfgForce {
+			fmt.Println()
+			fmt.Printf("  %s  This will halt ALL Tier-1 auto-actions immediately.\n", yellow("⚠"))
+			fmt.Printf("  Type %s to confirm: ", bold("yes"))
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "yes" {
+				fmt.Println(dim("  Cancelled."))
+				fmt.Println()
+				return nil
+			}
+		}
 		c := newClient()
 		if err := c.EmergencyStop(ctx()); err != nil {
 			return fmt.Errorf("emergency stop: %w", err)
@@ -97,4 +111,9 @@ func init() {
 	rootCmd.AddCommand(approveCmd)
 	rootCmd.AddCommand(rejectCmd)
 	rootCmd.AddCommand(emergencyStopCmd)
+
+	// --force/-f skips the "yes" confirmation prompt
+	for _, c := range []*cobra.Command{actionsEmergencyStopCmd, emergencyStopCmd} {
+		c.Flags().BoolVarP(&cfgForce, "force", "f", false, "Skip confirmation prompt")
+	}
 }

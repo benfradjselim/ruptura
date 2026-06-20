@@ -173,6 +173,17 @@ func (c *Client) Metrics(ctx context.Context) (string, error) {
 
 func (c *Client) Snapshots(ctx context.Context) ([]models.KPISnapshot, error) {
 	var r []models.KPISnapshot
+	return r, c.do(ctx, http.MethodGet, "/api/v2/fleet", nil, &r)
+}
+
+// Fleet is an alias for Snapshots — fetches all workload KPI snapshots.
+func (c *Client) Fleet(ctx context.Context) ([]models.KPISnapshot, error) {
+	return c.Snapshots(ctx)
+}
+
+// Ruptures fetches only workloads that are currently in a rupture state (FRI >= 1.5).
+func (c *Client) Ruptures(ctx context.Context) ([]models.KPISnapshot, error) {
+	var r []models.KPISnapshot
 	return r, c.do(ctx, http.MethodGet, "/api/v2/ruptures", nil, &r)
 }
 

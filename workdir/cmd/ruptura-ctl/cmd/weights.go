@@ -109,9 +109,16 @@ Weights are automatically normalised to sum 1.0.`,
 			return fmt.Errorf("set weights: %w", err)
 		}
 
+		// Display normalised values (what the server actually uses)
+		norm := func(v float64) float64 {
+			if total == 0 {
+				return 0
+			}
+			return v / total
+		}
 		successLine(fmt.Sprintf("Weights applied for selector %s", cyan(wSelector)))
-		fmt.Printf("  stress=%.2f  fatigue=%.2f  mood=%.2f  pressure=%.2f  humidity=%.2f  contagion=%.2f\n\n",
-			wStress, wFatigue, wMood, wPressure, wHumidity, wContagion)
+		fmt.Printf("  Normalised → stress=%.2f  fatigue=%.2f  mood=%.2f  pressure=%.2f  humidity=%.2f  contagion=%.2f\n\n",
+			norm(wStress), norm(wFatigue), norm(wMood), norm(wPressure), norm(wHumidity), norm(wContagion))
 		return nil
 	},
 }
