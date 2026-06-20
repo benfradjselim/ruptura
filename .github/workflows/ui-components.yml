@@ -38,6 +38,7 @@ jobs:
         run: npm run build
 
       - name: Check for build artifacts
+        working-directory: workdir
         run: |
-          test -d dist && echo "Build successful: dist/ exists" || (echo "Build failed: no dist/" && exit 1)
-          ls -la dist/
+          test -d web && echo "Build successful: workdir/web/ exists" || (echo "Build failed: no workdir/web/" && exit 1)
+          ls -la web/
