@@ -1,0 +1,285 @@
+/*
+ * Ruptura Community — Design System
+ * Skill: Müller-Brockmann Grid Systems + frontend-design
+ *
+ * ONE source of truth: every grid param lives here.
+ * Content, overlay, and spacing ALL derive from these tokens.
+ *
+ * Grid: 12 cols · 20px gutter · 24px margin · 8px baseline · 24px leading (3×bl)
+ * Palette: near-black #080A0F · ink #E8EDF2 · accent #22D3EE (one accent, used sparingly)
+ * Signature: large DM Mono numerals for FRI/health scores — the Swiss "big numeral" move
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── Grid — ONE source of truth ── */
+  --cols:    12;
+  --gutter:  20px;
+  --margin:  24px;
+  --bl:      8px;   /* baseline unit */
+  --lh:      24px;  /* leading = 3 × baseline */
+  --maxw:    1280px;
+
+  /* ── Backgrounds ── */
+  --bg:        #080A0F;
+  --surface:   #0F1420;
+  --surface-2: #161D2E;
+  --surface-3: #1C2540;
+
+  /* ── Borders ── */
+  --border:   rgba(148,163,184,0.08);
+  --border-2: rgba(148,163,184,0.14);
+  --border-3: rgba(148,163,184,0.22);
+
+  /* ── Text ── */
+  --text:   #E8EDF2;
+  --text-2: #94A3B8;
+  --text-3: #3F4D5C;
+
+  /* ── Status — strict channel separation ── */
+  --green:      #10B981;
+  --green-dim:  rgba(16,185,129,0.10);
+  --amber:      #F59E0B;
+  --amber-dim:  rgba(245,158,11,0.10);
+  --red:        #F43F5E;
+  --red-dim:    rgba(244,63,94,0.10);
+
+  /* ── Accent (one only) ── */
+  --accent:     #22D3EE;
+  --accent-dim: rgba(34,211,238,0.10);
+
+  /* ── Forecast (violet = future) ── */
+  --violet:     #8B5CF6;
+  --violet-dim: rgba(139,92,246,0.10);
+
+  /* ── Typography ── */
+  --font-ui:   "Inter", system-ui, sans-serif;
+  --font-mono: "DM Mono", "Fira Code", monospace;  /* all numerics */
+
+  /* ── Grid overlay colors ── */
+  --g-col:      rgba(34,211,238,0.05);
+  --g-edge:     rgba(34,211,238,0.20);
+  --g-base:     rgba(34,211,238,0.12);
+  --g-base-min: rgba(34,211,238,0.05);
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+  --shadow:    0 4px 16px rgba(0,0,0,0.6);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.7);
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: var(--lh);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* All numerics → DM Mono, tabular figures, never jumpy on value change */
+.num, .fri, .pct, .score, .metric-val, [data-num] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ── Müller-Brockmann grid scaffold ───────────────────────────────────────── */
+.spread {
+  position: relative;
+  width: 100%;
+}
+
+.wrap {
+  position: relative;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 var(--margin);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  column-gap: var(--gutter);
+  row-gap: var(--lh);
+}
+
+/* Subgrid bands — children placed by column LINE */
+.band {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  column-gap: var(--gutter);
+  align-items: start;
+}
+@supports not (grid-template-columns: subgrid) {
+  .band { grid-template-columns: repeat(var(--cols), 1fr); }
+}
+
+/* ── Grid overlay (SAME content box as content → columns match exactly) ──── */
+.guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0;
+  transition: opacity 0.26s ease;
+}
+body.grid-on .guides { opacity: 1; }
+
+.guides .cols {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: var(--margin); right: var(--margin);
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  column-gap: var(--gutter);
+}
+.guides .col {
+  background: var(--g-col);
+  box-shadow: inset 1px 0 0 var(--g-edge), inset -1px 0 0 var(--g-edge);
+  position: relative;
+}
+.guides .col span {
+  position: absolute;
+  top: var(--bl);
+  left: 0; right: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.7;
+}
+.guides .rows {
+  position: absolute;
+  left: var(--margin); right: var(--margin);
+  top: 0; bottom: 0;
+  background-image:
+    repeating-linear-gradient(to bottom, var(--g-base) 0 1px, transparent 1px var(--lh)),
+    repeating-linear-gradient(to bottom, var(--g-base-min) 0 1px, transparent 1px var(--bl));
+}
+.guides .mline {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: var(--g-edge);
+}
+.guides .mline.l { left: var(--margin); }
+.guides .mline.r { right: var(--margin); }
+
+/* ── Grid toggle button ───────────────────────────────────────────────────── */
+.grid-toggle {
+  position: fixed;
+  bottom: calc(var(--bl) * 3);
+  right: calc(var(--bl) * 3);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: var(--bl);
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.grid-toggle:hover { color: var(--text-2); border-color: var(--border-3); }
+body.grid-on .grid-toggle { background: var(--accent); color: #000; border-color: transparent; }
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+/* ── Inputs / buttons reset ──────────────────────────────────────────────── */
+input, select, textarea, button { font-family: inherit; font-size: inherit; }
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* ── Status color helpers ─────────────────────────────────────────────────── */
+.s-healthy  { color: var(--green); }
+.s-degraded { color: var(--amber); }
+.s-critical { color: var(--red);   }
+.s-muted    { color: var(--text-3); }
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--bl));
+  padding: calc(var(--bl)) calc(var(--bl) * 2);
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, opacity 0.12s;
+  white-space: nowrap;
+  line-height: var(--lh);
+}
+.btn:disabled { opacity: 0.4; pointer-events: none; }
+.btn-primary { background: var(--accent); color: #000; font-weight: 600; }
+.btn-primary:hover { background: #38E0F5; }
+.btn-ghost { background: transparent; color: var(--text-2); border-color: var(--border-2); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn-sm { padding: 4px 12px; font-size: 11px; line-height: 16px; }
+
+/* ── Spinner ──────────────────────────────────────────────────────────────── */
+.spinner {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-2);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--lh));
+  padding: calc(var(--lh) * 3) var(--margin);
+  text-align: center;
+  color: var(--text-3);
+  min-height: 240px;
+}
+.empty p { font-size: 13px; max-width: 280px; line-height: var(--lh); }
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-ring {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

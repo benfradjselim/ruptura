@@ -1,5 +1,5 @@
 <script>
-  import { isLoggedIn, currentPage } from './lib/store.js'
+  import { isLoggedIn, currentPage, theme } from './lib/store.js'
   import Login        from './pages/Login.svelte'
   import Dashboard    from './pages/Dashboard.svelte'
   import Alerts       from './pages/Alerts.svelte'
@@ -15,6 +15,10 @@
   import SLOs         from './pages/SLOs.svelte'
   import { api }      from './lib/api.js'
   import { SECURITY_TEMPLATE } from './lib/templates/security.js'
+
+  function toggleTheme() {
+    theme.update(t => t === 'dark' ? 'light' : 'dark')
+  }
 
   // SVG icon paths (Lucide-style)
   const NAV_ICONS = {
@@ -113,6 +117,31 @@
       </nav>
 
       <div class="sidebar-footer">
+        <!-- Dark / Light mode toggle -->
+        <button class="theme-toggle" on:click={toggleTheme} title="{$theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}">
+          {#if $theme === 'dark'}
+            <!-- Sun icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <span class="label">Light mode</span>
+          {:else}
+            <!-- Moon icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <span class="label">Dark mode</span>
+          {/if}
+        </button>
+
         <button class="sec-btn" on:click={applySecurityTemplate} title="Create Security Dashboard">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="sec-icon">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -205,8 +234,25 @@
   .nav-icon { width: 15px; height: 15px; flex-shrink: 0; }
 
   .sidebar-footer {
-    padding: 0.75rem; border-top: 1px solid #334155; margin-top: auto;
+    padding: 0.75rem; border-top: 1px solid var(--border, #334155); margin-top: auto;
+    display: flex; flex-direction: column; gap: 6px;
   }
+
+  .theme-toggle {
+    display: flex; align-items: center; gap: 6px;
+    width: 100%; background: var(--surface-2, #253045);
+    border: 1px solid var(--border, #334155);
+    color: var(--text-2, #94a3b8);
+    padding: 7px 10px; border-radius: 6px; cursor: pointer;
+    font-size: 0.78rem; text-align: left;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .theme-toggle:hover {
+    background: var(--surface-3, #2D3A52);
+    color: var(--text, #e2e8f0);
+    border-color: var(--border-2, #475569);
+  }
+  .theme-toggle svg { width: 13px; height: 13px; flex-shrink: 0; }
   .sec-btn {
     display: flex; align-items: center; gap: 6px;
     width: 100%; background: #1d1f2e; border: 1px solid #334155;

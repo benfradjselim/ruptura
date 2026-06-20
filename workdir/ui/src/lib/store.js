@@ -12,6 +12,24 @@ token.subscribe((t) => setToken(t))
 
 export const isLoggedIn = derived(token, ($t) => !!$t)
 
+// ── Theme store (dark / light) ─────────────────────────────────────────────
+// Persisted in localStorage. Applied to <html data-theme="dark|light">.
+const savedTheme = typeof localStorage !== 'undefined'
+  ? (localStorage.getItem('ruptura_theme') || 'dark')
+  : 'dark'
+
+export const theme = writable(savedTheme)
+
+theme.subscribe((t) => {
+  if (typeof localStorage !== 'undefined') localStorage.setItem('ruptura_theme', t)
+  if (typeof document !== 'undefined') document.documentElement.setAttribute('data-theme', t)
+})
+
+// Apply on boot
+if (typeof document !== 'undefined') {
+  document.documentElement.setAttribute('data-theme', savedTheme)
+}
+
 // KPI severity helpers
 export function kpiColor(name, value) {
   const thresholds = {
