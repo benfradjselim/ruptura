@@ -139,11 +139,11 @@
   .ts-wrap { position: relative; width: 100%; }
   .ts-svg  { width: 100%; height: 120px; display: block; }
   .ts-msg  { text-align: center; padding: 20px; font-size: 0.8rem; color: #475569; }
-  .ts-msg.err   { color: #ef4444; }
-  .ts-msg.muted { color: #334155; }
+  .ts-msg.err   { color: var(--red); }
+  .ts-msg.muted { color: var(--border-2); }
   .ts-current {
     position: absolute; top: 3px; right: 6px;
-    font-size: 1rem; font-weight: 700; color: #e2e8f0; line-height: 1;
+    font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1;
   }
-  .ts-unit { font-size: 0.65rem; color: #64748b; }
+  .ts-unit { font-size: 0.65rem; color: var(--text-3); }
 </style>

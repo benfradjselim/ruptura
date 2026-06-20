@@ -158,9 +158,9 @@
   .pred-wrap { position: relative; width: 100%; }
   .pred-svg  { width: 100%; height: 120px; display: block; }
   .pred-msg  { text-align: center; padding: 20px; color: #475569; font-size: 0.8rem; }
-  .err       { color: #ef4444; }
+  .err       { color: var(--red); }
   .pred-footer { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 0; font-size: 0.78rem; }
   .trend { font-weight: 600; }
-  .pred-val { color: #94a3b8; }
-  .pred-val strong { color: #e2e8f0; }
+  .pred-val { color: var(--text-2); }
+  .pred-val strong { color: var(--text); }
 </style>

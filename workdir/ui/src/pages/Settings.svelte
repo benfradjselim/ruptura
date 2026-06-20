@@ -19,105 +19,136 @@
       await api.userCreate(newUser)
       newUser = { username: '', password: '', role: 'viewer' }
       loadUsers()
-    } catch (e) {
-      createErr = e.json?.error?.message || e.message
-    } finally {
-      creating = false
-    }
+    } catch(e) { createErr = e.message }
+    finally { creating = false }
   }
 
-  async function deleteUser(u) {
-    await api.userDelete(u.username).catch(() => {})
+  async function deleteUser(id) {
+    if (!confirm('Delete this user?')) return
+    await api.userDelete(id).catch(() => {})
     loadUsers()
-  }
-
-  async function logout() {
-    await api.logout().catch(() => {})
-    token.set('')
-    user.set(null)
   }
 
   onMount(loadUsers)
 </script>
 
-<div class="page">
-  <div class="header">
-    <h1>Settings</h1>
-    <button class="btn-ghost" on:click={logout}>Sign out</button>
+<div class="page-wrap">
+  <div class="band page-header">
+    <h1 class="page-title" style="grid-column:1/7">Settings</h1>
   </div>
 
-  <div class="tabs">
-    <button class:active={activeTab==='users'} on:click={() => activeTab='users'}>Users</button>
+  <div class="band tabs-band">
+    <div class="tabs" style="grid-column:1/-1">
+      {#each ['users','api'] as t}
+        <button class="tab" class:active={activeTab===t} on:click={() => activeTab=t}>
+          {t === 'users' ? 'Users' : 'API Key'}
+        </button>
+      {/each}
+    </div>
   </div>
 
   {#if activeTab === 'users'}
-    <div class="card">
-      <h2>Create User</h2>
-      <div class="form-row">
-        <input bind:value={newUser.username} placeholder="Username" class="inp"/>
-        <input bind:value={newUser.password} type="password" placeholder="Password (min 8)" class="inp"/>
-        <select bind:value={newUser.role} class="inp">
-          <option value="viewer">viewer</option>
-          <option value="operator">operator</option>
-          <option value="admin">admin</option>
-        </select>
-        <button class="btn-primary" on:click={createUser} disabled={!newUser.username || !newUser.password || creating}>
-          Create
+    <div class="band">
+      <!-- Create user form -->
+      <div class="section-card" style="grid-column:1/6">
+        <div class="section-label">Create user</div>
+        <div class="form-row">
+          <input class="input" placeholder="Username" bind:value={newUser.username} />
+        </div>
+        <div class="form-row">
+          <input class="input" type="password" placeholder="Password" bind:value={newUser.password} />
+        </div>
+        <div class="form-row">
+          <select class="input" bind:value={newUser.role}>
+            <option value="viewer">Viewer</option>
+            <option value="operator">Operator</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        {#if createErr}<p class="err">{createErr}</p>{/if}
+        <button class="btn btn-primary" disabled={creating} on:click={createUser}>
+          {creating ? 'Creating…' : 'Create user'}
         </button>
       </div>
-      {#if createErr}<p class="err">{createErr}</p>{/if}
+
+      <!-- Users list -->
+      <div class="section-card" style="grid-column:6/13">
+        <div class="section-label">Users</div>
+        {#if loading}
+          <div class="loading"><div class="spinner"></div></div>
+        {:else if users.length === 0}
+          <p class="empty-msg">No users yet</p>
+        {:else}
+          <table class="data-table">
+            <thead><tr><th>Username</th><th>Role</th><th></th></tr></thead>
+            <tbody>
+              {#each users as u}
+                <tr>
+                  <td>{u.username}</td>
+                  <td><span class="role-badge">{u.role}</span></td>
+                  <td>
+                    {#if u.id !== $user?.id}
+                      <button class="btn btn-danger btn-sm" on:click={() => deleteUser(u.id)}>Delete</button>
+                    {/if}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+      </div>
     </div>
 
-    <div class="card" style="margin-top:0.75rem">
-      <h2>Users <span class="badge">{users.length}</span></h2>
-      {#if loading}
-        <p class="muted">Loading…</p>
-      {:else if users.length === 0}
-        <p class="muted">No users</p>
-      {:else}
-        <table>
-          <thead><tr><th>Username</th><th>Role</th><th>ID</th><th></th></tr></thead>
-          <tbody>
-            {#each users as u}
-              <tr>
-                <td>{u.username}</td>
-                <td><span class="role-badge role-{u.role}">{u.role}</span></td>
-                <td class="uid">{u.id}</td>
-                <td>
-                  <button class="btn-sm danger" on:click={() => deleteUser(u)}>Delete</button>
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
+  {:else}
+    <div class="band">
+      <div class="section-card" style="grid-column:1/8">
+        <div class="section-label">Current API key</div>
+        <div class="key-display">
+          <span class="mono">{$token ? $token.substring(0,8) + '…' : '—'}</span>
+        </div>
+        <p class="hint-text">Keep your API key secret. Rotate it by creating a new user and logging in again.</p>
+      </div>
     </div>
   {/if}
 </div>
 
 <style>
-  .page { padding: 0; }
-  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-  h1 { margin: 0; font-size: 1.2rem; color: #e2e8f0; }
-  h2 { margin: 0 0 0.75rem; font-size: 0.85rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1rem; }
-  .tabs { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; }
-  .tabs button { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 0.3rem 0.75rem; border-radius: 5px; cursor: pointer; font-size: 0.85rem; }
-  .tabs button.active { background: #0284c7; border-color: #0284c7; color: #fff; }
-  .form-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
-  .inp { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 5px; font-size: 0.85rem; }
-  .btn-primary { background: #0284c7; border: none; color: #fff; padding: 0.4rem 0.75rem; border-radius: 5px; cursor: pointer; font-size: 0.85rem; }
-  .btn-ghost { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 0.35rem 0.75rem; border-radius: 5px; cursor: pointer; font-size: 0.85rem; }
-  .btn-sm { background: #334155; border: none; color: #e2e8f0; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
-  .btn-sm.danger { background: #b91c1c; color: #fff; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  th { text-align: left; padding: 0.4rem 0.5rem; color: #64748b; font-weight: 500; }
-  td { padding: 0.4rem 0.5rem; border-top: 1px solid #0f172a; color: #cbd5e1; }
-  .uid { font-family: monospace; font-size: 0.75rem; color: #475569; }
-  .badge { background: #334155; border-radius: 10px; padding: 0 6px; font-size: 0.75rem; }
-  .role-badge { font-size: 0.7rem; padding: 1px 6px; border-radius: 10px; background: #334155; color: #94a3b8; }
-  .role-badge.role-admin { background: #1e3a5f; color: #60a5fa; }
-  .role-badge.role-operator { background: #1a2f1a; color: #4ade80; }
-  .muted { color: #64748b; font-size: 0.85rem; }
-  .err { color: #f87171; font-size: 0.8rem; }
+  .page-wrap { padding:32px 24px; overflow-y:auto; height:100%; display:grid; grid-template-columns:repeat(12,1fr); column-gap:20px; row-gap:0; align-content:start; }
+  .band { grid-column:1/-1; display:grid; grid-template-columns:subgrid; column-gap:20px; margin-bottom:24px; align-items:start; }
+  @supports not (grid-template-columns:subgrid) { .band { grid-template-columns:repeat(12,1fr); } }
+  .page-title { font-size:22px; font-weight:700; letter-spacing:-0.02em; color:var(--text); margin-bottom:0; }
+  .page-header { align-items:center; }
+
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); padding-bottom:0; }
+  .tab { padding:8px 16px; background:none; border:none; color:var(--text-3); font-size:13px; font-weight:500; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; font-family:inherit; transition:color .12s; }
+  .tab:hover { color:var(--text-2); }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  .section-card { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:20px; }
+  .section-label { font-size:10px; font-weight:700; letter-spacing:0.10em; text-transform:uppercase; color:var(--text-3); margin-bottom:16px; }
+  .form-row { margin-bottom:10px; }
+  .input { width:100%; background:var(--surface-2); border:1px solid var(--border-2); border-radius:4px; color:var(--text); padding:8px 12px; font-size:13px; font-family:inherit; }
+  .input:focus { outline:none; border-color:var(--accent); }
+  .err { color:var(--red); font-size:12px; margin-bottom:8px; }
+  .empty-msg { color:var(--text-3); font-size:13px; }
+
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:4px; border:1px solid transparent; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; margin-top:8px; }
+  .btn-primary { background:var(--accent); color:#000; }
+  .btn-primary:hover:not(:disabled) { opacity:.9; }
+  .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-ghost { background:transparent; color:var(--text-2); border-color:var(--border-2); }
+  .btn-danger { background:var(--red-dim); color:var(--red); border-color:rgba(244,63,94,.2); }
+  .btn-sm { padding:3px 10px; font-size:11px; margin-top:0; }
+
+  .data-table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:left; padding:6px 8px; font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-3); border-bottom:1px solid var(--border); }
+  td { padding:8px; border-bottom:1px solid var(--border); color:var(--text-2); vertical-align:middle; }
+  .role-badge { font-size:9px; font-weight:700; padding:2px 6px; border-radius:3px; text-transform:uppercase; letter-spacing:.06em; background:var(--surface-3); color:var(--text-3); }
+
+  .key-display { background:var(--surface-2); border:1px solid var(--border); border-radius:4px; padding:12px 16px; margin-bottom:12px; }
+  .mono { font-family:"DM Mono",monospace; font-size:13px; color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .hint-text { font-size:12px; color:var(--text-3); line-height:1.6; }
+  .loading { display:flex; justify-content:center; padding:32px; }
+  .spinner { width:16px; height:16px; border-radius:50%; border:2px solid var(--border-2); border-top-color:var(--accent); animation:spin .7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
 </style>

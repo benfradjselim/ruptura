@@ -46,7 +46,7 @@
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #94a3b8;
+    color: var(--text-2);
   }
   .label {
     font-size: 0.75rem;

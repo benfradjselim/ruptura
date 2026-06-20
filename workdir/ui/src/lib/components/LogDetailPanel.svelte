@@ -44,34 +44,34 @@
 
 <style>
   .panel {
-    width: 380px; background: #1e293b; border-left: 1px solid #334155;
+    width: 380px; background: var(--surface); border-left: 1px solid var(--border-2);
     display: flex; flex-direction: column; height: 100%;
     flex-shrink: 0;
   }
   .panel-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px; border-bottom: 1px solid #334155;
+    padding: 10px 14px; border-bottom: 1px solid var(--border-2);
   }
-  .panel-title { font-size: 0.82rem; font-weight: 600; color: #94a3b8; }
-  .close-btn   { background: none; border: none; color: #64748b; cursor: pointer; font-size: 1rem; }
-  .close-btn:hover { color: #e2e8f0; }
+  .panel-title { font-size: 0.82rem; font-weight: 600; color: var(--text-2); }
+  .close-btn   { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 1rem; }
+  .close-btn:hover { color: var(--text); }
 
   .panel-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 
   .msg-block code {
-    display: block; background: #0f172a; border: 1px solid #334155;
-    border-radius: 6px; padding: 10px; font-size: 0.8rem; color: #e2e8f0;
+    display: block; background: var(--bg); border: 1px solid var(--border-2);
+    border-radius: 6px; padding: 10px; font-size: 0.8rem; color: var(--text);
     white-space: pre-wrap; word-break: break-all;
   }
 
   .pairs { display: flex; flex-direction: column; gap: 4px; }
   .pair  { display: flex; gap: 8px; font-size: 0.78rem; align-items: flex-start; }
-  .pair-key { min-width: 90px; color: #38bdf8; font-weight: 600; flex-shrink: 0; word-break: break-all; }
-  .pair-val { color: #94a3b8; word-break: break-all; }
+  .pair-key { min-width: 90px; color: var(--accent); font-weight: 600; flex-shrink: 0; word-break: break-all; }
+  .pair-val { color: var(--text-2); word-break: break-all; }
 
   .raw-wrap { position: relative; }
   .raw-toggle { font-size: 0.75rem; color: #475569; cursor: pointer; }
-  .raw { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px; font-size: 0.72rem; color: #64748b; overflow-x: auto; margin-top: 6px; }
-  .copy-btn { position: absolute; top: 0; right: 0; background: #334155; border: none; color: #94a3b8; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 0.72rem; }
-  .copy-btn:hover { color: #e2e8f0; }
+  .raw { background: var(--bg); border: 1px solid var(--border-2); border-radius: 6px; padding: 8px; font-size: 0.72rem; color: var(--text-3); overflow-x: auto; margin-top: 6px; }
+  .copy-btn { position: absolute; top: 0; right: 0; background: var(--border-2); border: none; color: var(--text-2); padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 0.72rem; }
+  .copy-btn:hover { color: var(--text); }
 </style>

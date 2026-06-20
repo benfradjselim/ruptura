@@ -1,155 +1,132 @@
 <script>
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
-  import TraceWaterfall from '../lib/components/TraceWaterfall.svelte'
 
-  let traces  = []
-  let loading = false
-  let error   = ''
-  let selectedTrace = null   // full trace spans
-  let selectedId    = null
-
+  let traces = [], loading = true, error = '', selected = null
   let filterService = ''
-  let filterTraceId = ''
 
-  async function search() {
-    loading = true; error = ''; selectedTrace = null; selectedId = null
+  async function load() {
+    loading = true
     try {
-      const res = await api.traceSearch({ service: filterService, limit: 50 })
-      traces = res?.data?.traces || []
-    } catch (e) { error = e.message }
+      const r = await api.traces({ limit: 50, service: filterService || undefined })
+      traces = r.data || []
+    } catch(e) { error = e.message }
     finally { loading = false }
   }
 
-  async function openTrace(traceId) {
-    selectedId = traceId
-    try {
-      const res = await api.traceGet(traceId)
-      selectedTrace = res?.data || []
-    } catch (e) { error = e.message }
+  onMount(load)
+
+  function durationMs(t) {
+    if (!t.duration_ms) return '—'
+    return t.duration_ms.toFixed(1) + 'ms'
   }
-
-  async function openById() {
-    if (!filterTraceId.trim()) return
-    await openTrace(filterTraceId.trim())
-  }
-
-  onMount(search)
-
-  function fmtDur(ms) {
-    if (!ms) return '—'
-    if (ms >= 1000) return (ms/1000).toFixed(2) + 's'
-    return ms.toFixed(1) + 'ms'
-  }
-
-  function fmtTs(ms) {
-    if (!ms) return '—'
-    return new Date(ms).toLocaleTimeString()
+  function statusClass(t) {
+    if (t.error || t.status_code >= 500) return 'err'
+    if (t.status_code >= 400) return 'warn'
+    return 'ok'
   }
 </script>
 
-<div class="traces-page">
-  <div class="toolbar">
-    <h1>Trace Explorer</h1>
-    <div class="filters">
-      <input class="filter-inp" type="text" bind:value={filterService}  placeholder="Service name" />
-      <input class="filter-inp wide" type="text" bind:value={filterTraceId} placeholder="Trace ID (exact)" />
-      <button class="btn-query" on:click={search}>Search</button>
-      <button class="btn-ghost" on:click={openById} disabled={!filterTraceId.trim()}>Open Trace</button>
+<div class="page-wrap">
+  <div class="band page-header">
+    <div style="grid-column:1/7"><h1 class="page-title">Traces</h1></div>
+    <div style="grid-column:7/13; display:flex; gap:8px; align-items:center; justify-content:flex-end">
+      <input class="input-sm" placeholder="Filter service…" bind:value={filterService} on:input={load} />
+      <button class="btn btn-ghost btn-sm" on:click={load}>Refresh</button>
     </div>
   </div>
 
-  {#if error}<div class="err-bar">{error}</div>{/if}
-
-  <div class="traces-main">
-    <!-- List panel -->
-    {#if !selectedTrace}
-      <div class="traces-list">
-        {#if loading}
-          <div class="ts-state">Searching…</div>
-        {:else if !traces.length}
-          <div class="ts-state muted">No traces found. Send OTLP traces to /otlp/v1/traces to start tracing.</div>
-        {:else}
-          <div class="t-table">
-            <div class="t-head">
-              <span>Trace ID</span>
-              <span>Root Service</span>
-              <span>Operation</span>
-              <span>Start</span>
-              <span>Duration</span>
-              <span>Spans</span>
-              <span>Status</span>
-            </div>
+  {#if loading}
+    <div class="loading band"><div class="spinner"></div></div>
+  {:else if error}
+    <div class="band"><div style="grid-column:1/-1;color:var(--red);font-size:13px">{error}</div></div>
+  {:else if traces.length === 0}
+    <div class="band"><div style="grid-column:1/-1;color:var(--text-3);font-size:13px;padding:32px 0">No traces</div></div>
+  {:else}
+    <div class="band">
+      <!-- Trace list -->
+      <div style="grid-column:1/8">
+        <table class="data-table">
+          <thead><tr><th>Trace ID</th><th>Service</th><th>Duration</th><th>Status</th><th>Time</th></tr></thead>
+          <tbody>
             {#each traces as t}
-              <div class="t-row" on:click={() => openTrace(t.traceId)}>
-                <code class="t-id">{t.traceId.slice(0, 12)}…</code>
-                <span class="t-svc">{t.rootService || '—'}</span>
-                <span class="t-op">{t.rootOp || '—'}</span>
-                <span class="t-time">{fmtTs(t.startTimeMs)}</span>
-                <span class="t-dur">{fmtDur(t.durationMs)}</span>
-                <span class="t-spans">{t.spanCount}</span>
-                <span class="t-status" class:err={t.hasError}>
-                  {t.hasError ? '✕ Error' : '✓ OK'}
-                </span>
-              </div>
+              <tr class:selected={selected?.trace_id === t.trace_id} on:click={() => selected = selected?.trace_id === t.trace_id ? null : t} style="cursor:pointer">
+                <td class="mono trace-id">{t.trace_id?.substring(0,12)}…</td>
+                <td>{t.service || '—'}</td>
+                <td class="mono {statusClass(t) === 'err' ? 'red' : ''}">{durationMs(t)}</td>
+                <td>
+                  <span class="status-dot {statusClass(t)}"></span>
+                  <span class="status-text">{t.status_code || '—'}</span>
+                </td>
+                <td class="time-cell">{new Date(t.start_time).toLocaleTimeString()}</td>
+              </tr>
             {/each}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Trace detail -->
+      <div style="grid-column:8/13">
+        {#if selected}
+          <div class="detail-card">
+            <div class="detail-label">Trace detail</div>
+            <div class="detail-row"><span class="detail-key">Trace ID</span><span class="mono detail-val">{selected.trace_id}</span></div>
+            <div class="detail-row"><span class="detail-key">Service</span><span class="detail-val">{selected.service}</span></div>
+            <div class="detail-row"><span class="detail-key">Duration</span><span class="mono detail-val">{durationMs(selected)}</span></div>
+            <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">{selected.status_code || '—'}</span></div>
+            {#if selected.spans}
+              <div class="detail-label" style="margin-top:16px">Spans ({selected.spans.length})</div>
+              {#each selected.spans as sp}
+                <div class="span-row">
+                  <span class="span-name">{sp.operation_name || sp.name}</span>
+                  <span class="mono span-dur">{sp.duration_ms?.toFixed(1)}ms</span>
+                </div>
+              {/each}
+            {/if}
           </div>
+        {:else}
+          <div class="detail-empty">Click a trace to inspect</div>
         {/if}
       </div>
-    {:else}
-      <!-- Trace detail -->
-      <div class="trace-detail">
-        <div class="trace-detail-header">
-          <button class="back-btn" on:click={() => { selectedTrace = null; selectedId = null }}>← Back</button>
-          <span class="trace-id-label">Trace: <code>{selectedId}</code></span>
-          <span class="span-count">{selectedTrace.length} spans</span>
-        </div>
-        <TraceWaterfall spans={selectedTrace} />
-      </div>
-    {/if}
-  </div>
+    </div>
+  {/if}
 </div>
 
 <style>
-  .traces-page { display: flex; flex-direction: column; gap: 0.75rem; }
-  .toolbar { display: flex; flex-direction: column; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #334155; }
-  h1 { margin: 0; font-size: 1.1rem; color: #e2e8f0; }
-  .filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .filter-inp {
-    background: #1e293b; border: 1px solid #334155; border-radius: 6px;
-    color: #e2e8f0; padding: 6px 10px; font-size: 0.83rem; width: 150px;
-  }
-  .filter-inp.wide { flex: 1; min-width: 200px; }
-  .filter-inp:focus { border-color: #38bdf8; outline: none; }
-  .btn-query { background: #0284c7; border: none; color: #fff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.83rem; font-weight: 600; }
-  .btn-ghost { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.83rem; }
-  .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  .err-bar { background: #7f1d1d; border: 1px solid #ef4444; color: #fca5a5; padding: 8px 14px; border-radius: 6px; font-size: 0.82rem; }
-
-  .traces-main { flex: 1; }
-
-  .t-table { border: 1px solid #334155; border-radius: 8px; overflow: hidden; }
-  .t-head  { display: grid; grid-template-columns: 1.5fr 1fr 1.5fr 0.8fr 0.8fr 0.5fr 0.7fr; padding: 8px 14px; background: #0f172a; font-size: 0.72rem; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; gap: 8px; }
-  .t-row   { display: grid; grid-template-columns: 1.5fr 1fr 1.5fr 0.8fr 0.8fr 0.5fr 0.7fr; padding: 9px 14px; border-top: 1px solid #1e293b; align-items: center; gap: 8px; font-size: 0.8rem; cursor: pointer; }
-  .t-row:hover { background: #1e293b; }
-
-  .t-id    { color: #94a3b8; font-size: 0.75rem; }
-  .t-svc   { color: #38bdf8; font-weight: 600; }
-  .t-op    { color: #e2e8f0; }
-  .t-time  { color: #64748b; }
-  .t-dur   { color: #94a3b8; }
-  .t-spans { color: #64748b; text-align: center; }
-  .t-status { font-size: 0.75rem; font-weight: 600; color: #22c55e; }
-  .t-status.err { color: #ef4444; }
-
-  .ts-state { text-align: center; padding: 2rem; color: #475569; font-size: 0.85rem; }
-
-  .trace-detail { display: flex; flex-direction: column; gap: 10px; }
-  .trace-detail-header { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
-  .back-btn { background: transparent; border: 1px solid #334155; color: #64748b; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
-  .back-btn:hover { border-color: #38bdf8; color: #38bdf8; }
-  .trace-id-label { font-size: 0.82rem; color: #64748b; }
-  .trace-id-label code { color: #38bdf8; }
-  .span-count { font-size: 0.75rem; color: #475569; background: #1e293b; padding: 2px 8px; border-radius: 4px; }
+  .page-wrap { padding:32px 24px; overflow-y:auto; height:100%; display:grid; grid-template-columns:repeat(12,1fr); column-gap:20px; row-gap:0; align-content:start; }
+  .band { grid-column:1/-1; display:grid; grid-template-columns:subgrid; column-gap:20px; margin-bottom:24px; align-items:start; }
+  @supports not (grid-template-columns:subgrid) { .band { grid-template-columns:repeat(12,1fr); } }
+  .page-title { font-size:22px; font-weight:700; letter-spacing:-0.02em; color:var(--text); }
+  .input-sm { background:var(--surface-2); border:1px solid var(--border-2); border-radius:4px; color:var(--text); padding:5px 10px; font-size:12px; font-family:inherit; }
+  .input-sm:focus { outline:none; border-color:var(--accent); }
+  .btn { display:inline-flex; align-items:center; padding:5px 12px; border-radius:4px; border:1px solid var(--border-2); font-size:12px; cursor:pointer; font-family:inherit; }
+  .btn-ghost { background:transparent; color:var(--text-2); }
+  .btn-ghost:hover { background:var(--surface-2); }
+  .btn-sm { padding:4px 10px; font-size:11px; }
+  .loading { padding:64px; display:flex; justify-content:center; }
+  .spinner { width:20px; height:20px; border-radius:50%; border:2px solid var(--border-2); border-top-color:var(--accent); animation:spin .7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .data-table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:left; padding:6px 8px; font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-3); border-bottom:1px solid var(--border); }
+  td { padding:7px 8px; border-bottom:1px solid var(--border); color:var(--text-2); vertical-align:middle; }
+  tr:hover td { background:var(--surface-2); }
+  tr.selected td { background:var(--accent-dim); }
+  .mono { font-family:"DM Mono",monospace; font-variant-numeric:tabular-nums; font-size:11px; }
+  .trace-id { color:var(--text-3); }
+  .red { color:var(--red); }
+  .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .status-dot.ok { background:var(--green); }
+  .status-dot.warn { background:var(--amber); }
+  .status-dot.err { background:var(--red); }
+  .status-text { font-size:11px; }
+  .time-cell { white-space:nowrap; font-size:11px; color:var(--text-3); }
+  .detail-card { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:16px; }
+  .detail-label { font-size:10px; font-weight:700; letter-spacing:0.10em; text-transform:uppercase; color:var(--text-3); margin-bottom:12px; }
+  .detail-row { display:flex; gap:12px; align-items:baseline; padding:4px 0; border-bottom:1px solid var(--border); }
+  .detail-key { font-size:11px; color:var(--text-3); min-width:80px; }
+  .detail-val { font-size:12px; color:var(--text-2); }
+  .span-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .span-name { color:var(--text-2); }
+  .span-dur { color:var(--text-3); }
+  .detail-empty { color:var(--text-3); font-size:12px; padding:24px; text-align:center; background:var(--surface); border:1px solid var(--border); border-radius:4px; border-style:dashed; }
 </style>

@@ -87,13 +87,13 @@
 {/if}
 
 <style>
-  .qw-state       { display:flex; align-items:center; justify-content:center; height:100%; color:#64748b; font-size:0.8rem; }
-  .err            { color:#ef4444; }
+  .qw-state       { display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-3); font-size:0.8rem; }
+  .err            { color:var(--red); }
   .muted          { color:#475569; }
   .qw-table-wrap  { overflow:auto; height:100%; padding:4px; }
   .qw-table       { width:100%; border-collapse:collapse; font-size:0.75rem; }
-  .qw-table th    { text-align:left; padding:4px 8px; border-bottom:1px solid #334155; color:#94a3b8; font-weight:600; }
-  .qw-table td    { padding:4px 8px; border-bottom:1px solid #1e293b; color:#cbd5e1; vertical-align:top; }
+  .qw-table th    { text-align:left; padding:4px 8px; border-bottom:1px solid var(--border-2); color:var(--text-2); font-weight:600; }
+  .qw-table td    { padding:4px 8px; border-bottom:1px solid var(--surface); color:var(--text-2); vertical-align:top; }
   .series         { font-family:monospace; word-break:break-all; }
   .val            { text-align:right; font-variant-numeric:tabular-nums; }
   .pts            { text-align:right; color:#475569; }

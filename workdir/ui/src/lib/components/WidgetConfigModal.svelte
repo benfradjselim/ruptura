@@ -184,41 +184,41 @@
     display: flex; align-items: center; justify-content: center; z-index: 200;
   }
   .modal {
-    background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--border-2); border-radius: 12px;
     width: 480px; max-width: 95vw; max-height: 90vh;
     display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.5);
   }
   .modal-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 20px; border-bottom: 1px solid #334155;
+    padding: 16px 20px; border-bottom: 1px solid var(--border-2);
   }
-  .modal-header h3 { margin: 0; font-size: 1rem; color: #e2e8f0; }
-  .close-btn { background: none; border: none; color: #64748b; font-size: 1.1rem; cursor: pointer; }
-  .close-btn:hover { color: #e2e8f0; }
+  .modal-header h3 { margin: 0; font-size: 1rem; color: var(--text); }
+  .close-btn { background: none; border: none; color: var(--text-3); font-size: 1.1rem; cursor: pointer; }
+  .close-btn:hover { color: var(--text); }
 
   .modal-body { padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 
   .field { display: flex; flex-direction: column; gap: 4px; }
-  .field span { font-size: 0.78rem; color: #64748b; }
+  .field span { font-size: 0.78rem; color: var(--text-3); }
   .field input, .field select {
-    background: #0f172a; border: 1px solid #334155; border-radius: 6px;
-    color: #e2e8f0; padding: 7px 10px; font-size: 0.85rem;
+    background: var(--bg); border: 1px solid var(--border-2); border-radius: 6px;
+    color: var(--text); padding: 7px 10px; font-size: 0.85rem;
   }
-  .field input:focus, .field select:focus { border-color: #38bdf8; outline: none; }
+  .field input:focus, .field select:focus { border-color: var(--accent); outline: none; }
 
   .field-row { display: flex; gap: 12px; }
   .field.half { flex: 1; }
 
   .modal-footer {
     display: flex; justify-content: flex-end; gap: 8px;
-    padding: 14px 20px; border-top: 1px solid #334155;
+    padding: 14px 20px; border-top: 1px solid var(--border-2);
   }
   .cancel-btn {
-    background: transparent; border: 1px solid #334155; color: #94a3b8;
+    background: transparent; border: 1px solid var(--border-2); color: var(--text-2);
     padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
   }
   .save-btn {
-    background: #0284c7; border: none; color: #fff;
+    background: var(--accent); border: none; color: #fff;
     padding: 7px 18px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
     font-weight: 600;
   }

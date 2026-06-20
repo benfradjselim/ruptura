@@ -43,10 +43,10 @@
 
 <style>
   .aw-msg  { text-align: center; padding: 12px; color: #475569; font-size: 0.8rem; }
-  .aw-msg.ok { color: #22c55e; }
+  .aw-msg.ok { color: var(--green); }
   .aw-list { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
   .aw-row  { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
   .aw-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .aw-text { flex: 1; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .aw-text { flex: 1; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .aw-time { color: #475569; white-space: nowrap; font-size: 0.72rem; }
 </style>

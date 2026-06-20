@@ -105,5 +105,5 @@
   .g-wrap  { display:flex; align-items:center; justify-content:center; width:100%; height:100%; padding:4px; }
   .g-svg   { width:100%; max-width:200px; height:auto; }
   .g-state { display:flex; align-items:center; justify-content:center; height:100%; color:#475569; font-size:0.8rem; }
-  .err     { color:#ef4444; }
+  .err     { color:var(--red); }
 </style>

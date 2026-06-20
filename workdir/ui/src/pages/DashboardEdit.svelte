@@ -178,22 +178,22 @@
   .de-header {
     display: flex; align-items: center; justify-content: space-between;
     flex-wrap: wrap; gap: 0.75rem;
-    padding-bottom: 0.75rem; border-bottom: 1px solid #334155;
+    padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-2);
   }
   .de-title-row { display: flex; align-items: center; gap: 0.75rem; }
-  .de-title-row h2 { margin: 0; font-size: 1.2rem; color: #e2e8f0; }
+  .de-title-row h2 { margin: 0; font-size: 1.2rem; color: var(--text); }
 
   .de-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-  .de-err { font-size: 0.8rem; color: #ef4444; }
-  .de-ok  { font-size: 0.8rem; color: #22c55e; }
+  .de-err { font-size: 0.8rem; color: var(--red); }
+  .de-ok  { font-size: 0.8rem; color: var(--green); }
 
   .back-btn {
-    background: transparent; border: 1px solid #334155; color: #64748b;
+    background: transparent; border: 1px solid var(--border-2); color: var(--text-3);
     padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.82rem;
   }
-  .back-btn:hover { border-color: #38bdf8; color: #38bdf8; }
-  .add-btn  { background: #0f3460; border: 1px solid #0284c7; color: #38bdf8; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
-  .save-btn { background: #0284c7; border: none; color: #fff; padding: 7px 18px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .add-btn  { background: #0f3460; border: 1px solid var(--accent); color: var(--accent); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  .save-btn { background: var(--accent); border: none; color: #fff; padding: 7px 18px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
   .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .de-state, .de-empty { text-align: center; padding: 3rem; color: #475569; }
@@ -201,29 +201,29 @@
   .de-grid { display: flex; flex-direction: column; gap: 8px; }
 
   .de-card {
-    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border-2); border-radius: 8px;
     padding: 10px 14px; cursor: grab;
     transition: border-color 0.15s, opacity 0.15s;
   }
   .de-card:hover    { border-color: #475569; }
-  .de-card.dragging { opacity: 0.4; border-color: #38bdf8; }
+  .de-card.dragging { opacity: 0.4; border-color: var(--accent); }
 
   .de-card-header {
     display: flex; align-items: center; gap: 8px;
   }
-  .drag-handle { color: #334155; font-size: 1.1rem; cursor: grab; user-select: none; }
-  .type-badge  { font-size: 0.72rem; color: #38bdf8; background: #0f3460; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
-  .de-wtitle   { flex: 1; font-size: 0.88rem; color: #e2e8f0; font-weight: 600; }
+  .drag-handle { color: var(--border-2); font-size: 1.1rem; cursor: grab; user-select: none; }
+  .type-badge  { font-size: 0.72rem; color: var(--accent); background: #0f3460; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+  .de-wtitle   { flex: 1; font-size: 0.88rem; color: var(--text); font-weight: 600; }
 
   .de-card-actions { display: flex; gap: 4px; }
   .de-card-actions button {
-    background: transparent; border: 1px solid #334155; color: #64748b;
+    background: transparent; border: 1px solid var(--border-2); color: var(--text-3);
     padding: 3px 7px; border-radius: 4px; cursor: pointer; font-size: 0.78rem;
   }
-  .de-card-actions button:hover { background: #334155; color: #e2e8f0; }
-  .del-btn:hover { background: #7f1d1d !important; border-color: #ef4444 !important; color: #ef4444 !important; }
+  .de-card-actions button:hover { background: var(--border-2); color: var(--text); }
+  .del-btn:hover { background: #7f1d1d !important; border-color: var(--red) !important; color: var(--red) !important; }
 
   .de-card-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-  .meta-chip { font-size: 0.7rem; color: #64748b; background: #0f172a; padding: 2px 6px; border-radius: 4px; }
-  .size-chip { color: #38bdf8; border: 1px solid #0284c730; }
+  .meta-chip { font-size: 0.7rem; color: var(--text-3); background: var(--bg); padding: 2px 6px; border-radius: 4px; }
+  .size-chip { color: var(--accent); border: 1px solid var(--accent)30; }
 </style>

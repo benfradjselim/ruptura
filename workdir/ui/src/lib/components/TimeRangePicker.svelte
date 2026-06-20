@@ -96,12 +96,12 @@
 
   .trp-btn {
     display: flex; align-items: center; gap: 6px;
-    background: #1e293b; border: 1px solid #334155;
-    color: #94a3b8; padding: 6px 12px; border-radius: 6px;
+    background: var(--surface); border: 1px solid var(--border-2);
+    color: var(--text-2); padding: 6px 12px; border-radius: 6px;
     cursor: pointer; font-size: 0.85rem; white-space: nowrap;
     transition: border-color 0.15s, color 0.15s;
   }
-  .trp-btn:hover { border-color: #38bdf8; color: #e2e8f0; }
+  .trp-btn:hover { border-color: var(--accent); color: var(--text); }
   .trp-btn.future { border-color: #ec4899aa; color: #f472b6; }
   .trp-btn.future:hover { border-color: #ec4899; }
 
@@ -110,7 +110,7 @@
 
   .trp-dropdown {
     position: absolute; top: calc(100% + 6px); right: 0; z-index: 100;
-    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border-2); border-radius: 8px;
     padding: 8px; min-width: 220px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   }
 
@@ -123,23 +123,23 @@
 
   .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
   .preset-btn {
-    background: transparent; border: 1px solid #334155;
-    color: #94a3b8; padding: 5px 8px; border-radius: 4px;
+    background: transparent; border: 1px solid var(--border-2);
+    color: var(--text-2); padding: 5px 8px; border-radius: 4px;
     cursor: pointer; font-size: 0.8rem; text-align: center;
     transition: all 0.1s;
   }
-  .preset-btn:hover { background: #0f3460; color: #e2e8f0; }
-  .preset-btn.active { background: #0f3460; border-color: #38bdf8; color: #38bdf8; }
+  .preset-btn:hover { background: #0f3460; color: var(--text); }
+  .preset-btn.active { background: #0f3460; border-color: var(--accent); color: var(--accent); }
 
-  .divider { height: 1px; background: #334155; margin: 8px 0; }
+  .divider { height: 1px; background: var(--border-2); margin: 8px 0; }
   .custom { display: flex; flex-direction: column; gap: 6px; }
-  .custom label { display: flex; flex-direction: column; gap: 2px; font-size: 0.75rem; color: #64748b; }
+  .custom label { display: flex; flex-direction: column; gap: 2px; font-size: 0.75rem; color: var(--text-3); }
   .custom input {
-    background: #0f172a; border: 1px solid #334155; border-radius: 4px;
-    color: #e2e8f0; padding: 4px 8px; font-size: 0.8rem;
+    background: var(--bg); border: 1px solid var(--border-2); border-radius: 4px;
+    color: var(--text); padding: 4px 8px; font-size: 0.8rem;
   }
   .apply-btn {
-    background: #0284c7; border: none; color: #fff;
+    background: var(--accent); border: none; color: #fff;
     padding: 6px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;
   }
   .apply-btn:hover { background: #0369a1; }

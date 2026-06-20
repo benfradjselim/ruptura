@@ -18,16 +18,16 @@
   .rp { display: flex; align-items: center; gap: 4px; }
 
   .refresh-btn {
-    background: #1e293b; border: 1px solid #334155;
-    color: #94a3b8; padding: 6px 10px; border-radius: 6px;
+    background: var(--surface); border: 1px solid var(--border-2);
+    color: var(--text-2); padding: 6px 10px; border-radius: 6px;
     cursor: pointer; font-size: 1rem; line-height: 1;
   }
-  .refresh-btn:hover { color: #38bdf8; border-color: #38bdf8; }
+  .refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
 
   .interval-select {
-    background: #1e293b; border: 1px solid #334155;
-    color: #94a3b8; padding: 6px 8px; border-radius: 6px;
+    background: var(--surface); border: 1px solid var(--border-2);
+    color: var(--text-2); padding: 6px 8px; border-radius: 6px;
     font-size: 0.82rem; cursor: pointer;
   }
-  .interval-select:hover { border-color: #38bdf8; color: #e2e8f0; }
+  .interval-select:hover { border-color: var(--accent); color: var(--text); }
 </style>

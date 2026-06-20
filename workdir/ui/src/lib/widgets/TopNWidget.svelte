@@ -58,12 +58,12 @@
 
 <style>
   .topn-msg  { text-align: center; padding: 12px; color: #475569; font-size: 0.8rem; }
-  .err       { color: #ef4444; }
+  .err       { color: var(--red); }
   .topn-list { display: flex; flex-direction: column; gap: 4px; }
   .topn-row  { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
   .topn-rank { width: 20px; color: #475569; }
-  .topn-key  { width: 90px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .topn-bar-wrap { flex: 1; background: #1e293b; border-radius: 2px; height: 8px; }
-  .topn-bar      { background: #ef4444; height: 100%; border-radius: 2px; transition: width 0.3s; }
-  .topn-count { width: 30px; text-align: right; color: #64748b; }
+  .topn-key  { width: 90px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topn-bar-wrap { flex: 1; background: var(--surface); border-radius: 2px; height: 8px; }
+  .topn-bar      { background: var(--red); height: 100%; border-radius: 2px; transition: width 0.3s; }
+  .topn-count { width: 30px; text-align: right; color: var(--text-3); }
 </style>

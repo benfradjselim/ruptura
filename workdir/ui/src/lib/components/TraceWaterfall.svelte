@@ -121,8 +121,8 @@
 
   .wf-header {
     display: flex; align-items: center;
-    padding: 6px 10px; background: #0f172a; border-radius: 6px 6px 0 0;
-    border-bottom: 1px solid #334155; color: #475569; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 6px 10px; background: var(--bg); border-radius: 6px 6px 0 0;
+    border-bottom: 1px solid var(--border-2); color: #475569; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
   }
 
   .wf-col.name { flex: 0 0 280px; overflow: hidden; }
@@ -131,16 +131,16 @@
 
   .wf-row {
     display: flex; align-items: center;
-    padding: 5px 10px; border-bottom: 1px solid #0f172a; cursor: pointer;
+    padding: 5px 10px; border-bottom: 1px solid var(--bg); cursor: pointer;
   }
-  .wf-row:hover    { background: #1e293b; }
+  .wf-row:hover    { background: var(--surface); }
   .wf-row.selected { background: #0f3460; }
 
-  .wf-op  { color: #e2e8f0; font-weight: 600; }
-  .wf-svc { color: #38bdf8; margin-left: 6px; font-size: 0.72rem; }
+  .wf-op  { color: var(--text); font-weight: 600; }
+  .wf-svc { color: var(--accent); margin-left: 6px; font-size: 0.72rem; }
 
   .wf-bar-cell { flex: 1; }
-  .wf-bar-track { position: relative; height: 14px; background: #1e293b; border-radius: 2px; }
+  .wf-bar-track { position: relative; height: 14px; background: var(--surface); border-radius: 2px; }
   .wf-bar {
     position: absolute; height: 100%; border-radius: 2px;
     opacity: 0.85; min-width: 2px; transition: opacity 0.1s;
@@ -148,12 +148,12 @@
   .wf-row:hover .wf-bar { opacity: 1; }
 
   .wf-detail {
-    background: #0f172a; border-bottom: 1px solid #334155;
+    background: var(--bg); border-bottom: 1px solid var(--border-2);
     padding: 10px 20px;
   }
   .wf-detail-pairs { display: flex; flex-wrap: wrap; gap: 8px; }
   .dp { display: flex; gap: 6px; font-size: 0.75rem; }
-  .dk { color: #38bdf8; font-weight: 600; }
-  .dv { color: #94a3b8; }
+  .dk { color: var(--accent); font-weight: 600; }
+  .dv { color: var(--text-2); }
   .attr .dk { color: #a78bfa; }
 </style>

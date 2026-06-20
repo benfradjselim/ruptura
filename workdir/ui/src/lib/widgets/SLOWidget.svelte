@@ -101,32 +101,32 @@
 
 <style>
   .slo-state   { display:flex; align-items:center; justify-content:center; height:100%; color:#475569; font-size:0.8rem; }
-  .err         { color:#ef4444; }
+  .err         { color:var(--red); }
   .muted       { color:#475569; }
 
   /* List mode */
   .slo-list    { display:flex; flex-direction:column; gap:6px; padding:4px 2px; }
   .slo-row     { display:flex; align-items:center; gap:8px; font-size:0.78rem; }
   .slo-dot     { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-  .slo-name    { flex:1; color:#e2e8f0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .slo-name    { flex:1; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .slo-comp    { font-weight:700; font-variant-numeric:tabular-nums; }
   .slo-target  { color:#475569; }
-  .slo-budget  { font-size:0.7rem; color:#64748b; }
+  .slo-budget  { font-size:0.7rem; color:var(--text-3); }
 
   /* Detail mode */
   .slo-detail  { display:flex; flex-direction:column; gap:10px; padding:4px; height:100%; }
   .slo-toprow  { display:flex; align-items:center; gap:8px; }
   .slo-badge   { font-size:0.68rem; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid; white-space:nowrap; }
-  .slo-name-big { font-size:0.88rem; font-weight:600; color:#e2e8f0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .slo-name-big { font-size:0.88rem; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   .slo-metrics  { display:flex; gap:12px; }
-  .slo-metric   { flex:1; text-align:center; background:#0f172a; border-radius:6px; padding:8px 4px; }
+  .slo-metric   { flex:1; text-align:center; background:var(--bg); border-radius:6px; padding:8px 4px; }
   .sm-val       { font-size:1.3rem; font-weight:700; line-height:1; }
-  .sm-label     { font-size:0.68rem; color:#64748b; margin-top:2px; }
-  .sm-sub       { font-size:0.62rem; color:#334155; margin-top:1px; }
+  .sm-label     { font-size:0.68rem; color:var(--text-3); margin-top:2px; }
+  .sm-sub       { font-size:0.62rem; color:var(--border-2); margin-top:1px; }
 
   .budget-bar-wrap  { margin-top:auto; }
-  .budget-bar-track { height:6px; background:#1e293b; border-radius:3px; overflow:hidden; }
+  .budget-bar-track { height:6px; background:var(--surface); border-radius:3px; overflow:hidden; }
   .budget-bar-fill  { height:100%; border-radius:3px; transition:width 0.5s; }
   .budget-bar-label { font-size:0.65rem; color:#475569; margin-top:4px; display:block; }
 </style>

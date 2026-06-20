@@ -207,17 +207,17 @@
 <style>
   :global(*) { box-sizing: border-box; margin: 0; padding: 0; }
   :global(body) {
-    background: var(--bg, #0F172A); color: var(--text, #E2E8F0);
+    background: var(--bg, var(--bg)); color: var(--text, var(--text));
     font-family: "Inter", system-ui, -apple-system, sans-serif;
     font-size: 13px; line-height: 24px; -webkit-font-smoothing: antialiased;
   }
-  :global(input:focus), :global(select:focus) { outline: none; border-color: var(--accent, #38BDF8) !important; }
+  :global(input:focus), :global(select:focus) { outline: none; border-color: var(--accent, var(--accent)) !important; }
 
   .layout { display: flex; min-height: 100vh; }
 
   .sidebar {
     width: 184px;
-    background: var(--surface, #1E293B);
+    background: var(--surface, var(--surface));
     border-right: 1px solid var(--border, rgba(148,163,184,0.10));
     display: flex; flex-direction: column;
     position: sticky; top: 0; height: 100vh;
@@ -231,7 +231,7 @@
   }
   .brand-logo { display: flex; align-items: center; }
   .logo-icon  { width: 20px; height: 20px; }
-  .brand-text { font-size: 15px; font-weight: 800; color: var(--accent, #38BDF8); line-height: 1; letter-spacing: -0.02em; }
+  .brand-text { font-size: 15px; font-weight: 800; color: var(--accent, var(--accent)); line-height: 1; letter-spacing: -0.02em; }
   .brand-ver  { font-size: 9px; color: var(--text-3, #3F4D5C); font-weight: 600; margin-left: 3px; vertical-align: super; font-family: "DM Mono", monospace; }
 
   nav { display: flex; flex-direction: column; padding: 8px; flex: 1; gap: 2px; }
@@ -245,13 +245,13 @@
 
   .nav-item {
     display: flex; align-items: center; gap: 8px; width: 100%;
-    background: transparent; border: none; color: var(--text-2, #94A3B8);
+    background: transparent; border: none; color: var(--text-2, var(--text-2));
     padding: 6px 8px; border-radius: 4px;
     cursor: pointer; font-size: 12px; font-weight: 500; text-align: left;
     transition: background 0.10s, color 0.10s; font-family: inherit; line-height: 1;
   }
-  .nav-item:hover  { background: var(--surface-2, #253045); color: var(--text, #E2E8F0); }
-  .nav-item.active { background: var(--accent-dim, rgba(56,189,248,0.12)); color: var(--accent, #38BDF8); }
+  .nav-item:hover  { background: var(--surface-2, var(--surface-2)); color: var(--text, var(--text)); }
+  .nav-item.active { background: var(--accent-dim, rgba(56,189,248,0.12)); color: var(--accent, var(--accent)); }
   .nav-icon { width: 13px; height: 13px; flex-shrink: 0; }
 
   .sidebar-footer {

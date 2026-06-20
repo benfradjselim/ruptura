@@ -46,8 +46,8 @@
 
 <style>
   .stat-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 8px; }
-  .stat-val  { font-size: 1.9rem; font-weight: 700; color: #e2e8f0; }
-  .stat-unit { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+  .stat-val  { font-size: 1.9rem; font-weight: 700; color: var(--text); }
+  .stat-unit { font-size: 0.75rem; color: var(--text-3); margin-top: 2px; }
   .stat-loading { text-align: center; padding: 20px; color: #475569; font-size: 0.8rem; }
-  .err { color: #ef4444; }
+  .err { color: var(--red); }
 </style>

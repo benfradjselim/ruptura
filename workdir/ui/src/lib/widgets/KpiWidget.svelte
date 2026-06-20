@@ -51,7 +51,7 @@
 <style>
   .kpi-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 8px; }
   .kpi-val  { font-size: 2.4rem; font-weight: 800; line-height: 1; }
-  .kpi-unit { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+  .kpi-unit { font-size: 0.8rem; color: var(--text-3); margin-top: 4px; }
   .kpi-loading { text-align: center; padding: 20px; color: #475569; font-size: 0.8rem; }
-  .err { color: #ef4444; }
+  .err { color: var(--red); }
 </style>
