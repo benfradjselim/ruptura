@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/benfradjselim/ruptura/internal/pipeline/metrics"
+	"github.com/benfradjselim/ruptura/internal/receiver"
 	"github.com/benfradjselim/ruptura/pkg/logger"
 	"github.com/benfradjselim/ruptura/pkg/models"
 )
@@ -298,12 +299,13 @@ func (e *Engine) handleRemoteWrite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
-	var req models.OTLPMetricsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	decoded, err := receiver.DecodeMetricsRequest(r)
+	if err != nil {
 		logger.Default.Error("otlp metrics decode failed", "error", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	req := *decoded
 	for _, rm := range req.ResourceMetrics {
 		ref := extractWorkloadRef(rm.Resource)
 		var host string
@@ -355,11 +357,12 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
-	var req models.OTLPLogsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	decoded, err := receiver.DecodeLogsRequest(r)
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	req := *decoded
 	for _, rl := range req.ResourceLogs {
 		ref := extractWorkloadRef(rl.Resource)
 		service := rl.Resource.GetAttr("service.name")
@@ -427,11 +430,12 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (e *Engine) handleOTLPTraces(w http.ResponseWriter, r *http.Request) {
-	var req models.OTLPTraceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	decoded, err := receiver.DecodeTracesRequest(r)
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	req := *decoded
 	now := time.Now()
 	for _, rs := range req.ResourceSpans {
 		ref := extractWorkloadRef(rs.Resource)

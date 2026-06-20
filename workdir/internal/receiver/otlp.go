@@ -4,7 +4,6 @@
 package receiver
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -134,12 +133,12 @@ func (r *OTLPReceiver) lookupSpanService(spanID string) string {
 // TraceHandler handles POST /otlp/v1/traces
 // Note: persistence is handled exclusively by r.spans (SpanSink) to avoid double-writes.
 func (r *OTLPReceiver) TraceHandler(w http.ResponseWriter, req *http.Request) {
-	req.Body = http.MaxBytesReader(w, req.Body, 32<<20)
-	var otlpReq models.OTLPTraceRequest
-	if err := json.NewDecoder(req.Body).Decode(&otlpReq); err != nil {
+	decoded, err := DecodeTracesRequest(req)
+	if err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	otlpReq := *decoded
 
 	count := 0
 	for _, rs := range otlpReq.ResourceSpans {
@@ -197,12 +196,12 @@ func (r *OTLPReceiver) TraceHandler(w http.ResponseWriter, req *http.Request) {
 // MetricsHandler handles POST /otlp/v1/metrics
 // Note: persistence is handled exclusively by r.metrics (MetricSink) to avoid double-writes.
 func (r *OTLPReceiver) MetricsHandler(w http.ResponseWriter, req *http.Request) {
-	req.Body = http.MaxBytesReader(w, req.Body, 32<<20)
-	var otlpReq models.OTLPMetricsRequest
-	if err := json.NewDecoder(req.Body).Decode(&otlpReq); err != nil {
+	decoded, err := DecodeMetricsRequest(req)
+	if err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	otlpReq := *decoded
 
 	count := 0
 	for _, rm := range otlpReq.ResourceMetrics {
@@ -239,12 +238,12 @@ func (r *OTLPReceiver) MetricsHandler(w http.ResponseWriter, req *http.Request) 
 // LogsHandler handles POST /otlp/v1/logs
 // Note: persistence is handled exclusively by r.logs (LogSink) to avoid double-writes.
 func (r *OTLPReceiver) LogsHandler(w http.ResponseWriter, req *http.Request) {
-	req.Body = http.MaxBytesReader(w, req.Body, 32<<20)
-	var otlpReq models.OTLPLogsRequest
-	if err := json.NewDecoder(req.Body).Decode(&otlpReq); err != nil {
+	decoded, err := DecodeLogsRequest(req)
+	if err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	otlpReq := *decoded
 
 	count := 0
 	for _, rl := range otlpReq.ResourceLogs {
