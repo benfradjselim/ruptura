@@ -25,7 +25,7 @@
     # ruptura-ui-xxx                   1/1     Running   0          30s
 
     curl http://<node-ip>:31468/api/v2/health
-    # {"status":"ok","version":"7.0.4",...}
+    # {"status":"ok","version":"7.1.0",...}
     ```
 
     | Endpoint | URL |
@@ -41,11 +41,14 @@
       -p 8080:8080 -p 4317:4317 \
       -v ruptura-data:/var/lib/ruptura/data \
       -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-      ghcr.io/benfradjselim/ruptura:v7.0.4
+      ghcr.io/benfradjselim/ruptura:v7.1.0
     curl http://localhost:8080/api/v2/health
     ```
 
-    !!! note "Dashboard in Docker"
+    !!! warning "API key required"
+    As of v7.1.0, `RUPTURA_API_KEY` is required in production. The server will reject all API calls with 503 if no key is set. The `helm install` command above sets it automatically via `--set apiKey`.
+
+!!! note "Dashboard in Docker"
         In Docker mode, deploy the UI container separately or use `kubectl port-forward` for the full dashboard experience. The engine API is available at port 8080.
 
 === "ruptura-ctl (CLI)"
@@ -74,7 +77,7 @@
       https://github.com/benfradjselim/ruptura/releases/latest/download/ruptura-ctl-linux-amd64
     chmod +x ruptura-ctl && sudo mv ruptura-ctl /usr/local/bin/
     ruptura-ctl version
-    # ruptura-ctl v1.0.0
+    # ruptura-ctl v1.2.0
     ```
 
 === "Linux arm64"
@@ -122,7 +125,7 @@
 export RUPTURA_URL=http://<node-ip>:31468    # engine NodePort
 export RUPTURA_API_KEY=<your-api-key>
 
-ruptura-ctl version          # ruptura-ctl v1.0.0
+ruptura-ctl version          # ruptura-ctl v1.2.0
 ruptura-ctl health           # server version, uptime, ingest stats
 ruptura-ctl status           # live workload health table
 ruptura-ctl get workloads    # all workloads with KPI breakdown
@@ -168,7 +171,7 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
 | `--set resources.limits.memory=512Mi` | `512Mi` | Engine memory limit |
 | `--set-string goMemLimit="400MiB"` | `"400MiB"` | Go GC soft limit — ~85% of memory limit |
 | `--set persistence.size=10Gi` | `10Gi` | PVC size for BadgerDB storage |
-| `--set image.tag=v7.0.4` | `latest` | Pin to specific version |
+| `--set image.tag=v7.1.0` | `latest` | Pin to specific version |
 | `--set serviceMonitor.enabled=true` | `false` | Prometheus Operator scrape |
 | `--set edition=autopilot` | `community` | Enable Tier-1 auto-execution |
 
@@ -178,7 +181,7 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
 helm upgrade ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system \
   --reuse-values \
-  --set image.tag=v7.0.4
+  --set image.tag=v7.1.0
 ```
 
 ### Verify
@@ -188,7 +191,7 @@ kubectl get pods -n ruptura-system
 kubectl logs -n ruptura-system -l app.kubernetes.io/name=ruptura --tail=20
 
 curl http://<node-ip>:31468/api/v2/health
-# {"status":"ok","version":"7.0.4","edition":"community",...}
+# {"status":"ok","version":"7.1.0","edition":"community",...}
 ```
 
 ---
@@ -226,7 +229,7 @@ docker run -d --name ruptura \
   -p 4317:4317 \
   -v ruptura-data:/var/lib/ruptura/data \
   -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-  ghcr.io/benfradjselim/ruptura:v7.0.4
+  ghcr.io/benfradjselim/ruptura:v7.1.0
 ```
 
 | Port | Purpose |

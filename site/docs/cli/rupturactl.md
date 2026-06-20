@@ -1,9 +1,9 @@
 # ruptura-ctl
 
-`ruptura-ctl` **v1.0.0** is the command-line interface for Ruptura. It runs **outside the pod** and speaks to the Ruptura REST API — the same API the dashboard uses. You point it at any running instance (local Docker, Kubernetes service, or OpenShift Route) with `--url` or the `RUPTURA_URL` environment variable.
+`ruptura-ctl` **v1.2.0** is the command-line interface for Ruptura. It runs **outside the pod** and speaks to the Ruptura REST API — the same API the dashboard uses. You point it at any running instance (local Docker, Kubernetes service, or OpenShift Route) with `--url` or the `RUPTURA_URL` environment variable.
 
 !!! info "Independent versioning"
-    `ruptura-ctl` is versioned **independently** from the server. You can run `ruptura-ctl v1.0.0` against any `ruptura >= v6.8.x`. Check your CLI version with `ruptura-ctl version`.
+    `ruptura-ctl` is versioned **independently** from the server. You can run `ruptura-ctl v1.2.0` against any `ruptura >= v6.8.x`. Check your CLI version with `ruptura-ctl version`.
 
 ---
 
@@ -21,7 +21,7 @@ Download a pre-built binary from the [GitHub Releases page](https://github.com/b
     chmod +x ruptura-ctl
     sudo mv ruptura-ctl /usr/local/bin/
     ruptura-ctl version
-    # ruptura-ctl v1.0.0
+    # ruptura-ctl v1.2.0
     ```
 
 === "Linux (arm64)"
@@ -55,7 +55,7 @@ Verify:
 
 ```bash
 ruptura-ctl version
-# ruptura-ctl v1.0.0
+# ruptura-ctl v1.2.0
 ```
 
 ### Go install
@@ -234,7 +234,7 @@ Print the CLI version (independently versioned from the server):
 
 ```bash
 ruptura-ctl version
-# ruptura-ctl v1.0.0
+# ruptura-ctl v1.2.0
 ```
 
 ### `health`
@@ -366,4 +366,68 @@ ruptura-ctl completion bash
 ruptura-ctl completion zsh
 ruptura-ctl completion fish
 ruptura-ctl completion powershell
+```
+
+---
+
+## New in v1.2.0
+
+### Watch mode
+
+```bash
+ruptura-ctl status -w 5     # refresh every 5 seconds
+ruptura-ctl status --watch 10
+```
+
+Clears the terminal and re-runs `status` on every tick. Press `Ctrl+C` to exit.
+
+### Context windows
+
+Suppress false positives during planned events:
+
+```bash
+# Add a maintenance window
+ruptura-ctl context add "production/Deployment/payment-api" \
+  --type maintenance \
+  --note "DB schema migration" \
+  --duration 2h
+
+# Add for an entire namespace
+ruptura-ctl context add "production/*" --type load-test --duration 30m
+
+# List active contexts
+ruptura-ctl context list
+
+# Remove a context
+ruptura-ctl context delete ctx_abc123
+```
+
+Context types: `maintenance` · `load-test` · `deploy` · `incident` · `other`
+
+### Emergency stop with confirmation
+
+```bash
+ruptura-ctl emergency-stop          # prompts: type 'yes' to confirm
+ruptura-ctl emergency-stop --force  # skip prompt (for scripts/CI)
+```
+
+### Server version check
+
+`ruptura-ctl health` now shows both CLI and server versions and warns if the CLI is behind:
+
+```
+  status                 ● ok
+  version                7.1.0
+  ctl version            1.2.0
+  ⚠  ruptura-ctl v1.1.0 is behind the server v7.1.0
+  →  Update with: go install github.com/benfradjselim/ruptura/cmd/ruptura-ctl@latest
+```
+
+### Normalized weights display
+
+`ruptura-ctl weights set` now shows the normalized values the server actually uses:
+
+```bash
+ruptura-ctl weights set "production/*" --stress 2 --fatigue 3
+# Normalised → stress=0.40  fatigue=0.60  mood=0.00  pressure=0.00  humidity=0.00  contagion=0.00
 ```

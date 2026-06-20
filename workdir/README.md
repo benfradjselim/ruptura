@@ -493,7 +493,8 @@ helm lint helm/
 
 ```
 ruptura (application)
-v7.1.0 ✅  Security hardening · KPI compaction fix · GC shutdown order · Fleet UI null guard · ruptura-ctl v1.2.0
+v7.1.0 ✅  Security hardening · atomic compaction · Fleet UX · SRE labels · ruptura-ctl v1.2.0 (watch, context, emergency-stop confirm)
+v7.2.0 ⏳  Demo mode · Grafana datasource plugin · Pricing page
 v6.8.2 ✅  OOMKill prevention — BadgerDB memory tuning, periodic GC, GOMEMLIMIT
 v6.8.x ✅  Stable dashboard · fleet heatmap · workload identity
 v6.7.0 ✅  Embedded web dashboard — air-gap safe, vendor-local assets

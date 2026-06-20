@@ -5,29 +5,30 @@
 </p>
 
 <p align="center">
-  <img alt="Go version" src="https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go">
+  <img alt="Go" src="https://img.shields.io/badge/Go-1.22-00ADD8?logo=go">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
+  <img alt="Version" src="https://img.shields.io/github/v/release/benfradjselim/ruptura">
   <img alt="CNCF Sandbox" src="https://img.shields.io/badge/CNCF-Sandbox%20Applicant-0086FF">
   <a href="https://codecov.io/gh/benfradjselim/ruptura"><img alt="Coverage" src="https://codecov.io/gh/benfradjselim/ruptura/branch/main/graph/badge.svg"></a>
-  <img alt="GitHub release" src="https://img.shields.io/github/v/release/benfradjselim/ruptura">
 </p>
 
-Ruptura is a predictive AIOps engine for Kubernetes that detects workload failures before they become outages. It ingests telemetry via OTLP and Prometheus remote-write, computes 10 composite KPI signals per workload with adaptive per-workload baselines, fuses them into the **Fused Rupture Index (FRI)** using a self-calibrating 5-model ML ensemble, and drives an action engine that applies automated Kubernetes remediations — scaling, restarts, cordons — behind configurable safety gates.
+<p align="center">
+  <b>Ruptura detects Kubernetes workload failures before they become outages.</b>
+</p>
+
+It ingests telemetry via OTLP and Prometheus remote-write, computes 10 composite KPI signals per workload, fuses them into the **Fused Rupture Index™ (FRI)** using a 5-model adaptive ML ensemble, and drives a 3-tier action engine that applies automated Kubernetes remediations behind configurable safety gates.
 
 ---
 
-## Key Features
+## Why Ruptura?
 
-- **Fused Rupture Index (FRI)** — weighted fusion of metric, log, and trace anomaly scores into a single actionable severity value
-- **5-model ML ensemble** — CA-ILR, ARIMA, Holt-Winters, MAD, and EWMA; models are re-weighted every 60 s based on live prediction error
-- **10 KPI signals** — Stress, Fatigue, Mood, Pressure, Humidity, Contagion, Resilience, Entropy, Velocity, Throughput; each with adaptive per-workload baselines
-- **OTLP ingest** — native receivers for OTLP metrics, logs, and traces plus Prometheus remote-write on a dedicated NodePort
-- **Helm / OCI deploy** — single `helm install` from `ghcr.io/benfradjselim/charts/ruptura`
-- **ruptura-ctl CLI** — inspect workloads, trigger actions, and query the engine from the terminal
-- **Automated K8s remediation** — Tier-1 (auto), Tier-2 (human-approved), Tier-3 (alert-only); emergency stop endpoint
-- **Rupture fingerprinting** — cosine-similarity pattern matching against historical rupture vectors for instant suggested fixes
-- **HealthScore forecast** — +15 and +30 minute projections with "Critical in ~Nm" warnings
-- **Svelte 4 dashboard** — light/dark, SSE live stream, Fleet grid, Topology map, per-workload history and predictions
+| Traditional observability | Ruptura |
+|--------------------------|---------|
+| Alerts fire *after* the fact | FRI detects divergence **hours early** |
+| Global thresholds — batch jobs always "stressed" | **Adaptive per-workload baselines** after ~45 min |
+| 5+ tools: Prom + Grafana + AM + Loki + PD | **One `helm install`**, two pods, no external database |
+| "host-123 CPU 78%" — what does it mean? | "payment-api has 28 minutes before cascade failure" |
+| Manual incident response | Tier-1 actions (scale, restart, rollback) fire automatically |
 
 ---
 
@@ -38,23 +39,41 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system \
   --create-namespace \
   --set apiKey=$(openssl rand -hex 32)
-
-# Dashboard:   http://<node-ip>:31469/
-# Engine API:  http://<node-ip>:31468/api/v2/health
-# OTLP ingest: http://<node-ip>:31470/otlp/v1/metrics
 ```
 
-That's it. Ruptura starts calibrating per-workload baselines immediately once telemetry flows in. Send synthetic workloads to see it in action:
+| Endpoint | URL |
+|----------|-----|
+| Dashboard | `http://<node-ip>:31469/` |
+| Engine API | `http://<node-ip>:31468/api/v2/health` |
+| OTLP ingest | `<node-ip>:31470` |
+
+Send synthetic workloads to see all 6 failure modes immediately:
 
 ```bash
-python3 scripts/simulate.py
+python3 scripts/simulate.py --host <node-ip> --port 31470
 ```
 
 ---
 
-## Architecture
+## Key Features
 
-Ruptura v7 ships as two Kubernetes pods behind a shared Helm chart in the `ruptura-system` namespace. The **ruptura-engine** pod (Go binary) handles all telemetry ingest on port 4317/31470, exposes the REST API on port 8080/31468, and runs the analyzer, ensemble, action engine, and BadgerDB storage. The **ruptura-ui** pod (Svelte 4 + nginx) serves the dashboard on port 80/31469 and reverse-proxies `/api/` calls to the engine, injecting the Bearer token automatically. Both images are published to `ghcr.io/benfradjselim/ruptura`.
+- **Fused Rupture Index™** — fuses metric, log, and trace anomaly scores into one actionable severity value per workload
+- **5-model adaptive ensemble** — CA-ILR, ARIMA, Holt-Winters, MAD, EWMA; re-weighted every 60s on live prediction error
+- **10 KPI signals** — Stress, Fatigue, Mood, Pressure, Humidity, Contagion, Resilience, Entropy, Velocity, Throughput
+- **SRE-friendly labels** — signals display as Risk Score, Memory Pressure, Blast Radius, etc. in the UI
+- **Adaptive per-workload baselines** — Welford online stats, active after ~45 min of telemetry
+- **OTLP + Prometheus ingest** — native receivers, no sidecar required
+- **Kubernetes-native** — groups signals by `namespace/kind/name`, not by host IP
+- **Helm OCI deploy** — single `helm install`, two pods, no external database
+- **ruptura-ctl** — full CLI with watch mode, context windows, emergency stop, server version check
+- **3-tier action engine** — Tier-1 auto, Tier-2 human-approved, Tier-3 alert-only; per-target rate limits
+- **Rupture fingerprinting** — cosine-similarity pattern matching against historical rupture vectors
+- **HealthScore forecast** — +15 and +30 minute projections with time-to-critical warnings
+- **Synthetic test lab** — 6 pre-built workload simulators covering all failure scenarios (stable, degraded, at-risk, spike, calibrating)
+
+---
+
+## Architecture
 
 ```
 ruptura-system
@@ -64,16 +83,56 @@ ruptura-system
 
 ---
 
+## Lab Setup (Civo / k3s)
+
+A ready-to-deploy lab environment with Prometheus, OTel Collector, and 6 synthetic test apps:
+
+```bash
+export KUBECONFIG=~/your-kubeconfig
+bash lab-setup/setup.sh
+```
+
+Deploys: Prometheus + kube-state-metrics + OTel Collector + Ruptura + 6 apps covering all failure scenarios.
+
+---
+
+## CLI — ruptura-ctl
+
+```bash
+ruptura-ctl status              # fleet overview
+ruptura-ctl status -w 5         # watch mode, refresh every 5s
+ruptura-ctl get ruptures        # active rupture events (server-side filtered)
+ruptura-ctl describe workload <ns/kind/name>
+ruptura-ctl actions             # pending Tier-2 actions
+ruptura-ctl context add "production/*" --type maintenance --duration 2h
+ruptura-ctl suppress create "staging/*" 30m
+ruptura-ctl emergency-stop      # halt all Tier-1 actions (requires confirmation)
+```
+
+---
+
+## Security
+
+| Property | Status |
+|----------|--------|
+| Auth fail-closed | `RUPTURA_API_KEY` required — no silent open access |
+| `/api/v2/metrics` | Public (Prometheus scraping without token) |
+| `/api/v2/health` `/ready` | Public (k8s probes) |
+| All other routes | Bearer token required |
+| Constant-time comparison | `crypto/subtle` on all auth checks |
+| Atomic storage | Crash-safe compaction — no double-averaging on restart |
+
+---
+
 ## Documentation
 
 | Resource | Link |
 |----------|------|
-| Full technical docs & API reference | [workdir/README.md](workdir/README.md) |
-| Governance | [GOVERNANCE.md](GOVERNANCE.md) |
-| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Security policy | [SECURITY.md](SECURITY.md) |
-| OpenAPI spec | [docs/openapi.yaml](docs/openapi.yaml) |
-| Website | <https://ruptura.dev> |
+| Technical docs & API reference | [docs/REFERENCE.md](docs/REFERENCE.md) |
+| Engine & concepts | [workdir/README.md](workdir/README.md) |
+| CLI reference | [site/docs/cli/rupturactl.md](site/docs/cli/rupturactl.md) |
+| Website | <https://benfradjselim.github.io/ruptura/> |
+| CNCF Sandbox proposal | [docs/cncf-sandbox-proposal.md](docs/cncf-sandbox-proposal.md) |
 
 ---
 
@@ -81,8 +140,8 @@ ruptura-system
 
 | Version | Status |
 |---------|--------|
-| v7.1.0 | Current stable release |
-| v7.0.x | Maintained |
+| **v7.1.0** | Current stable |
+| v7.0.25 | Maintained |
 
 Active branch: `main` — Module: `github.com/benfradjselim/ruptura`
 
@@ -90,14 +149,13 @@ Active branch: `main` — Module: `github.com/benfradjselim/ruptura`
 
 ## Community
 
-Questions, ideas, and discussion live in [GitHub Discussions](https://github.com/benfradjselim/ruptura/discussions). Bug reports and feature requests go to [GitHub Issues](https://github.com/benfradjselim/ruptura/issues).
-
-Ruptura is applying to the [CNCF Sandbox](https://www.cncf.io/sandbox-projects/) program. Governance details, maintainer list, and contribution process are documented in the files above.
+- **Discussions** — [github.com/benfradjselim/ruptura/discussions](https://github.com/benfradjselim/ruptura/discussions)
+- **Issues** — [github.com/benfradjselim/ruptura/issues](https://github.com/benfradjselim/ruptura/issues)
+- **CNCF Sandbox** — proposal in preparation
 
 ---
 
 ## License
 
-Copyright 2024-2026 Selim Benfradj and the Ruptura Authors.
-
+Copyright 2024–2026 Selim Benfradj and the Ruptura Authors.  
 Licensed under the [Apache License, Version 2.0](LICENSE).
