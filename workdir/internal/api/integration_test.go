@@ -55,12 +55,13 @@ func TestIntegration_RuptureWorkload(t *testing.T) {
 	hc := telemetry.NewHealthChecker()
 	al := alerter.NewAlerter(10)
 	exp := explain.NewEngine()
-	h := New(store, nil, exp, al, nil, nil, nil, nil, met, hc, "")
+	h := New(store, nil, exp, al, nil, nil, nil, nil, met, hc, "test-key")
 	h.SetReady(true)
 	router := h.NewRouter()
 
 	t.Run("GET /api/v2/rupture/default/test-workload", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/v2/rupture/default/test-workload", nil)
+		req.Header.Set("Authorization", "Bearer test-key")
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -84,6 +85,7 @@ func TestIntegration_RuptureWorkload(t *testing.T) {
 
 	t.Run("GET /api/v2/ruptures returns >=1", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/v2/ruptures", nil)
+		req.Header.Set("Authorization", "Bearer test-key")
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 

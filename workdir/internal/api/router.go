@@ -17,13 +17,15 @@ func (h *Handlers) NewRouter() http.Handler {
 	r.HandleFunc("/api/v2/health", h.handleHealth).Methods("GET")
 	r.HandleFunc("/api/v2/ready", h.handleReady).Methods("GET")
 	r.HandleFunc("/api/v2/version", h.handleHealth).Methods("GET")
+	// Prometheus metrics scrape endpoint — must be unauthenticated so scrapers
+	// (Prometheus, Datadog, etc.) don't need an API key configured.
+	r.HandleFunc("/api/v2/metrics", h.handleMetrics).Methods("GET")
 
 	// All other /api/v2 routes require authentication
 	api := r.PathPrefix("/api/v2").Subrouter()
 	api.Use(h.authMiddleware)
 
 	api.HandleFunc("/timeline", h.handleTimeline).Methods("GET")
-	api.HandleFunc("/metrics", h.handleMetrics).Methods("GET")
 
 	api.HandleFunc("/write", h.handleWrite).Methods("POST")
 	api.HandleFunc("/ingest/purge", h.handleIngestPurge).Methods("DELETE")

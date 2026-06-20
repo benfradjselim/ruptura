@@ -7,7 +7,7 @@ import (
 )
 
 // TestKPICompactionEndToEnd verifies that KPI data older than CompactRawAfter
-// is correctly rolled up into 5-minute buckets and accessible via GetKPIRangeTiered.
+// is correctly rolled up into 5-minute buckets and accessible via GetKPIRange.
 func TestKPICompactionEndToEnd(t *testing.T) {
 	dir, err := os.MkdirTemp("", "ruptura-compact-test-*")
 	if err != nil {
@@ -33,16 +33,18 @@ func TestKPICompactionEndToEnd(t *testing.T) {
 	// Run compaction
 	s.Compact()
 
-	// Verify rollups exist in kr5: tier
+	// Verify rollups exist via RetentionStats
 	stats := s.RetentionStats()
 	if stats["kr5:"] == 0 {
 		t.Error("expected kr5: rollups after compaction, got 0")
 	}
 
-	// Verify tiered range query returns data
-	vals, err := s.GetKPIRangeTiered("test-host", "health_score", pastBase.Add(-time.Minute), time.Now())
+	// Verify data is accessible via GetKPIRange over the rolled-up window
+	from := pastBase.Add(-time.Minute)
+	to := pastBase.Add(10 * time.Minute)
+	vals, err := s.GetKPIRange("test-host", "health_score", from, to)
 	if err != nil {
-		t.Fatalf("GetKPIRangeTiered: %v", err)
+		t.Fatalf("GetKPIRange: %v", err)
 	}
 	if len(vals) == 0 {
 		t.Error("expected KPI rollup data, got empty slice — check compaction prefix logic")
@@ -76,24 +78,27 @@ func TestCompactionAtomicity(t *testing.T) {
 	// First compaction: should produce rollup avg=1.0
 	s.Compact()
 
-	vals1, _ := s.GetKPIRangeTiered("idempotent-host", "stress", pastBase.Add(-time.Minute), time.Now())
+	from := pastBase.Add(-time.Minute)
+	to := pastBase.Add(10 * time.Minute)
+	vals1, _ := s.GetKPIRange("idempotent-host", "stress", from, to)
 
 	// Second compaction: sources are already deleted, rollup should stay at 1.0
 	s.Compact()
 
-	vals2, _ := s.GetKPIRangeTiered("idempotent-host", "stress", pastBase.Add(-time.Minute), time.Now())
+	vals2, _ := s.GetKPIRange("idempotent-host", "stress", from, to)
 
 	if len(vals1) != len(vals2) {
 		t.Errorf("double compaction changed result count: %d -> %d", len(vals1), len(vals2))
 	}
 	if len(vals1) > 0 && len(vals2) > 0 {
-		if abs(vals1[0].Value-vals2[0].Value) > 0.001 {
-			t.Errorf("double compaction changed value: %.4f -> %.4f (double-averaging bug)", vals1[0].Value, vals2[0].Value)
+		if absF(vals1[0].Value-vals2[0].Value) > 0.001 {
+			t.Errorf("double compaction changed value: %.4f -> %.4f (double-averaging bug)",
+				vals1[0].Value, vals2[0].Value)
 		}
 	}
 }
 
-func abs(x float64) float64 {
+func absF(x float64) float64 {
 	if x < 0 {
 		return -x
 	}

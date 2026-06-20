@@ -40,11 +40,12 @@ func TestHandleRupture_404_unknownHost(t *testing.T) {
 	hc := telemetry.NewHealthChecker()
 	al := alerter.NewAlerter(10)
 	exp := explain.NewEngine()
-	h := New(store, nil, exp, al, nil, nil, nil, nil, met, hc, "")
+	h := New(store, nil, exp, al, nil, nil, nil, nil, met, hc, "test-key")
 	h.SetReady(true)
 	router := h.NewRouter()
 
 	req, _ := http.NewRequest("GET", "/api/v2/rupture/nonexistent-host", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -61,7 +62,7 @@ func TestHandleRupture_200_knownHost(t *testing.T) {
 	hc := telemetry.NewHealthChecker()
 	al := alerter.NewAlerter(10)
 	exp := explain.NewEngine()
-	h := New(store, nil, exp, al, nil, nil, nil, nil, met, hc, "")
+	h := New(store, nil, exp, al, nil, nil, nil, nil, met, hc, "test-key")
 	h.SetReady(true)
 	router := h.NewRouter()
 
@@ -74,6 +75,7 @@ func TestHandleRupture_200_knownHost(t *testing.T) {
 	store.StoreSnapshot(snap)
 
 	req, _ := http.NewRequest("GET", "/api/v2/rupture/web-01", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -101,7 +103,7 @@ func TestHandleRuptures_200_allHosts(t *testing.T) {
 	hc := telemetry.NewHealthChecker()
 	al := alerter.NewAlerter(10)
 	exp := explain.NewEngine()
-	h := New(store, nil, exp, al, nil, nil, nil, nil, met, hc, "")
+	h := New(store, nil, exp, al, nil, nil, nil, nil, met, hc, "test-key")
 	h.SetReady(true)
 	router := h.NewRouter()
 
@@ -111,6 +113,7 @@ func TestHandleRuptures_200_allHosts(t *testing.T) {
 	}
 
 	req, _ := http.NewRequest("GET", "/api/v2/ruptures", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
