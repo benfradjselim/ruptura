@@ -21,6 +21,21 @@ data:
               scrape_interval: 15s
               static_configs:
                 - targets: ["kube-state-metrics.monitoring.svc.cluster.local:8080"]
+            - job_name: test-apps
+              scrape_interval: 15s
+              metrics_path: /metrics
+              kubernetes_sd_configs:
+                - role: pod
+                  namespaces:
+                    names: [test-apps]
+              relabel_configs:
+                # Only scrape pods that expose port 8080
+                - source_labels: [__meta_kubernetes_pod_container_port_number]
+                  regex: "8080"
+                  action: keep
+                # Set the job label to the pod's app label so service.name becomes the app name
+                - source_labels: [__meta_kubernetes_pod_label_app]
+                  target_label: job
 
     processors:
       batch:
@@ -47,6 +62,25 @@ data:
             - tag_name: workload
               key: workload
               from: pod
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: net.host.ip
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.ip
+          - sources:
+              - from: connection
+
+      # Copy service.name → k8s.deployment.name for test-apps pods so Ruptura
+      # classifies them as Deployment workloads (not host) in the fleet view.
+      transform/testapps-kind:
+        error_mode: ignore
+        metric_statements:
+          - context: resource
+            statements:
+              - set(attributes["k8s.deployment.name"], attributes["service.name"])
+                where IsMatch(attributes["k8s.namespace.name"], "test-apps")
 
     exporters:
       otlphttp/ruptura:
@@ -68,7 +102,7 @@ data:
       pipelines:
         metrics:
           receivers: [otlp, prometheus]
-          processors: [memory_limiter, k8sattributes, batch]
+          processors: [memory_limiter, k8sattributes, transform/testapps-kind, batch]
           exporters: [otlphttp/ruptura]
         logs:
           receivers: [otlp]
