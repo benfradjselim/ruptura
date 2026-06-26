@@ -103,13 +103,15 @@ type PatternMatch struct {
 // Selector is a glob pattern matched against workload keys (e.g. "payments/*", "batch/*", "*").
 // Weights are normalised to sum to 1.0 on load. Omitted fields default to 0.
 type SignalWeights struct {
-	Selector  string  `json:"selector" yaml:"selector"`
-	Stress    float64 `json:"stress"   yaml:"stress"`
-	Fatigue   float64 `json:"fatigue"  yaml:"fatigue"`
-	Mood      float64 `json:"mood"     yaml:"mood"`
-	Pressure  float64 `json:"pressure" yaml:"pressure"`
-	Humidity  float64 `json:"humidity" yaml:"humidity"`
-	Contagion float64 `json:"contagion" yaml:"contagion"`
+	Selector      string  `json:"selector"                        yaml:"selector"`
+	Stress        float64 `json:"stress"                          yaml:"stress"`
+	Fatigue       float64 `json:"fatigue"                         yaml:"fatigue"`
+	Mood          float64 `json:"mood"                            yaml:"mood"`
+	Pressure      float64 `json:"pressure"                        yaml:"pressure"`
+	Humidity      float64 `json:"humidity"                        yaml:"humidity"`
+	Contagion     float64 `json:"contagion"                       yaml:"contagion"`
+	InfraStress   float64 `json:"infraStress,omitempty"   yaml:"infraStress,omitempty"`
+	NetworkHealth float64 `json:"networkHealth,omitempty" yaml:"networkHealth,omitempty"`
 }
 
 // DefaultSignalWeights returns the canonical HealthScore weights used when no

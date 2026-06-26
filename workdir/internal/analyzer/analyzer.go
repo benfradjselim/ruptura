@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/collector/infra/dag"
 	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
@@ -34,6 +35,17 @@ type Analyzer struct {
 
 	// v6.6: per-workload HealthScore signal weight overrides (ordered; first match wins).
 	weightConfigs []models.SignalWeights
+
+	// v8.0: infra collector registry — nil when not running in-cluster.
+	infraRegistry *dag.Registry
+}
+
+// SetInfraRegistry wires the infra collector registry for namespace-level pressure signals.
+// When nil (default), infraStress=0 and networkHealth=1.0 — identical to v7 behavior.
+func (a *Analyzer) SetInfraRegistry(r *dag.Registry) {
+	a.mu.Lock()
+	a.infraRegistry = r
+	a.mu.Unlock()
 }
 
 // SetTopology injects a live topology source for graph-based contagion computation.
@@ -92,10 +104,11 @@ func matchSelector(selector, key string) bool {
 	return selector == key
 }
 
-// normaliseWeights scales the six signal weights so they sum to 1.0.
-// If all weights are zero the default weights are returned unchanged.
+// normaliseWeights scales all signal weights so they sum to 1.0.
+// InfraStress and NetworkHealth default to 0 (omitempty) so existing configs
+// that omit infra fields normalise correctly to 1.0 unchanged.
 func normaliseWeights(w models.SignalWeights) models.SignalWeights {
-	total := w.Stress + w.Fatigue + w.Mood + w.Pressure + w.Humidity + w.Contagion
+	total := w.Stress + w.Fatigue + w.Mood + w.Pressure + w.Humidity + w.Contagion + w.InfraStress + w.NetworkHealth
 	if total < 1e-9 {
 		return w
 	}
@@ -105,6 +118,8 @@ func normaliseWeights(w models.SignalWeights) models.SignalWeights {
 	w.Pressure /= total
 	w.Humidity /= total
 	w.Contagion /= total
+	w.InfraStress /= total
+	w.NetworkHealth /= total
 	return w
 }
 
@@ -327,6 +342,20 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 	}
 	contagion = utils.Clamp(contagion, 0, 1)
 
+	// --- v8.0: Infra + CGPM integration (nil-safe; defaults to v7 behavior when absent) ---
+	infraStress := 0.0
+	networkHealth := 1.0
+	if a.infraRegistry != nil {
+		nsSnap := a.infraRegistry.NamespaceSnapshot(ref.Namespace)
+		infraStress = nsSnap.InfraStress
+		networkHealth = nsSnap.NetworkHealth
+		// Fold CGPM PropPressure into contagion via max() — existing contagion never decreases.
+		if nsSnap.PropPressure > contagion {
+			contagion = nsSnap.PropPressure
+		}
+		contagion = utils.Clamp(contagion, 0, 1)
+	}
+
 	// --- Throughput collapse signal (v6.1) ---
 	reqRate := getMetric(metrics, "request_rate")
 	throughputDrop := 0.0
@@ -346,7 +375,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 	// HealthScore: additive weighted penalty (avoids multiplicative collapse).
 	// Weights are resolved per-workload; fall back to global defaults when no override matches.
 	w := a.resolveWeights(ref.Key())
-	penalty := w.Stress*stress + w.Fatigue*ws.fatigue + w.Mood*(1-mood) + w.Pressure*pressureNorm + w.Humidity*humidity + w.Contagion*contagion
+	penalty := w.Stress*stress + w.Fatigue*ws.fatigue + w.Mood*(1-mood) + w.Pressure*pressureNorm + w.Humidity*humidity + w.Contagion*contagion + w.InfraStress*infraStress + w.NetworkHealth*(1-networkHealth)
 	healthScore := utils.Clamp(1-penalty, 0, 1)
 
 	// Entropy: system disorder — how much KPI values deviate from their rolling mean
@@ -402,7 +431,8 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 		relPressure := adaptiveScore(ws, "pressure", pressureNorm)
 		relHumidity := adaptiveScore(ws, "humidity", humidity)
 		relContagion := adaptiveScore(ws, "contagion", contagion)
-		penalty = w.Stress*relStress + w.Fatigue*ws.fatigue + w.Mood*relMood + w.Pressure*relPressure + w.Humidity*relHumidity + w.Contagion*relContagion
+		// infraStress and networkHealth are registry-sourced; not adaptive per-workload baseline.
+		penalty = w.Stress*relStress + w.Fatigue*ws.fatigue + w.Mood*relMood + w.Pressure*relPressure + w.Humidity*relHumidity + w.Contagion*relContagion + w.InfraStress*infraStress + w.NetworkHealth*(1-networkHealth)
 		healthScore = utils.Clamp(1-penalty, 0, 1)
 	}
 

@@ -19,8 +19,8 @@ type Engine struct {
 }
 
 type hostData struct {
-	metricVal, logVal, traceVal float64
-	metricTs, logTs, traceTs    time.Time
+	metricVal, logVal, traceVal, infraVal float64
+	metricTs, logTs, traceTs, infraTs     time.Time
 }
 
 type FusionEngine interface {
@@ -67,6 +67,17 @@ func (e *Engine) SetTraceR(host string, r float64, ts time.Time) {
 	h.traceTs = ts
 }
 
+// SetInfraR records the infrastructure rupture index for a host.
+// When infraR has never been set (or goes stale), FusedR renormalises to the
+// v7 0.6/0.2/0.2 split — the 0.30 infra weight is never left dangling.
+func (e *Engine) SetInfraR(host string, r float64, ts time.Time) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	h := e.getHost(host)
+	h.infraVal = r
+	h.infraTs = ts
+}
+
 func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 	e.mu.RLock()
 	h, ok := e.hosts[host]
@@ -96,7 +107,8 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 		return 0, time.Time{}, fmt.Errorf("fusion: signal lag too large for host %s", host)
 	}
 
-	// Staleness check: ignore signals older than staleThreshold
+	// Staleness check for all signals. Infra updates every 30s by design so it is
+	// excluded from the lag check above but still subject to the 5-minute stale window.
 	now := time.Now()
 	if !data.metricTs.IsZero() && now.Sub(data.metricTs) > staleThreshold {
 		data.metricTs = time.Time{}
@@ -110,19 +122,24 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 		data.traceTs = time.Time{}
 		data.traceVal = 0
 	}
+	if !data.infraTs.IsZero() && now.Sub(data.infraTs) > staleThreshold {
+		data.infraTs = time.Time{}
+		data.infraVal = 0
+	}
 
-	// Insufficient check
+	// Count active signals across all four pipelines.
 	count := 0
 	if !data.metricTs.IsZero() { count++ }
 	if !data.logTs.IsZero() { count++ }
 	if !data.traceTs.IsZero() { count++ }
+	if !data.infraTs.IsZero() { count++ }
 
 	if count < 2 {
 		return 0, time.Time{}, fmt.Errorf("fusion: insufficient signals for host %s", host)
 	}
 
-	// Conflict check
-	if count == 3 {
+	// Conflict check among metric/log/trace when all three are active.
+	if !data.metricTs.IsZero() && !data.logTs.IsZero() && !data.traceTs.IsZero() {
 		diff1 := math.Abs(data.metricVal - data.logVal)
 		diff2 := math.Abs(data.metricVal - data.traceVal)
 		diff3 := math.Abs(data.logVal - data.traceVal)
@@ -131,29 +148,16 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 		}
 	}
 
-	// Compute weighted average
-	var val float64
-	if count == 3 {
-		val = 0.6*data.metricVal + 0.2*data.logVal + 0.2*data.traceVal
-	} else {
-		// Only 2 signals
-		// Rule: metric=0.75, whichever-other=0.25
-		if !data.metricTs.IsZero() {
-			if !data.logTs.IsZero() {
-				val = 0.75*data.metricVal + 0.25*data.logVal
-			} else {
-				val = 0.75*data.metricVal + 0.25*data.traceVal
-			}
-		} else {
-			// Log and Trace are the 2 signals
-			val = 0.5*data.logVal + 0.5*data.traceVal
-		}
-	}
-	
+	val, _ := e.fusedR(&data)
 	return val, latest, nil
 }
 
-// fusedR computes the fused R for hostData without locking (caller must hold e.mu).
+// fusedR computes the fused R for a hostData snapshot (caller must not hold e.mu).
+//
+// When infraTs is zero (never set or went stale), weights renormalise to the v7
+// 0.6/0.2/0.2 metric/log/trace split — the 0.30 infra weight is never left dangling.
+// When infraTs is valid, proportional 4-signal weights are used (base: metric=0.42,
+// log=0.14, trace=0.14, infra=0.30), renormalised over the active subset.
 func (e *Engine) fusedR(data *hostData) (float64, bool) {
 	d := *data
 
@@ -170,41 +174,61 @@ func (e *Engine) fusedR(data *hostData) (float64, bool) {
 		d.traceTs = time.Time{}
 		d.traceVal = 0
 	}
-
-	count := 0
-	if !d.metricTs.IsZero() { count++ }
-	if !d.logTs.IsZero() { count++ }
-	if !d.traceTs.IsZero() { count++ }
-	if count < 2 {
-		return 0, false
+	if !d.infraTs.IsZero() && now.Sub(d.infraTs) > staleThreshold {
+		d.infraTs = time.Time{}
+		d.infraVal = 0
 	}
 
-	var val float64
-	if count == 3 {
-		val = 0.6*d.metricVal + 0.2*d.logVal + 0.2*d.traceVal
-	} else {
+	// When infraR has never been set (or went stale), fall back to the v7 3-signal logic
+	// so the 0.30 base weight is never left dangling over an absent signal.
+	if d.infraTs.IsZero() {
+		count := 0
+		if !d.metricTs.IsZero() { count++ }
+		if !d.logTs.IsZero() { count++ }
+		if !d.traceTs.IsZero() { count++ }
+		if count < 2 {
+			return 0, false
+		}
+		if count == 3 {
+			return 0.6*d.metricVal + 0.2*d.logVal + 0.2*d.traceVal, true
+		}
+		// Two signals: metric=0.75, other=0.25.
 		if !d.metricTs.IsZero() {
 			if !d.logTs.IsZero() {
-				val = 0.75*d.metricVal + 0.25*d.logVal
-			} else {
-				val = 0.75*d.metricVal + 0.25*d.traceVal
+				return 0.75*d.metricVal + 0.25*d.logVal, true
 			}
-		} else {
-			val = 0.5*d.logVal + 0.5*d.traceVal
+			return 0.75*d.metricVal + 0.25*d.traceVal, true
 		}
+		return 0.5*d.logVal + 0.5*d.traceVal, true
 	}
+
+	// infraR is participating: proportional 4-signal weighting.
+	// Base weights: metric=0.42, log=0.14, trace=0.14, infra=0.30.
+	activeW := 0.30 // infra is active
+	activeCount := 1
+	if !d.metricTs.IsZero() { activeW += 0.42; activeCount++ }
+	if !d.logTs.IsZero()    { activeW += 0.14; activeCount++ }
+	if !d.traceTs.IsZero()  { activeW += 0.14; activeCount++ }
+	if activeCount < 2 {
+		return 0, false
+	}
+	val := (0.30 / activeW) * d.infraVal
+	if !d.metricTs.IsZero() { val += (0.42 / activeW) * d.metricVal }
+	if !d.logTs.IsZero()    { val += (0.14 / activeW) * d.logVal }
+	if !d.traceTs.IsZero()  { val += (0.14 / activeW) * d.traceVal }
 	return val, true
 }
 
 // WorkloadState holds the per-signal breakdown for a single workload.
 type WorkloadState struct {
-	Workload          string    `json:"workload"`
-	MetricR           float64   `json:"metric_r"`
-	LogR              float64   `json:"log_r"`
-	TraceR            float64   `json:"trace_r"`
-	FusedR            float64   `json:"fused_r"`
-	DominantPipeline  string    `json:"dominant_pipeline"`
-	LastUpdated       time.Time `json:"last_updated"`
+	Workload         string    `json:"workload"`
+	MetricR          float64   `json:"metric_r"`
+	LogR             float64   `json:"log_r"`
+	TraceR           float64   `json:"trace_r"`
+	InfraR           float64   `json:"infra_r"`
+	FusedR           float64   `json:"fused_r"`
+	DominantPipeline string    `json:"dominant_pipeline"`
+	LastUpdated      time.Time `json:"last_updated"`
 }
 
 // dominantPipeline returns the pipeline name with the highest R value among active signals.
@@ -212,8 +236,9 @@ func dominantPipeline(d hostData) string {
 	best := ""
 	var bestVal float64
 	if !d.metricTs.IsZero() && d.metricVal > bestVal { bestVal = d.metricVal; best = "metrics" }
-	if !d.logTs.IsZero() && d.logVal > bestVal      { bestVal = d.logVal;    best = "logs"    }
-	if !d.traceTs.IsZero() && d.traceVal > bestVal  {                         best = "traces"  }
+	if !d.logTs.IsZero() && d.logVal > bestVal        { bestVal = d.logVal;    best = "logs"    }
+	if !d.traceTs.IsZero() && d.traceVal > bestVal    { bestVal = d.traceVal;  best = "traces"  }
+	if !d.infraTs.IsZero() && d.infraVal > bestVal    {                         best = "infra"   }
 	return best
 }
 
@@ -243,6 +268,7 @@ func (e *Engine) StateByWorkload(key string) (WorkloadState, error) {
 		MetricR:          d.metricVal,
 		LogR:             d.logVal,
 		TraceR:           d.traceVal,
+		InfraR:           d.infraVal,
 		FusedR:           math.Round(fused*1000) / 1000,
 		DominantPipeline: dominantPipeline(d),
 		LastUpdated:      latest,
