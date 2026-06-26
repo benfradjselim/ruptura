@@ -173,6 +173,17 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/nodes", h.handleNodes).Methods("GET")
 	api.HandleFunc("/nodes/{node:.+}", h.handleNode).Methods("GET")
 
+	// Infra collector — GroupSnapshot aggregates and CGPM propagation
+	api.HandleFunc("/infra/groups", h.handleInfraGroups).Methods("GET")
+	api.HandleFunc("/infra/nodes", h.handleInfraNodes).Methods("GET")
+	api.HandleFunc("/infra/mcp", h.handleInfraMCP).Methods("GET")
+	api.HandleFunc("/infra/operators", h.handleInfraOperators).Methods("GET")
+	api.HandleFunc("/infra/network", h.handleInfraNetwork).Methods("GET")
+	api.HandleFunc("/infra/storage", h.handleInfraStorage).Methods("GET")
+	api.HandleFunc("/infra/admission", h.handleInfraAdmission).Methods("GET")
+	api.HandleFunc("/infra/tenancy", h.handleInfraTenancy).Methods("GET")
+	api.HandleFunc("/propagation", h.handlePropagation).Methods("GET")
+
 	// Workload k8s metadata
 	api.HandleFunc("/workloads/{namespace}/{kind}/{name}/k8s", h.handleWorkloadK8s).Methods("GET")
 

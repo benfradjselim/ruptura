@@ -16,6 +16,15 @@ import (
 	"github.com/benfradjselim/ruptura/internal/alerter"
 	"github.com/benfradjselim/ruptura/internal/analyzer"
 	"github.com/benfradjselim/ruptura/internal/api"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/admission"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/co"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/dag"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/mcp"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/networking"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/node"
+	infraoperator "github.com/benfradjselim/ruptura/internal/collector/infra/operator"
+	infrastorage "github.com/benfradjselim/ruptura/internal/collector/infra/storage"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/tenancy"
 	apicontext "github.com/benfradjselim/ruptura/internal/context"
 	"github.com/benfradjselim/ruptura/internal/correlator"
 	"github.com/benfradjselim/ruptura/internal/discovery"
@@ -36,7 +45,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "7.1.0"
+const version = "8.0.0"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -199,6 +208,36 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		logger.Default.Info("k8s auto-discovery skipped (not in-cluster)", "reason", err.Error())
 	}
 
+	// Infra collector registry — probes and starts in-cluster collectors.
+	// Falls back to empty registry (safe, returns healthy defaults) when not in-cluster.
+	infraRegistry := dag.NewRegistry()
+	if nodeCol, err := node.New(); err == nil {
+		infraRegistry.Add(nodeCol)
+	}
+	if coCol, err := co.New(); err == nil {
+		infraRegistry.Add(coCol)
+	}
+	if mcpCol, err := mcp.New(); err == nil {
+		infraRegistry.Add(mcpCol)
+	}
+	if netCol, err := networking.New(); err == nil {
+		infraRegistry.Add(netCol)
+	}
+	if storageCol, err := infrastorage.New(); err == nil {
+		infraRegistry.Add(storageCol)
+	}
+	if admissionCol, err := admission.New(); err == nil {
+		infraRegistry.Add(admissionCol)
+	}
+	if opCol, err := infraoperator.New(); err == nil {
+		infraRegistry.Add(opCol)
+	}
+	if tenancyCol, err := tenancy.New(); err == nil {
+		infraRegistry.Add(tenancyCol)
+	}
+	go infraRegistry.Run(ctx)
+	analyzerEngine.SetInfraRegistry(infraRegistry)
+
 	// Flush log pipeline buckets every 15 s so signals are emitted even when
 	// log volume is low and no new lines arrive to trigger auto-flush.
 	go func() {
@@ -308,7 +347,16 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	_ = providers.NewKubernetesProviderWithActuator(k8sActuator) // registered; used by action dispatcher
 
-	actionEngine, err := engine.New(nil, bus)
+	var rulesYAML []byte
+	if p := os.Getenv("RUPTURA_ACTION_RULES_PATH"); p != "" {
+		if data, err := os.ReadFile(p); err == nil {
+			rulesYAML = data
+			logger.Default.Info("loaded custom action rules", "path", p)
+		} else {
+			logger.Default.Warn("RUPTURA_ACTION_RULES_PATH: failed to read file", "path", p, "err", err)
+		}
+	}
+	actionEngine, err := engine.New(rulesYAML, bus)
 	if err != nil {
 		return fmt.Errorf("init action engine failed: %w", err)
 	}
@@ -349,6 +397,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if inf != nil {
 		handlers.SetDiscovery(inf)
 	}
+	handlers.SetInfraRegistry(infraRegistry)
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)
 	histMgr := history.New()

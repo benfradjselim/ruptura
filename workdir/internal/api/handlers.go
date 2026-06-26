@@ -10,6 +10,7 @@ import (
     "github.com/benfradjselim/ruptura/internal/alerter"
     "github.com/benfradjselim/ruptura/internal/analyzer"
     apicontext "github.com/benfradjselim/ruptura/internal/context"
+    "github.com/benfradjselim/ruptura/internal/collector/infra/dag"
     "github.com/benfradjselim/ruptura/internal/correlator"
     "github.com/benfradjselim/ruptura/internal/discovery"
     "github.com/benfradjselim/ruptura/internal/events"
@@ -47,9 +48,10 @@ type Handlers struct {
     historyMgr  *history.Manager
     eventBus    *events.Bus
     ingest      IngestCounter
-    fusionEng   *fusion.Engine
-    topoBuilder *correlator.TopologyBuilder
-    discovery   *discovery.Informer
+    fusionEng     *fusion.Engine
+    topoBuilder   *correlator.TopologyBuilder
+    discovery     *discovery.Informer
+    infraRegistry *dag.Registry
 }
 
 func (h *Handlers) SetIngest(c IngestCounter)                       { h.ingest = c }
