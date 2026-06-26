@@ -16,6 +16,12 @@ const (
 	k8sAPIBase         = "https://kubernetes.default.svc"
 )
 
+// InClusterCreds is the exported form of inClusterCreds. External packages
+// (e.g. infra collectors) call this instead of duplicating the credential logic.
+func InClusterCreds() (apiBase, token string, client *http.Client, err error) {
+	return inClusterCreds()
+}
+
 // inClusterCreds reads the pod's ServiceAccount token and CA cert and returns
 // an authenticated HTTP client. Returns an error when not running inside a pod.
 func inClusterCreds() (apiBase, token string, client *http.Client, err error) {
