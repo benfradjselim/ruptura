@@ -1,5 +1,5 @@
 # Ruptura — Technical Reference
-**Version:** 7.1.0 · **Updated:** 2026-06-18
+**Version:** 8.0.0 · **Updated:** 2026-06-26
 
 This document is the single authoritative reference for contributors and operators.
 For the whitepaper and formal specs, see `docs/v6.1.0/SPECS.md`.
@@ -66,15 +66,38 @@ Rupture Index: R(t) = α_burst / α_stable
 
 ### Fused Rupture Index
 ```
-FusedR = 0.6 × metricR + 0.2 × logR + 0.2 × traceR
-         (when all three signals available)
+v7 (3-signal, default when infraR absent):
+  FusedR = 0.6 × metricR + 0.2 × logR + 0.2 × traceR
+  2-signal fallback: FusedR = 0.75 × metricR + 0.25 × other
 
-If only 2 signals:  FusedR = 0.75 × metricR + 0.25 × other
+v8 (4-signal, when infraR is available from infra collector):
+  Base weights: metric=0.42, log=0.14, trace=0.14, infra=0.30
+  Active subset renormalised to sum to 1.0.
+  When infraR is absent or stale: automatically falls back to v7 split —
+  the 0.30 infra weight is never left dangling.
 ```
 
 ### HealthScore
 ```
-HealthScore = 100 × ∏_{k ∈ {stress, fatigue, pressure, contagion}} min(1, max(0, 1 − w_k × s_k))
+penalty = w_stress·stress + w_fatigue·fatigue + w_mood·(1−mood)
+        + w_pressure·pressure + w_humidity·humidity + w_contagion·contagion
+        + w_infraStress·infraStress + w_networkHealth·(1−networkHealth)
+
+HealthScore = 100 × clamp(1 − penalty, 0, 1)
+
+Weights are per-workload overrides (SignalWeights); defaults sum to 1.0.
+infraStress and networkHealth default to weight=0 when not configured,
+preserving bit-for-bit v7 behavior on clusters without the infra collector.
+```
+
+### Extended Contagion (v8)
+```
+contagion = max(trace_topology_contagion, cgpm_prop_pressure)
+            clamped to [0, 1]
+
+PropPressure is the CGPM-computed downstream pressure delivered to
+grp.workload for the workload's namespace. It can only increase the
+existing contagion — never decrease it.
 ```
 
 ### Time-to-Failure
@@ -104,6 +127,84 @@ All signals are returned as raw values from the API. The UI applies a multiply f
 
 ---
 
+## v8 Infrastructure & Cluster Intelligence Layer
+
+### Dual-Axis Object Identity
+
+Every watched Kubernetes object is identified on two orthogonal axes:
+
+| Axis | Dimension | Values |
+|------|-----------|--------|
+| A — topology | `Scope` | `cluster` · `namespace` · `workload` · `pod` |
+| B — domain   | `Group` | `grp.controlplane` · `grp.operators` · `grp.admission` · `grp.tenancy` · `grp.storage` · `grp.network` · `grp.workload` |
+
+Signals aggregate: object → `GroupSnapshot` (per group per namespace) → `NamespaceSnapshot` → workload KPI.
+
+### Infra Collectors
+
+| Collector | Kubernetes resources watched | Probe guard |
+|-----------|------------------------------|-------------|
+| `node` | `api/v1/nodes` | always active |
+| `co` | `apis/config.openshift.io/v1/clusteroperators` | OpenShift only |
+| `mcp` | `apis/machineconfiguration.openshift.io/v1/machineconfigpools` | OpenShift only |
+| `networking` | Services, Endpoints, NetworkPolicy + Routes/Ingresses | Routes probed at startup |
+| `storage` | PVC, PV, StorageClass | always active |
+| `admission` | PolicyReport (wgpolicyk8s.io/v1alpha2 or kyverno.io/v1), ValidatingWebhookConfiguration | Kyverno only — silently skipped if absent |
+| `operator` | Subscription, CSV, InstallPlan, CRD | OLM only — silently skipped if absent |
+| `tenancy` | ResourceQuota, LimitRange, Namespace | always active |
+
+Non-in-cluster deployments: all constructors return an error → zero collectors added → registry is a safe no-op. All API endpoints return empty results with HTTP 200.
+
+### Cross-Group Propagation Model (CGPM)
+
+```
+PropPressure(t) = clamp( max over upstream edges g→t of:
+    effectiveA(g) · ω(g→t) · (1 + κ · GNI(g))
+, 0, 1 )
+
+effectiveA(g) = max( activation(g), PropPressure(g) )   — multi-hop
+activation(g) = 1 − GroupHealth(g)
+κ (noise amplification) = 0.5
+θ_blast (blast radius threshold) = 0.2
+```
+
+CGPM edge graph (canonical, read-only):
+```
+controlplane → workload  ω=1.0   node/CO failure breaks hosted pods
+controlplane → network   ω=0.9   network-operator CO failure breaks routing
+network      → workload  ω=0.9   endpoint/route failure makes service unreachable
+storage      → workload  ω=0.8   PVC stall blocks pod start
+admission    → workload  ω=0.7   admission denial blocks pod creation
+admission    → network   ω=0.6   admission blocks route/service creation
+operators    → storage   ω=0.6   CSI operator failure breaks provisioning
+operators    → network   ω=0.6   network operator failure breaks routes
+operators    → workload  ω=0.5   operator-managed workload reconcile loop
+```
+
+Processing order: controlplane → operators → admission → tenancy → storage → network → workload.
+Tick rate: 30 seconds. GNI=0 in v8.0 (Phase 6); full GNI wiring in v8.1.
+
+### Infra Signal Catalog (v8)
+
+**GroupSnapshot fields** (per group per namespace):
+
+| Field | Formula | Meaning |
+|-------|---------|---------|
+| `health` | `1 − max(object signals)` | Group health in [0,1]; 1.0 = all healthy |
+| `spread` | `mean(object signals)` | Localized vs. widespread fault |
+| `gni` | `0.5·StateChurn + 0.5·EventBurst` | Group Noise Index (v8.0: always 0; v8.1: wired) |
+| `agitated` | `GNI elevated ∧ health still green` | Pre-rupture warning |
+
+**NamespaceSnapshot fields** (consumed by workload analyzer):
+
+| Field | Source | Default (nil registry) |
+|-------|--------|----------------------|
+| `infraStress` | `max(1 − GroupHealth)` across all groups | 0.0 |
+| `networkHealth` | `GroupHealth(grp.network)` | 1.0 |
+| `storageRisk` | `1 − GroupHealth(grp.storage)` | 0.0 |
+| `admissionPressure` | `1 − GroupHealth(grp.admission)` | 0.0 |
+| `propPressure` | CGPM result for `grp.workload` in namespace | 0.0 |
+
 ## Storage Key Schema
 
 ```
@@ -120,6 +221,16 @@ ctx:{id}                        context entries
 sup:{id}                        suppression windows
 sp:{traceID}:{spanID}           spans
 l:{service}:{ts}                log output
+```
+
+v8 additive prefixes (infra collector — not yet written to storage in v8.0; reserved for v8.1):
+```
+is:{group}:{ns}:{ts_ns}         infra signal raw       TTL 7d
+is5:{group}:{ns}:{ts_ns}        5m infra rollup        TTL 35d
+is1h:{group}:{ns}:{ts_ns}       1h infra rollup        TTL 400d
+gh:{group}:{ns}:{ts_ns}         GroupHealth history    TTL 35d
+gni:{group}:{ns}:{ts_ns}        GNI history            TTL 35d
+prop:{ns}:{ts_ns}               PropPressure history   TTL 35d
 ```
 
 **CRITICAL:** Never change prefixes without updating `internal/storage/retention.go`.
@@ -170,6 +281,22 @@ POST /api/v2/actions/{id}/approve            approve Tier-2 action (autopilot on
 POST /api/v2/actions/{id}/rollback           rollback action (autopilot only → 402 in community)
 POST /api/v2/actions/emergency-stop          stop all auto-actions immediately
 ```
+
+### v8 Infrastructure Endpoints
+
+```
+GET  /api/v2/infra/groups      all GroupSnapshots (all groups, all namespaces)
+GET  /api/v2/infra/nodes       Node signals (Kind=Node, grouped by ObjectID)
+GET  /api/v2/infra/mcp         MachineConfigPool signals (OpenShift)
+GET  /api/v2/infra/operators   ClusterOperator signals (OpenShift)
+GET  /api/v2/infra/network     Network health per namespace (grp.network)
+GET  /api/v2/infra/storage     Storage health per namespace (grp.storage)
+GET  /api/v2/infra/admission   Admission health per namespace (grp.admission)
+GET  /api/v2/infra/tenancy     Tenancy health per namespace (grp.tenancy)
+GET  /api/v2/propagation       CGPM PropPressure results per namespace
+```
+
+All infra endpoints return empty results (`{"groups":[]}` or `{"signals":[]}`) with HTTP 200 when the infra collector registry has no active collectors (non-in-cluster deployments).
 
 ### OTLP Ingest (separate port 4317)
 ```
@@ -264,6 +391,8 @@ workdir/                      Go engine source
   internal/storage/           BadgerDB + compaction
   internal/api/               REST handlers
   internal/actions/           action engine + K8s actuator
+  internal/collector/infra/   v8 infra collectors (node, co, mcp, networking, storage, admission, operator, tenancy)
+  internal/collector/infra/dag/  Registry + CGPM Propagator
   ui/                         ACTIVE Svelte 4 UI (workdir/ui/)
 docs/                         internal planning + specs
   REFERENCE.md                this file

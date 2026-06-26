@@ -1579,3 +1579,70 @@ Python SDK (`sdk/python/ruptura/`) — full implementation, not stubs:
 > An SRE installs Ruptura on a fresh k3s cluster. Within 15 minutes, without editing any config file, they see all their workloads. They click one that is degrading, read why it is degrading (causal narrative), click through its service dependency graph, create a suppression window for an upcoming deploy, and see Ruptura's own component health — all from one browser tab. No CLI required for Day 1 operation.
 
 Every v7 feature either contributes to that test or it is deferred to v7.1.
+
+---
+
+## v8.0.0 (shipped 2026-06-26 — "Infrastructure & Cluster Intelligence" release)
+
+### What shipped
+
+**Phase 4 — Control-plane + network collectors**
+- `internal/collector/infra/node/` — Watches `api/v1/nodes`. Signals: notReady=1.0 critical, DiskPressure/MemoryPressure=0.7 warning, PIDPressure=0.5 elevated.
+- `internal/collector/infra/co/` — Watches ClusterOperators (OpenShift only; silently skipped on upstream k8s). Signals: Available=False→1.0 critical, Degraded=True→0.8 critical, Progressing=True→0.3 elevated.
+- `internal/collector/infra/mcp/` — Watches MachineConfigPools (OpenShift only). degradedMachineCount and unavailableMachineCount each produce graded signals.
+- `internal/collector/infra/networking/` — Multi-resource: Services, Endpoints, NetworkPolicy always; Routes and Ingresses probed at startup. Endpoint ready/notReady ratio is the primary network health signal.
+- `internal/collector/infra/dag/registry.go` — `Registry` probes, starts, ticks (30s), aggregates `GroupSnapshot`s, drives the CGPM `Propagator`. Placed in `package dag` (not `package infra`) to break the `infra ↔ dag` import cycle.
+- `internal/api/handlers_infra.go` + router + main.go wiring — all infra endpoints with nil-safe guards.
+
+**Phase 5 — Storage, admission, operator, tenancy collectors**
+- `internal/collector/infra/storage/` — PVC, PV, StorageClass. PVC Lost=1.0 critical, Pending=0.5 elevated. PV Failed=1.0 critical.
+- `internal/collector/infra/admission/` — Kyverno PolicyReport with dual-path probe: `wgpolicyk8s.io/v1alpha2` first, then `kyverno.io/v1`; silently skipped if neither exists. fail/total ratio graded severity. `policyReportPath` written in `Probe()`, read in `Start()` — race-safe via sequential wg.Wait().
+- `internal/collector/infra/operator/` — OLM (Subscription, CSV, InstallPlan, CRD); silently skipped if `operators.coreos.com/v1alpha1` returns non-200.
+- `internal/collector/infra/tenancy/` — ResourceQuota (numeric-only ratio parsing), LimitRange (stable presence), Namespace (Terminating → 0.6 warning).
+
+**Phase 6 — Engine integration**
+- `pkg/models.SignalWeights` — added `InfraStress` and `NetworkHealth` fields (`omitempty`). Existing YAML/JSON configs that omit these fields normalise correctly to 1.0 unchanged.
+- `internal/analyzer.Analyzer` — added `infraRegistry *dag.Registry` + `SetInfraRegistry()`. `normaliseWeights()` extended to sum all 8 weight fields. `Update()` reads `NamespaceSnapshot` per namespace (nil-safe; defaults: infraStress=0, networkHealth=1.0). CGPM `PropPressure` folded into contagion via `max()` — existing contagion value never decreases. `HealthScore` penalty extended: `+w_infraStress·infraStress + w_networkHealth·(1−networkHealth)`. Both the initial and adaptive-baseline penalty paths updated identically.
+- `internal/fusion.Engine` — added `infraVal`/`infraTs` to `hostData` + `SetInfraR()`. When `infraTs.IsZero()` (never set or stale), `fusedR()` falls back to v7 0.6/0.2/0.2 — the 0.30 base infra weight is never left dangling. When infra is active, 4-signal proportional weights (metric=0.42, log=0.14, trace=0.14, infra=0.30) are renormalised over the active subset. `WorkloadState` exposes `InfraR`.
+- `cmd/ruptura/main.go` — `analyzerEngine.SetInfraRegistry(infraRegistry)` wired after registry startup.
+
+**Phase 7 — Version bump + docs**
+- Version: `7.1.0 → 8.0.0` (const, test, version.json).
+- `docs/REFERENCE.md` — dual-axis model summary, CGPM edge table, infra collector table, new API endpoints, updated FusedR formula, updated HealthScore formula, v8 storage prefix table.
+- `docs/judgment.md` — this section.
+
+### Gaps closed by v8.0
+
+**The infra blindspot**: v7 could see a workload degrading but could not answer "is this a cluster-layer problem or a workload-layer problem?" An OOMKill caused by node memory pressure was indistinguishable from a memory leak inside the pod. v8 closes this by watching the infrastructure layer directly and flowing its health signals into the same HealthScore that operators already watch.
+
+**Cross-group propagation**: v7 had no model for "a control-plane failure causes workload failures." In production, a node NotReady event cascades to every pod on that node; a network-operator CO degradation silently breaks route admission for unrelated workloads. The CGPM DAG makes this causality explicit and quantitative.
+
+**Noisy behavior as a pre-rupture signal**: A group can be Agitated (GNI elevated) while Health is still green. This is the pre-rupture window where human intervention is most effective. v7 had no equivalent. The GNI field exists on `GroupSnapshot` in v8.0; wiring the state-churn and event-burst inputs is v8.1 work.
+
+### Decisions made
+
+**Raw HTTP over client-go** — client-go adds 12 MB to the binary and requires kubeconfig setup for local testing. The raw HTTP + LIST/WATCH pattern with a ServiceAccount token is 200 lines per collector, fully testable without a cluster, and has zero external Go dependencies. The collector API surface is intentionally small: `Probe()`, `Start()`, `Signals()`.
+
+**Registry in `dag/` package, not `infra/`** — The natural home for the aggregator is the `infra` package, but the propagator DAG needs to import `infra` types. Placing `Registry` in `infra` would create `infra → dag → infra` — an illegal import cycle in Go. Moving it to `package dag` makes the only dependency direction `dag → infra` (one-way). The trade-off: `dag` is a non-obvious home for the registry. The alternative (separate `registry` package) was rejected as unnecessary indirection.
+
+**30-second aggregation tick** — The CGPM propagation and `GroupSnapshot` recomputation run every 30 seconds, not on every signal update. This is a deliberate throttle: most infra objects change rarely, and frequent re-aggregation would waste CPU on steady-state clusters. The 5-minute stale threshold for fusion signals is generous enough that a 30-second tick never causes false stale evictions.
+
+**`max()` not `mean()` for GroupHealth** — `GroupHealth = 1 − max(member signals)`. The alternative was `1 − mean(member signals)`. `max` was chosen because a single critically-failing node in a group of 100 should surface immediately — mean would dilute it to 1% and hide it. Spread (mean) is reported separately for context.
+
+**`max()` for PropPressure → contagion fold** — The CGPM-computed PropPressure folds into the existing trace-topology contagion via `max(existing, propPressure)`. This ensures the infra pressure can only add urgency, never reduce it. A workload already in epidemic contagion state from trace data keeps that reading even if the infra pressure is lower.
+
+**`omitempty` on InfraStress/NetworkHealth in SignalWeights** — These fields are additive to the weight normalisation. Omitting them from a config produces a zero-sum contribution, so the remaining 6 weights normalise to 1.0 unchanged. This is the zero-migration guarantee: every existing `RUPTURA_WORKLOAD_WEIGHTS` config is bit-for-bit equivalent to v7 behavior.
+
+### What v8.0 does NOT do (deferred to v8.1)
+
+- **GNI wiring**: `GroupSnapshot.GNI` is always 0.0 in v8.0. StateChurn (condition flip count) and EventBurst (k8s Event rate) inputs are not yet computed. The CGPM formula includes `1 + κ·GNI` but with GNI=0 it reduces to `1 + 0 = 1` (no noise amplification). v8.1 will wire real GNI values.
+- **Infra signal persistence**: The v8 storage prefixes (`is:`, `is5:`, `is1h:`, `gh:`, `gni:`, `prop:`) are reserved but not written. `GroupSnapshot` and `PropPressure` live only in memory (reset on restart). v8.1 will add the compaction loop.
+- **UI panels**: No UI panels for infra groups, propagation flow, or blast radius badge in v8.0. The API endpoints are live; the Svelte components are v8.1 work.
+- **Probabilistic resilience formula**: The CGPM currently propagates the worst-case pressure (`max` over upstream edges). A probabilistic model (independent failure assumption) would give `P(failure) = 1 − ∏(1 − pᵢ)` across edges, producing lower but statistically correct estimates under independence. The max model is conservative (always overestimates) which is the right default for alerting.
+
+### v8.0 Completion Test
+
+> An operator with Ruptura v8.0 on an OpenShift cluster takes a node NotReady. Within 60 seconds, the affected workloads show elevated `infraStress` in their HealthScore, the `contagion` signal increases (CGPM PropPressure folded in), and `GET /api/v2/infra/nodes` returns the failing node with `value=1.0, severity=critical`. No workload KPI config changes required.
+
+`go test -race ./...`: all packages pass clean.
+Version: `8.0.0`.
