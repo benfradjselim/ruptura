@@ -15,6 +15,7 @@ import (
 
 	"github.com/benfradjselim/ruptura/internal/collector/infra"
 	"github.com/benfradjselim/ruptura/internal/discovery"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 type k8sMeta struct {
@@ -60,17 +61,23 @@ func (c *Collector) Probe(ctx context.Context) error {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("tenancy: probe: %w", err)
+		probeErr := fmt.Errorf("tenancy: probe: %w", err)
+		logger.Default.Info("infra collector skipped", "collector", c.Name(), "reason", probeErr.Error())
+		return probeErr
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("tenancy: probe: status %d", resp.StatusCode)
+		probeErr := fmt.Errorf("tenancy: probe: status %d", resp.StatusCode)
+		logger.Default.Info("infra collector skipped", "collector", c.Name(), "reason", probeErr.Error())
+		return probeErr
 	}
+	logger.Default.Info("infra collector probed", "collector", c.Name())
 	return nil
 }
 
 // Start launches watch goroutines for ResourceQuota, LimitRange, and Namespace.
 func (c *Collector) Start(ctx context.Context) error {
+	logger.Default.Info("infra collector started", "collector", c.Name())
 	go c.watchLoop(ctx, "api/v1/resourcequotas", "ResourceQuota")
 	go c.watchLoop(ctx, "api/v1/limitranges", "LimitRange")
 	go c.watchLoop(ctx, "api/v1/namespaces", "Namespace")

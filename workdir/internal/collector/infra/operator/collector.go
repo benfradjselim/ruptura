@@ -17,6 +17,7 @@ import (
 
 	"github.com/benfradjselim/ruptura/internal/collector/infra"
 	"github.com/benfradjselim/ruptura/internal/discovery"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 const olmProbePath = "apis/operators.coreos.com/v1alpha1/subscriptions"
@@ -64,17 +65,23 @@ func (c *Collector) Probe(ctx context.Context) error {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("operator: probe: %w", err)
+		probeErr := fmt.Errorf("operator: probe: %w", err)
+		logger.Default.Info("infra collector skipped", "collector", c.Name(), "reason", probeErr.Error())
+		return probeErr
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("operator: OLM (operators.coreos.com/v1alpha1) not available: status %d", resp.StatusCode)
+		probeErr := fmt.Errorf("operator: OLM (operators.coreos.com/v1alpha1) not available: status %d", resp.StatusCode)
+		logger.Default.Info("infra collector skipped", "collector", c.Name(), "reason", probeErr.Error())
+		return probeErr
 	}
+	logger.Default.Info("infra collector probed", "collector", c.Name())
 	return nil
 }
 
 // Start watches OLM resources and CRDs until ctx is cancelled.
 func (c *Collector) Start(ctx context.Context) error {
+	logger.Default.Info("infra collector started", "collector", c.Name())
 	go c.watchLoop(ctx, "apis/operators.coreos.com/v1alpha1/subscriptions", "Subscription")
 	go c.watchLoop(ctx, "apis/operators.coreos.com/v1alpha1/clusterserviceversions", "ClusterServiceVersion")
 	go c.watchLoop(ctx, "apis/operators.coreos.com/v1alpha1/installplans", "InstallPlan")

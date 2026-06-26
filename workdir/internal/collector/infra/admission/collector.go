@@ -21,6 +21,7 @@ import (
 
 	"github.com/benfradjselim/ruptura/internal/collector/infra"
 	"github.com/benfradjselim/ruptura/internal/discovery"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 // kyvernoPaths lists the two Kyverno policy-report API group paths in preference order.
@@ -71,15 +72,19 @@ func (c *Collector) Probe(ctx context.Context) error {
 	for _, path := range kyvernoPaths {
 		if err := c.probeAPI(ctx, path); err == nil {
 			c.policyReportPath = path
+			logger.Default.Info("infra collector probed", "collector", c.Name())
 			return nil
 		}
 	}
-	return fmt.Errorf("admission: kyverno policy-reports API not available (tried wgpolicyk8s.io/v1alpha2, kyverno.io/v1)")
+	probeErr := fmt.Errorf("admission: kyverno policy-reports API not available (tried wgpolicyk8s.io/v1alpha2, kyverno.io/v1)")
+	logger.Default.Info("infra collector skipped", "collector", c.Name(), "reason", probeErr.Error())
+	return probeErr
 }
 
 // Start watches PolicyReports and ValidatingWebhookConfigurations until ctx is
 // cancelled. The policyReportPath is guaranteed to be set when Start is called.
 func (c *Collector) Start(ctx context.Context) error {
+	logger.Default.Info("infra collector started", "collector", c.Name())
 	go c.watchLoop(ctx, c.policyReportPath, "PolicyReport")
 	go c.watchLoop(ctx, webhookPath, "ValidatingWebhookConfiguration")
 	<-ctx.Done()

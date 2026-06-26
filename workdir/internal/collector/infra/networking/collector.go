@@ -14,6 +14,7 @@ import (
 
 	"github.com/benfradjselim/ruptura/internal/collector/infra"
 	"github.com/benfradjselim/ruptura/internal/discovery"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 // Core network resources — always available in any k8s cluster.
@@ -75,12 +76,17 @@ func (c *Collector) Probe(ctx context.Context) error {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("networking: probe: %w", err)
+		probeErr := fmt.Errorf("networking: probe: %w", err)
+		logger.Default.Info("infra collector skipped", "collector", c.Name(), "reason", probeErr.Error())
+		return probeErr
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("networking: probe: status %d", resp.StatusCode)
+		probeErr := fmt.Errorf("networking: probe: status %d", resp.StatusCode)
+		logger.Default.Info("infra collector skipped", "collector", c.Name(), "reason", probeErr.Error())
+		return probeErr
 	}
+	logger.Default.Info("infra collector probed", "collector", c.Name())
 	return nil
 }
 
@@ -88,6 +94,7 @@ func (c *Collector) Probe(ctx context.Context) error {
 // is cancelled. Optional resource types (Routes, Ingresses) are probed first
 // and silently skipped when their API group is absent.
 func (c *Collector) Start(ctx context.Context) error {
+	logger.Default.Info("infra collector started", "collector", c.Name())
 	for _, res := range coreResources {
 		go c.watchLoop(ctx, res.path, res.kind)
 	}

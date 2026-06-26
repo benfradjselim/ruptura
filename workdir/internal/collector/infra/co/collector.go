@@ -14,6 +14,7 @@ import (
 
 	"github.com/benfradjselim/ruptura/internal/collector/infra"
 	"github.com/benfradjselim/ruptura/internal/discovery"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 const listPath = "apis/config.openshift.io/v1/clusteroperators"
@@ -66,17 +67,23 @@ func (c *Collector) Probe(ctx context.Context) error {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("co: probe: %w", err)
+		probeErr := fmt.Errorf("co: probe: %w", err)
+		logger.Default.Info("infra collector skipped", "collector", c.Name(), "reason", probeErr.Error())
+		return probeErr
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("co: probe: status %d (not OpenShift?)", resp.StatusCode)
+		probeErr := fmt.Errorf("co: probe: status %d (not OpenShift?)", resp.StatusCode)
+		logger.Default.Info("infra collector skipped", "collector", c.Name(), "reason", probeErr.Error())
+		return probeErr
 	}
+	logger.Default.Info("infra collector probed", "collector", c.Name())
 	return nil
 }
 
 // Start runs the perpetual LIST+WATCH loop. Blocks until ctx is cancelled.
 func (c *Collector) Start(ctx context.Context) error {
+	logger.Default.Info("infra collector started", "collector", c.Name())
 	backoff := time.Second
 	const maxBackoff = 30 * time.Second
 
