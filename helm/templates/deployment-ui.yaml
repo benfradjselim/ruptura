@@ -78,9 +78,16 @@ spec:
               mountPath: /var/cache/nginx
             - name: nginx-run
               mountPath: /var/run
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
       volumes:
         - name: nginx-cache
           emptyDir: {}
         - name: nginx-run
           emptyDir: {}
+        - name: nginx-conf
+          configMap:
+            name: {{ include "ruptura.fullname" . }}-ui-nginx
 {{- end }}
