@@ -23,8 +23,8 @@
       } else {
         data = await api.login(username, password)
       }
-      token.set(data.data.token)
-      user.set(data.data.user)
+      token.set(data.token)
+      user.set(data.user)
     } catch (e) {
       error = e.json?.error?.message || e.message || 'Authentication failed'
     } finally {
