@@ -180,4 +180,13 @@ export const api = {
     return req('GET', '/traces?' + params.toString())
   },
   traceGet: (traceID) => req('GET', `/traces/${encodeURIComponent(traceID)}`),
+
+  // ── Infra ──────────────────────────────────────────────────────────────────
+  infraGroups:    () => req('GET', '/infra/groups'),
+  infraNodes:     () => req('GET', '/infra/nodes'),
+  infraNetwork:   () => req('GET', '/infra/network'),
+  infraStorage:   () => req('GET', '/infra/storage'),
+  infraAdmission: () => req('GET', '/infra/admission'),
+  infraTenancy:   () => req('GET', '/infra/tenancy'),
+  propagation:    () => req('GET', '/propagation'),
 }

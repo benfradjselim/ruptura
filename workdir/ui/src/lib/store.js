@@ -53,6 +53,10 @@ export function kpiColor(name, value) {
   return '#ef4444'
 }
 
+// ── Infra stores ──────────────────────────────────────────────────────────
+export const infraGroups     = writable([])
+export const infraPropagation = writable({})
+
 export function kpiLabel(name, value) {
   const labels = {
     stress: ['calm', 'nervous', 'stressed', 'panic'],

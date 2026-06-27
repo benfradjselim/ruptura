@@ -6,6 +6,7 @@
   import Dashboards   from './pages/Dashboards.svelte'
   import Settings     from './pages/Settings.svelte'
   import Fleet        from './pages/Fleet.svelte'
+  import Infra        from './pages/Infra.svelte'
   import Notifications from './pages/Notifications.svelte'
   import Logs         from './pages/Logs.svelte'
   import Traces       from './pages/Traces.svelte'
@@ -26,6 +27,7 @@
     slos:            'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
     dashboard:       'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2zM9 22V12h6v10',
     fleet:           'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+    infra:           'M5 12H3m4-7l-2-2m10 2 2-2M5 19l-2 2m14-2 2 2M12 3v2m0 14v2M7 7l10 10M17 7 7 17',
     dashboards:      'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
     logs:            'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
     traces:          'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
@@ -42,6 +44,7 @@
       items: [
         { id: 'dashboard',  label: 'Overview'   },
         { id: 'fleet',      label: 'Fleet'      },
+        { id: 'infra',      label: 'Infra'      },
         { id: 'dashboards', label: 'Boards'     },
       ],
     },
@@ -179,6 +182,8 @@
         <Dashboard />
       {:else if $currentPage === 'fleet'}
         <Fleet />
+      {:else if $currentPage === 'infra'}
+        <Infra />
       {:else if $currentPage === 'alerts'}
         <Alerts />
       {:else if $currentPage === 'dashboards'}

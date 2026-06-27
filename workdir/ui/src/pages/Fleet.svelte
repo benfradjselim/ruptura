@@ -13,12 +13,27 @@
   let forecastData = {} // { workloadKey: {} }
   let loadingDetail = {}
 
+  // Infra context: keyed by namespace; matched on namespace only (v8.1 key normalization gap)
+  let infraByNs = {} // { [namespace]: [{ group, health, spread, objectCount }] }
+
   const SIGNAL_KEYS = ['stress', 'fatigue', 'mood', 'contagion', 'pressure', 'resilience']
 
   async function load() {
     try {
-      const res = await api.fleet()
-      fleet = res
+      const [fleetRes, infraRes] = await Promise.allSettled([
+        api.fleet(),
+        api.infraGroups(),
+      ])
+      if (fleetRes.status === 'fulfilled') fleet = fleetRes.value
+      if (infraRes.status === 'fulfilled') {
+        const ns = {}
+        for (const g of (infraRes.value.groups || [])) {
+          const key = g.namespace || ''
+          if (!ns[key]) ns[key] = []
+          ns[key].push(g)
+        }
+        infraByNs = ns
+      }
       error = null
     } catch (e) {
       error = e.message
@@ -95,6 +110,25 @@
     if (w.signals) return w.signals[key]
     if (w.kpis) return w.kpis[key]
     return w[key]
+  }
+
+  function infraGroups(w) {
+    const ns = w.workload?.namespace || w.namespace || ''
+    const nsGroups = infraByNs[ns] || []
+    const clusterGroups = infraByNs[''] || []
+    return [...nsGroups, ...clusterGroups]
+  }
+
+  function infraHealthColor(h) {
+    if (h >= 0.9) return 'var(--green)'
+    if (h >= 0.6) return 'var(--amber)'
+    return 'var(--red)'
+  }
+
+  const INFRA_GROUP_LABELS = {
+    node: 'Node', network: 'Net', storage: 'Store',
+    admission: 'Admission', tenancy: 'Tenancy',
+    operators: 'Ops', co: 'CO', mcp: 'MCP',
   }
 
   onMount(() => {
@@ -206,6 +240,25 @@
               {/if}
             {/each}
           </div>
+
+          <!-- Infra context bar — matched on namespace only (v8.1) -->
+          {#if expanded}
+            {@const ig = infraGroups(w)}
+            {#if ig.length > 0}
+              <div class="infra-bar">
+                <span class="infra-bar-label">Infra</span>
+                {#each ig as g}
+                  <div class="infra-chip"
+                    style="border-color:{infraHealthColor(g.health)}"
+                    title="{INFRA_GROUP_LABELS[g.group] || g.group}: {Math.round(g.health * 100)}% healthy, {g.objectCount} objects">
+                    <span class="infra-dot" style="background:{infraHealthColor(g.health)}"></span>
+                    <span class="infra-chip-name">{INFRA_GROUP_LABELS[g.group] || g.group}</span>
+                    <span class="infra-chip-val" style="color:{infraHealthColor(g.health)}">{Math.round(g.health * 100)}%</span>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          {/if}
 
           <!-- Expanded detail tabs -->
           {#if expanded}
@@ -421,4 +474,24 @@
 .forecast-row { grid-template-columns: 50px 1fr 50px; }
 .forecast-offset { color: var(--text-secondary, var(--text-2)); }
 .forecast-val { font-weight: 600; text-align: right; }
+
+/* Infra context bar */
+.infra-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-3, #1C2540);
+}
+.infra-bar-label {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--text-3); margin-right: 4px;
+}
+.infra-chip {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 7px; border-radius: 3px; border: 1px solid;
+  background: var(--surface-2);
+}
+.infra-dot     { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.infra-chip-name { font-size: 9px; color: var(--text-2); }
+.infra-chip-val  { font-family: var(--font-mono); font-size: 9px; font-variant-numeric: tabular-nums; }
 </style>
