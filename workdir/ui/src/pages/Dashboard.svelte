@@ -1,347 +1,532 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
-  import { token, kpis, alerts, wsConnected } from '../lib/store.js'
-  import KpiGauge from '../lib/KpiGauge.svelte'
-  import Sparkline from '../lib/Sparkline.svelte'
 
-  let host = ''
-  let wsClient = null
-  let liveKpis = {}
-  let metricHistory = {}
-  let recentAlerts = []
-  let predictions = []
-  let pollTimer = null
-  let dataflow = { metrics: 0, logs: 0, traces: 0 }
+  let health = null
+  let dataflow = null
+  let fleet = null
+  let infraGroups = []
+  let alerts = []
+  let loading = true
+  let error = null
+  let interval
 
-  const KPI_NAMES = ['stress','fatigue','mood','pressure','humidity','contagion']
-  const ETF_KPI_NAMES = ['resilience','entropy','velocity','health_score']
-  const PCT_METRICS = new Set(['cpu_percent','memory_percent','disk_percent'])
-  const KPI_METRICS = new Set(['stress','fatigue','mood','pressure','humidity','contagion','resilience','entropy','velocity'])
-  const PRED_SHOW = new Set([...PCT_METRICS, ...KPI_METRICS, 'load_avg_1'])
-
-  const KPI_LABELS = {
-    stress:'CPU Pressure', fatigue:'Memory Pressure', mood:'Trend',
-    pressure:'Load Index', humidity:'Saturation', contagion:'Blast Radius',
-    resilience:'Resilience', entropy:'Entropy', velocity:'Velocity', health_score:'Reliability'
-  }
-
-  function fmtPred(p) {
-    const isKpi = KPI_METRICS.has(p.target)
-    const isPct = PCT_METRICS.has(p.target)
-    const scale = isKpi ? 100 : 1
-    const unit = (isKpi || isPct) ? '%' : ''
-    return {
-      cur: (Math.max(0, p.current * scale)).toFixed(1) + unit,
-      pred: (Math.max(0, p.predicted * scale)).toFixed(1) + unit
-    }
-  }
-
-  function kpiVal(name) {
-    const v = liveKpis[name]?.value ?? 0
-    return name === 'health_score' ? v : v * 100
-  }
-
-  function kpiColor(name, val) {
-    const v = val / 100
-    if (name === 'mood' || name === 'resilience') {
-      return v >= 0.7 ? 'var(--green)' : v >= 0.4 ? 'var(--amber)' : 'var(--red)'
-    }
-    return v <= 0.3 ? 'var(--green)' : v <= 0.6 ? 'var(--amber)' : 'var(--red)'
-  }
-
-  async function detectHost() {
-    try { const r = await api.health(); host = r.data?.host || '' } catch {}
-  }
-  async function loadKPIs() {
-    try { const r = await api.kpis(host); liveKpis = r.data || {} } catch {}
-  }
-  async function loadPredictions() {
+  async function load() {
     try {
-      const r = await api.predict(host, '', 120)
-      const all = r.data?.predictions || []
-      predictions = (Array.isArray(all) ? all : Object.values(all)).filter(p => PRED_SHOW.has(p.target))
-    } catch {}
-  }
-  async function loadAlerts() {
-    try { const r = await api.alerts(); recentAlerts = (r.data || []).slice(0, 8) } catch {}
-  }
-
-  function connectWS() {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    wsClient = new WebSocket(`${proto}://${location.host}/api/v1/ws?token=${encodeURIComponent($token || '')}`)
-    wsClient.onopen  = () => wsConnected.set(true)
-    wsClient.onclose = () => { wsConnected.set(false); setTimeout(connectWS, 3000) }
-    wsClient.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data)
-        if (msg.type === 'kpi' && msg.payload)    liveKpis = { ...liveKpis, ...msg.payload }
-        if (msg.type === 'alert' && msg.payload)   recentAlerts = [msg.payload, ...recentAlerts].slice(0, 8)
-        if (msg.type === 'metric' && msg.payload) {
-          const { name, value } = msg.payload
-          metricHistory = { ...metricHistory, [name]: [...(metricHistory[name] || []), value].slice(-20) }
-        }
-      } catch {}
+      const [hRes, dfRes, flRes, igRes, alRes] = await Promise.allSettled([
+        api.health(),
+        api.dataflow(),
+        api.fleet(),
+        api.infraGroups(),
+        api.alerts(),
+      ])
+      if (hRes.status === 'fulfilled')  health      = hRes.value
+      if (dfRes.status === 'fulfilled') dataflow    = dfRes.value
+      if (flRes.status === 'fulfilled') fleet       = flRes.value
+      if (igRes.status === 'fulfilled') infraGroups = igRes.value.groups || []
+      if (alRes.status === 'fulfilled') alerts      = Array.isArray(alRes.value) ? alRes.value : []
+      error = null
+    } catch (e) {
+      error = e.message
+    } finally {
+      loading = false
     }
   }
 
-  onMount(async () => {
-    await detectHost()
-    loadKPIs(); loadAlerts(); loadPredictions()
-    connectWS()
-    api.dataflow().then(r => { if (r.data) dataflow = r.data }).catch(() => {})
-    pollTimer = setInterval(() => {
-      loadKPIs(); loadAlerts(); loadPredictions()
-      api.dataflow().then(r => { if (r.data) dataflow = r.data }).catch(() => {})
-    }, 15000)
+  onMount(() => {
+    load()
+    interval = setInterval(load, 30_000)
   })
 
-  onDestroy(() => { if (wsClient) wsClient.close(); clearInterval(pollTimer) })
+  onDestroy(() => clearInterval(interval))
 
-  async function ackAlert(id) {
-    await api.alertAck(id).catch(() => {})
-    loadAlerts()
+  function fmtUptime(s) {
+    if (s == null) return '—'
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    if (h > 0) return `${h}h ${m}m`
+    return `${m}m`
   }
 
-  $: healthVal = kpiVal('health_score')
-  $: healthColor = healthVal >= 70 ? 'var(--green)' : healthVal >= 40 ? 'var(--amber)' : 'var(--red)'
+  function fmtNum(n) {
+    if (n == null) return '—'
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+    if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K'
+    return String(n)
+  }
+
+  function healthStatusClass(s) {
+    if (s === 'ready' || s === 'online') return 'ok'
+    if (s === 'starting')                return 'warn'
+    return 'err'
+  }
+
+  function hostStateClass(s) {
+    if (s === 'healthy')   return 'ok'
+    if (s === 'degraded')  return 'warn'
+    if (s === 'critical')  return 'err'
+    return 'dim'
+  }
+
+  function sevClass(sev) {
+    if (!sev) return ''
+    const s = sev.toLowerCase()
+    if (s === 'critical' || s === 'emergency') return 'err'
+    if (s === 'warning' || s === 'warn')       return 'warn'
+    return 'ok'
+  }
+
+  $: activeAlerts     = alerts.filter(a => !a.acknowledged)
+  $: namespaceCount   = new Set(infraGroups.map(g => g.namespace).filter(Boolean)).size
+  $: agitatedGroups   = infraGroups.filter(g => g.agitated).length
+  $: notableHosts     = (fleet?.hosts || []).filter(h => h.state === 'critical' || h.state === 'degraded').slice(0, 6)
 </script>
 
-<!-- Müller-Brockmann: main content area is the grid zone -->
-<div class="dash-spread">
+<div class="page-wrap">
 
-  <!-- Grid overlay (same container — §2.2 compliance) -->
-  <div class="guides" aria-hidden="true">
-    <div class="cols"></div>
-    <div class="rows"></div>
-    <div class="mline l"></div>
-    <div class="mline r"></div>
-  </div>
-
-  <!-- Hero band: large FRI numeral (Swiss big numeral move) + health score -->
-  <div class="band hero-band">
-    <div class="hero-num-col" style="grid-column: 1 / 5">
-      <div class="kicker">Health Score</div>
-      <div class="hero-numeral" style="color:{healthColor}">{healthVal.toFixed(0)}</div>
-      <div class="hero-unit">/ 100</div>
-      <div class="live-dot" class:live={$wsConnected} title={$wsConnected ? 'Live' : 'Polling'}></div>
+  <!-- ── Header ─────────────────────────────────────────────────────────────── -->
+  <div class="band page-header">
+    <div style="grid-column:1/9">
+      <p class="kicker">Ruptura</p>
+      <h1 class="page-title">Overview</h1>
     </div>
-
-    <!-- Dataflow counters -->
-    <div class="flow-col" style="grid-column: 5 / 9">
-      <div class="kicker">Data ingest</div>
-      <div class="flow-row">
-        <div class="flow-item">
-          <span class="flow-val num">{dataflow.metrics.toLocaleString()}</span>
-          <span class="flow-lbl">Metrics</span>
-        </div>
-        <div class="flow-sep"></div>
-        <div class="flow-item">
-          <span class="flow-val num">{dataflow.logs.toLocaleString()}</span>
-          <span class="flow-lbl">Logs</span>
-        </div>
-        <div class="flow-sep"></div>
-        <div class="flow-item">
-          <span class="flow-val num">{dataflow.traces.toLocaleString()}</span>
-          <span class="flow-lbl">Traces</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Active alerts count -->
-    <div class="alert-count-col" style="grid-column: 9 / 13">
-      <div class="kicker">Active alerts</div>
-      <div class="hero-numeral-sm num" style="color:{recentAlerts.filter(a=>!a.acknowledged).length > 0 ? 'var(--red)' : 'var(--green)'}">
-        {recentAlerts.filter(a=>!a.acknowledged).length}
-      </div>
-    </div>
-  </div>
-
-  <!-- Divider -->
-  <div class="band rule-band">
-    <div class="rule" style="grid-column: 1 / -1"></div>
-  </div>
-
-  <!-- KPI signals band -->
-  <div class="band signals-band">
-    <div class="section-head" style="grid-column: 1 / -1">
-      <span class="kicker">KPI Signals</span>
-    </div>
-    {#each KPI_NAMES as name}
-      {@const val = kpiVal(name)}
-      {@const color = kpiColor(name, val)}
-      <div class="signal-card" style="grid-column: span 2">
-        <div class="signal-label">{KPI_LABELS[name] || name}</div>
-        <div class="signal-val num" style="color:{color}">{val.toFixed(0)}<span class="unit">%</span></div>
-        <div class="signal-bar-track">
-          <div class="signal-bar-fill" style="width:{Math.min(val,100)}%; background:{color}"></div>
-        </div>
-      </div>
-    {/each}
-  </div>
-
-  <!-- ETF composed KPIs band -->
-  <div class="band etf-band">
-    <div class="section-head" style="grid-column: 1 / -1">
-      <span class="kicker">Composed KPIs</span>
-      <span class="kicker-badge">ensemble</span>
-    </div>
-    {#each ETF_KPI_NAMES as name}
-      {@const val = kpiVal(name)}
-      {@const color = kpiColor(name, val)}
-      <div class="signal-card etf" style="grid-column: span 3">
-        <div class="signal-label">{KPI_LABELS[name] || name}</div>
-        <div class="signal-val lg num" style="color:{color}">{val.toFixed(0)}</div>
-        <div class="signal-bar-track">
-          <div class="signal-bar-fill" style="width:{Math.min(val,100)}%; background:{color}"></div>
-        </div>
-      </div>
-    {/each}
-  </div>
-
-  <div class="band rule-band">
-    <div class="rule" style="grid-column: 1 / -1"></div>
-  </div>
-
-  <!-- Predictions + Alerts band -->
-  <div class="band bottom-band">
-    <!-- Predictions table -->
-    {#if predictions.length > 0}
-      <div style="grid-column: 1 / 7">
-        <div class="section-head"><span class="kicker">Predictions</span><span class="kicker-badge violet">2h horizon</span></div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Signal</th>
-              <th class="num-col">Now</th>
-              <th class="num-col">→ 2h</th>
-              <th>Trend</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each predictions as p}
-              {@const f = fmtPred(p)}
-              <tr>
-                <td>{p.target}</td>
-                <td class="num-col num">{f.cur}</td>
-                <td class="num-col num">{f.pred}</td>
-                <td class="trend trend-{p.trend}">{p.trend}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-    {/if}
-
-    <!-- Alerts table -->
-    <div style="grid-column: {predictions.length > 0 ? '7 / 13' : '1 / -1'}">
-      <div class="section-head">
-        <span class="kicker">Recent alerts</span>
-        <span class="kicker-badge {recentAlerts.filter(a=>!a.acknowledged).length > 0 ? 'red' : ''}">{recentAlerts.length}</span>
-      </div>
-      {#if recentAlerts.length === 0}
-        <div class="empty-state">
-          <span class="empty-icon">✓</span>
-          <span>No active alerts</span>
-        </div>
-      {:else}
-        <table class="data-table">
-          <thead>
-            <tr><th>Workload</th><th>Rule</th><th>Severity</th><th></th></tr>
-          </thead>
-          <tbody>
-            {#each recentAlerts as a}
-              <tr class:crit={a.severity === 'critical'} class:warn={a.severity === 'warning'}>
-                <td>{a.host}</td>
-                <td class="rule-cell">{a.rule_id}</td>
-                <td>
-                  <span class="sev-badge sev-{a.severity || 'info'}">{a.severity || 'info'}</span>
-                </td>
-                <td>
-                  {#if !a.acknowledged}
-                    <button class="ack-btn" on:click={() => ackAlert(a.id)}>Ack</button>
-                  {:else}
-                    <span class="acked">✓</span>
-                  {/if}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
+    <div style="grid-column:9/13; display:flex; align-items:center; justify-content:flex-end; gap:8px">
+      {#if health}
+        <span class="badge {healthStatusClass(health.status)}">{health.status}</span>
+        <span class="badge dim">{health.edition || 'community'} · v{health.version || '—'}</span>
       {/if}
     </div>
   </div>
 
-  <!-- Sparklines band -->
-  {#if Object.keys(metricHistory).length > 0}
-    <div class="band spark-band">
-      <div class="section-head" style="grid-column: 1 / -1"><span class="kicker">Live metrics</span></div>
-      {#each Object.entries(metricHistory) as [name, vals]}
-        <div class="spark-card" style="grid-column: span 3">
-          <span class="spark-name">{name}</span>
-          <Sparkline data={vals} />
-          <span class="spark-val num">{vals[vals.length-1]?.toFixed(1)}%</span>
+  {#if loading && !health}
+    <div class="band"><p class="muted">Loading…</p></div>
+  {:else if error}
+    <div class="band"><p class="error-msg">{error}</p></div>
+  {:else}
+
+  <!-- ── Section 1: Engine health ──────────────────────────────────────────── -->
+  <div class="band section-band">
+    <div class="section-label" style="grid-column:1/13">
+      <span class="kicker">Engine</span>
+    </div>
+
+    <!-- Status -->
+    <div class="stat-card" style="grid-column:1/4">
+      <p class="stat-label">Status</p>
+      <p class="stat-value">
+        <span class="dot {healthStatusClass(health?.status)}"></span>
+        {health?.status || '—'}
+      </p>
+      <p class="stat-sub">{health?.message || ''}</p>
+    </div>
+
+    <!-- Uptime -->
+    <div class="stat-card" style="grid-column:4/7">
+      <p class="stat-label">Uptime</p>
+      <p class="stat-value mono">{fmtUptime(health?.uptime_seconds)}</p>
+      <p class="stat-sub">since last restart</p>
+    </div>
+
+    <!-- Rupture detection -->
+    <div class="stat-card" style="grid-column:7/10">
+      <p class="stat-label">Rupture detection</p>
+      <p class="stat-value">
+        <span class="dot {health?.rupture_detection === 'active' ? 'ok' : 'warn'}"></span>
+        {health?.rupture_detection || '—'}
+      </p>
+      <p class="stat-sub">5-model ensemble</p>
+    </div>
+
+    <!-- Tracker count -->
+    <div class="stat-card" style="grid-column:10/13">
+      <p class="stat-label">Signal trackers</p>
+      <p class="stat-value mono">{Object.keys(health?.trackers || {}).length}</p>
+      <p class="stat-sub">active trackers</p>
+    </div>
+  </div>
+
+  <!-- ── Section 2: Data ingest ─────────────────────────────────────────────── -->
+  <div class="band section-band">
+    <div class="section-label" style="grid-column:1/13">
+      <span class="kicker">Data ingest</span>
+    </div>
+
+    <div class="stat-card" style="grid-column:1/5">
+      <p class="stat-label">Metrics ingested</p>
+      <p class="stat-value mono accent">{fmtNum(dataflow?.metrics)}</p>
+      <p class="stat-sub">OTLP datapoints</p>
+    </div>
+
+    <div class="stat-card" style="grid-column:5/9">
+      <p class="stat-label">Logs ingested</p>
+      <p class="stat-value mono">{fmtNum(dataflow?.logs)}</p>
+      <p class="stat-sub">log entries</p>
+    </div>
+
+    <div class="stat-card" style="grid-column:9/13">
+      <p class="stat-label">Traces ingested</p>
+      <p class="stat-value mono">{fmtNum(dataflow?.traces)}</p>
+      <p class="stat-sub">spans</p>
+    </div>
+  </div>
+
+  <!-- ── Section 3: Infra summary ──────────────────────────────────────────── -->
+  <div class="band section-band">
+    <div class="section-label" style="grid-column:1/13">
+      <span class="kicker">Infrastructure</span>
+    </div>
+
+    <div class="stat-card" style="grid-column:1/4">
+      <p class="stat-label">Namespaces</p>
+      <p class="stat-value mono">{namespaceCount}</p>
+      <p class="stat-sub">observed</p>
+    </div>
+
+    <div class="stat-card" style="grid-column:4/7">
+      <p class="stat-label">Infra groups</p>
+      <p class="stat-value mono">{infraGroups.length}</p>
+      <p class="stat-sub">object groups</p>
+    </div>
+
+    <div class="stat-card" style="grid-column:7/10">
+      <p class="stat-label">Agitated groups</p>
+      <p class="stat-value mono {agitatedGroups > 0 ? 'text-warn' : ''}">{agitatedGroups}</p>
+      <p class="stat-sub">above GNI threshold</p>
+    </div>
+
+    {#if infraGroups.length > 0}
+    <div class="group-list" style="grid-column:1/13; margin-top:4px">
+      {#each infraGroups.slice(0, 8) as g}
+        <div class="group-row">
+          <span class="group-name">{g.namespace}/{g.group}</span>
+          <div class="health-bar-bg">
+            <div class="health-bar-fill" style="width:{(g.health * 100).toFixed(0)}%; background:{g.health > 0.7 ? 'var(--green,#22C55E)' : g.health > 0.4 ? 'var(--amber,#F59E0B)' : 'var(--red,#EF4444)'}"></div>
+          </div>
+          <span class="group-pct mono">{(g.health * 100).toFixed(0)}%</span>
+          {#if g.agitated}<span class="badge warn" style="font-size:9px;padding:1px 5px">agitated</span>{/if}
         </div>
       {/each}
     </div>
+    {/if}
+  </div>
+
+  <!-- ── Section 4: Fleet summary ──────────────────────────────────────────── -->
+  <div class="band section-band">
+    <div class="section-label" style="grid-column:1/13">
+      <span class="kicker">Fleet</span>
+    </div>
+
+    <div class="stat-card" style="grid-column:1/4">
+      <p class="stat-label">Total workloads</p>
+      <p class="stat-value mono">{fleet?.total_hosts ?? '—'}</p>
+      <p class="stat-sub">monitored</p>
+    </div>
+
+    <div class="stat-card" style="grid-column:4/6">
+      <p class="stat-label">Healthy</p>
+      <p class="stat-value mono text-ok">{fleet?.healthy_hosts ?? '—'}</p>
+      <p class="stat-sub">≥ 70 HS</p>
+    </div>
+
+    <div class="stat-card" style="grid-column:6/8">
+      <p class="stat-label">Degraded</p>
+      <p class="stat-value mono text-warn">{fleet?.degraded_hosts ?? '—'}</p>
+      <p class="stat-sub">40–70 HS</p>
+    </div>
+
+    <div class="stat-card" style="grid-column:8/10">
+      <p class="stat-label">Critical</p>
+      <p class="stat-value mono text-err">{fleet?.critical_hosts ?? '—'}</p>
+      <p class="stat-sub">&lt; 40 HS</p>
+    </div>
+
+    {#if notableHosts.length > 0}
+    <div class="host-list" style="grid-column:1/13; margin-top:4px">
+      <p class="list-hdr">Critical &amp; degraded workloads</p>
+      {#each notableHosts as h}
+        <div class="host-row">
+          <span class="dot {hostStateClass(h.state)}"></span>
+          <span class="host-name">{h.host}</span>
+          <span class="host-hs mono">{h.health_score.toFixed(0)}</span>
+          <span class="host-fri mono text-2">{h.fused_rupture_index?.toFixed(2) ?? '—'}</span>
+          {#if h.calibration_progress < 100}
+            <span class="badge dim" style="font-size:9px;padding:1px 5px">cal {h.calibration_progress}%</span>
+          {/if}
+        </div>
+      {/each}
+    </div>
+    {:else if fleet && fleet.total_hosts > 0}
+    <div style="grid-column:1/13; margin-top:4px">
+      <p class="muted">All workloads healthy.</p>
+    </div>
+    {:else if fleet && fleet.total_hosts === 0}
+    <div style="grid-column:1/13; margin-top:4px">
+      <p class="muted">No workloads detected yet. Waiting for telemetry.</p>
+    </div>
+    {/if}
+  </div>
+
+  <!-- ── Section 5: Active alerts ──────────────────────────────────────────── -->
+  <div class="band section-band">
+    <div class="section-label" style="grid-column:1/13">
+      <span class="kicker">Active alerts</span>
+      <span class="badge {activeAlerts.length > 0 ? 'err' : 'dim'}" style="margin-left:8px">{activeAlerts.length}</span>
+    </div>
+
+    {#if activeAlerts.length === 0}
+      <div style="grid-column:1/13">
+        <p class="muted">No active alerts.</p>
+      </div>
+    {:else}
+      <div class="alert-list" style="grid-column:1/13">
+        {#each activeAlerts.slice(0, 10) as a}
+          <div class="alert-row">
+            <span class="badge {sevClass(a.severity)}">{a.severity || 'info'}</span>
+            <span class="alert-host mono">{a.host}</span>
+            <span class="alert-metric text-2">{a.metric}</span>
+            <span class="alert-score mono text-2">{a.score?.toFixed(2) ?? '—'}</span>
+          </div>
+        {/each}
+        {#if activeAlerts.length > 10}
+          <p class="muted" style="margin-top:8px">+{activeAlerts.length - 10} more — see Alerts page</p>
+        {/if}
+      </div>
+    {/if}
+  </div>
+
   {/if}
 </div>
 
 <style>
-  /* ── Grid scaffold — ONE source of truth ── */
-  .dash-spread {
-    position: relative;
-    padding: 32px 24px;
+  .page-wrap {
+    padding-bottom: 48px;
+  }
+
+  /* ── Band / 12-col grid ── */
+  .band {
     display: grid;
     grid-template-columns: repeat(12, 1fr);
-    column-gap: 20px;
-    row-gap: 0;
-    overflow-y: auto;
+    gap: 0 16px;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border, rgba(148,163,184,0.10));
+  }
+  .page-header { padding: 24px 32px 20px; }
+
+  .section-band { padding-top: 20px; }
+
+  .section-label {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  /* ── Stat cards ── */
+  .stat-card {
+    background: var(--surface, #1E293B);
+    border: 1px solid var(--border, rgba(148,163,184,0.10));
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 0;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--text-3, #3F4D5C);
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text, #E2E8F0);
+    line-height: 1;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-sub {
+    font-size: 11px;
+    color: var(--text-3, #3F4D5C);
+  }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .badge.ok   { background: rgba(34,197,94,0.15);  color: var(--green,  #22C55E); }
+  .badge.warn { background: rgba(245,158,11,0.15); color: var(--amber,  #F59E0B); }
+  .badge.err  { background: rgba(239,68,68,0.15);  color: var(--red,    #EF4444); }
+  .badge.dim  { background: rgba(148,163,184,0.10); color: var(--text-2, #94A3B8); }
+
+  /* ── Status dots ── */
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+  .dot.ok   { background: var(--green, #22C55E); }
+  .dot.warn { background: var(--amber, #F59E0B); }
+  .dot.err  { background: var(--red,   #EF4444); }
+  .dot.dim  { background: var(--text-3, #3F4D5C); }
+
+  /* ── Typography utilities ── */
+  .mono { font-family: "DM Mono", "Fira Code", monospace; font-variant-numeric: tabular-nums; }
+  .muted { font-size: 13px; color: var(--text-3, #3F4D5C); }
+  .text-ok   { color: var(--green, #22C55E); }
+  .text-warn { color: var(--amber, #F59E0B); }
+  .text-err  { color: var(--red,   #EF4444); }
+  .text-2    { color: var(--text-2, #94A3B8); }
+  .accent    { color: var(--accent, #38BDF8); }
+
+  .error-msg {
+    font-size: 13px;
+    color: var(--red, #EF4444);
+  }
+
+  /* ── Infra group rows ── */
+  .group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .group-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--surface, #1E293B);
+    border: 1px solid var(--border, rgba(148,163,184,0.10));
+    border-radius: 4px;
+  }
+  .group-name {
+    flex: 1;
+    font-size: 12px;
+    font-family: "DM Mono", "Fira Code", monospace;
+    color: var(--text, #E2E8F0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .health-bar-bg {
+    width: 120px;
+    height: 4px;
+    background: rgba(148,163,184,0.12);
+    border-radius: 2px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .health-bar-fill {
     height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  .group-pct {
+    font-size: 12px;
+    color: var(--text-2, #94A3B8);
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
   }
 
-  /* ── Grid overlay (SAME container as content — §2.2) ── */
-  .guides {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 60;
-    opacity: 0;
-    transition: opacity 0.26s;
+  /* ── Host list ── */
+  .list-hdr {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3, #3F4D5C);
+    margin-bottom: 8px;
   }
-  :global(body.grid-on) .guides { opacity: 1; }
-  .guides .cols {
-    position: absolute; top: 0; bottom: 0; left: 24px; right: 24px;
-    display: grid; grid-template-columns: repeat(12, 1fr); column-gap: 20px;
+  .host-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
-  .guides .rows {
-    position: absolute; left: 24px; right: 24px; top: 0; bottom: 0;
-    background-image:
-      repeating-linear-gradient(to bottom, rgba(34,211,238,0.08) 0 1px, transparent 1px 24px),
-      repeating-linear-gradient(to bottom, rgba(34,211,238,0.04) 0 1px, transparent 1px 8px);
+  .host-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--surface, #1E293B);
+    border: 1px solid var(--border, rgba(148,163,184,0.10));
+    border-radius: 4px;
   }
-  .guides .mline { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(34,211,238,0.25); }
-  .guides .mline.l { left: 24px; } .guides .mline.r { right: 24px; }
+  .host-name {
+    flex: 1;
+    font-size: 12px;
+    font-family: "DM Mono", "Fira Code", monospace;
+    color: var(--text, #E2E8F0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .host-hs {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text, #E2E8F0);
+    width: 32px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .host-fri {
+    font-size: 11px;
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+  }
 
-  /* ── Bands — children placed by column line ── */
-  .band {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: subgrid;
-    column-gap: 20px;
-    align-items: start;
-    padding-top: 24px;
-    padding-bottom: 8px;
+  /* ── Alert list ── */
+  .alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
-  @supports not (grid-template-columns: subgrid) {
-    .band { grid-template-columns: repeat(12, 1fr); }
+  .alert-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--surface, #1E293B);
+    border: 1px solid var(--border, rgba(148,163,184,0.10));
+    border-radius: 4px;
   }
-
-  .rule-band { padding: 0; }
-  .rule { height: 1px; background: var(--border, rgba(148,163,184,0.10)); margin: 8px 0; }
-
-  /* ── Hero band — Swiss big numerals ── */
-  .hero-band { align-items: end; padding-bottom: 24px; }
+  .alert-host {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text, #E2E8F0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .alert-metric {
+    font-size: 11px;
+    color: var(--text-2, #94A3B8);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .alert-score {
+    font-size: 11px;
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+  }
 
   .kicker {
     font-size: 10px;
@@ -349,189 +534,13 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--text-3, #3F4D5C);
-    margin-bottom: 8px;
-    display: block;
+    margin-bottom: 4px;
   }
 
-  /* THE signature move: large mono numeral flush-left */
-  .hero-numeral {
-    font-family: "DM Mono", "Fira Code", monospace;
-    font-size: clamp(56px, 6vw, 80px);
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    margin-left: -3px; /* optical ink alignment */
-  }
-  .hero-unit {
-    font-family: "DM Mono", monospace;
-    font-size: 16px;
-    color: var(--text-3, #3F4D5C);
-    margin-top: 4px;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .hero-numeral-sm {
-    font-family: "DM Mono", "Fira Code", monospace;
-    font-size: 48px;
-    font-weight: 500;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    margin-top: 8px;
-    margin-left: -2px;
-  }
-
-  .live-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--text-3, #3F4D5C);
-    margin-top: 12px;
-    display: inline-block;
-  }
-  .live-dot.live { background: var(--green, #22C55E); box-shadow: 0 0 6px var(--green, #22C55E); }
-
-  .flow-col { display: flex; flex-direction: column; }
-  .flow-row { display: flex; align-items: center; gap: 24px; margin-top: 8px; }
-  .flow-item { display: flex; flex-direction: column; gap: 4px; }
-  .flow-val {
-    font-family: "DM Mono", monospace;
-    font-size: 28px;
-    font-weight: 500;
-    line-height: 1;
+  .page-title {
+    font-size: 22px;
+    font-weight: 700;
     color: var(--text, #E2E8F0);
-    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
-  .flow-lbl {
-    font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--text-3, #3F4D5C);
-  }
-  .flow-sep { width: 1px; height: 32px; background: var(--border, rgba(148,163,184,0.10)); }
-
-  /* ── Signal cards ── */
-  .section-head {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-  .kicker-badge {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 2px 6px;
-    border-radius: 3px;
-    background: var(--surface-2, #1E2535);
-    color: var(--text-3, #3F4D5C);
-    border: 1px solid var(--border, rgba(148,163,184,0.10));
-  }
-  .kicker-badge.violet { background: var(--violet-dim, rgba(139,92,246,0.10)); color: var(--violet, #8B5CF6); }
-  .kicker-badge.red { background: var(--red-dim, rgba(239,68,68,0.10)); color: var(--red, #EF4444); }
-
-  .signal-card {
-    background: var(--surface, #1E293B);
-    border: 1px solid var(--border, rgba(148,163,184,0.10));
-    border-radius: 4px;
-    padding: 12px;
-    margin-bottom: 8px;
-  }
-  .signal-card.etf { border-color: var(--accent-dim, rgba(56,189,248,0.15)); }
-  .signal-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3, #3F4D5C); margin-bottom: 6px; }
-  .signal-val {
-    font-family: "DM Mono", monospace;
-    font-size: 24px;
-    font-weight: 500;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    margin-bottom: 8px;
-  }
-  .signal-val.lg { font-size: 32px; }
-  .unit { font-size: 14px; color: var(--text-3, #3F4D5C); margin-left: 1px; }
-  .signal-bar-track {
-    height: 3px;
-    background: var(--surface-3, #1C2540);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-  .signal-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
-
-  /* ── Data tables ── */
-  .data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    margin-top: 8px;
-  }
-  th {
-    text-align: left;
-    padding: 6px 8px;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-3, #3F4D5C);
-    border-bottom: 1px solid var(--border, rgba(148,163,184,0.10));
-  }
-  td {
-    padding: 7px 8px;
-    border-bottom: 1px solid var(--border, rgba(148,163,184,0.08));
-    color: var(--text-2, #94A3B8);
-    vertical-align: middle;
-  }
-  .num-col { text-align: right; font-family: "DM Mono", monospace; font-variant-numeric: tabular-nums; }
-  .rule-cell { color: var(--text-3, #3F4D5C); font-size: 11px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  tr.crit td { background: var(--red-dim, rgba(239,68,68,0.05)); }
-  tr.warn td { background: var(--amber-dim, rgba(245,158,11,0.05)); }
-
-  .trend { font-weight: 600; }
-  .trend-rising  { color: var(--red, #EF4444); }
-  .trend-falling { color: var(--green, #22C55E); }
-  .trend-stable  { color: var(--text-3, #3F4D5C); }
-
-  .sev-badge {
-    font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
-    text-transform: uppercase; padding: 2px 6px; border-radius: 3px;
-  }
-  .sev-critical { background: var(--red-dim, rgba(239,68,68,0.12)); color: var(--red, #EF4444); }
-  .sev-warning  { background: var(--amber-dim, rgba(245,158,11,0.12)); color: var(--amber, #F59E0B); }
-  .sev-info     { background: var(--surface-3, #1C2540); color: var(--text-3, #3F4D5C); }
-
-  .ack-btn {
-    background: none; border: 1px solid var(--border-2, rgba(148,163,184,0.18));
-    color: var(--text-3, #3F4D5C); padding: 2px 8px; border-radius: 3px;
-    font-size: 10px; cursor: pointer; font-family: inherit;
-  }
-  .ack-btn:hover { border-color: var(--accent, #38BDF8); color: var(--accent, #38BDF8); }
-  .acked { color: var(--green, #22C55E); font-size: 12px; }
-
-  .empty-state {
-    display: flex; align-items: center; gap: 8px;
-    padding: 16px 8px; font-size: 12px; color: var(--text-3, #3F4D5C);
-  }
-  .empty-icon { color: var(--green, #22C55E); }
-
-  /* ── Sparklines band ── */
-  .spark-band { padding-top: 16px; }
-  .spark-card {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--surface, #1E293B);
-    border: 1px solid var(--border, rgba(148,163,184,0.10));
-    border-radius: 4px;
-    padding: 8px 12px;
-    margin-bottom: 8px;
-  }
-  .spark-name { font-size: 11px; color: var(--text-2, #94A3B8); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .spark-val { font-family: "DM Mono", monospace; font-size: 12px; font-weight: 500; color: var(--text, #E2E8F0); font-variant-numeric: tabular-nums; }
-
-  /* Grid toggle script */
-  :global(.grid-toggle) {
-    position: fixed;
-    bottom: 24px; right: 24px; z-index: 200;
-    display: flex; align-items: center; gap: 6px;
-    background: var(--surface-2); border: 1px solid var(--border-2);
-    color: var(--text-3); font-size: 10px; letter-spacing: 0.1em;
-    text-transform: uppercase; padding: 6px 10px; border-radius: 4px;
-    cursor: pointer; font-family: "DM Mono", monospace;
-  }
-  :global(body.grid-on .grid-toggle) { background: var(--accent); color: #000; border-color: transparent; }
 </style>

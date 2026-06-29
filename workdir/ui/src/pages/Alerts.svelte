@@ -6,7 +6,7 @@
 
   async function load() {
     loading = true
-    try { const r = await api.alerts(); alertList = r.data || [] }
+    try { const r = await api.alerts(); alertList = r || [] }
     catch (e) { error = e.message }
     finally { loading = false }
   }

@@ -9,7 +9,7 @@
     loading = true
     try {
       const r = await api.logs({ limit, level: filterLevel !== 'all' ? filterLevel : undefined, service: filterService || undefined })
-      logs = r.data || []
+      logs = r || []
     } catch(e) { error = e.message }
     finally { loading = false }
   }
