@@ -16,6 +16,16 @@
   import SLOs         from './pages/SLOs.svelte'
   import { api }      from './lib/api.js'
   import { SECURITY_TEMPLATE } from './lib/templates/security.js'
+  import { onMount } from 'svelte'
+
+  let appVersion = 'v8'
+
+  onMount(async () => {
+    try {
+      const h = await api.health()
+      if (h.version) appVersion = 'v' + h.version
+    } catch {}
+  })
 
   function toggleTheme() {
     theme.update(t => t === 'dark' ? 'light' : 'dark')
@@ -109,7 +119,7 @@
         </div>
         <div>
           <span class="brand-text">Ruptura</span>
-          <span class="brand-ver">v7</span>
+          <span class="brand-ver">{appVersion}</span>
         </div>
       </div>
 
