@@ -45,7 +45,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "8.1.1"
+const version = "8.1.2"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -82,12 +82,14 @@ func parseFlags(args []string) (Config, error) {
 func main() {
 	cfg, err := parseFlags(os.Args[1:])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing flags: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error parsing flags: %v
+", err)
 		os.Exit(1)
 	}
 
 	if cfg.ShowVersion {
-		fmt.Printf("ruptura v%s\n", version)
+		fmt.Printf("ruptura v%s
+", version)
 		os.Exit(0)
 	}
 
@@ -503,4 +505,3 @@ func buildExplainRecord(
 		ContagionSources: contagionSources,
 	}
 }
-
