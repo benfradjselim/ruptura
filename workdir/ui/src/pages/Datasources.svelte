@@ -61,7 +61,11 @@
   {:else if sources.length === 0}
     <div class="band"><div class="empty-state" style="grid-column:1/-1">
       <div class="empty-icon">🔌</div>
-      <p>No data sources — Ruptura already ingests via OTLP and Prometheus remote-write on port 31470.</p>
+      <p>No external data sources configured.</p>
+      <p style="font-size:11px;color:var(--text-3);margin-top:4px;">
+        Ruptura ingests telemetry via OTLP (port 4317) and Prometheus remote-write (/api/v2/write).<br/>
+        Add an external source to proxy queries through Ruptura dashboards.
+      </p>
     </div></div>
   {:else}
     <div class="band sources-grid">
