@@ -82,14 +82,12 @@ func parseFlags(args []string) (Config, error) {
 func main() {
 	cfg, err := parseFlags(os.Args[1:])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing flags: %v
-", err)
+		fmt.Fprintf(os.Stderr, "error parsing flags: %v\n", err)
 		os.Exit(1)
 	}
 
 	if cfg.ShowVersion {
-		fmt.Printf("ruptura v%s
-", version)
+		fmt.Printf("ruptura v%s\n", version)
 		os.Exit(0)
 	}
 

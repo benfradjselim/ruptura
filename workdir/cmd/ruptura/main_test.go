@@ -63,8 +63,8 @@ func TestParseFlags_UnknownFlag(t *testing.T) {
 }
 
 func TestVersion_Constant(t *testing.T) {
-	if version != "8.1.1" {
-		t.Errorf("want version 8.1.1 got %s", version)
+	if version != "8.1.2" {
+		t.Errorf("want version 8.1.2 got %s", version)
 	}
 }
 
