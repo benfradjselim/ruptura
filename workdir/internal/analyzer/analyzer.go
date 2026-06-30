@@ -410,10 +410,14 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 	}
 
 	// --- Adaptive baseline update (Welford online algorithm) ---
+	// mood is stored as 1-mood (penalty direction) so that adaptiveScore(ws,"mood",1-mood)
+	// computes a z-score relative to the workload's normal penalty level, not its raw mood.
+	// Without this, idle workloads (mood=0 always, baseline=0) produce z=(1-0)/sigma_guard=20
+	// → full penalty every tick → healthScore stuck at exactly 0.80 regardless of activity.
 	signals := map[string]float64{
 		"stress":          stress,
 		"fatigue":         ws.fatigue,
-		"mood":            mood,
+		"mood":            1 - mood,
 		"pressure":        pressureNorm,
 		"humidity":        humidity,
 		"contagion":       contagion,

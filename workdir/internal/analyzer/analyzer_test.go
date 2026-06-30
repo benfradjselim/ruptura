@@ -297,3 +297,32 @@ func TestWeightConfigRoundtrip(t *testing.T) {
 		t.Errorf("roundtrip failed: %+v", got)
 	}
 }
+
+// TestAdaptiveBaseline_IdleWorkload verifies that an idle workload (no CPU/memory/request
+// metrics) does not get its health_score pinned at 0.80 once the adaptive baseline is
+// established.
+//
+// Root cause of the pin: the baseline stored mood=0 (raw signal) but adaptiveScore was
+// called with 1-mood=1.0 (penalty direction). For an idle pod where baseline["mood"]=0
+// and sigma→0.05 guard, z=(1.0-0)/0.05=20 → clamped to 1.0 → full 0.20 mood penalty →
+// healthScore=1-0.20=0.80 every tick regardless of activity. Fixed by storing 1-mood in
+// the baseline so z=(1.0-1.0)/0.05=0 → no penalty for a normally-idle workload.
+func TestAdaptiveBaseline_IdleWorkload(t *testing.T) {
+	a := NewAnalyzer()
+	ref := models.WorkloadRef{Namespace: "test", Kind: "host", Name: "idle-pod"}
+	// Feed 100 cycles of idle metrics (no cpu, no memory, no requests — pure zeros).
+	// 96 cycles is the threshold for baselineReady; 100 ensures it trips.
+	idleMetrics := map[string]float64{}
+	var lastSnap models.KPISnapshot
+	for i := 0; i < 100; i++ {
+		lastSnap = a.Update(ref, idleMetrics)
+	}
+	hs := lastSnap.HealthScore.Value
+	// An idle workload with all-zero signals should settle well above 0.80 after
+	// the adaptive baseline correctly learns that mood=0 is normal for this workload.
+	// Threshold of 0.85 gives headroom for the pressure term (pressureNorm=0.5 before
+	// adaptive kicks in, then ≈0 once baseline converges).
+	if hs <= 0.80 {
+		t.Errorf("idle workload health_score = %.4f, want > 0.80 (adaptive baseline stuck at 0.80 pin)", hs)
+	}
+}
