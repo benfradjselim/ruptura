@@ -42,8 +42,19 @@
     }
   }
 
+  function hostKey(workload) {
+    return workload.host || workload.key || workload.name || ''
+  }
+
+  function parseHost(workload) {
+    const raw = hostKey(workload)
+    const parts = raw.split('/')
+    if (parts.length >= 3) return { ns: parts[0], kind: parts[1], name: parts.slice(2).join('/') }
+    return { ns: '', kind: 'host', name: raw }
+  }
+
   async function expand(workload) {
-    const key = workload.key || workload.name
+    const key = hostKey(workload)
     if (expandedWorkload === key) {
       expandedWorkload = null
       return
@@ -54,7 +65,7 @@
   }
 
   async function loadTab(workload, tab) {
-    const key = workload.key || workload.name
+    const key = hostKey(workload)
     activeTab[key] = tab
     if (tab === 'history' && !historyData[key]) {
       loadingDetail[key] = true
@@ -68,9 +79,7 @@
     if (tab === 'forecast' && !forecastData[key]) {
       loadingDetail[key] = true
       try {
-        const ns = workload.namespace || workload.workload?.namespace || 'default'
-        const name = workload.workload?.name || workload.name
-        const res = await api.forecastWorkload('health_score', ns, name)
+        const res = await api.forecastWorkload('health_score', key)
         forecastData[key] = res
       } catch { forecastData[key] = { error: true } }
       loadingDetail[key] = false
@@ -102,8 +111,9 @@
   }
 
   function workloadLabel(w) {
-    if (w.workload) return `${w.workload.namespace}/${w.workload.name}`
-    return w.name || w.host || 'unknown'
+    const { ns, name } = parseHost(w)
+    if (ns) return `${ns}/${name}`
+    return w.host || 'unknown'
   }
 
   function getSignal(w, key) {
@@ -113,7 +123,7 @@
   }
 
   function infraGroups(w) {
-    const ns = w.workload?.namespace || w.namespace || ''
+    const ns = parseHost(w).ns || ''
     const nsGroups = infraByNs[ns] || []
     const clusterGroups = infraByNs[''] || []
     return [...nsGroups, ...clusterGroups]
@@ -180,8 +190,8 @@
 
   {:else}
     <div class="workload-grid">
-      {#each fleet.hosts as w (w.key || w.name)}
-        {@const key = w.key || w.name}
+      {#each fleet.hosts as w (w.host)}
+        {@const key = w.host}
         {@const pct = healthPct(w)}
         {@const risk = riskScore(w)}
         {@const sc = stateClass(w.state)}
@@ -275,7 +285,7 @@
 
               {#if activeTab[key] === 'signals'}
                 <div class="signals-detail">
-                  {#each Object.entries(w.signals || w.kpis || {}) as [k, v]}
+                  {#each Object.entries(w.signals || w.kpis || { stress: w.stress, fatigue: w.fatigue, contagion: w.contagion, health_score: w.health_score }).filter(([,v]) => v != null) as [k, v]}
                     {#if typeof v === 'number'}
                       <div class="signal-row">
                         <span class="signal-name">{displayLabel(k)}</span>

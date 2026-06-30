@@ -134,8 +134,8 @@ export const api = {
   ruptureProfile:  (host)   => req('GET', `/rupture/${encodeURIComponent(host)}/profile`),
 
   // ── Forecast ───────────────────────────────────────────────────────────────
-  forecastWorkload: (metric, ns, workload) =>
-    req('GET', `/forecast/${encodeURIComponent(metric)}/${encodeURIComponent(ns)}/${encodeURIComponent(workload)}`),
+  forecastWorkload: (metric, host) =>
+    req('GET', `/forecast/${encodeURIComponent(metric)}/${encodeURIComponent(host)}`),
 
   // ── Notifications ──────────────────────────────────────────────────────────
   notifications:        ()         => req('GET', '/notifications'),

@@ -529,7 +529,7 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 		},
 		HealthScore: models.KPI{
 			Name:      "health_score",
-			Value:     utils.RoundTo(healthScore*100, 2), // expose as 0-100
+			Value:     utils.RoundTo(healthScore, 4),
 			State:     healthScoreState(healthScore),
 			Timestamp: now,
 			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
@@ -881,7 +881,7 @@ func (a *Analyzer) ForecastHealthScore(ref models.WorkloadRef) *models.HealthFor
 	}
 	denom := fn*sumX2 - sumX*sumX
 	if math.Abs(denom) < 1e-12 {
-		return &models.HealthForecast{Trend: "stable", In15Min: vals[n-1] * 100, In30Min: vals[n-1] * 100}
+		return &models.HealthForecast{Trend: "stable", In15Min: vals[n-1], In30Min: vals[n-1]}
 	}
 	slope := (fn*sumXY - sumX*sumY) / denom
 	intercept := (sumY - slope*sumX) / fn
@@ -889,7 +889,7 @@ func (a *Analyzer) ForecastHealthScore(ref models.WorkloadRef) *models.HealthFor
 	// Project: each tick ≈ 15s. 15min = 60 ticks, 30min = 120 ticks from index 0.
 	project := func(ticks float64) float64 {
 		raw := slope*(float64(n-1)+ticks) + intercept
-		return utils.Clamp(raw*100, 0, 100)
+		return utils.Clamp(raw, 0, 1)
 	}
 	in15 := project(60)
 	in30 := project(120)
@@ -913,8 +913,8 @@ func (a *Analyzer) ForecastHealthScore(ref models.WorkloadRef) *models.HealthFor
 
 	return &models.HealthForecast{
 		Trend:              trend,
-		In15Min:            math.Round(in15*10) / 10,
-		In30Min:            math.Round(in30*10) / 10,
+		In15Min:            math.Round(in15*1000) / 1000,
+		In30Min:            math.Round(in30*1000) / 1000,
 		CriticalETAMinutes: critETA,
 		ConfidenceWindow:   n,
 	}

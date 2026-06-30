@@ -45,7 +45,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "8.1.2"
+const version = "8.2.0"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -284,7 +284,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 						continue
 					}
 					ref := models.WorkloadRefFromKey(host)
-					snap := analyzerEngine.Update(ref, rawMetrics)
+					snap := analyzerEngine.Update(ref, mapToAnalyzerSignals(rawMetrics))
 
 					// Feed metricR into fusion BEFORE storing snapshot so FusedR is current.
 					metricName := pickPrimaryMetric(rawMetrics)
@@ -442,9 +442,52 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 }
 
+// mapToAnalyzerSignals translates OTel/kubeletstats metric names to the canonical
+// names expected by the analyzer (cpu_percent, memory_percent, etc.).
+// Original entries are preserved so the rupture index engine still sees raw series.
+func mapToAnalyzerSignals(raw map[string]float64) map[string]float64 {
+	out := make(map[string]float64, len(raw)+4)
+	for k, v := range raw {
+		out[k] = v
+	}
+
+	// kubeletstats CPU utilization [0,1] → cpu_percent
+	for _, key := range []string{
+		"k8s.pod.cpu.node.utilization",
+		"k8s.pod.cpu.utilization",
+		"k8s.container.cpu.utilization",
+		"k8s.node.cpu.utilization",
+	} {
+		if v, ok := raw[key]; ok {
+			out["cpu_percent"] = v
+			break
+		}
+	}
+
+	// kubeletstats memory utilization [0,1] → memory_percent
+	for _, key := range []string{
+		"k8s.pod.memory.working_set.utilization",
+		"k8s.pod.memory.utilization",
+		"k8s.container.memory.working_set.utilization",
+		"k8s.container.memory.utilization",
+		"k8s.node.memory.working_set.utilization",
+	} {
+		if v, ok := raw[key]; ok {
+			out["memory_percent"] = v
+			break
+		}
+	}
+
+	return out
+}
+
 // pickPrimaryMetric returns the best available metric name for RuptureIndex computation.
 func pickPrimaryMetric(metrics map[string]float64) string {
-	preferred := []string{"cpu_percent", "memory_percent", "latency_p99", "error_rate", "request_rate"}
+	preferred := []string{
+		"cpu_percent", "memory_percent",
+		"k8s.pod.cpu.node.utilization", "k8s.pod.memory.working_set.utilization",
+		"latency_p99", "error_rate", "request_rate",
+	}
 	for _, name := range preferred {
 		if _, ok := metrics[name]; ok {
 			return name

@@ -76,12 +76,21 @@ func (s *Store) LatestSnapshot(key string) (models.KPISnapshot, bool) {
 	return snap, ok
 }
 
+// snapshotStaleTTL is how long a snapshot can go without an update before
+// it is considered stale (workload gone) and excluded from AllSnapshots.
+const snapshotStaleTTL = 5 * time.Minute
+
 // AllSnapshots returns one snapshot per unique workload (deduplicates host vs workload-key entries).
+// Snapshots not updated within snapshotStaleTTL are excluded (dead-pod eviction).
 func (s *Store) AllSnapshots() []models.KPISnapshot {
 	s.snapshotsMu.RLock()
 	seen := make(map[string]bool, len(s.snapshots))
 	result := make([]models.KPISnapshot, 0, len(s.snapshots)/2+1)
+	cutoff := time.Now().Add(-snapshotStaleTTL)
 	for _, snap := range s.snapshots {
+		if snap.Timestamp.Before(cutoff) {
+			continue
+		}
 		canonical := snap.Workload.Key()
 		if canonical == "" || canonical == "default/host/" {
 			canonical = snap.Host
