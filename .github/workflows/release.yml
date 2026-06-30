@@ -83,6 +83,15 @@ jobs:
           GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" \
             -o /tmp/ruptura-ctl-darwin-arm64 ./cmd/ruptura-ctl
 
+      - name: Create GitHub release if not exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --title "Release ${{ steps.tag.outputs.tag }}" \
+            --generate-notes \
+            --repo "${{ github.repository }}" 2>/dev/null || true
+
       - name: Attach binaries to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
