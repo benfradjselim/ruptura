@@ -62,3 +62,16 @@ are registered on the ROOT router. They must NOT be behind authMiddleware.
 2. `go test ./...` must pass
 3. UI: `npm run build` must produce a clean dist in `workdir/web/`
 4. Update `workdir/ui/public/version.json` to match `const version` in main.go
+
+## Deployment rules
+
+### NEVER use `gh workflow run` to trigger CI
+`gh workflow run` consumes GitHub API rate limit (5000/hr shared).
+When the limit is exhausted the dispatch fails and you lose the slot.
+
+### ALWAYS trigger CI via git tag push
+```
+git tag v<version>
+git push origin v<version>
+```
+Tag pushes use plain git protocol — zero GitHub API calls, never rate-limited.
