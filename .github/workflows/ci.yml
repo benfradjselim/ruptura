@@ -120,3 +120,12 @@ jobs:
 
       - name: Build site (strict mode)
         run: cd site && mkdocs build --strict
+
+  # ── Docs: env-var drift guard ──────────────────────────────────────────────
+  docs-drift:
+    name: Docs — env drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check documented env vars exist in code
+        run: bash scripts/check-docs-env.sh

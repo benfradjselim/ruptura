@@ -1,5 +1,5 @@
 # Ruptura — Technical Reference
-**Version:** 8.0.0 · **Updated:** 2026-06-26
+**Applies to:** v8.x · **Updated:** 2026-07-05
 
 This document is the single authoritative reference for contributors and operators.
 For the whitepaper and formal specs, see `docs/v6.1.0/SPECS.md`.
@@ -330,8 +330,6 @@ Key environment variables:
 ```
 RUPTURA_API_KEY        Bearer token for API auth (required in production)
 RUPTURA_EDITION        "community" (default) | "autopilot"
-RUPTURA_DEMO_MODE      "true" to inject synthetic workloads
-KAFKA_BROKERS          Kafka brokers for event bus (optional)
 RUPTURA_WORKLOAD_WEIGHTS  JSON array of SignalWeights for per-workload overrides
 ```
 
@@ -397,7 +395,6 @@ workdir/                      Go engine source
 docs/                         internal planning + specs
   REFERENCE.md                this file
   v6.1.0/SPECS.md             formal technical specifications
-  judgment.md                 design conscience document
 helm/                         Helm chart for community edition
 site/                         MkDocs source → GitHub Pages
 scripts/simulate.py           workload simulator for demos

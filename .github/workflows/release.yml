@@ -36,6 +36,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Version consistency guard (tag == main.go const == version.json)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          CONST=$(grep -oP 'const version = "\K[0-9.]+' cmd/ruptura/main.go)
+          UIVER=$(python3 -c "import json;print(json.load(open('ui/public/version.json'))['version'])")
+          echo "tag=$TAG const=$CONST ui=$UIVER"
+          if [ "$TAG" != "$CONST" ] || [ "$TAG" != "$UIVER" ]; then
+            echo "::error::Version mismatch — tag v$TAG, main.go $CONST, version.json $UIVER. Align all three before tagging."
+            exit 1
+          fi
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"

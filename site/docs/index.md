@@ -6,7 +6,7 @@
 
 **The Predictive Action Layer for Cloud-Native Infrastructure.**
 
-Ruptura detects Kubernetes workload failures before they become outages — using the Fused Rupture Index™, 10 composite KPI signals with adaptive per-workload baselines, and an action engine that responds automatically with configurable safety gates.
+Ruptura detects Kubernetes workload failures before they become outages — using the Fused Rupture Index, 10 composite KPI signals with adaptive per-workload baselines, and an action engine that responds automatically with configurable safety gates.
 
 → **[Getting Started →](getting-started/installation.md)** · **[GitHub](https://github.com/benfradjselim/ruptura)** · **[CLI Reference →](cli/rupturactl.md)**
 
@@ -16,7 +16,7 @@ Ruptura detects Kubernetes workload failures before they become outages — usin
 
 | Traditional Observability | Ruptura |
 |--------------------------|---------| 
-| Threshold alerts fire *after* the fact | Fused Rupture Index™ detects divergence **hours early** |
+| Threshold alerts fire *after* the fact | Fused Rupture Index detects divergence **hours early** |
 | Global thresholds — batch jobs always "stressed" | **Adaptive per-workload baselines** after ~45 min |
 | "host-123 CPU 78%" — what does it mean? | "payment-api is exhausted — fatigue accumulation, cascade from db" |
 | Manual incident response | Tier-1 actions (scale, restart, rollback) with safety gates |
@@ -54,7 +54,7 @@ Ruptura detects Kubernetes workload failures before they become outages — usin
 
 ## Core Concepts
 
-### Fused Rupture Index™
+### Fused Rupture Index
 
 ```
 FusedR = weighted_average(metricR, logR, traceR)

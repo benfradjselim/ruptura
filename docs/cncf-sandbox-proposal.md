@@ -1,4 +1,8 @@
-# Ruptura — CNCF Sandbox Proposal
+# Ruptura — CNCF Sandbox Proposal (DRAFT — DO NOT SUBMIT)
+
+> **Status: internal draft.** Submission is gated on the prerequisites in `FABLE.md` Epic A4
+> (named production adopters, external contributors, governance in practice, TAG presentation).
+> All factual claims below must be re-verified against the repo at submission time.
 
 ## Name of Project
 Ruptura
@@ -19,10 +23,10 @@ Ruptura addresses the observability and reliability gap in the CNCF landscape:
 
 ## Project Maturity
 
-- **Current version**: v7.1.0 (community) / v7.2.0 (autopilot commercial)
+- **Current version**: see the latest [GitHub Release](https://github.com/benfradjselim/ruptura/releases) — do not hard-code a version here; re-verify at submission time
 - **Kubernetes operator**: Published to OperatorHub (community-operators PR #8246, OCP PR #9872)
 - **License**: Apache License 2.0
-- **Languages**: Go 1.22, TypeScript/Svelte 4
+- **Languages**: Go 1.18 (module minimum; CI builds with 1.22), TypeScript/Svelte 4
 - **Test coverage**: Unit tests across all packages (`go test ./...` passes)
 - **CI/CD**: GitHub Actions — build, test, Helm lint, OLM bundle validate, smoke test on k3d
 
@@ -45,7 +49,7 @@ https://github.com/benfradjselim/ruptura
 ## External Dependencies
 
 All dependencies are listed in `workdir/go.mod`. Key runtime dependencies:
-- `dgraph-io/badger/v4` — embedded time-series storage (Apache 2.0)
+- `dgraph-io/badger/v3` — embedded time-series storage (Apache 2.0)
 - `gorilla/mux` — HTTP routing (BSD-3)
 - `open-telemetry/opentelemetry-go` — OTLP ingest (Apache 2.0)
 - `google.golang.org/grpc` — gRPC server (Apache 2.0)

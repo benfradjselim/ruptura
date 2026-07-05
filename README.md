@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img alt="Go" src="https://img.shields.io/badge/Go-1.22-00ADD8?logo=go">
+  <img alt="Go" src="https://img.shields.io/badge/Go-1.18-00ADD8?logo=go">
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
   <img alt="Version" src="https://img.shields.io/github/v/release/benfradjselim/ruptura">
   <img alt="CNCF Sandbox" src="https://img.shields.io/badge/CNCF-Sandbox%20Applicant-0086FF">
@@ -16,7 +16,7 @@
   <b>Ruptura detects Kubernetes workload failures before they become outages.</b>
 </p>
 
-It ingests telemetry via OTLP and Prometheus remote-write, computes 10 composite KPI signals per workload, fuses them into the **Fused Rupture Index™ (FRI)** using a 5-model adaptive ML ensemble, and drives a 3-tier action engine that applies automated Kubernetes remediations behind configurable safety gates.
+It ingests telemetry via OTLP and Prometheus remote-write, computes 10 composite KPI signals per workload, fuses them into the **Fused Rupture Index (FRI)** using a 5-model adaptive ML ensemble, and drives a 3-tier action engine that applies automated Kubernetes remediations behind configurable safety gates.
 
 ---
 
@@ -57,7 +57,7 @@ python3 scripts/simulate.py --host <node-ip> --port 31470
 
 ## Key Features
 
-- **Fused Rupture Index™** — fuses metric, log, and trace anomaly scores into one actionable severity value per workload
+- **Fused Rupture Index** — fuses metric, log, and trace anomaly scores into one actionable severity value per workload
 - **5-model adaptive ensemble** — CA-ILR, ARIMA, Holt-Winters, MAD, EWMA; re-weighted every 60s on live prediction error
 - **10 KPI signals** — Stress, Fatigue, Mood, Pressure, Humidity, Contagion, Resilience, Entropy, Velocity, Throughput
 - **SRE-friendly labels** — signals display as Risk Score, Memory Pressure, Blast Radius, etc. in the UI
@@ -138,10 +138,7 @@ ruptura-ctl emergency-stop      # halt all Tier-1 actions (requires confirmation
 
 ## Project Status
 
-| Version | Status |
-|---------|--------|
-| **v7.1.0** | Current stable |
-| v7.0.25 | Maintained |
+Pre-1.0-adoption: the engine is feature-complete and released continuously, and the project is actively seeking early production adopters and external contributors. The latest stable version is always the newest [GitHub Release](https://github.com/benfradjselim/ruptura/releases) — the version badge above tracks it automatically.
 
 Active branch: `main` — Module: `github.com/benfradjselim/ruptura`
 
