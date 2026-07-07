@@ -109,18 +109,18 @@ Safety gates: per-target rate limit (6/hour), 300s cooldown, namespace allowlist
 
 ## Current Release
 
-**v7.1.0** — Security hardening, atomic compaction, Fleet UX, ruptura-ctl v1.2.0.
+**v8.2.3** — Dual-axis infra collector layer, complete UI redesign, HealthScore fixes.
 
 | Change | Detail |
 |--------|--------|
-| Auth fail-closed | `RUPTURA_API_KEY` required — no silent open access |
-| Atomic compaction | Storage rollups are crash-safe — no double-averaging on restart |
-| `/api/v2/metrics` public | Prometheus scraping no longer requires an API key |
-| Fleet UX | Signal mini-bars, null guards, 3-tab detail, empty states with calibration status |
-| SRE-friendly labels | `FusedRuptureIndex` → Risk Score, `fatigue` → Memory Pressure, `contagion` → Blast Radius |
-| ruptura-ctl v1.2.0 | Watch mode (`-w 5`), `context` subcommand, emergency-stop confirmation, server version check |
-| Lab setup | Civo/k3s one-shot deploy — 6 synthetic test apps covering all failure modes |
-| Tenant isolation | Autopilot: namespace filter applied to ALL GET endpoints (was fleet/actions only) |
+| Infra collector layer (v8.0) | 8 collectors (node, control-plane, MCP, networking, storage, admission, operator, tenancy) feeding SDI/EBI/GNI/CGPM signals into HealthScore + eFRI |
+| `/api/v2/infra/*`, `/api/v2/propagation/*` | New endpoints exposing the infra signal graph and cross-workload propagation |
+| UI redesign (v8.1) | Complete Müller-Brockmann grid redesign, dark/light mode, infrastructure visibility panels, calibration progress bar |
+| HealthScore fix (v8.2) | Analyzer now stores `1 - mood` in the adaptive baseline, fixing a bug that pinned `health_score` at 0.80 for healthy workloads |
+| Demo mode (unreleased, `main`) | `--demo` / `RUPTURA_DEMO_MODE=true` seeds 7 days of synthetic data across 12 workloads — no cluster, no calibration wait |
+| One-command install (unreleased, `main`) | `kubectl apply -f install/ruptura.yaml` — namespace, RBAC, and an auto-generated API key, no Helm required |
+
+Previous release: **v7.1.0** — auth fail-closed, atomic compaction, Fleet UX, ruptura-ctl v1.2.0. [Full history →](community/roadmap.md)
 
 [Full changelog →](community/roadmap.md) · [Getting Started →](getting-started/installation.md) · [CLI Reference →](cli/rupturactl.md)
 

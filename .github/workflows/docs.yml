@@ -54,3 +54,20 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # FBL-A1-3: the deploy step reporting success doesn't guarantee Pages
+      # itself is reachable (wrong source setting, 403, DNS not yet
+      # propagated) — this is the check that would have caught that.
+      - name: Verify the deployed site is actually reachable
+        run: |
+          url="${{ steps.deployment.outputs.page_url }}"
+          for i in 1 2 3 4 5; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$url" || echo "000")
+            echo "attempt $i: ${url} -> ${status}"
+            if [ "$status" = "200" ]; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::Pages deploy reported success but ${url} did not return 200 after 5 attempts"
+          exit 1

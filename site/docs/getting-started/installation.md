@@ -41,7 +41,7 @@
       -p 8080:8080 -p 4317:4317 \
       -v ruptura-data:/var/lib/ruptura/data \
       -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-      ghcr.io/benfradjselim/ruptura:v7.1.0
+      docker.io/selimbf/ruptura:v8.2.3
     curl http://localhost:8080/api/v2/health
     ```
 
@@ -171,7 +171,7 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
 | `--set resources.limits.memory=512Mi` | `512Mi` | Engine memory limit |
 | `--set-string goMemLimit="400MiB"` | `"400MiB"` | Go GC soft limit — ~85% of memory limit |
 | `--set persistence.size=10Gi` | `10Gi` | PVC size for BadgerDB storage |
-| `--set image.tag=v7.1.0` | `latest` | Pin to specific version |
+| `--set image.tag=v8.2.3` | `latest` | Pin to specific version |
 | `--set serviceMonitor.enabled=true` | `false` | Prometheus Operator scrape |
 | `--set edition=autopilot` | `community` | Enable Tier-1 auto-execution |
 
@@ -181,7 +181,7 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
 helm upgrade ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system \
   --reuse-values \
-  --set image.tag=v7.1.0
+  --set image.tag=v8.2.3
 ```
 
 ### Verify
@@ -229,7 +229,7 @@ docker run -d --name ruptura \
   -p 4317:4317 \
   -v ruptura-data:/var/lib/ruptura/data \
   -e RUPTURA_API_KEY=$(openssl rand -hex 32) \
-  ghcr.io/benfradjselim/ruptura:v7.1.0
+  docker.io/selimbf/ruptura:v8.2.3
 ```
 
 | Port | Purpose |
