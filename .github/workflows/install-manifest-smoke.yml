@@ -1,0 +1,101 @@
+name: Install manifest — Smoke test
+
+# FBL-A1-2 gate: install/ruptura.yaml is the one-command install path
+# advertised in the README. This applies it verbatim to a fresh k3d cluster
+# and asserts pods reach Running, the auto-generated API key Job succeeds,
+# and the dashboard responds — so drift between the chart and the rendered
+# static manifest becomes a CI failure instead of a support ticket.
+
+on:
+  pull_request:
+    paths:
+      - "install/ruptura.yaml"
+      - "helm/**"
+      - "scripts/render-install-manifest.sh"
+  push:
+    branches: [main]
+    paths:
+      - "install/ruptura.yaml"
+      - "helm/**"
+      - "scripts/render-install-manifest.sh"
+  schedule:
+    - cron: "37 4 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: install/ruptura.yaml (k3d)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k3d
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.29.0"
+
+      - name: Verify install manifest is up to date with the chart
+        run: |
+          ./scripts/render-install-manifest.sh
+          git diff --exit-code install/ruptura.yaml || {
+            echo "::error::install/ruptura.yaml is stale — run scripts/render-install-manifest.sh and commit the result"
+            exit 1
+          }
+
+      - name: Create k3d cluster
+        run: |
+          k3d cluster create ruptura-install-smoke --agents 1 --wait --timeout 120s
+          kubectl cluster-info
+
+      # ── The exact command from the README's one-command install ────────────
+      - name: kubectl apply (README command, verbatim)
+        run: |
+          kubectl apply -f install/ruptura.yaml
+          kubectl -n ruptura-system get pods
+
+      - name: Wait for the API key Job to complete
+        run: |
+          kubectl -n ruptura-system wait --for=condition=complete job/ruptura-init-apikey --timeout=90s
+          kubectl -n ruptura-system logs job/ruptura-init-apikey
+
+      - name: Assert the API key Secret was created
+        run: |
+          kubectl -n ruptura-system get secret ruptura-secret -o jsonpath='{.data.api-key}' | base64 -d | wc -c
+
+      - name: Wait for pods Running
+        run: |
+          kubectl -n ruptura-system wait pods --all --for=condition=Ready --timeout=180s
+
+      - name: port-forward and assert dashboard + API reachable
+        run: |
+          kubectl -n ruptura-system port-forward svc/ruptura 8080:80 &
+          kubectl -n ruptura-system port-forward svc/ruptura-ui 8081:80 &
+          sleep 5
+
+          API_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080/api/v2/health || echo "000")
+          echo "engine API status: ${API_STATUS}"
+          if [ "${API_STATUS}" != "200" ]; then
+            echo "::error::install manifest engine API endpoint did not return 200 (got ${API_STATUS})"
+            exit 1
+          fi
+
+          UI_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8081/ || echo "000")
+          echo "dashboard status: ${UI_STATUS}"
+          if [ "${UI_STATUS}" != "200" ]; then
+            echo "::error::install manifest dashboard endpoint did not return 200 (got ${UI_STATUS})"
+            exit 1
+          fi
+
+      - name: Cleanup k3d cluster
+        if: always()
+        run: k3d cluster delete ruptura-install-smoke || true

@@ -17,6 +17,14 @@ fullnameOverride: ""
 # If empty, authentication is disabled (dev/testing only).
 apiKey: ""
 
+# -- When true and apiKey is empty, a one-shot Job generates a random API key
+# on first install, stores it in the same Secret apiKey would use, and prints
+# it in the Job's logs (kubectl logs -n <ns> job/<release>-init-apikey).
+# Used by the single-manifest install path (install/ruptura.yaml); off by
+# default for normal `helm install`, where setting --set apiKey=... directly
+# is the documented production path.
+autoGenerateApiKey: false
+
 # -- Product edition: "community" (default) or "autopilot".
 # community: action recommendations are visible (read-only); approve endpoint returns 402.
 # autopilot: full Tier-1 auto-execution and manual action approval enabled.

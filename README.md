@@ -34,6 +34,19 @@ It ingests telemetry via OTLP and Prometheus remote-write, computes 10 composite
 
 ## Quick Start
 
+One command, no Helm required — a single manifest with namespace, RBAC,
+Deployment, Services, and a Job that auto-generates your API key on first
+apply:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/benfradjselim/ruptura/main/install/ruptura.yaml
+kubectl -n ruptura-system get pods
+kubectl -n ruptura-system logs job/ruptura-init-apikey   # prints the generated API key
+```
+
+Prefer Helm (production installs, upgrades, values overrides)? Same result,
+more control:
+
 ```bash
 helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system \

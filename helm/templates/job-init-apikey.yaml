@@ -1,0 +1,98 @@
+{{- if and .Values.autoGenerateApiKey (not .Values.apiKey) -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "ruptura.fullname" . }}-init-apikey
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ruptura.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "ruptura.fullname" . }}-init-apikey
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ruptura.labels" . | nindent 4 }}
+rules:
+  # Scoped to this namespace only, and only enough to check for and create the
+  # one Secret this Job is responsible for — never cluster-wide, never any
+  # other verb.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "ruptura.fullname" . }}-init-apikey
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ruptura.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "ruptura.fullname" . }}-init-apikey
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "ruptura.fullname" . }}-init-apikey
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ruptura.fullname" . }}-init-apikey
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ruptura.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "ruptura.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "ruptura.fullname" . }}-init-apikey
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: init-apikey
+          image: "bitnami/kubectl:1.29"
+          securityContext:
+            allowPrivilegeEscalation: false
+            # Not read-only: kubectl writes a discovery cache under $HOME
+            # (~/.kube/cache). This Job is short-lived and namespace-scoped,
+            # unlike the main Deployment which does run with a read-only root FS.
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: SECRET_NAME
+              value: {{ include "ruptura.fullname" . }}-secret
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: HOME
+              value: /tmp
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              if kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+                echo "Secret $SECRET_NAME already exists in $NAMESPACE — leaving it as-is."
+                exit 0
+              fi
+              KEY=$(tr -dc 'a-f0-9' </dev/urandom | head -c 64)
+              kubectl create secret generic "$SECRET_NAME" -n "$NAMESPACE" --from-literal=api-key="$KEY"
+              echo "============================================================"
+              echo " Ruptura API key generated for this install:"
+              echo ""
+              echo "   $KEY"
+              echo ""
+              echo " Save it now — retrieve it again later with:"
+              echo "   kubectl get secret $SECRET_NAME -n $NAMESPACE -o jsonpath='{.data.api-key}' | base64 -d"
+              echo "============================================================"
+{{- end }}
