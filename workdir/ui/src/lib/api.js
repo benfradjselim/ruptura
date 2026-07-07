@@ -33,6 +33,7 @@ export const api = {
 
   // ── Health ─────────────────────────────────────────────────────────────────
   health: () => req('GET', '/health'),
+  engineStatus: () => req('GET', '/engine/status'),
 
   // ── KPIs ───────────────────────────────────────────────────────────────────
   kpis:      (host)       => req('GET', '/kpis' + (host ? '?host=' + encodeURIComponent(host) : '')),

@@ -52,7 +52,13 @@ type Handlers struct {
     topoBuilder   *correlator.TopologyBuilder
     discovery     *discovery.Informer
     infraRegistry *dag.Registry
+    demoMode      bool
 }
+
+// SetDemoMode marks the server as running with synthetic demo data
+// (--demo / RUPTURA_DEMO_MODE=true), surfaced via /api/v2/engine/status so
+// the UI can render the "Demo mode" banner.
+func (h *Handlers) SetDemoMode(v bool) { h.demoMode = v }
 
 func (h *Handlers) SetIngest(c IngestCounter)                       { h.ingest = c }
 func (h *Handlers) SetFusion(f *fusion.Engine)                      { h.fusionEng = f }

@@ -15,6 +15,7 @@
   import Orgs         from './pages/Orgs.svelte'
   import SLOs         from './pages/SLOs.svelte'
   import { api }      from './lib/api.js'
+  import DemoBanner   from './lib/components/DemoBanner.svelte'
   import { SECURITY_TEMPLATE } from './lib/templates/security.js'
   import { onMount } from 'svelte'
 
@@ -188,6 +189,7 @@
     </button>
 
     <main class="content">
+      <DemoBanner />
       {#if $currentPage === 'dashboard'}
         <Dashboard />
       {:else if $currentPage === 'fleet'}

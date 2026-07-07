@@ -38,6 +38,7 @@ import (
 	pipelinelogs "github.com/benfradjselim/ruptura/internal/pipeline/logs"
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/predictor"
+	"github.com/benfradjselim/ruptura/internal/sim"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
 	"github.com/benfradjselim/ruptura/pkg/logger"
@@ -55,6 +56,7 @@ type Config struct {
 	APIKey      string
 	Edition     string // "community" (default) or "autopilot"
 	ShowVersion bool
+	DemoMode    bool // --demo / RUPTURA_DEMO_MODE=true: seed synthetic data, no cluster required
 }
 
 func parseFlags(args []string) (Config, error) {
@@ -65,6 +67,7 @@ func parseFlags(args []string) (Config, error) {
 	fs.StringVar(&cfg.StoragePath, "storage", "/var/lib/ruptura/data", "storage directory")
 	fs.StringVar(&cfg.APIKey, "api-key", "", "API bearer token")
 	fs.BoolVar(&cfg.ShowVersion, "version", false, "print version and exit")
+	fs.BoolVar(&cfg.DemoMode, "demo", false, "seed synthetic demo data on startup; no cluster required")
 	err := fs.Parse(args)
 	if cfg.APIKey == "" {
 		cfg.APIKey = os.Getenv("RUPTURA_API_KEY")
@@ -75,6 +78,9 @@ func parseFlags(args []string) (Config, error) {
 		} else {
 			cfg.Edition = "community"
 		}
+	}
+	if !cfg.DemoMode && os.Getenv("RUPTURA_DEMO_MODE") == "true" {
+		cfg.DemoMode = true
 	}
 	return cfg, err
 }
@@ -196,6 +202,22 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		} else {
 			logger.Default.Warn("RUPTURA_WORKLOAD_WEIGHTS parse error — using defaults", "err", err)
 		}
+	}
+
+	// --demo / RUPTURA_DEMO_MODE=true: seed 7 days of synthetic baseline data
+	// (12 workloads, 3 namespaces) so the dashboard is fully populated within
+	// seconds, no cluster and no calibration wait. One workload is put on a
+	// live degradation trajectory that breaches within ~10 minutes.
+	var demoStats sim.SeedStats
+	if cfg.DemoMode {
+		seedStart := time.Now()
+		demoStats = sim.Seed(analyzerEngine, store, sim.DefaultSeedConfig())
+		logger.Default.Info("demo mode: seeded synthetic baseline",
+			"workloads", demoStats.Workloads, "ticks", demoStats.Ticks,
+			"degrading_workload", demoStats.DegradingWorkload,
+			"elapsed", time.Since(seedStart).String())
+		degradingRef := models.WorkloadRefFromKey(demoStats.DegradingWorkload)
+		go sim.DegradeLive(ctx, analyzerEngine, store, degradingRef, 10*time.Minute)
 	}
 
 	// k8s workload auto-discovery — no-op when not running inside a cluster.
@@ -400,6 +422,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	handlers.SetInfraRegistry(infraRegistry)
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)
+	handlers.SetDemoMode(cfg.DemoMode)
 	histMgr := history.New()
 	evBus := events.New()
 	handlers.SetHistoryMgr(histMgr)

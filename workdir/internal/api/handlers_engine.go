@@ -148,12 +148,14 @@ func (h *Handlers) handleEngineStatus(w http.ResponseWriter, _ *http.Request) {
 		Version       string          `json:"version"`
 		Edition       string          `json:"edition"`
 		UptimeSeconds int64           `json:"uptime_seconds"`
+		DemoMode      bool            `json:"demo_mode"`
 	}
 
 	resp := statusResp{
 		Version:       h.version,
 		Edition:       h.edition,
 		UptimeSeconds: int64(uptime),
+		DemoMode:      h.demoMode,
 		Analyzer: analyzerSection{
 			TickIntervalMS: 15000,
 			LastTickAgoMS:  -1,
