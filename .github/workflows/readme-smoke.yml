@@ -1,0 +1,113 @@
+name: README — Smoke test
+
+# Executes the exact commands from the README Quick Start section against a
+# fresh k3d cluster and asserts the documented endpoints actually respond.
+# This is the FBL-A0-5 gate: README drift (undocumented flags, wrong ports,
+# stale endpoints) becomes a CI failure instead of a support ticket.
+#
+# Runs on every PR touching README.md or the Helm chart, on push to main for
+# the same paths, daily on schedule (catches OCI registry / chart drift), and
+# on workflow_dispatch.
+
+on:
+  pull_request:
+    paths:
+      - "README.md"
+      - "helm/**"
+  push:
+    branches: [main]
+    paths:
+      - "README.md"
+      - "helm/**"
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: README Quick Start (k3d)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k3d
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.29.0"
+
+      - name: Create k3d cluster
+        run: |
+          k3d cluster create ruptura-readme-smoke --agents 1 --wait --timeout 120s
+          kubectl cluster-info
+
+      # ── The exact command from README.md "Quick Start" ──────────────────────
+      - name: helm install (README command, verbatim)
+        run: |
+          helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
+            --namespace ruptura-system \
+            --create-namespace \
+            --set apiKey=$(openssl rand -hex 32) \
+            --set ui.enabled=true \
+            --wait --timeout 120s
+
+      - name: Wait for pods Running
+        run: |
+          kubectl -n ruptura-system get pods
+          kubectl -n ruptura-system wait pods --all --for=condition=Ready --timeout=120s
+
+      # ── The exact port-forward commands from README.md "Quick Start" ────────
+      - name: port-forward (README commands, verbatim)
+        run: |
+          kubectl -n ruptura-system port-forward svc/ruptura 8080:80 &
+          kubectl -n ruptura-system port-forward svc/ruptura-ui 8081:80 &
+          sleep 5
+
+      - name: Assert engine API health endpoint returns 200
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080/api/v2/health || echo "000")
+          echo "engine API status: ${STATUS}"
+          if [ "${STATUS}" != "200" ]; then
+            echo "::error::README Quick Start engine API endpoint did not return 200 (got ${STATUS})"
+            exit 1
+          fi
+
+      - name: Assert dashboard endpoint returns 200
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8081/ || echo "000")
+          echo "dashboard status: ${STATUS}"
+          if [ "${STATUS}" != "200" ]; then
+            echo "::error::README Quick Start dashboard endpoint did not return 200 (got ${STATUS})"
+            exit 1
+          fi
+
+      # ── The exact simulator command from README.md, adapted to the OTLP
+      #    service via port-forward (k3d does not expose NodePorts to the
+      #    runner host by default; port-forward is the CI-portable equivalent
+      #    of "<node-ip>:31470" on a real cluster). ─────────────────────────
+      - name: Send synthetic workloads (README command, port-forwarded)
+        run: |
+          kubectl -n ruptura-system port-forward svc/ruptura-otlp 31470:4317 &
+          sleep 3
+          # simulate.py runs an infinite tick loop by design; `timeout` bounds it
+          # to a few ticks for CI. Exit code 124 (timeout fired) is the expected,
+          # successful outcome here — anything else means the command itself failed.
+          timeout 20s python3 scripts/simulate.py --host localhost --port 31470
+          status=$?
+          if [ "${status}" -ne 124 ] && [ "${status}" -ne 0 ]; then
+            echo "::error::README simulator command failed against the OTLP endpoint (exit ${status})"
+            exit 1
+          fi
+
+      - name: Cleanup k3d cluster
+        if: always()
+        run: k3d cluster delete ruptura-readme-smoke || true

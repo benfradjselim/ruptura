@@ -38,14 +38,20 @@ It ingests telemetry via OTLP and Prometheus remote-write, computes 10 composite
 helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system \
   --create-namespace \
-  --set apiKey=$(openssl rand -hex 32)
+  --set apiKey=$(openssl rand -hex 32) \
+  --set ui.enabled=true
+```
+
+```bash
+kubectl -n ruptura-system port-forward svc/ruptura 8080:80 &      # engine API
+kubectl -n ruptura-system port-forward svc/ruptura-ui 8081:80 &   # dashboard
 ```
 
 | Endpoint | URL |
 |----------|-----|
-| Dashboard | `http://<node-ip>:31469/` |
-| Engine API | `http://<node-ip>:31468/api/v2/health` |
-| OTLP ingest | `<node-ip>:31470` |
+| Dashboard | `http://localhost:8081/` |
+| Engine API | `http://localhost:8080/api/v2/health` |
+| OTLP ingest | `<node-ip>:31470` (fixed NodePort) |
 
 Send synthetic workloads to see all 6 failure modes immediately:
 
