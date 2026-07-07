@@ -1,0 +1,85 @@
+name: Docker Compose — Smoke test
+
+# FBL-A1-5 gate: `docker compose up --build` is the documented no-Kubernetes
+# local path. This builds and runs it for real on every PR/push touching the
+# compose file, the Dockerfiles, or the nginx proxy config, so drift becomes
+# a CI failure instead of a broken laptop demo.
+
+on:
+  pull_request:
+    paths:
+      - "docker-compose.yml"
+      - "deploy/docker-compose-ui-nginx.conf"
+      - "workdir/Dockerfile"
+      - "workdir/ui/Dockerfile"
+      - "workdir/web/**"
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose.yml"
+      - "deploy/docker-compose-ui-nginx.conf"
+      - "workdir/Dockerfile"
+      - "workdir/ui/Dockerfile"
+      - "workdir/web/**"
+  schedule:
+    - cron: "53 4 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: docker compose up --build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: docker compose up --build (README command, verbatim)
+        run: docker compose up --build -d
+
+      - name: Wait for the engine health endpoint
+        run: |
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/v2/health || echo "000")
+            if [ "$status" = "200" ]; then
+              echo "engine healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::engine did not become healthy within 30s"
+          docker compose logs ruptura
+          exit 1
+
+      - name: Assert demo mode seeded workloads (no calibration wait)
+        run: |
+          status=$(curl -s -X POST http://localhost:8080/api/v2/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"username":"admin","password":"ruptura-local-dev"}')
+          token=$(echo "$status" | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
+
+          active=$(curl -s -H "Authorization: Bearer ${token}" http://localhost:8080/api/v2/engine/status \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['analyzer']['active_workloads'])")
+          echo "active_workloads=${active}"
+          if [ "${active}" -lt 12 ]; then
+            echo "::error::expected 12 active demo workloads with no calibration wait, got ${active}"
+            docker compose logs ruptura
+            exit 1
+          fi
+
+      - name: Assert dashboard is reachable
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/ || echo "000")
+          echo "dashboard status: ${status}"
+          if [ "${status}" != "200" ]; then
+            echo "::error::dashboard did not return 200 (got ${status})"
+            docker compose logs ruptura-ui
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v || true

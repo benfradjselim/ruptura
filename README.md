@@ -72,6 +72,23 @@ Send synthetic workloads to see all 6 failure modes immediately:
 python3 scripts/simulate.py --host <node-ip> --port 31470
 ```
 
+### No Kubernetes? Try it locally
+
+```bash
+docker compose up --build
+```
+
+Starts the engine in demo mode (7 days of synthetic baseline data across 12
+workloads, no calibration wait) plus the dashboard — nothing else required.
+Dashboard: `http://localhost:8081/` (log in with any username, password
+`ruptura-local-dev`). Engine API: `http://localhost:8080/api/v2/health`.
+
+For Go development without Docker at all:
+
+```bash
+cd workdir && go run ./cmd/ruptura --demo
+```
+
 ---
 
 ## Key Features
