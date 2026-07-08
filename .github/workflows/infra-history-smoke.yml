@@ -1,0 +1,106 @@
+name: Infra signal history — Smoke test
+
+# FBL-A3-1 gate: deploys to a real k3d cluster (so the Node infra collector
+# has real Kubernetes API objects to watch — Nodes are universal, unlike the
+# OpenShift-specific CRDs some other collectors probe for and skip on
+# vanilla k8s), waits the AC's literal "after 10 min of runtime" window, and
+# asserts GET /api/v2/engine/storage shows non-zero is:/prop: counts and the
+# new GET /api/v2/infra/groups/{group}/history endpoint returns a timeline.
+
+on:
+  pull_request:
+    paths:
+      - "workdir/internal/storage/**"
+      - "workdir/internal/collector/infra/**"
+      - "workdir/internal/api/handlers_infra.go"
+      - "workdir/internal/api/handlers_engine.go"
+  push:
+    branches: [main]
+    paths:
+      - "workdir/internal/storage/**"
+      - "workdir/internal/collector/infra/**"
+      - "workdir/internal/api/handlers_infra.go"
+      - "workdir/internal/api/handlers_engine.go"
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Infra history persists after 10 min (k3d)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k3d
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.29.0"
+
+      - uses: azure/setup-helm@v4
+
+      - name: Create k3d cluster (2 nodes, so the Node collector has real data)
+        run: |
+          k3d cluster create ruptura-infra-smoke --agents 1 --wait --timeout 120s
+          kubectl get nodes
+
+      - name: helm install ruptura in-cluster (needs RBAC to watch Nodes)
+        run: |
+          helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
+            --namespace ruptura-system --create-namespace \
+            --set apiKey=$(openssl rand -hex 32) \
+            --wait --timeout 120s
+          kubectl -n ruptura-system get pods
+
+      - name: Wait 10 minutes (AC's literal runtime requirement)
+        run: sleep 600
+
+      - name: "Assert non-zero is:/prop: counts in /api/v2/engine/storage"
+        run: |
+          kubectl -n ruptura-system port-forward svc/ruptura 8080:80 &
+          sleep 5
+          API_KEY=$(kubectl -n ruptura-system get secret ruptura-secret -o jsonpath='{.data.api-key}' | base64 -d)
+
+          resp=$(curl -sf -H "Authorization: Bearer ${API_KEY}" http://localhost:8080/api/v2/engine/storage)
+          echo "$resp"
+
+          is_count=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin)['retention']['is:'])")
+          prop_count=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin)['retention']['prop:'])")
+
+          if [ "$is_count" -eq 0 ]; then
+            echo "::error::retention['is:'] is 0 after 10 minutes — infra signal history is not being written"
+            kubectl -n ruptura-system logs deployment/ruptura --tail=100
+            exit 1
+          fi
+          if [ "$prop_count" -eq 0 ]; then
+            echo "::error::retention['prop:'] is 0 after 10 minutes — CGPM snapshots are not being written"
+            kubectl -n ruptura-system logs deployment/ruptura --tail=100
+            exit 1
+          fi
+          echo "OK: is:=${is_count} prop:=${prop_count}"
+
+      - name: Assert the group history endpoint returns a timeline
+        run: |
+          API_KEY=$(kubectl -n ruptura-system get secret ruptura-secret -o jsonpath='{.data.api-key}' | base64 -d)
+          resp=$(curl -sf -H "Authorization: Bearer ${API_KEY}" "http://localhost:8080/api/v2/infra/groups/grp.controlplane/history")
+          echo "$resp"
+          count=$(echo "$resp" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['points']))")
+          if [ "$count" -eq 0 ]; then
+            echo "::error::GET /api/v2/infra/groups/grp.controlplane/history returned zero points"
+            exit 1
+          fi
+          echo "OK: ${count} history points"
+
+      - name: Cleanup k3d cluster
+        if: always()
+        run: k3d cluster delete ruptura-infra-smoke || true

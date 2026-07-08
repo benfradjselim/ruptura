@@ -202,7 +202,8 @@ func (h *Handlers) handleEngineStorage(w http.ResponseWriter, _ *http.Request) {
 		Keys          int64 `json:"keys"`
 	}
 	type storageResp struct {
-		Badger badgerSection `json:"badger"`
+		Badger    badgerSection    `json:"badger"`
+		Retention map[string]int64 `json:"retention,omitempty"`
 	}
 
 	if h.store == nil {
@@ -218,5 +219,8 @@ func (h *Handlers) handleEngineStorage(w http.ResponseWriter, _ *http.Request) {
 			NumTables:     bs.NumTables,
 			Keys:          bs.Keys,
 		},
+		// FBL-A3-1 AC: per-prefix counts (including is:/prop:) must be
+		// observable here, proving infra signal history is actually written.
+		Retention: h.store.RetentionStats(),
 	})
 }

@@ -17,26 +17,26 @@ func TestBuildWorkloadSummary_HeadlineGeneration(t *testing.T) {
 	ref := models.WorkloadRef{Namespace: "prod", Kind: "Deployment", Name: "payment-api"}
 
 	tests := []struct {
-		name           string
-		forecast       *models.HealthForecast
-		etaMinutes     int
-		pending        *engine.ActionRecommendation
-		wantWarmingUp  bool
+		name            string
+		forecast        *models.HealthForecast
+		etaMinutes      int
+		pending         *engine.ActionRecommendation
+		wantWarmingUp   bool
 		wantHeadlineHas []string
-		wantTTFSeconds int64
+		wantTTFSeconds  int64
 	}{
 		{
-			name:           "warming-up: no forecast yet",
-			forecast:       nil,
-			etaMinutes:     150, // 2.5h
-			wantWarmingUp:  true,
+			name:            "warming-up: no forecast yet",
+			forecast:        nil,
+			etaMinutes:      150, // 2.5h
+			wantWarmingUp:   true,
 			wantHeadlineHas: []string{"Learning", "payment-api", "baseline", "~2h"},
 		},
 		{
-			name:           "warming-up: sub-hour ETA still renders at least ~1h",
-			forecast:       nil,
-			etaMinutes:     10,
-			wantWarmingUp:  true,
+			name:            "warming-up: sub-hour ETA still renders at least ~1h",
+			forecast:        nil,
+			etaMinutes:      10,
+			wantWarmingUp:   true,
 			wantHeadlineHas: []string{"~1h"},
 		},
 		{
@@ -48,7 +48,7 @@ func TestBuildWorkloadSummary_HeadlineGeneration(t *testing.T) {
 				CriticalETAMinutes: 0,
 				ConfidenceWindow:   60,
 			},
-			wantWarmingUp:  false,
+			wantWarmingUp:   false,
 			wantHeadlineHas: []string{"payment-api", "healthy", "stable"},
 		},
 		{
@@ -58,7 +58,7 @@ func TestBuildWorkloadSummary_HeadlineGeneration(t *testing.T) {
 				CriticalETAMinutes: 0,
 				ConfidenceWindow:   60,
 			},
-			wantWarmingUp:  false,
+			wantWarmingUp:   false,
 			wantHeadlineHas: []string{"payment-api", "healthy", "improving"},
 		},
 		{
@@ -68,9 +68,9 @@ func TestBuildWorkloadSummary_HeadlineGeneration(t *testing.T) {
 				CriticalETAMinutes: 42,
 				ConfidenceWindow:   54, // 90% of 60
 			},
-			wantWarmingUp:  false,
+			wantWarmingUp:   false,
 			wantHeadlineHas: []string{"payment-api", "predicted to breach", "42 minutes", "90% confidence", "Recommended action"},
-			wantTTFSeconds: 42 * 60,
+			wantTTFSeconds:  42 * 60,
 		},
 		{
 			name: "breaching: with a queued scale action",
@@ -84,9 +84,9 @@ func TestBuildWorkloadSummary_HeadlineGeneration(t *testing.T) {
 				ActionType: "scale",
 				ScaleDelta: 2,
 			},
-			wantWarmingUp:  false,
+			wantWarmingUp:   false,
 			wantHeadlineHas: []string{"Scale out by 2 replica"},
-			wantTTFSeconds: 5 * 60,
+			wantTTFSeconds:  5 * 60,
 		},
 		{
 			name: "breaching: over an hour renders in hours",
@@ -95,9 +95,9 @@ func TestBuildWorkloadSummary_HeadlineGeneration(t *testing.T) {
 				CriticalETAMinutes: 130,
 				ConfidenceWindow:   60,
 			},
-			wantWarmingUp:  false,
+			wantWarmingUp:   false,
 			wantHeadlineHas: []string{"2 hours"},
-			wantTTFSeconds: 130 * 60,
+			wantTTFSeconds:  130 * 60,
 		},
 	}
 

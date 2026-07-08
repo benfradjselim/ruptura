@@ -2,10 +2,12 @@ package dag
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/collector/infra"
+	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
 // Registry probes, starts, and aggregates all registered InfraCollectors.
@@ -17,6 +19,7 @@ type Registry struct {
 	active         []infra.InfraCollector
 	groupSnapshots map[string]infra.GroupSnapshot // key: group+"|"+namespace
 	propagator     *Propagator
+	persister      Persister // optional; nil = no persistence (FBL-A3-1)
 }
 
 // NewRegistry creates an empty Registry with an initialized Propagator.
@@ -248,7 +251,53 @@ func (r *Registry) tick() {
 			namespaces[s.Namespace] = struct{}{}
 		}
 	}
+	var propResults []PropagationResult
 	for ns := range namespaces {
-		r.propagator.Tick(ns, snapshots)
+		propResults = append(propResults, r.propagator.Tick(ns, snapshots))
+	}
+
+	r.mu.RLock()
+	persister := r.persister
+	r.mu.RUnlock()
+	if persister != nil {
+		r.persist(persister, allSignals, snapshots, propResults, now)
+	}
+}
+
+// persist writes one tick's worth of infra signal history (FBL-A3-1):
+// raw object signals (is:), group health + noise (gh:/gni:), and one CGPM
+// snapshot covering every namespace ticked this cycle (prop:). Errors are
+// logged, never returned — a persistence failure must never break the live
+// in-memory aggregation the analyzer/API depend on.
+func (r *Registry) persist(p Persister, signals []infra.InfraSignal, snapshots []infra.GroupSnapshot, propResults []PropagationResult, now time.Time) {
+	for _, sig := range signals {
+		obj := sig.Object
+		if err := p.PutInfraSignal(obj.Group, obj.Scope, obj.Namespace, obj.Kind, obj.Name, sig.Signal, sig.Timestamp, sig.Value); err != nil {
+			logger.Default.Error("persist infra signal", "err", err)
+		}
+	}
+	for _, snap := range snapshots {
+		if err := p.PutGroupHealth(snap.Group, snap.Namespace, snap.Timestamp, snap.Health); err != nil {
+			logger.Default.Error("persist group health", "err", err)
+		}
+		// gni:{group}:{ts} is cluster-wide per group, not namespace-scoped
+		// (unlike gh:) — only persist from the cluster-scoped snapshot so
+		// concurrent per-namespace snapshots at the same tick timestamp don't
+		// silently overwrite each other's GNI value under the same key.
+		if snap.Namespace == "" {
+			if err := p.PutGroupNoise(snap.Group, snap.Timestamp, snap.GNI); err != nil {
+				logger.Default.Error("persist group noise", "err", err)
+			}
+		}
+	}
+	if len(propResults) > 0 {
+		payload, err := json.Marshal(propResults)
+		if err != nil {
+			logger.Default.Error("marshal propagation snapshot", "err", err)
+			return
+		}
+		if err := p.PutPropagationSnapshot(now, payload); err != nil {
+			logger.Default.Error("persist propagation snapshot", "err", err)
+		}
 	}
 }

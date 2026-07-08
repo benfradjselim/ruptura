@@ -175,6 +175,7 @@ func (h *Handlers) NewRouter() http.Handler {
 
 	// Infra collector — GroupSnapshot aggregates and CGPM propagation
 	api.HandleFunc("/infra/groups", h.handleInfraGroups).Methods("GET")
+	api.HandleFunc("/infra/groups/{group}/history", h.handleInfraGroupHistory).Methods("GET")
 	api.HandleFunc("/infra/nodes", h.handleInfraNodes).Methods("GET")
 	api.HandleFunc("/infra/mcp", h.handleInfraMCP).Methods("GET")
 	api.HandleFunc("/infra/operators", h.handleInfraOperators).Methods("GET")

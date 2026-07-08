@@ -258,6 +258,10 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if tenancyCol, err := tenancy.New(); err == nil {
 		infraRegistry.Add(tenancyCol)
 	}
+	// FBL-A3-1: persist infra signal history (is:/gh:/gni:/prop: prefixes) —
+	// store already satisfies dag.Persister; nil (unset) would silently skip
+	// persistence, so this must run before Run() starts ticking.
+	infraRegistry.SetPersister(store)
 	go infraRegistry.Run(ctx)
 	analyzerEngine.SetInfraRegistry(infraRegistry)
 

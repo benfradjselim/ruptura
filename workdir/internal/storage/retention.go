@@ -87,6 +87,15 @@ func (s *Store) Compact() {
 	if err := s.compactTier("kr5:", "kr1h:", time.Hour, cut5m, Rollup1hTTL); err != nil {
 		logger.Default.Error("compact 5m->1h kpis", "err", err)
 	}
+	// raw → 5m (infra signals, FBL-A3-1) — compactTier is generic over the
+	// series-identity prefix, so the 6-segment is: key schema works unchanged.
+	if err := s.compactTier("is:", "is5:", 5*time.Minute, cutRaw, Rollup5mTTL); err != nil {
+		logger.Default.Error("compact raw->5m infra signals", "err", err)
+	}
+	// 5m → 1h (infra signals)
+	if err := s.compactTier("is5:", "is1h:", time.Hour, cut5m, Rollup1hTTL); err != nil {
+		logger.Default.Error("compact 5m->1h infra signals", "err", err)
+	}
 }
 
 // compactTier reads all source keys older than cutoff, groups them into buckets
@@ -208,7 +217,10 @@ func mean(vals []float64) float64 {
 
 // RetentionStats returns counts of keys per tier for observability.
 func (s *Store) RetentionStats() map[string]int64 {
-	prefixes := []string{"m:", "kpi:", "r5:", "kr5:", "r1h:", "kr1h:"}
+	prefixes := []string{
+		"m:", "kpi:", "r5:", "kr5:", "r1h:", "kr1h:",
+		"is:", "is5:", "is1h:", "gh:", "gni:", "prop:",
+	}
 	stats := make(map[string]int64, len(prefixes))
 	for _, pfx := range prefixes {
 		var count int64

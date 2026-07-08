@@ -173,6 +173,13 @@ func (s *Store) set(key string, value interface{}, ttl time.Duration) error {
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
+	return s.setRaw(key, data, ttl)
+}
+
+// setRaw writes pre-encoded bytes verbatim — used where the caller already
+// holds a JSON payload and a second json.Marshal([]byte) would double-encode
+// it (base64-wrapping real JSON instead of storing it directly).
+func (s *Store) setRaw(key string, data []byte, ttl time.Duration) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		entry := badger.NewEntry([]byte(key), data)
 		if ttl > 0 {
@@ -434,6 +441,90 @@ func (s *Store) rangeQueryKPI(prefix string, from, to time.Time) ([]KPISample, e
 			})
 			results = append(results, KPISample{Timestamp: ts, Value: v})
 		}
+		return nil
+	})
+	return results, err
+}
+
+// --- Infra signal history (v8.0 Infrastructure & Cluster Intelligence Layer) ---
+// Key schema (docs/v8.0.0/RUPTURA-PLATFORM-EXTENSION.md §6.4, additive-only,
+// never change existing prefixes — see CLAUDE.md §3.1):
+//
+//	is:{group}:{scope}:{ns}:{kind}:{name}:{signal}:{ts}   raw object signal   7d
+//	is5:  / is1h:                                          rollups            35d / 400d
+//	gh:{group}:{ns}:{ts}                                   group health       35d
+//	gni:{group}:{ts}                                       group noise index  35d
+//	prop:{ts}                                              CGPM snapshot      24h
+const (
+	InfraSignalsTTL = 7 * 24 * time.Hour
+	GroupHealthTTL  = 35 * 24 * time.Hour
+	GroupNoiseTTL   = 35 * 24 * time.Hour
+	PropagationTTL  = 24 * time.Hour
+)
+
+// PutInfraSignal stores one raw dual-axis object signal value.
+func (s *Store) PutInfraSignal(group, scope, ns, kind, name, signal string, ts time.Time, value float64) error {
+	prefix := fmt.Sprintf("is:%s:%s:%s:%s:%s:%s:", group, scope, ns, kind, name, signal)
+	key := tsKey(prefix, ts)
+	return s.set(key, value, InfraSignalsTTL)
+}
+
+// ListInfraSignal retrieves raw object signal values within [from, to].
+func (s *Store) ListInfraSignal(group, scope, ns, kind, name, signal string, from, to time.Time) ([]MetricSample, error) {
+	prefix := fmt.Sprintf("is:%s:%s:%s:%s:%s:%s:", group, scope, ns, kind, name, signal)
+	return s.rangeQueryMetrics(prefix, from, to)
+}
+
+// PutGroupHealth stores one GroupSnapshot.Health value for a group within a
+// namespace ("" for cluster-scoped groups).
+func (s *Store) PutGroupHealth(group, ns string, ts time.Time, health float64) error {
+	prefix := fmt.Sprintf("gh:%s:%s:", group, ns)
+	key := tsKey(prefix, ts)
+	return s.set(key, health, GroupHealthTTL)
+}
+
+// ListGroupHealth retrieves group health history within [from, to] — the
+// timeline behind GET /api/v2/infra/groups/{group}/history.
+func (s *Store) ListGroupHealth(group, ns string, from, to time.Time) ([]MetricSample, error) {
+	prefix := fmt.Sprintf("gh:%s:%s:", group, ns)
+	return s.rangeQueryMetrics(prefix, from, to)
+}
+
+// PutGroupNoise stores one GroupSnapshot.GNI (Group Noise Index) value,
+// cluster-wide per group (not namespace-scoped, per the design's key schema).
+func (s *Store) PutGroupNoise(group string, ts time.Time, gni float64) error {
+	prefix := fmt.Sprintf("gni:%s:", group)
+	key := tsKey(prefix, ts)
+	return s.set(key, gni, GroupNoiseTTL)
+}
+
+// ListGroupNoise retrieves group noise index history within [from, to].
+func (s *Store) ListGroupNoise(group string, from, to time.Time) ([]MetricSample, error) {
+	prefix := fmt.Sprintf("gni:%s:", group)
+	return s.rangeQueryMetrics(prefix, from, to)
+}
+
+// PutPropagationSnapshot stores one CGPM tick's propagation result payload
+// (JSON-encoded by the caller — the dag package owns the shape).
+func (s *Store) PutPropagationSnapshot(ts time.Time, payload []byte) error {
+	key := tsKey("prop:", ts)
+	// payload is already-encoded JSON (the dag package's caller marshals it) —
+	// setRaw avoids double-encoding it through s.set's own json.Marshal.
+	return s.setRaw(key, payload, PropagationTTL)
+}
+
+// ListPropagationSnapshots retrieves raw CGPM snapshot payloads within [from, to].
+func (s *Store) ListPropagationSnapshots(from, to time.Time) ([][]byte, error) {
+	prefix := "prop:"
+	seekKey := []byte(tsKey(prefix, from))
+	endKey := []byte(tsKey(prefix, to))
+
+	var results [][]byte
+	err := s.listByPrefix(prefix, func(key, val []byte) error {
+		if string(key) < string(seekKey) || string(key) > string(endKey) {
+			return nil
+		}
+		results = append(results, val)
 		return nil
 	})
 	return results, err
