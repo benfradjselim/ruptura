@@ -121,6 +121,114 @@ func TestOTLPMetrics_gauge(t *testing.T) {
 	}
 }
 
+// TestOTLPMetrics_PodResolvesToOwningDeployment is FBL-V2's core regression
+// test: a pod-scoped OTLP resource (k8s.pod.name, no explicit deployment
+// attribute — the shape a cAdvisor/eBPF-style exporter actually sends) must
+// register under its owning Deployment, not the pod's own ReplicaSet-hash
+// name, once an owner resolver is wired.
+func TestOTLPMetrics_PodResolvesToOwningDeployment(t *testing.T) {
+	mp := &mockPipeline{}
+	e := New(mp, nil, nil, nil, nil)
+	e.SetOwnerResolver(func(ns, podName string) (kind, name string, ok bool) {
+		if ns == "prod" && podName == "web-stable-58cdf6849d-n5l2d" {
+			return "Deployment", "web-stable", true
+		}
+		return "", "", false
+	})
+
+	body := `{"resourceMetrics":[{"resource":{"attributes":[
+		{"key":"k8s.namespace.name","value":{"stringValue":"prod"}},
+		{"key":"k8s.pod.name","value":{"stringValue":"web-stable-58cdf6849d-n5l2d"}}
+	]},"scopeMetrics":[{"metrics":[{"name":"cpu","gauge":{"dataPoints":[{"asDouble":0.5,"timeUnixNano":"1000000000"}]}}]}]}]}`
+	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	e.handleOTLPMetrics(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if len(mp.ingested) != 1 {
+		t.Fatalf("expected 1 metric, got %d", len(mp.ingested))
+	}
+	if got, want := mp.ingested[0].host, "prod/Deployment/web-stable"; got != want {
+		t.Errorf("host = %q, want %q (owning Deployment, not the pod name)", got, want)
+	}
+}
+
+// TestOTLPMetrics_PodOwnerUnresolved_FallsBackToPodAsHost covers the
+// transient case (no resolver wired, or the informer hasn't seen this pod's
+// owner yet): telemetry must still be ingested, degraded to a pod-keyed
+// "host" identity, rather than silently dropped.
+func TestOTLPMetrics_PodOwnerUnresolved_FallsBackToPodAsHost(t *testing.T) {
+	mp := &mockPipeline{}
+	e := New(mp, nil, nil, nil, nil) // no SetOwnerResolver call
+
+	body := `{"resourceMetrics":[{"resource":{"attributes":[
+		{"key":"k8s.namespace.name","value":{"stringValue":"prod"}},
+		{"key":"k8s.pod.name","value":{"stringValue":"web-stable-58cdf6849d-n5l2d"}}
+	]},"scopeMetrics":[{"metrics":[{"name":"cpu","gauge":{"dataPoints":[{"asDouble":0.5,"timeUnixNano":"1000000000"}]}}]}]}]}`
+	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	e.handleOTLPMetrics(w, req)
+
+	if len(mp.ingested) != 1 {
+		t.Fatalf("expected 1 metric (degraded, not dropped), got %d", len(mp.ingested))
+	}
+	if got, want := mp.ingested[0].host, "prod/host/web-stable-58cdf6849d-n5l2d"; got != want {
+		t.Errorf("host = %q, want %q", got, want)
+	}
+}
+
+// TestOTLPMetrics_NodeScopedTelemetry_NeverRegisteredAsWorkload is FBL-V2's
+// other AC half: a resource carrying only k8s.node.name (real node-level
+// metrics, no pod/service/workload attribute at all) must never become a
+// fleet entry — it's dropped, not registered under the node's name.
+func TestOTLPMetrics_NodeScopedTelemetry_NeverRegisteredAsWorkload(t *testing.T) {
+	mp := &mockPipeline{}
+	e := New(mp, nil, nil, nil, nil)
+
+	body := `{"resourceMetrics":[{"resource":{"attributes":[
+		{"key":"k8s.node.name","value":{"stringValue":"k3s-lab-ruptura-3a97-node-pool-1"}}
+	]},"scopeMetrics":[{"metrics":[{"name":"node_cpu_percent","gauge":{"dataPoints":[{"asDouble":0.3,"timeUnixNano":"1000000000"}]}}]}]}]}`
+	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	e.handleOTLPMetrics(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if len(mp.ingested) != 0 {
+		t.Errorf("expected 0 metrics (node telemetry must never become a fleet workload), got %d: %+v", len(mp.ingested), mp.ingested)
+	}
+}
+
+// TestOTLPMetrics_BareHostTelemetry_StillRegistersAsHost is the negative
+// case for the node-exclusion fix: a plain host.name attribute with no
+// k8s.node.name at all is the documented non-K8s bare-metal/VM path
+// (WorkloadRef's own doc comment) and must keep working exactly as before —
+// this guards against over-broadly treating any "node"-like identity as
+// excluded.
+func TestOTLPMetrics_BareHostTelemetry_StillRegistersAsHost(t *testing.T) {
+	mp := &mockPipeline{}
+	e := New(mp, nil, nil, nil, nil)
+
+	body := `{"resourceMetrics":[{"resource":{"attributes":[{"key":"host.name","value":{"stringValue":"h1"}}]},"scopeMetrics":[{"metrics":[{"name":"cpu","gauge":{"dataPoints":[{"asDouble":1.0,"timeUnixNano":"1000000000"}]}}]}]}]}`
+	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	e.handleOTLPMetrics(w, req)
+
+	if len(mp.ingested) != 1 {
+		t.Fatalf("expected 1 metric (bare-metal host telemetry), got %d", len(mp.ingested))
+	}
+	if got, want := mp.ingested[0].host, "default/host/h1"; got != want {
+		t.Errorf("host = %q, want %q", got, want)
+	}
+}
+
 func TestOTLPMetrics_sum(t *testing.T) {
 	mp := &mockPipeline{}
 	e := New(mp, nil, nil, nil, nil)

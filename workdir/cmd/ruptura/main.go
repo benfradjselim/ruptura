@@ -226,6 +226,12 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if disc, err := discovery.NewInformer(); err == nil {
 		logger.Default.Info("k8s auto-discovery active — watching Deployments/StatefulSets/DaemonSets")
 		inf = disc
+		// FBL-V2: let the ingest path resolve pod-scoped telemetry to its
+		// owning Deployment/StatefulSet/DaemonSet via the informer's
+		// already-known ownerReferences, instead of registering the pod
+		// itself (an unstable, ReplicaSet-hash-suffixed name) as a fleet
+		// workload.
+		ingestEngine.SetOwnerResolver(disc.ResolvePodOwner)
 		// FBL-A3-4 / REFERENCE.md A8: the informer is the single source of
 		// truth for k8s workload registration. Once its first LIST sync
 		// completes across all watched kinds, prune any Deployment/

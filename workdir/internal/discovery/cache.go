@@ -128,6 +128,45 @@ func isRSOwnedBy(rsName, deploymentName string) bool {
 	return len(suffix) > 0 && !strings.Contains(suffix, "/")
 }
 
+// ResolvePodOwner returns the owning Deployment/StatefulSet/DaemonSet for a
+// pod already observed by the pod watch loop (runPodLoop), or ok=false if
+// the pod isn't cached yet or its owner can't be resolved (e.g. a bare Pod
+// with no matching controller, or a ReplicaSet whose owning Deployment
+// hasn't been listed yet). For ReplicaSet-owned pods (the Deployment case),
+// the ReplicaSet name is matched against known Deployment names in the same
+// namespace via the same "<deployment>-<hash>" prefix rule podsForWorkload
+// already uses for the reverse (workload -> pods) lookup.
+func (c *MetadataCache) ResolvePodOwner(ns, podName string) (kind, name string, ok bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var pod *cachedPod
+	for i := range c.pods {
+		if c.pods[i].namespace == ns && c.pods[i].info.Name == podName {
+			pod = &c.pods[i]
+			break
+		}
+	}
+	if pod == nil {
+		return "", "", false
+	}
+
+	switch pod.ownerKind {
+	case "StatefulSet", "DaemonSet":
+		return pod.ownerKind, pod.ownerName, true
+	case "ReplicaSet":
+		for _, m := range c.workloads {
+			if m.Kind != "Deployment" || m.Namespace != ns {
+				continue
+			}
+			if isRSOwnedBy(pod.ownerName, m.Name) {
+				return "Deployment", m.Name, true
+			}
+		}
+	}
+	return "", "", false
+}
+
 func (c *MetadataCache) upsertPod(p cachedPod) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

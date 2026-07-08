@@ -86,6 +86,61 @@ func TestMetadataCache_DeletePod(t *testing.T) {
 	}
 }
 
+// TestMetadataCache_ResolvePodOwner is FBL-V2's core cache-level regression
+// test: forward lookup (pod name -> owner), the direction podsForWorkload
+// never provided, which is what lets the ingest path resolve a pod's real
+// treatment unit instead of registering the pod itself as a "host" workload.
+func TestMetadataCache_ResolvePodOwner(t *testing.T) {
+	c := newMetadataCache()
+	c.setWorkload("ns", "Deployment", "web-stable", WorkloadMeta{Namespace: "ns", Kind: "Deployment", Name: "web-stable"})
+	c.upsertPod(cachedPod{
+		namespace: "ns", ownerKind: "ReplicaSet", ownerName: "web-stable-58cdf6849d",
+		info: PodInfo{Name: "web-stable-58cdf6849d-n5l2d", Node: "node-1"},
+	})
+	c.setWorkload("ns", "StatefulSet", "db", WorkloadMeta{Namespace: "ns", Kind: "StatefulSet", Name: "db"})
+	c.upsertPod(cachedPod{
+		namespace: "ns", ownerKind: "StatefulSet", ownerName: "db",
+		info: PodInfo{Name: "db-0"},
+	})
+
+	tests := []struct {
+		name     string
+		ns, pod  string
+		wantKind string
+		wantName string
+		wantOK   bool
+	}{
+		{"pod owned by a Deployment via ReplicaSet", "ns", "web-stable-58cdf6849d-n5l2d", "Deployment", "web-stable", true},
+		{"pod directly owned by a StatefulSet", "ns", "db-0", "StatefulSet", "db", true},
+		{"unknown pod", "ns", "never-seen-pod-abc123", "", "", false},
+		{"known pod name, wrong namespace", "other-ns", "web-stable-58cdf6849d-n5l2d", "", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotKind, gotName, gotOK := c.ResolvePodOwner(tt.ns, tt.pod)
+			if gotKind != tt.wantKind || gotName != tt.wantName || gotOK != tt.wantOK {
+				t.Errorf("ResolvePodOwner(%q, %q) = (%q, %q, %v), want (%q, %q, %v)",
+					tt.ns, tt.pod, gotKind, gotName, gotOK, tt.wantKind, tt.wantName, tt.wantOK)
+			}
+		})
+	}
+}
+
+// TestMetadataCache_ResolvePodOwner_ReplicaSetOwnerNotYetKnown covers the
+// transient case: the pod's ReplicaSet is known, but the owning Deployment
+// hasn't been listed by the informer yet (race at startup, or a Deployment
+// scaled to zero and never observed). Must resolve as unknown, not guess.
+func TestMetadataCache_ResolvePodOwner_ReplicaSetOwnerNotYetKnown(t *testing.T) {
+	c := newMetadataCache()
+	c.upsertPod(cachedPod{
+		namespace: "ns", ownerKind: "ReplicaSet", ownerName: "web-stable-58cdf6849d",
+		info: PodInfo{Name: "web-stable-58cdf6849d-n5l2d"},
+	})
+	if _, _, ok := c.ResolvePodOwner("ns", "web-stable-58cdf6849d-n5l2d"); ok {
+		t.Error("expected ok=false when the owning Deployment hasn't been listed yet")
+	}
+}
+
 func TestIsRSOwnedBy(t *testing.T) {
 	cases := []struct {
 		rs, dep string

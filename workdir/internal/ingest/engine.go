@@ -61,6 +61,13 @@ type Engine struct {
 	traceR      TraceRSink
 	ingestHook  func(source string) // optional; called once per ingested item
 
+	// ownerResolver looks up the owning Deployment/StatefulSet/DaemonSet for
+	// a pod (namespace + pod name). Backed by the discovery informer's
+	// already-known ownerReferences when running in-cluster; nil when not
+	// (bare-metal/VM/demo mode, where pod-scoped k8s attributes never
+	// appear anyway). See SetOwnerResolver and resolveFleetWorkloadRef.
+	ownerResolver func(ns, podName string) (kind, name string, ok bool)
+
 	activeSeries sync.Map
 	seriesCount  int32
 
@@ -95,6 +102,16 @@ func (e *Engine) SetLogPipeline(sink LogSink) { e.logPipeline = sink }
 // SetIngestHook registers a callback invoked once per ingested log or trace item.
 // Used to forward counts to the telemetry registry for Prometheus export.
 func (e *Engine) SetIngestHook(fn func(source string)) { e.ingestHook = fn }
+
+// SetOwnerResolver wires a pod-name -> owning-controller lookup (typically
+// (*discovery.Informer).ResolvePodOwner) used by the metrics ingestion path
+// to register pod telemetry under its real treatment unit (FBL-V2). Passed
+// as a plain func rather than importing the discovery package directly, to
+// avoid a new inter-package dependency for what's fundamentally an optional,
+// in-cluster-only enrichment — same pattern as SetLogStore/SetLogPipeline.
+func (e *Engine) SetOwnerResolver(fn func(ns, podName string) (kind, name string, ok bool)) {
+	e.ownerResolver = fn
+}
 
 // rateLimiter is a simple token-bucket middleware for the ingest HTTP server.
 // Capacity and refill rate are configurable via RUPTURA_INGEST_RPS env variable.
@@ -246,6 +263,82 @@ func inferWorkloadKind(r models.OTLPResource) string {
 	}
 }
 
+// resolveFleetWorkloadRef is extractWorkloadRef's fleet-registration-aware
+// counterpart (FBL-V2). Used only by handleOTLPMetrics — the one path whose
+// output (via e.pipeline.Ingest) actually becomes a fleet entry — so its
+// two behavior changes are scoped to exactly where the observed bug was:
+//
+//  1. A resource carrying a pod name (k8s.pod.name) but no explicit
+//     deployment/statefulset/daemonset/job attribute is resolved to its
+//     OWNING controller via e.ownerResolver instead of being registered as
+//     a "host" workload keyed by the pod's own (ReplicaSet-hash-suffixed,
+//     unstable) name. If the owner isn't resolvable yet (no resolver wired,
+//     or the informer hasn't observed this pod/owner), the pod name is kept
+//     as a degraded "host" identity rather than dropping real telemetry —
+//     informers catch up within one LIST/WATCH cycle, this is a transient
+//     state, not a silent data loss.
+//  2. A resource carrying only node identity (k8s.node.name/host.name) and
+//     no pod/service/workload attribute at all is node-scoped telemetry,
+//     not workload telemetry — skip=true tells the caller to drop it rather
+//     than registering a fleet entry keyed by node name. Nodes surface via
+//     the v8 infra layer's node collector (grp.controlplane), not the fleet.
+//
+// extractWorkloadRef/inferWorkloadKind are left unchanged and still used by
+// the logs/traces handlers, which use the resulting ref only as an
+// auxiliary correlation key (service name, workload label on a log line,
+// trace-derived R score) — not as new fleet registrations — so their
+// existing node-as-host fallback behavior is preserved deliberately rather
+// than risked here.
+func (e *Engine) resolveFleetWorkloadRef(r models.OTLPResource) (ref models.WorkloadRef, skip bool) {
+	ns := r.GetAttr("k8s.namespace.name")
+	if ns == "" {
+		ns = "default"
+	}
+	// k8sNode (a real Kubernetes Node object) is tracked separately from the
+	// combined node identity: a bare host.name with no k8s.node.name at all
+	// is the legitimate non-k8s bare-metal/VM case (WorkloadRef's own doc
+	// comment: "For non-K8s: Kind=host, Name=hostname") and must keep
+	// falling back to a "host" workload exactly as before — only a genuine
+	// k8s.node.name with no pod/service/workload context is the FBL-V2
+	// node-exclusion case.
+	k8sNode := r.GetAttr("k8s.node.name")
+	node := models.FirstNonEmpty(k8sNode, r.GetAttr("host.name"))
+
+	if dep := r.GetAttr("k8s.deployment.name"); dep != "" {
+		return models.WorkloadRef{Namespace: ns, Kind: "Deployment", Name: dep, Node: node}, false
+	}
+	if ss := r.GetAttr("k8s.statefulset.name"); ss != "" {
+		return models.WorkloadRef{Namespace: ns, Kind: "StatefulSet", Name: ss, Node: node}, false
+	}
+	if ds := r.GetAttr("k8s.daemonset.name"); ds != "" {
+		return models.WorkloadRef{Namespace: ns, Kind: "DaemonSet", Name: ds, Node: node}, false
+	}
+	if job := r.GetAttr("k8s.job.name"); job != "" {
+		return models.WorkloadRef{Namespace: ns, Kind: "Job", Name: job, Node: node}, false
+	}
+
+	if pod := r.GetAttr("k8s.pod.name"); pod != "" {
+		if e.ownerResolver != nil {
+			if kind, name, ok := e.ownerResolver(ns, pod); ok {
+				return models.WorkloadRef{Namespace: ns, Kind: kind, Name: name, Node: node}, false
+			}
+		}
+		return models.WorkloadRef{Namespace: ns, Kind: "host", Name: pod, Node: node}, false
+	}
+
+	if svc := r.GetAttr("service.name"); svc != "" {
+		return models.WorkloadRef{Namespace: ns, Kind: "host", Name: svc, Node: node}, false
+	}
+
+	if k8sNode != "" {
+		// Genuine k8s Node telemetry with no pod/service/workload attribute
+		// at all — node identity, not workload identity (FBL-V2 AC).
+		return models.WorkloadRef{}, true
+	}
+
+	return models.WorkloadRef{Namespace: ns, Kind: "host", Name: node, Node: node}, false
+}
+
 func (e *Engine) handleRemoteWrite(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -307,7 +400,11 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	req := *decoded
 	for _, rm := range req.ResourceMetrics {
-		ref := extractWorkloadRef(rm.Resource)
+		ref, skip := e.resolveFleetWorkloadRef(rm.Resource)
+		if skip {
+			// Node-scoped telemetry (FBL-V2) — never a fleet workload.
+			continue
+		}
 		var host string
 		if !ref.IsEmpty() {
 			host = ref.Key() // prefer workload identity (namespace/kind/name) over node name

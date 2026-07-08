@@ -71,6 +71,18 @@ func (inf *Informer) GetWorkloadMeta(ns, kind, name string) (WorkloadMeta, bool)
 	return inf.cache.Get(ns, kind, name)
 }
 
+// ResolvePodOwner returns the owning Deployment/StatefulSet/DaemonSet for a
+// pod name already observed by the informer's pod watch, or ok=false when
+// the informer isn't running or hasn't seen that pod/its owner yet.
+// FBL-V2: lets the ingest path resolve pod-scoped telemetry to its real
+// treatment unit instead of registering the pod itself as a "host" workload.
+func (inf *Informer) ResolvePodOwner(ns, podName string) (kind, name string, ok bool) {
+	if inf == nil || inf.cache == nil {
+		return "", "", false
+	}
+	return inf.cache.ResolvePodOwner(ns, podName)
+}
+
 // Run starts goroutines for workload + pod watching and blocks until ctx is cancelled.
 // onAdd is called for every ADDED/MODIFIED workload event; onDelete for DELETED.
 // onFirstSync (may be nil) is called exactly once, after the initial LIST phase
