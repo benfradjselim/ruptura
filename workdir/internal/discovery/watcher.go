@@ -42,11 +42,16 @@ type listResponse struct {
 }
 
 // watchResource runs a perpetual LIST+WATCH loop for one resource type.
-// It calls onAdd/onDelete for each event and reconnects on errors.
+// It calls onAdd/onDelete for each event and reconnects on errors. onFirstList
+// (may be nil) is called once, after the very first successful LIST — not on
+// subsequent relists (410 Gone, stream drops, etc.), which is why it's
+// signaled here rather than left for the caller to infer from onAdd (a
+// resource type with zero live objects would otherwise never signal at all).
 // Exported as a method so tests can inject a custom apiBase and httpClient.
-func (inf *Informer) watchResource(ctx context.Context, res resource, onAdd, onDelete func(models.WorkloadRef)) {
+func (inf *Informer) watchResource(ctx context.Context, res resource, onAdd, onDelete func(models.WorkloadRef), onFirstList func()) {
 	backoff := time.Second
 	const maxBackoff = 30 * time.Second
+	firstListDone := false
 
 	for {
 		if ctx.Err() != nil {
@@ -68,6 +73,13 @@ func (inf *Informer) watchResource(ctx context.Context, res resource, onAdd, onD
 			continue
 		}
 		backoff = time.Second // reset after successful list
+
+		if !firstListDone {
+			firstListDone = true
+			if onFirstList != nil {
+				onFirstList()
+			}
+		}
 
 		// WATCH from the resource version we got from the list.
 		relistNeeded, err := inf.watchStream(ctx, res, rv, onAdd, onDelete)

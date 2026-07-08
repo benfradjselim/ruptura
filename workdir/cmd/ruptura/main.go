@@ -226,7 +226,33 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if disc, err := discovery.NewInformer(); err == nil {
 		logger.Default.Info("k8s auto-discovery active — watching Deployments/StatefulSets/DaemonSets")
 		inf = disc
-		go disc.Run(ctx, analyzerEngine.RegisterWorkload, analyzerEngine.UnregisterWorkload)
+		// FBL-A3-4 / REFERENCE.md A8: the informer is the single source of
+		// truth for k8s workload registration. Once its first LIST sync
+		// completes across all watched kinds, prune any Deployment/
+		// StatefulSet/DaemonSet the analyzer has registered that k8s didn't
+		// actually confirm — this is the fix for the historical "23 vs 17"
+		// fleet-count drift (a stale/renamed workload lingering after a
+		// Prometheus/OTLP scrape re-registered it post-deletion). Telemetry-
+		// only, non-k8s hosts (Kind="host", bare-metal/VM/demo mode) are
+		// never touched — they were never k8s-known to begin with.
+		k8sManagedKinds := map[string]bool{"Deployment": true, "StatefulSet": true, "DaemonSet": true}
+		go disc.Run(ctx, analyzerEngine.RegisterWorkload, analyzerEngine.UnregisterWorkload, func() {
+			known := make(map[string]bool)
+			for _, ref := range disc.KnownRefs() {
+				known[ref.Key()] = true
+			}
+			pruned := 0
+			for _, ref := range analyzerEngine.AllWorkloadRefs() {
+				if !k8sManagedKinds[ref.Kind] {
+					continue
+				}
+				if !known[ref.Key()] {
+					analyzerEngine.UnregisterWorkload(ref)
+					pruned++
+				}
+			}
+			logger.Default.Info("discovery: first sync complete", "known_workloads", len(known), "pruned_stale", pruned)
+		})
 	} else {
 		logger.Default.Info("k8s auto-discovery skipped (not in-cluster)", "reason", err.Error())
 	}

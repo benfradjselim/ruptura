@@ -71,6 +71,7 @@ func TestWatchResource_ListCallsOnAdd(t *testing.T) {
 				mu.Unlock()
 			},
 			func(models.WorkloadRef) {},
+			nil,
 		)
 	}()
 
@@ -138,6 +139,7 @@ func TestWatchResource_WatchEventsRoutedCorrectly(t *testing.T) {
 		inf.watchResource(ctx, res,
 			func(ref models.WorkloadRef) { mu.Lock(); added = append(added, ref.Name); mu.Unlock() },
 			func(ref models.WorkloadRef) { mu.Lock(); deleted = append(deleted, ref.Name); mu.Unlock() },
+			nil,
 		)
 	}()
 
@@ -192,7 +194,7 @@ func TestWatchResource_410Gone_TriggersRelist(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		inf.watchResource(ctx, res, func(models.WorkloadRef) {}, func(models.WorkloadRef) {})
+		inf.watchResource(ctx, res, func(models.WorkloadRef) {}, func(models.WorkloadRef) {}, nil)
 	}()
 
 	deadline := time.Now().Add(2 * time.Second)
@@ -232,7 +234,7 @@ func TestWatchResource_ContextCancel(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		res := resource{path: "apis/apps/v1/deployments", kind: "Deployment"}
-		inf.watchResource(ctx, res, func(models.WorkloadRef) {}, func(models.WorkloadRef) {})
+		inf.watchResource(ctx, res, func(models.WorkloadRef) {}, func(models.WorkloadRef) {}, nil)
 		close(done)
 	}()
 

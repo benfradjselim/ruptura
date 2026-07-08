@@ -1,0 +1,98 @@
+name: Discovery drift — Smoke test
+
+# FBL-A3-4 gate: reproduces the historical "23 vs 17" fleet-count drift on a
+# real k3d cluster — deploys ruptura, restarts the pod 3 times (each restart
+# re-runs the informer's first-sync-then-prune cycle from a clean analyzer
+# state), and asserts /api/v2/fleet's workload count is stable across all
+# three restarts instead of drifting upward.
+
+on:
+  pull_request:
+    paths:
+      - "workdir/internal/discovery/**"
+      - "workdir/cmd/ruptura/main.go"
+  push:
+    branches: [main]
+    paths:
+      - "workdir/internal/discovery/**"
+      - "workdir/cmd/ruptura/main.go"
+  schedule:
+    - cron: "37 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Fleet count stable across 3 restarts (k3d)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k3d
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.29.0"
+
+      - uses: azure/setup-helm@v4
+
+      - name: Create k3d cluster with a few workloads
+        run: |
+          k3d cluster create ruptura-drift-smoke --agents 1 --wait --timeout 120s
+          kubectl create deployment sample-a --image=nginx:alpine --replicas=1
+          kubectl create deployment sample-b --image=nginx:alpine --replicas=1
+          kubectl rollout status deployment/sample-a --timeout=60s
+          kubectl rollout status deployment/sample-b --timeout=60s
+
+      - name: helm install ruptura
+        run: |
+          helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
+            --namespace ruptura-system --create-namespace \
+            --set apiKey=$(openssl rand -hex 32) \
+            --wait --timeout 120s
+
+      - name: Fleet count stable across 3 restart cycles
+        run: |
+          API_KEY=$(kubectl -n ruptura-system get secret ruptura-secret -o jsonpath='{.data.api-key}' | base64 -d)
+          counts=()
+          for i in 1 2 3; do
+            kubectl -n ruptura-system rollout restart deployment/ruptura
+            kubectl -n ruptura-system rollout status deployment/ruptura --timeout=90s
+            # Give the informer time to complete its first LIST sync.
+            sleep 15
+
+            pf_pid=""
+            kubectl -n ruptura-system port-forward svc/ruptura 8080:80 &
+            pf_pid=$!
+            sleep 5
+
+            count=$(curl -sf -H "Authorization: Bearer ${API_KEY}" http://localhost:8080/api/v2/fleet \
+              | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('hosts', [])))")
+            echo "restart ${i}: fleet count = ${count}"
+            counts+=("$count")
+
+            kill "$pf_pid" 2>/dev/null || true
+            wait "$pf_pid" 2>/dev/null || true
+          done
+
+          first="${counts[0]}"
+          for c in "${counts[@]}"; do
+            if [ "$c" != "$first" ]; then
+              echo "::error::fleet count drifted across restarts: ${counts[*]}"
+              kubectl -n ruptura-system logs deployment/ruptura --tail=100
+              exit 1
+            fi
+          done
+          echo "OK: fleet count stable at ${first} across 3 restarts"
+
+      - name: Cleanup k3d cluster
+        if: always()
+        run: k3d cluster delete ruptura-drift-smoke || true

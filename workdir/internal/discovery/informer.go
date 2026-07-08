@@ -23,6 +23,14 @@ type Informer struct {
 	logMu      sync.Mutex
 	logFn      func(msg string, args ...interface{})
 	cache      *MetadataCache
+
+	// knownMu/known track the informer's own view of "what k8s actually has
+	// right now" (FBL-A3-4 / REFERENCE.md A8), independent of whatever the
+	// analyzer has registered — telemetry can register stale/renamed
+	// workloads the informer never confirmed, which is the root cause of the
+	// historical fleet-count drift this field exists to let callers correct.
+	knownMu sync.Mutex
+	known   map[string]models.WorkloadRef // key: ref.Key()
 }
 
 // NewInformer creates an Informer from in-cluster ServiceAccount credentials.
@@ -37,6 +45,7 @@ func NewInformer() (*Informer, error) {
 		token:      token,
 		httpClient: client,
 		cache:      newMetadataCache(),
+		known:      make(map[string]models.WorkloadRef),
 	}, nil
 }
 
@@ -48,6 +57,7 @@ func newInformerForTest(apiBase string, client *http.Client) *Informer {
 		token:      "test-token",
 		httpClient: client,
 		cache:      newMetadataCache(),
+		known:      make(map[string]models.WorkloadRef),
 	}
 }
 
@@ -63,8 +73,12 @@ func (inf *Informer) GetWorkloadMeta(ns, kind, name string) (WorkloadMeta, bool)
 
 // Run starts goroutines for workload + pod watching and blocks until ctx is cancelled.
 // onAdd is called for every ADDED/MODIFIED workload event; onDelete for DELETED.
+// onFirstSync (may be nil) is called exactly once, after the initial LIST phase
+// for every watched resource type (Deployment/StatefulSet/DaemonSet) has
+// completed — the signal REFERENCE.md A8's GC fix uses to prune any
+// previously-registered workload that k8s doesn't actually know about.
 // The metadata cache is populated in parallel.
-func (inf *Informer) Run(ctx context.Context, onAdd func(models.WorkloadRef), onDelete func(models.WorkloadRef)) {
+func (inf *Informer) Run(ctx context.Context, onAdd func(models.WorkloadRef), onDelete func(models.WorkloadRef), onFirstSync func()) {
 	resources := []resource{
 		{path: "apis/apps/v1/deployments", kind: "Deployment"},
 		{path: "apis/apps/v1/statefulsets", kind: "StatefulSet"},
@@ -73,13 +87,39 @@ func (inf *Informer) Run(ctx context.Context, onAdd func(models.WorkloadRef), on
 
 	var wg sync.WaitGroup
 
+	wrappedAdd := func(ref models.WorkloadRef) {
+		inf.trackKnown(ref)
+		onAdd(ref)
+	}
+	wrappedDelete := func(ref models.WorkloadRef) {
+		inf.untrackKnown(ref)
+		onDelete(ref)
+	}
+
+	var syncWG sync.WaitGroup
+	syncWG.Add(len(resources))
+
 	// Existing: WorkloadRef registration goroutines (one per resource type).
 	for _, res := range resources {
 		res := res
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			inf.watchResource(ctx, res, onAdd, onDelete)
+			var syncOnce sync.Once
+			inf.watchResource(ctx, res, wrappedAdd, wrappedDelete, func() {
+				syncOnce.Do(syncWG.Done)
+			})
+		}()
+	}
+
+	if onFirstSync != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			syncWG.Wait()
+			if ctx.Err() == nil {
+				onFirstSync()
+			}
 		}()
 	}
 
@@ -100,6 +140,33 @@ func (inf *Informer) Run(ctx context.Context, onAdd func(models.WorkloadRef), on
 	}()
 
 	wg.Wait()
+}
+
+// trackKnown/untrackKnown maintain the informer's own record of what k8s
+// currently has, independent of whatever the analyzer has registered.
+func (inf *Informer) trackKnown(ref models.WorkloadRef) {
+	inf.knownMu.Lock()
+	inf.known[ref.Key()] = ref
+	inf.knownMu.Unlock()
+}
+
+func (inf *Informer) untrackKnown(ref models.WorkloadRef) {
+	inf.knownMu.Lock()
+	delete(inf.known, ref.Key())
+	inf.knownMu.Unlock()
+}
+
+// KnownRefs returns every workload the informer has confirmed exists in the
+// cluster right now (i.e. "k8sKnown" — REFERENCE.md A8's single source of
+// truth). Safe to call concurrently.
+func (inf *Informer) KnownRefs() []models.WorkloadRef {
+	inf.knownMu.Lock()
+	defer inf.knownMu.Unlock()
+	out := make([]models.WorkloadRef, 0, len(inf.known))
+	for _, ref := range inf.known {
+		out = append(out, ref)
+	}
+	return out
 }
 
 // runMetadataLoop runs a perpetual LIST+WATCH loop populating the metadata cache.
