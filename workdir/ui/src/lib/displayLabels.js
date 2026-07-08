@@ -117,6 +117,21 @@ export function signalClass(key, rawValue) {
     if (rawValue <= 5.0) return 'at-risk'
     return 'critical'
   }
+  // FBL-V4: Mood ("Trend") is normalized so 1.0 = happy/positive — higher is
+  // better, the opposite of every other composite signal. Fleet.svelte's
+  // always-visible signal-bars render mood through this same function
+  // (SIGNAL_KEYS includes 'mood'); without this branch a genuinely happy
+  // workload (mood=0.9) fell into the generic "lower is better" bucket
+  // below and rendered as "critical" (red) — a real, live color inversion,
+  // not just the illustrative Fatigue example in the bug report. The old,
+  // otherwise-superseded kpiColor() in store.js already special-cased this
+  // correctly; signalClass() lost it when it replaced that function.
+  if (key === 'mood') {
+    if (rawValue >= 0.8) return 'healthy'
+    if (rawValue >= 0.5) return 'degraded'
+    if (rawValue >= 0.3) return 'at-risk'
+    return 'critical'
+  }
   // All other signals: lower is better
   if (rawValue <= 0.3) return 'healthy'
   if (rawValue <= 0.6) return 'degraded'
