@@ -1,6 +1,6 @@
-# Rupture Index™
+# Rupture Index
 
-The Rupture Index™ measures how fast a metric is diverging from its baseline. It is the foundation of Ruptura's predictive capability — not a threshold alarm, but a rate-of-change signal that fires hours before a threshold would.
+The Rupture Index measures how fast a metric is diverging from its baseline. It is the foundation of Ruptura's predictive capability — not a threshold alarm, but a rate-of-change signal that fires hours before a threshold would.
 
 ## The Fused Rupture Index
 

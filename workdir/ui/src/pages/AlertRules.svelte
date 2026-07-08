@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
+  import { alertMetricLabel } from '../lib/displayLabels.js'
 
   const KPI_OPTIONS = ['stress','fatigue','mood','pressure','humidity','contagion','resilience','entropy','velocity','health_score']
   const MET_OPTIONS = ['cpu_percent','memory_percent','disk_percent','request_rate','error_rate']
@@ -63,7 +64,7 @@
           </div>
           <div class="field"><label class="field-label">Metric</label>
             <select class="input" bind:value={form.metric}>
-              {#each ALL_METRICS as m}<option value={m}>{m}</option>{/each}
+              {#each ALL_METRICS as m}<option value={m}>{alertMetricLabel(m)}</option>{/each}
             </select>
           </div>
           <div class="field"><label class="field-label">Operator</label>
@@ -92,7 +93,7 @@
           {#each rules as r}
             <tr class={SEV_CLASS[r.severity] || ''}>
               <td class="rule-name">{r.name}</td>
-              <td class="mono">{r.metric} {r.operator} {r.threshold}</td>
+              <td class="mono">{alertMetricLabel(r.metric)} {r.operator} {r.threshold}</td>
               <td><span class="sev-badge sev-{r.severity}">{r.severity}</span></td>
               <td class="dim">{r.host || 'all'}</td>
               <td class="actions-cell">

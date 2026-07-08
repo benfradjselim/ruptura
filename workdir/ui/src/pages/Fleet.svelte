@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
-  import { displayLabel, displayValue, displayUnit, signalClass } from '../lib/displayLabels.js'
+  import { displayLabel, displayValue, displayUnit, signalClass, incidentProbabilityBand } from '../lib/displayLabels.js'
 
   let fleet = null
   let error = null
@@ -242,7 +242,7 @@
                 </div>
               {/if}
               {#if risk != null}
-                <div class="score-block">
+                <div class="score-block" title={incidentProbabilityBand(w.fused_rupture_index ?? w.fused_r)}>
                   <span class="score-label">Risk</span>
                   <span class="score-value {signalClass('fused_r', w.fused_rupture_index ?? w.fused_r)}">{risk}</span>
                 </div>

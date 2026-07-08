@@ -2,26 +2,29 @@
 
 Ruptura computes 10 composite KPI signals from raw telemetry. Each maps multiple input metrics to a single 0–1 interpretable index with a published formula. No black boxes.
 
+The dashboard and alert rules speak SRE-native vocabulary (Reliability, CPU Pressure, Memory Pressure, Error Budget Burn Rate, Blast Radius, Incident Probability). This page uses that vocabulary first, with the underlying Ruptura signal name — the one you'll see in API responses, Prometheus metric labels, and curl examples below — in parentheses.
+
 ## Signal overview
 
-| Signal | Range | What it measures |
-|--------|-------|-----------------|
-| `stress` | 0–1 | Instantaneous load pressure across CPU, RAM, latency, errors, timeouts |
-| `fatigue` | 0–1 | Accumulated stress over time — dissipative, recovers during low-stress periods |
-| `mood` | 0–1 | System well-being: uptime × throughput vs errors × timeouts × restarts |
-| `pressure` | 0–1 | Rate of change in stress + integrated error load (storm approaching) |
-| `humidity` | 0–1 | Error × timeout density relative to throughput |
-| `contagion` | 0–1 | Error propagation across service dependencies (topology-based when traces available) |
-| `resilience` | 0–1 | How quickly the workload recovers from stress |
-| `entropy` | 0–1 | Behavioral unpredictability — rolling variance of HealthScore |
-| `velocity` | 0–1 | Rate of change of HealthScore — how fast the workload is degrading |
-| `health_score` | 0–100 | Composite: additive-penalty sum of the primary signals |
+| SRE-native name (Ruptura signal) | Range | What it measures |
+|-----------------------------------|-------|-----------------|
+| CPU Pressure (`stress`) | 0–1 | Instantaneous load pressure across CPU, RAM, latency, errors, timeouts |
+| Memory Pressure (`fatigue`) | 0–1 | Accumulated stress over time — dissipative, recovers during low-stress periods |
+| Trend (`mood`) | 0–1 | System well-being: uptime × throughput vs errors × timeouts × restarts |
+| Load Index (`pressure`) | 0–1 | Rate of change in stress + integrated error load (storm approaching) |
+| Saturation (`humidity`) | 0–1 | Error × timeout density relative to throughput |
+| Blast Radius (`contagion`) | 0–1 | Error propagation across service dependencies (topology-based when traces available) |
+| Resilience (`resilience`) | 0–1 | How quickly the workload recovers from stress |
+| Entropy (`entropy`) | 0–1 | Behavioral unpredictability — rolling variance of HealthScore |
+| Velocity (`velocity`) | 0–1 | Rate of change of HealthScore — how fast the workload is degrading |
+| Reliability / SLO Probability (`health_score`) | 0–100 | Composite: additive-penalty sum of the primary signals |
+| Error Budget Burn Rate (`fused_rupture_index`) | 0–10 | How fast the workload is burning through its error budget — banded into Low / Elevated / High / Critical incident probability |
 
 ---
 
 ## Formulas
 
-### Stress
+### CPU Pressure (Stress)
 
 ```
 stress(t) = 0.3·CPU(t) + 0.2·RAM(t) + 0.2·Latency(t) + 0.2·Errors(t) + 0.1·Timeouts(t)
@@ -36,7 +39,7 @@ All inputs normalised to [0, 1].
 | 0.6 – 0.8 | Stressed |
 | ≥ 0.8 | Panic |
 
-### Fatigue (dissipative)
+### Memory Pressure (Fatigue, dissipative)
 
 ```
 F(t) = max(0, F(t−1) + (stress(t) − R_threshold) − λ)
@@ -54,7 +57,7 @@ The dissipative term `λ` prevents false fatigue alarms from legitimate schedule
 | 0.6 – 0.8 | Exhausted | Plan maintenance window |
 | ≥ 0.8 | Burnout imminent | Preventive restart |
 
-### Mood
+### Trend (Mood)
 
 ```
 mood(t) = log(uptime × throughput + 1) / log(errors × timeouts × restarts + 2)
@@ -70,7 +73,7 @@ High mood = service is happy and performant. Low mood = degraded user experience
 | 0.1–0.3 | Sad |
 | < 0.1 | Depressed |
 
-### Pressure
+### Load Index (Pressure)
 
 ```
 pressure(t) = d(stress̄)/dt + ∫₀ᵗ errors̄(τ) dτ
@@ -83,7 +86,7 @@ pressure(t) = d(stress̄)/dt + ∫₀ᵗ errors̄(τ) dτ
 | Declining | System recovering |
 | ≥ 0.8 | Storm approaching |
 
-### Humidity
+### Saturation (Humidity)
 
 ```
 humidity(t) = (errors(t) × timeouts(t)) / max(throughput(t), ε)
@@ -91,7 +94,7 @@ humidity(t) = (errors(t) × timeouts(t)) / max(throughput(t), ε)
 
 A high-throughput service absorbs more errors before becoming "humid." A low-throughput service with even a few errors/timeouts gets high humidity — which is usually a sign of a problem.
 
-### Contagion
+### Blast Radius (Contagion)
 
 **When trace spans are available** (OTLP traces ingested):
 
@@ -138,7 +141,7 @@ velocity(t) = |ΔHealthScore| / Δt
 
 Rate of change of HealthScore. High velocity means the workload is degrading (or recovering) rapidly.
 
-### Health Score
+### Reliability / SLO Probability (Health Score)
 
 ```
 health_score = 100 × (1 − (
