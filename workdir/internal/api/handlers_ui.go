@@ -9,6 +9,7 @@ package api
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"math"
 	"net/http"
 	"sort"
 	"time"
@@ -89,15 +90,27 @@ type fleetResponse struct {
 	Hosts         []fleetHost `json:"hosts"`
 }
 
+// snapshotState derives the fleet-facing state for a workload from its
+// HealthScore. HealthScore.Value is stored on a [0,1] scale (see
+// analyzer.go's healthScore := utils.Clamp(1-penalty, 0, 1)) — comparing it
+// against 70/40 thresholds (a [0,100]-scale bug) previously meant every real
+// workload's health score (typically 0.7-0.9) failed both comparisons and
+// fell through to "critical" regardless of how healthy it actually was.
+// A NaN health score (never computed) fails every ordered comparison in Go
+// and must not silently fall through to "critical" either — it means the
+// same thing an incomplete calibration does: not enough data yet.
 func snapshotState(snap models.KPISnapshot) string {
 	if snap.CalibrationProgress < 100 {
 		return "calibrating"
 	}
 	hs := snap.HealthScore.Value
-	if hs >= 70 {
+	if math.IsNaN(hs) {
+		return "calibrating"
+	}
+	if hs >= 0.70 {
 		return "healthy"
 	}
-	if hs >= 40 {
+	if hs >= 0.40 {
 		return "degraded"
 	}
 	return "critical"
@@ -127,12 +140,18 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 
 		state := snapshotState(s)
 		resp.TotalHosts++
+		// Explicit cases only — a bare "default: critical" here previously
+		// counted every "calibrating" workload (state=calibrating is grey,
+		// never red — see snapshotState) as critical in the fleet-wide
+		// tally, even though its own per-host State field correctly said
+		// "calibrating". That's how a fleet that was mostly still warming
+		// up could show 0 healthy and N critical.
 		switch state {
 		case "healthy":
 			resp.HealthyHosts++
 		case "degraded":
 			resp.DegradedHosts++
-		default:
+		case "critical":
 			resp.CriticalHosts++
 		}
 
@@ -170,9 +189,13 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Critical first, then degraded, then healthy; within a tier sort by health_score ascending.
+	// Critical first, then degraded, then healthy, then still-warming-up
+	// states last; within a tier sort by health_score ascending. Unlisted
+	// states would otherwise default to Go's zero value (0) and sort
+	// alongside "critical" — calibrating/pending_telemetry workloads are
+	// explicitly listed so they never do that.
 	sort.Slice(resp.Hosts, func(i, j int) bool {
-		order := map[string]int{"critical": 0, "degraded": 1, "healthy": 2}
+		order := map[string]int{"critical": 0, "degraded": 1, "healthy": 2, "calibrating": 3, "pending_telemetry": 4}
 		if order[resp.Hosts[i].State] != order[resp.Hosts[j].State] {
 			return order[resp.Hosts[i].State] < order[resp.Hosts[j].State]
 		}
