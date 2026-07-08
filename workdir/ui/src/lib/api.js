@@ -138,6 +138,10 @@ export const api = {
   forecastWorkload: (metric, host) =>
     req('GET', `/forecast/${encodeURIComponent(metric)}/${encodeURIComponent(host)}`),
 
+  // ── Workload summary (forecast-as-hero headline) ────────────────────────────
+  workloadSummary: (ns, kind, name) =>
+    req('GET', `/workloads/${encodeURIComponent(ns)}/${encodeURIComponent(kind)}/${encodeURIComponent(name)}/summary`),
+
   // ── Notifications ──────────────────────────────────────────────────────────
   notifications:        ()         => req('GET', '/notifications'),
   notificationCreate:   (ch)       => req('POST', '/notifications', ch),

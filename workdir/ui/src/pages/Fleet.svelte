@@ -11,6 +11,7 @@
   let activeTab = {}   // { workloadKey: 'signals'|'history'|'forecast' }
   let historyData = {} // { workloadKey: [] }
   let forecastData = {} // { workloadKey: {} }
+  let summaryData = {} // { workloadKey: { headline, confidence, recommended_action, warming_up } }
   let loadingDetail = {}
 
   // Infra context: keyed by namespace; matched on namespace only (v8.1 key normalization gap)
@@ -62,6 +63,21 @@
     expandedWorkload = key
     if (!activeTab[key]) activeTab[key] = 'signals'
     loadTab(workload, activeTab[key])
+    loadSummary(workload)
+  }
+
+  // FBL-A2-1: forecast-as-hero — the summary sentence is the first thing
+  // shown on expand, before the chart/signal tabs.
+  async function loadSummary(workload) {
+    const key = hostKey(workload)
+    if (summaryData[key]) return
+    const { ns, kind, name } = parseHost(workload)
+    try {
+      summaryData[key] = await api.workloadSummary(ns, kind, name)
+    } catch {
+      summaryData[key] = null
+    }
+    summaryData = { ...summaryData }
   }
 
   async function loadTab(workload, tab) {
@@ -273,6 +289,17 @@
           <!-- Expanded detail tabs -->
           {#if expanded}
             <div class="card-detail">
+              <!-- FBL-A2-1: forecast-as-hero — the sentence is the first thing
+                   shown, before the chart (forecast tab) or raw signals. -->
+              {#if summaryData[key]}
+                <div class="summary-hero" class:warming={summaryData[key].warming_up}>
+                  <p class="summary-headline">{summaryData[key].headline}</p>
+                  {#if !summaryData[key].warming_up}
+                    <p class="summary-action">{summaryData[key].recommended_action}</p>
+                  {/if}
+                </div>
+              {/if}
+
               <div class="tab-bar">
                 {#each ['signals', 'history', 'forecast'] as t}
                   <button
@@ -452,6 +479,12 @@
 
 /* Expanded detail */
 .card-detail { border-top: 1px solid var(--border, rgba(255,255,255,0.06)); padding: 1rem; }
+
+/* FBL-A2-1: forecast-as-hero — the one sentence an SRE reads first */
+.summary-hero { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; background: var(--bg-2, rgba(255,255,255,0.03)); border-left: 3px solid var(--accent-cyan, #06b6d4); }
+.summary-hero.warming { border-left-color: var(--amber); }
+.summary-headline { margin: 0; font-size: 0.95rem; font-weight: 600; line-height: 1.4; }
+.summary-action { margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--text-secondary, var(--text-2)); }
 .tab-bar { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
 .tab-btn { padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--border, rgba(255,255,255,0.06)); background: none; color: var(--text-secondary, var(--text-2)); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
 .tab-btn.active { background: var(--accent-cyan, #06b6d4); color: #000; border-color: transparent; font-weight: 600; }

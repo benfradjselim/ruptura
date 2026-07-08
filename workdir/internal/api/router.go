@@ -186,6 +186,8 @@ func (h *Handlers) NewRouter() http.Handler {
 
 	// Workload k8s metadata
 	api.HandleFunc("/workloads/{namespace}/{kind}/{name}/k8s", h.handleWorkloadK8s).Methods("GET")
+	// FBL-A2-1: forecast-as-hero summary sentence for workload detail
+	api.HandleFunc("/workloads/{namespace}/{kind}/{name}/summary", h.handleWorkloadSummary).Methods("GET")
 
 	// Engine internals
 	api.HandleFunc("/engine/status", h.handleEngineStatus).Methods("GET")
