@@ -331,6 +331,9 @@ Key environment variables:
 RUPTURA_API_KEY        Bearer token for API auth (required in production)
 RUPTURA_EDITION        "community" (default) | "autopilot"
 RUPTURA_WORKLOAD_WEIGHTS  JSON array of SignalWeights for per-workload overrides
+RUPTURA_DEMO_MODE      "true" seeds 7 days of synthetic demo data on startup — no cluster, no calibration wait
+RUPTURA_SLACK_URL      Slack incoming webhook URL — fires on Tier-2+ rupture events
+RUPTURA_WEBHOOK_URL    Generic JSON webhook URL — fires on Tier-2+ rupture events
 ```
 
 CLI flags:
@@ -339,6 +342,7 @@ CLI flags:
 --otlp-port   int    OTLP ingest port (default 4317)
 --storage     string BadgerDB path (default /var/lib/ruptura/data)
 --api-key     string API bearer token
+--demo               seed synthetic demo data on startup; no cluster required
 --version            print version and exit
 ```
 

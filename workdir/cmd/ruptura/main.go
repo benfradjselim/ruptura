@@ -37,6 +37,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/ingest"
 	pipelinelogs "github.com/benfradjselim/ruptura/internal/pipeline/logs"
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
+	"github.com/benfradjselim/ruptura/internal/notify"
 	"github.com/benfradjselim/ruptura/internal/predictor"
 	"github.com/benfradjselim/ruptura/internal/sim"
 	"github.com/benfradjselim/ruptura/internal/storage"
@@ -383,6 +384,19 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("init action engine failed: %w", err)
 	}
 
+	// FBL-A2-3: native alert webhooks (community: Slack + generic webhook
+	// only; PagerDuty/OpsGenie routing stays in the paid autopilot edition).
+	notifier := notify.New(notify.Config{
+		SlackWebhookURL:   os.Getenv("RUPTURA_SLACK_URL"),
+		GenericWebhookURL: os.Getenv("RUPTURA_WEBHOOK_URL"),
+		MinTier:           notify.Tier2,
+	})
+	if notifier.Configured() {
+		logger.Default.Info("notify: outbound webhook(s) configured",
+			"slack", os.Getenv("RUPTURA_SLACK_URL") != "",
+			"webhook", os.Getenv("RUPTURA_WEBHOOK_URL") != "")
+	}
+
 	// Forward critical anomaly events from the alerter channel to the action engine.
 	go func() {
 		for {
@@ -399,8 +413,25 @@ func runWithContext(ctx context.Context, cfg Config) error {
 						Severity:  models.SeverityCritical,
 						Timestamp: alert.CreatedAt,
 					}
-					if _, err := actionEngine.RecommendFromAnomaly(ev); err != nil {
+					recs, err := actionEngine.RecommendFromAnomaly(ev)
+					if err != nil {
 						logger.Default.Warn("action recommend failed", "err", err)
+						continue
+					}
+					for _, rec := range recs {
+						nev := notify.Event{
+							ID:         rec.ID,
+							Host:       rec.Host,
+							ActionType: rec.ActionType,
+							Tier:       notify.TierLevel(rec.Tier),
+							Reason:     fmt.Sprintf("%s = %.3f (threshold %.3f)", alert.Metric, alert.Value, alert.Threshold),
+							Timestamp:  rec.Timestamp,
+						}
+						if notifyErr := notifier.Notify(ctx, nev); notifyErr != nil {
+							// notify.Notify() never embeds destination URLs/secrets in its
+							// error strings (see redactURLError) — safe to log verbatim.
+							logger.Default.Warn("notify failed", "err", notifyErr)
+						}
 					}
 				}
 			}

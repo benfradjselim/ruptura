@@ -148,6 +148,17 @@ kafka:
 # -- Ingest rate limit in requests/second (default 1000).
 ingestRPS: 1000
 
+# -- FBL-A2-3: outbound webhook notifications on Tier-2+ rupture events.
+# Community edition supports Slack + a generic JSON webhook only —
+# PagerDuty/OpsGenie routing is a paid autopilot feature.
+notify:
+  slackWebhookURL: ""
+  webhookURL: ""
+
+# -- Arbitrary extra container env vars (list of {name, value} or
+# {name, valueFrom}), appended after all built-in env vars above.
+extraEnv: []
+
 # -- ServiceMonitor for Prometheus Operator scraping (optional).
 serviceMonitor:
   enabled: false

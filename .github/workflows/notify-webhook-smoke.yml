@@ -1,0 +1,108 @@
+name: Notify webhooks — Smoke test
+
+# FBL-A2-3 gate: deploys a mock webhook receiver in-cluster, points
+# RUPTURA_WEBHOOK_URL at it via the new helm notify.webhookURL value, feeds a
+# sustained simulated rupture (scripts/simulate.py's payment-api workload —
+# high error rate + contagion, designed to trip the anomaly consensus
+# detector), and asserts the receiver actually got a POST. Also asserts the
+# webhook URL itself never appears in the ruptura pod's logs.
+
+on:
+  pull_request:
+    paths:
+      - "workdir/internal/notify/**"
+      - "workdir/cmd/ruptura/main.go"
+      - "helm/templates/deployment.yaml"
+      - "helm/values.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "workdir/internal/notify/**"
+      - "workdir/cmd/ruptura/main.go"
+      - "helm/templates/deployment.yaml"
+      - "helm/values.yaml"
+  schedule:
+    - cron: "11 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Webhook fires on simulated rupture (k3d)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k3d
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.29.0"
+
+      - uses: azure/setup-helm@v4
+
+      - name: Create k3d cluster
+        run: |
+          k3d cluster create ruptura-notify-smoke --agents 1 --wait --timeout 120s
+          kubectl cluster-info
+
+      - name: Deploy mock webhook receiver
+        # mendhak/http-https-echo logs every request (headers + body) to
+        # stdout by default — no custom server script needed.
+        run: |
+          kubectl create namespace mock-webhook
+          kubectl -n mock-webhook create deployment receiver --image=mendhak/http-https-echo:31 --port=8080
+          kubectl -n mock-webhook set env deployment/receiver HTTP_PORT=8080
+          kubectl -n mock-webhook expose deployment receiver --port=8080 --target-port=8080
+          kubectl -n mock-webhook wait --for=condition=available deployment/receiver --timeout=90s
+
+      - name: helm install ruptura with RUPTURA_WEBHOOK_URL set
+        run: |
+          helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
+            --namespace ruptura-system --create-namespace \
+            --set apiKey=$(openssl rand -hex 32) \
+            --set notify.webhookURL="http://receiver.mock-webhook.svc.cluster.local:8080/hook/SECRETPATH123" \
+            --wait --timeout 120s
+
+      - name: "Feed a sustained simulated rupture (payment-api: high error rate + contagion)"
+        run: |
+          kubectl -n ruptura-system port-forward svc/ruptura-otlp 31470:4317 &
+          sleep 3
+          # Run long enough for the pipeline's z-score/MAD/seasonal detectors
+          # to establish a baseline and then register payment-api's error
+          # bursts as a ≥2-method consensus anomaly (SeverityCritical).
+          timeout 300s python3 scripts/simulate.py --host localhost --port 31470 --interval 2 || true
+
+      - name: Assert the mock receiver got a webhook POST
+        run: |
+          for i in $(seq 1 10); do
+            if kubectl -n mock-webhook logs deployment/receiver | grep -q "rupture.recommended"; then
+              echo "webhook received:"
+              kubectl -n mock-webhook logs deployment/receiver | grep -A5 "rupture.recommended"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::mock webhook receiver never got a POST from a simulated rupture"
+          kubectl -n ruptura-system logs deployment/ruptura --tail=100
+          exit 1
+
+      - name: Assert the webhook URL/secret path was never logged
+        run: |
+          if kubectl -n ruptura-system logs deployment/ruptura | grep -q "SECRETPATH123"; then
+            echo "::error::the webhook URL leaked into ruptura's own logs"
+            exit 1
+          fi
+          echo "OK: webhook URL never appeared in logs"
+
+      - name: Cleanup k3d cluster
+        if: always()
+        run: k3d cluster delete ruptura-notify-smoke || true

@@ -78,6 +78,17 @@ spec:
               value: {{ .Values.autodiscovery.enabled | default false | quote }}
             - name: GOMEMLIMIT
               value: {{ .Values.goMemLimit | default "419430400" | quote }}
+            {{- if .Values.notify.slackWebhookURL }}
+            - name: RUPTURA_SLACK_URL
+              value: {{ .Values.notify.slackWebhookURL | quote }}
+            {{- end }}
+            {{- if .Values.notify.webhookURL }}
+            - name: RUPTURA_WEBHOOK_URL
+              value: {{ .Values.notify.webhookURL | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           startupProbe:
             httpGet:
               path: /api/v2/health
