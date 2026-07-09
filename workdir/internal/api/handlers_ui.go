@@ -229,11 +229,28 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			resp.TotalHosts++
+			// A workload can be perpetually "pending_telemetry" and still be
+			// demonstrably crash-looping: a pod that spends nearly all of its
+			// time in CrashLoopBackOff (not Running) is rarely, if ever, alive
+			// at the moment resource-usage telemetry gets scraped, so it may
+			// never earn a real analyzer snapshot at all — but the discovery
+			// informer already knows its restart count independent of
+			// telemetry (it watches the k8s API directly). Apply the same
+			// crash-loop override here as the telemetry-backed path above,
+			// rather than leaving this workload stuck reading
+			// "pending_telemetry" forever despite obviously being broken.
+			restarts := h.workloadRestartCount(s.Workload.Namespace, s.Workload.Kind, s.Workload.Name)
+			state := "pending_telemetry"
+			if restarts >= crashLoopRestartThreshold {
+				state = "critical"
+				resp.CriticalHosts++
+			}
 			resp.Hosts = append(resp.Hosts, fleetHost{
-				Host:        name,
-				State:       "pending_telemetry",
-				HealthScore: 0,
-				LastSeen:    s.Timestamp,
+				Host:         name,
+				State:        state,
+				HealthScore:  0,
+				LastSeen:     s.Timestamp,
+				RestartCount: restarts,
 			})
 		}
 	}

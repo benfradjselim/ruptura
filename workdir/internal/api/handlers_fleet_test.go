@@ -99,6 +99,48 @@ func TestWorkloadRestartCount_NoDiscovery(t *testing.T) {
 	}
 }
 
+// TestHandleFleet_PendingTelemetryWithNoDiscovery_StaysPending covers the
+// other real-world shape the crash-loop override needs to handle: a
+// workload that's been discovered via k8s (RegisterWorkload) but has never
+// received a single telemetry snapshot — a pod that spends nearly all its
+// time in CrashLoopBackOff (not Running) is rarely alive at the moment
+// resource-usage telemetry gets scraped, so it may sit in
+// "pending_telemetry" indefinitely (the exact live shape observed for
+// demo-crashloop/crash-app on the Civo lab). With no discovery informer
+// wired up (the common case in tests, and for non-k8s/demo-mode
+// deployments), workloadRestartCount fails closed to 0, so this must stay
+// "pending_telemetry" rather than panicking or misreporting critical.
+func TestHandleFleet_PendingTelemetryWithNoDiscovery_StaysPending(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+	a := analyzer.NewAnalyzer()
+
+	ref := models.WorkloadRef{Namespace: "demo-crashloop", Kind: "Deployment", Name: "crash-app"}
+	a.RegisterWorkload(ref) // known via k8s discovery, but never Update()'d
+
+	h := &Handlers{store: store, analyzer: a}
+	r := mux.NewRouter()
+	r.HandleFunc("/api/v2/fleet", h.handleFleet).Methods("GET")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/fleet", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	var resp fleetResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Hosts) != 1 {
+		t.Fatalf("Hosts = %d, want 1", len(resp.Hosts))
+	}
+	if resp.Hosts[0].State != "pending_telemetry" {
+		t.Errorf("state = %q, want pending_telemetry (no discovery informer wired up)", resp.Hosts[0].State)
+	}
+	if resp.CriticalHosts != 0 {
+		t.Errorf("CriticalHosts = %d, want 0", resp.CriticalHosts)
+	}
+}
+
 // TestHandleFleet_CalibratingWorkloadsNeverCountAsCritical is the AC's
 // literal requirement in fleet-aggregate form: a fleet that's still warming
 // up must never show those workloads as critical. Before the fix,
