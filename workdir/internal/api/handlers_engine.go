@@ -39,10 +39,10 @@ type topologyNode struct {
 }
 
 type topologyEdge struct {
-	Source      string  `json:"source"`
-	Target      string  `json:"target"`
-	CallRate    int64   `json:"call_rate"`
-	ErrorRate   float64 `json:"error_rate"`
+	Source       string  `json:"source"`
+	Target       string  `json:"target"`
+	CallRate     int64   `json:"call_rate"`
+	ErrorRate    float64 `json:"error_rate"`
 	P99LatencyMS float64 `json:"p99_latency_ms"`
 }
 
@@ -67,14 +67,16 @@ func (h *Handlers) handleTopology(w http.ResponseWriter, r *http.Request) {
 			h.enrichSnapshot(&snapshots[i])
 			s := snapshots[i]
 			id := s.Host
+			restarts := 0
 			if s.Workload.Namespace != "" {
 				id = s.Workload.Namespace + "/" + s.Workload.Kind + "/" + s.Workload.Name
+				restarts = h.workloadRestartCount(s.Workload.Namespace, s.Workload.Kind, s.Workload.Name)
 			}
 			resp.Nodes = append(resp.Nodes, topologyNode{
 				ID:          id,
 				HealthScore: s.HealthScore.Value,
 				FusedR:      s.FusedRuptureIndex,
-				State:       snapshotState(s),
+				State:       snapshotState(s, restarts),
 			})
 		}
 	}
@@ -125,11 +127,11 @@ func (h *Handlers) handleEngineStatus(w http.ResponseWriter, _ *http.Request) {
 	uptime := time.Since(h.startTime).Seconds()
 
 	type analyzerSection struct {
-		TickIntervalMS      int `json:"tick_interval_ms"`
-		LastTickAgoMS       int `json:"last_tick_ago_ms"`
-		ActiveWorkloads     int `json:"active_workloads"`
+		TickIntervalMS       int `json:"tick_interval_ms"`
+		LastTickAgoMS        int `json:"last_tick_ago_ms"`
+		ActiveWorkloads      int `json:"active_workloads"`
 		CalibratingWorkloads int `json:"calibrating_workloads"`
-		PendingWorkloads    int `json:"pending_workloads"`
+		PendingWorkloads     int `json:"pending_workloads"`
 	}
 	type ingestSection struct {
 		MetricsPerSec float64 `json:"metrics_per_sec"`
@@ -137,9 +139,9 @@ func (h *Handlers) handleEngineStatus(w http.ResponseWriter, _ *http.Request) {
 		TracesPerSec  float64 `json:"traces_per_sec"`
 	}
 	type actionsSection struct {
-		PendingTier1      int `json:"pending_tier1"`
-		PendingTier2      int `json:"pending_tier2"`
-		ExecutedLastHour  int `json:"executed_last_hour"`
+		PendingTier1     int `json:"pending_tier1"`
+		PendingTier2     int `json:"pending_tier2"`
+		ExecutedLastHour int `json:"executed_last_hour"`
 	}
 	type statusResp struct {
 		Analyzer      analyzerSection `json:"analyzer"`

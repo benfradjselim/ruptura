@@ -25,17 +25,18 @@ func TestSnapshotState(t *testing.T) {
 		name                string
 		calibrationProgress int
 		healthScore         float64
+		restarts            int
 		want                string
 	}{
-		{"still calibrating, no health score yet", 40, 0, "calibrating"},
-		{"still calibrating despite a high-looking score", 99, 0.9, "calibrating"},
-		{"calibrated, healthy — the regression case: 0.8 must never be critical", 100, 0.8, "healthy"},
-		{"calibrated, healthy at the boundary", 100, 0.70, "healthy"},
-		{"calibrated, degraded", 100, 0.55, "degraded"},
-		{"calibrated, degraded at the boundary", 100, 0.40, "degraded"},
-		{"calibrated, genuinely critical", 100, 0.10, "critical"},
-		{"calibrated, health score never computed (NaN) must not read as critical", 100, math.NaN(), "calibrating"},
-		{"calibrated, exactly zero health is genuinely critical, not NaN", 100, 0, "critical"},
+		{"still calibrating, no health score yet", 40, 0, 0, "calibrating"},
+		{"still calibrating despite a high-looking score", 99, 0.9, 0, "calibrating"},
+		{"calibrated, healthy — the regression case: 0.8 must never be critical", 100, 0.8, 0, "healthy"},
+		{"calibrated, healthy at the boundary", 100, 0.70, 0, "healthy"},
+		{"calibrated, degraded", 100, 0.55, 0, "degraded"},
+		{"calibrated, degraded at the boundary", 100, 0.40, 0, "degraded"},
+		{"calibrated, genuinely critical", 100, 0.10, 0, "critical"},
+		{"calibrated, health score never computed (NaN) must not read as critical", 100, math.NaN(), 0, "calibrating"},
+		{"calibrated, exactly zero health is genuinely critical, not NaN", 100, 0, 0, "critical"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -43,11 +44,58 @@ func TestSnapshotState(t *testing.T) {
 				CalibrationProgress: tt.calibrationProgress,
 				HealthScore:         models.KPI{Value: tt.healthScore},
 			}
-			if got := snapshotState(snap); got != tt.want {
-				t.Errorf("snapshotState(calibration=%d, health=%v) = %q, want %q",
-					tt.calibrationProgress, tt.healthScore, got, tt.want)
+			if got := snapshotState(snap, tt.restarts); got != tt.want {
+				t.Errorf("snapshotState(calibration=%d, health=%v, restarts=%d) = %q, want %q",
+					tt.calibrationProgress, tt.healthScore, tt.restarts, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestSnapshotState_CrashLoopOverride is FBL-V6's regression test: a
+// workload with a genuinely healthy resource-usage-derived score (or one
+// still calibrating) must still read "critical" once its container restart
+// count crosses crashLoopRestartThreshold — this is the fix for the live
+// finding that demo-crashloop/demo-oom's actually crash-looping pods
+// (thousands of real restarts) read "healthy" because no other signal in
+// the composite model is sourced from restart counts at all.
+func TestSnapshotState_CrashLoopOverride(t *testing.T) {
+	tests := []struct {
+		name                string
+		calibrationProgress int
+		healthScore         float64
+		restarts            int
+		want                string
+	}{
+		{"below threshold, healthy score: normal computation applies", 100, 0.9, crashLoopRestartThreshold - 1, "healthy"},
+		{"at threshold: critical overrides a healthy score", 100, 0.9, crashLoopRestartThreshold, "critical"},
+		{"above threshold: critical overrides a healthy score", 100, 1.0, crashLoopRestartThreshold + 100, "critical"},
+		{"above threshold: critical overrides even mid-calibration", 40, 0, crashLoopRestartThreshold, "critical"},
+		{"above threshold: critical overrides a NaN health score too", 100, math.NaN(), crashLoopRestartThreshold, "critical"},
+		{"zero restarts: no override, normal calibrating path", 0, 0, 0, "calibrating"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snap := models.KPISnapshot{
+				CalibrationProgress: tt.calibrationProgress,
+				HealthScore:         models.KPI{Value: tt.healthScore},
+			}
+			if got := snapshotState(snap, tt.restarts); got != tt.want {
+				t.Errorf("snapshotState(calibration=%d, health=%v, restarts=%d) = %q, want %q",
+					tt.calibrationProgress, tt.healthScore, tt.restarts, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestWorkloadRestartCount_NoDiscovery confirms the nil-informer path (bare-
+// metal/VM/demo mode, or tests that don't wire discovery up) fails closed to
+// 0 restarts rather than panicking — matching every other discovery-optional
+// path in this file.
+func TestWorkloadRestartCount_NoDiscovery(t *testing.T) {
+	h := &Handlers{}
+	if got := h.workloadRestartCount("prod", "Deployment", "api"); got != 0 {
+		t.Errorf("workloadRestartCount with nil discovery = %d, want 0", got)
 	}
 }
 

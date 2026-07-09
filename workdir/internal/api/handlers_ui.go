@@ -80,7 +80,18 @@ type fleetHost struct {
 	FusedRuptureIndex   float64                `json:"fused_rupture_index"`
 	CalibrationProgress int                    `json:"calibration_progress"`
 	HealthForecast      *models.HealthForecast `json:"health_forecast,omitempty"`
+	RestartCount        int                    `json:"restart_count,omitempty"`
 }
+
+// crashLoopRestartThreshold is the container restart count (summed across a
+// workload's pods, from the k8s API via the discovery informer) at which a
+// workload is treated as demonstrably unstable regardless of what its
+// resource-usage-derived composite score says. A handful of restarts can
+// happen to a healthy workload (a node drain, a deploy, an OOM once under
+// real load); a fleet-relevant crash loop is a sustained pattern. This
+// mirrors Kubernetes' own CrashLoopBackOff heuristic, which also kicks in
+// after repeated failures rather than the first one.
+const crashLoopRestartThreshold = 5
 
 type fleetResponse struct {
 	TotalHosts    int         `json:"total_hosts"`
@@ -91,15 +102,30 @@ type fleetResponse struct {
 }
 
 // snapshotState derives the fleet-facing state for a workload from its
-// HealthScore. HealthScore.Value is stored on a [0,1] scale (see
-// analyzer.go's healthScore := utils.Clamp(1-penalty, 0, 1)) — comparing it
-// against 70/40 thresholds (a [0,100]-scale bug) previously meant every real
-// workload's health score (typically 0.7-0.9) failed both comparisons and
-// fell through to "critical" regardless of how healthy it actually was.
-// A NaN health score (never computed) fails every ordered comparison in Go
-// and must not silently fall through to "critical" either — it means the
-// same thing an incomplete calibration does: not enough data yet.
-func snapshotState(snap models.KPISnapshot) string {
+// HealthScore and its pods' container restart count. HealthScore.Value is
+// stored on a [0,1] scale (see analyzer.go's healthScore :=
+// utils.Clamp(1-penalty, 0, 1)) — comparing it against 70/40 thresholds (a
+// [0,100]-scale bug) previously meant every real workload's health score
+// (typically 0.7-0.9) failed both comparisons and fell through to
+// "critical" regardless of how healthy it actually was. A NaN health score
+// (never computed) fails every ordered comparison in Go and must not
+// silently fall through to "critical" either — it means the same thing an
+// incomplete calibration does: not enough data yet.
+//
+// restarts overrides state to "critical" once it crosses
+// crashLoopRestartThreshold, independent of the resource-usage-derived
+// health score: a workload that crash-loops but uses negligible CPU/memory
+// between crashes (the exact shape of the demo-crashloop/demo-oom scenarios)
+// is otherwise structurally invisible to every other signal this function
+// computes — none of stress/fatigue/mood/pressure/humidity/contagion/
+// resilience/entropy/velocity/throughput is sourced from container restart
+// counts. This check runs even during calibration, since a crash loop is
+// itself real, actionable information a user shouldn't have to wait 96
+// observations to see.
+func snapshotState(snap models.KPISnapshot, restarts int) string {
+	if restarts >= crashLoopRestartThreshold {
+		return "critical"
+	}
 	if snap.CalibrationProgress < 100 {
 		return "calibrating"
 	}
@@ -114,6 +140,26 @@ func snapshotState(snap models.KPISnapshot) string {
 		return "degraded"
 	}
 	return "critical"
+}
+
+// workloadRestartCount sums container restart counts across every pod the
+// discovery informer currently associates with a workload. Returns 0 when
+// the informer isn't wired up (bare-metal/VM/demo mode — no k8s API to ask)
+// or the workload isn't found, matching every other discovery-optional path
+// in this file (e.g. enrichSnapshot's nil-analyzer guard).
+func (h *Handlers) workloadRestartCount(ns, kind, name string) int {
+	if h.discovery == nil {
+		return 0
+	}
+	meta, ok := h.discovery.GetWorkloadMeta(ns, kind, name)
+	if !ok {
+		return 0
+	}
+	total := 0
+	for _, p := range meta.Pods {
+		total += p.Restarts
+	}
+	return total
 }
 
 func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
@@ -133,12 +179,14 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		s := snapshots[i]
 
 		name := s.Host
+		restarts := 0
 		if s.Workload.Namespace != "" {
 			name = s.Workload.Namespace + "/" + s.Workload.Kind + "/" + s.Workload.Name
+			restarts = h.workloadRestartCount(s.Workload.Namespace, s.Workload.Kind, s.Workload.Name)
 		}
 		knownHosts[name] = true
 
-		state := snapshotState(s)
+		state := snapshotState(s, restarts)
 		resp.TotalHosts++
 		// Explicit cases only — a bare "default: critical" here previously
 		// counted every "calibrating" workload (state=calibrating is grey,
@@ -166,6 +214,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 			FusedRuptureIndex:   s.FusedRuptureIndex,
 			CalibrationProgress: s.CalibrationProgress,
 			HealthForecast:      s.HealthForecast,
+			RestartCount:        restarts,
 		})
 	}
 
