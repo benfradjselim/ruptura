@@ -1,0 +1,6 @@
+signals:
+  - name: memory_saturation
+    mode: saturation
+    usage: 'sum by (namespace,pod) (container_memory_working_set_bytes{container!="",container!="POD"})'
+    capacity: 'sum by (namespace,pod) (kube_pod_container_resource_limits{resource="memory"})'
+    restarts: 'sum by (namespace,pod) (kube_pod_container_status_restarts_total)'
