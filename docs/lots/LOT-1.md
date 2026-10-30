@@ -15,3 +15,5 @@ Stop rule: 2 attempts with no score change means stop and re-diagnose.
 | M6 | M | Critical uses lifetime restart count | `internal/api/handlers_ui.go` |
 | M7 | M | Summary ignores OOMKilled | `internal/api` |
 | M8 | M | Alerts fire on negligible changes | `internal/predictor/anomaly_mad.go` |
+
+Also found: the UI image listens on port 80 and needs port 8080 for OpenShift (installation lot).
