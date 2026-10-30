@@ -2,18 +2,30 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"time"
 )
 
 const (
-	defaultImage       = "ghcr.io/benfradjselim/ruptura:v6.8.1"
+	defaultImage       = "docker.io/selimbf/ruptura:v8.3.0-rc.3"
 	defaultStorageSize = "10Gi"
 	defaultEdition     = "community"
 	appLabel           = "app.kubernetes.io/name"
 	managedByLabel     = "app.kubernetes.io/managed-by"
 	instanceLabel      = "app.kubernetes.io/instance"
 	finalizer          = "ruptura.io/cleanup"
+	// thanosURL is the OpenShift in-cluster Thanos querier endpoint.
+	thanosURL = "https://thanos-querier.openshift-monitoring.svc:9091"
+	// monitoringViewRole is the ClusterRole granting read access to cluster metrics.
+	monitoringViewRole = "cluster-monitoring-view"
+	// instanceServiceAccount is the ServiceAccount used by instance pods.
+	instanceServiceAccount = "ruptura-instance"
+	// apiKeySecretKey is the Secret data key holding the engine API key.
+	apiKeySecretKey = "api-key"
+	// apiKeyBytes is the number of random bytes in a generated API key.
+	apiKeyBytes = 32
 )
 
 // hasFinalizer reports whether inst already carries our finalizer.
@@ -47,6 +59,12 @@ func cleanup(c *k8sClient, inst RupturaInstance, isOCP bool) error {
 		if err := c.delete(fmt.Sprintf("/apis/route.openshift.io/v1/namespaces/%s/routes/%s", ns, name)); err != nil {
 			return fmt.Errorf("delete Route: %w", err)
 		}
+		if err := c.delete(clusterRoleBindingPath(ns, name)); err != nil {
+			return fmt.Errorf("delete ClusterRoleBinding: %w", err)
+		}
+	}
+	if err := c.delete(fmt.Sprintf("/api/v1/namespaces/%s/secrets/%s", ns, generatedSecretName(name))); err != nil {
+		return fmt.Errorf("delete Secret: %w", err)
 	}
 	if err := c.delete(fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s", ns, name)); err != nil {
 		return fmt.Errorf("delete Deployment: %w", err)
@@ -114,7 +132,19 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	if err := reconcilePVC(c, ns, name, storageSize, labels); err != nil {
 		return fmt.Errorf("PVC: %w", err)
 	}
-	if err := reconcileDeployment(c, ns, name, image, edition, replicas, inst.Spec, labels); err != nil {
+	apiKeyRef := inst.Spec.APIKeyRef
+	if apiKeyRef == "" {
+		apiKeyRef = generatedSecretName(name)
+		if err := ensureAPIKeySecret(c, ns, apiKeyRef, labels); err != nil {
+			return fmt.Errorf("API key Secret: %w", err)
+		}
+	}
+	if isOCP {
+		if err := reconcileMonitoringBinding(c, ns, name, labels); err != nil {
+			return fmt.Errorf("ClusterRoleBinding: %w", err)
+		}
+	}
+	if err := reconcileDeployment(c, ns, name, image, edition, apiKeyRef, replicas, isOCP, inst.Spec, labels); err != nil {
 		return fmt.Errorf("Deployment: %w", err)
 	}
 	if err := reconcileService(c, ns, name, labels); err != nil {
@@ -163,21 +193,22 @@ func reconcilePVC(c *k8sClient, ns, name, size string, labels map[string]string)
 	return c.apply(path, pvc)
 }
 
-func reconcileDeployment(c *k8sClient, ns, name, image, edition string, replicas int32, spec RupturaInstanceSpec, labels map[string]string) error {
+func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef string, replicas int32, isOCP bool, spec RupturaInstanceSpec, labels map[string]string) error {
 	env := []EnvVar{
 		{Name: "RUPTURA_EDITION", Value: edition},
 	}
-	if spec.APIKeyRef != "" {
-		env = append(env, EnvVar{
-			Name: "RUPTURA_API_KEY",
-			ValueFrom: &EnvVarSource{
-				SecretKeyRef: &SecretKeySelector{
-					Name:     spec.APIKeyRef,
-					Key:      "api-key",
-					Optional: true,
-				},
+	env = append(env, EnvVar{
+		Name: "RUPTURA_API_KEY",
+		ValueFrom: &EnvVarSource{
+			SecretKeyRef: &SecretKeySelector{
+				Name:     apiKeyRef,
+				Key:      apiKeySecretKey,
+				Optional: true,
 			},
-		})
+		},
+	})
+	if isOCP {
+		env = append(env, EnvVar{Name: "RUPTURA_THANOS_URL", Value: thanosURL})
 	}
 	if spec.IngestRPS > 0 {
 		env = append(env, EnvVar{
@@ -194,9 +225,15 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition string, replicas
 		}
 	}
 
-	falseVal := false
 	trueVal := true
-	_ = falseVal
+
+	// OpenShift assigns UID and fsGroup from the namespace SCC range and
+	// rejects fixed values, so they are set on plain Kubernetes only.
+	podSC := &PodSecurityContext{RunAsNonRoot: true}
+	if !isOCP {
+		podSC.RunAsUser = 65532
+		podSC.FSGroup = 65532
+	}
 
 	dep := Deployment{
 		APIVersion: "apps/v1",
@@ -222,12 +259,8 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition string, replicas
 					},
 				},
 				Spec: PodSpec{
-					ServiceAccountName: "ruptura-instance",
-					SecurityContext: &PodSecurityContext{
-						RunAsNonRoot: true,
-						RunAsUser:    65532,
-						FSGroup:      65532,
-					},
+					ServiceAccountName: instanceServiceAccount,
+					SecurityContext:    podSC,
 					Containers: []Container{
 						{
 							Name:  "ruptura",
@@ -318,7 +351,8 @@ func reconcileRoute(c *k8sClient, ns, name string, labels map[string]string) err
 				TargetPort: "http",
 			},
 			TLS: &RouteTLS{
-				Termination: "edge",
+				Termination:                   "edge",
+				InsecureEdgeTerminationPolicy: "Redirect",
 			},
 		},
 	}
@@ -349,4 +383,76 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 
 	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s", ns, name)
 	return c.patchStatus(path, status)
+}
+
+// generatedSecretName returns the name of the operator-generated API key Secret.
+func generatedSecretName(name string) string { return name + "-api-key" }
+
+// generateAPIKey returns a hex-encoded random API key.
+func generateAPIKey() (string, error) {
+	b := make([]byte, apiKeyBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// ensureAPIKeySecret creates the API key Secret when it does not exist yet.
+// An existing Secret is never overwritten, so the key is stable across
+// reconciles. The key value is never logged.
+func ensureAPIKeySecret(c *k8sClient, ns, secretName string, labels map[string]string) error {
+	path := fmt.Sprintf("/api/v1/namespaces/%s/secrets/%s", ns, secretName)
+	var existing map[string]interface{}
+	err := c.get(path, &existing)
+	if err == nil {
+		return nil
+	}
+	if !isNotFound(err) {
+		return err
+	}
+	key, err := generateAPIKey()
+	if err != nil {
+		return fmt.Errorf("generate API key: %w", err)
+	}
+	secret := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Secret",
+		"type":       "Opaque",
+		"metadata": map[string]interface{}{
+			"name":      secretName,
+			"namespace": ns,
+			"labels":    labels,
+		},
+		"stringData": map[string]string{apiKeySecretKey: key},
+	}
+	return c.apply(path, secret)
+}
+
+// clusterRoleBindingPath returns the API path of the per-instance monitoring binding.
+func clusterRoleBindingPath(ns, name string) string {
+	return fmt.Sprintf("/apis/rbac.authorization.k8s.io/v1/clusterrolebindings/ruptura-%s-%s-monitoring-view", ns, name)
+}
+
+// reconcileMonitoringBinding binds the instance ServiceAccount to
+// cluster-monitoring-view so the engine can query Thanos on OpenShift.
+func reconcileMonitoringBinding(c *k8sClient, ns, name string, labels map[string]string) error {
+	crb := map[string]interface{}{
+		"apiVersion": "rbac.authorization.k8s.io/v1",
+		"kind":       "ClusterRoleBinding",
+		"metadata": map[string]interface{}{
+			"name":   fmt.Sprintf("ruptura-%s-%s-monitoring-view", ns, name),
+			"labels": labels,
+		},
+		"roleRef": map[string]interface{}{
+			"apiGroup": "rbac.authorization.k8s.io",
+			"kind":     "ClusterRole",
+			"name":     monitoringViewRole,
+		},
+		"subjects": []interface{}{map[string]interface{}{
+			"kind":      "ServiceAccount",
+			"name":      instanceServiceAccount,
+			"namespace": ns,
+		}},
+	}
+	return c.apply(clusterRoleBindingPath(ns, name), crb)
 }
