@@ -295,3 +295,45 @@ func TestRun_SIGTERM(t *testing.T) {
 		t.Fatal("run() did not return after SIGTERM")
 	}
 }
+
+
+func TestMapToAnalyzerSignals_PrefersLimitUtilization(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     map[string]float64
+		wantMem float64
+		wantCPU float64
+	}{
+		{
+			name: "limit utilization wins over node utilization",
+			raw: map[string]float64{
+				"k8s.pod.memory_limit_utilization": 0.9,
+				"k8s.pod.memory.utilization":       0.01,
+				"k8s.pod.cpu_limit_utilization":    0.8,
+				"k8s.pod.cpu.utilization":          0.02,
+			},
+			wantMem: 0.9,
+			wantCPU: 0.8,
+		},
+		{
+			name: "no limit falls back to node utilization",
+			raw: map[string]float64{
+				"k8s.pod.memory.utilization": 0.4,
+				"k8s.pod.cpu.utilization":    0.3,
+			},
+			wantMem: 0.4,
+			wantCPU: 0.3,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := mapToAnalyzerSignals(tc.raw)
+			if got["memory_percent"] != tc.wantMem {
+				t.Errorf("memory_percent = %v, want %v", got["memory_percent"], tc.wantMem)
+			}
+			if got["cpu_percent"] != tc.wantCPU {
+				t.Errorf("cpu_percent = %v, want %v", got["cpu_percent"], tc.wantCPU)
+			}
+		})
+	}
+}

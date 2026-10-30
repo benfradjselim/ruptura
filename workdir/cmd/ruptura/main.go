@@ -543,6 +543,7 @@ func mapToAnalyzerSignals(raw map[string]float64) map[string]float64 {
 
 	// kubeletstats CPU utilization [0,1] → cpu_percent
 	for _, key := range []string{
+		"k8s.pod.cpu_limit_utilization",
 		"k8s.pod.cpu.node.utilization",
 		"k8s.pod.cpu.utilization",
 		"k8s.container.cpu.utilization",
@@ -556,6 +557,7 @@ func mapToAnalyzerSignals(raw map[string]float64) map[string]float64 {
 
 	// kubeletstats memory utilization [0,1] → memory_percent
 	for _, key := range []string{
+		"k8s.pod.memory_limit_utilization",
 		"k8s.pod.memory.working_set.utilization",
 		"k8s.pod.memory.utilization",
 		"k8s.container.memory.working_set.utilization",
