@@ -18,7 +18,6 @@ const (
 type seriesEnsemble struct {
 	ilr  *BatchILR
 	hw1h *HoltWinters // 1-hour season (240 samples @ 15s)
-	hw24 *HoltWinters // 24-hour season (5760 samples @ 15s)
 	ar   *ARIMA
 
 	// running MSE tracker per model for inverse-MSE ensemble weighting
@@ -34,7 +33,6 @@ func newSeriesEnsemble() *seriesEnsemble {
 	return &seriesEnsemble{
 		ilr:  NewBatchILR(20),
 		hw1h: newHoltWinters(240),
-		hw24: newHoltWinters(5760),
 		ar:   newARIMA(),
 
 		ilrMSE: newMSETracker(),
@@ -59,7 +57,6 @@ func (e *seriesEnsemble) Update(x, y float64) {
 
 	e.ilr.Update(x, y)
 	e.hw1h.Update(y)
-	e.hw24.Update(y)
 	e.ar.Update(y)
 
 	e.lastValue = y

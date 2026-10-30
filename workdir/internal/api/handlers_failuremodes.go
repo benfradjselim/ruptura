@@ -18,6 +18,11 @@ const (
 
 	// restartWindow is the period in which restarts count as active instability.
 	restartWindow = 30 * time.Minute
+
+	// recentCrashLoopRestarts is the restart count in restartWindow that marks a
+	// crash loop. Kubernetes backoff limits a looping pod to about one restart
+	// every five minutes.
+	recentCrashLoopRestarts = 3
 )
 
 // FailureEstimates answers the current time to failure of a workload.
@@ -43,7 +48,20 @@ func (h *Handlers) stateRestarts(workload string, lifetime int) int {
 	if h.failureModes == nil {
 		return lifetime
 	}
-	return h.failureModes.RecentRestarts(workload, time.Now(), restartWindow)
+	if h.failureModes.RecentRestarts(workload, time.Now(), restartWindow) >= recentCrashLoopRestarts {
+		return crashLoopRestartThreshold
+	}
+	return 0
+}
+
+// baseRisk returns the risk before failure modes apply. A tracked workload
+// takes its risk from failure modes only, because the raw rupture ratio is
+// meaningless on flat series.
+func (h *Handlers) baseRisk(fused float64) float64 {
+	if h.failureModes != nil {
+		return 0
+	}
+	return fused
 }
 
 // applyEstimate raises a workload's state and risk from its time to failure.

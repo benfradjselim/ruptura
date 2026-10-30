@@ -13,6 +13,9 @@ import (
 
 const staleThreshold = 5 * time.Minute
 
+// MaxFusedR is the upper bound of the Fused Rupture Index.
+const MaxFusedR = 10.0
+
 type Engine struct {
 	mu    sync.RWMutex
 	hosts map[string]*hostData
@@ -149,7 +152,7 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 	}
 
 	val, _ := e.fusedR(&data)
-	return val, latest, nil
+	return math.Min(val, MaxFusedR), latest, nil
 }
 
 // fusedR computes the fused R for a hostData snapshot (caller must not hold e.mu).

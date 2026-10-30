@@ -259,3 +259,15 @@ func TestFusedR_SingleSignalSource(t *testing.T) {
 		})
 	}
 }
+
+func TestFusedR_IsBounded(t *testing.T) {
+	e := NewEngine()
+	e.SetMetricR("w", 1164101, time.Now())
+	got, _, err := e.FusedR("w")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != MaxFusedR {
+		t.Fatalf("FusedR = %v, want %v", got, MaxFusedR)
+	}
+}

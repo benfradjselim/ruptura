@@ -64,7 +64,12 @@ func TestSummary_AnnouncesTimeToFailure(t *testing.T) {
 	}
 }
 
-func (f fixedEstimates) RecentRestarts(string, time.Time, time.Duration) int { return 1 }
+func (f fixedEstimates) RecentRestarts(workload string, _ time.Time, _ time.Duration) int {
+	if workload == "demo/Deployment/looping" {
+		return 3
+	}
+	return 1
+}
 
 func TestStateRestarts_PrefersRecentCount(t *testing.T) {
 	h := New(nil, nil, nil, nil, nil, nil, nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
@@ -72,8 +77,11 @@ func TestStateRestarts_PrefersRecentCount(t *testing.T) {
 		t.Fatalf("without tracking = %d, want the lifetime count", got)
 	}
 	h.SetFailureModes(fixedEstimates{})
-	if got := h.stateRestarts("demo/Deployment/orders", 9); got != 1 {
-		t.Fatalf("with tracking = %d, want the recent count", got)
+	if got := h.stateRestarts("demo/Deployment/orders", 9); got != 0 {
+		t.Fatalf("one recent restart = %d, want 0", got)
+	}
+	if got := h.stateRestarts("demo/Deployment/looping", 0); got < crashLoopRestartThreshold {
+		t.Fatalf("three recent restarts = %d, want a crash loop", got)
 	}
 }
 
@@ -115,5 +123,16 @@ func TestSummary_AnnouncesCPUThrottling(t *testing.T) {
 	}
 	if want := "orders is CPU throttled 40 percent of the time."; body.Headline != want {
 		t.Fatalf("headline = %q, want %q", body.Headline, want)
+	}
+}
+
+func TestTrackedRisk_IgnoresRawRuptureIndex(t *testing.T) {
+	h := New(nil, nil, nil, nil, nil, nil, nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
+	if got := h.baseRisk(7); got != 7 {
+		t.Fatalf("without tracking = %v, want 7", got)
+	}
+	h.SetFailureModes(fixedEstimates{})
+	if got := h.baseRisk(7); got != 0 {
+		t.Fatalf("with tracking = %v, want 0", got)
 	}
 }

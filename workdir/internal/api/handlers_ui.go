@@ -189,7 +189,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		knownHosts[name] = true
 
 		state := snapshotState(s, h.stateRestarts(name, restarts))
-		risk := s.FusedRuptureIndex
+		risk := h.baseRisk(s.FusedRuptureIndex)
 		etfSeconds, failureMode := 0, ""
 		if est, ok := h.workloadEstimate(name); ok {
 			state, risk = applyEstimate(state, risk, est)
