@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/analyzer"
+	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
@@ -80,3 +81,41 @@ func TestScore_CountsLeadTime(t *testing.T) {
 type detectorFunc func(Sample) bool
 
 func (f detectorFunc) Observe(s Sample) bool { return f(s) }
+
+// saturationDetector warns when the failure-mode estimator predicts saturation
+// within the warning horizon.
+type saturationDetector struct {
+	byPod map[string]*failuremodes.Saturation
+}
+
+const warningETF = 25 * time.Minute
+
+func (d *saturationDetector) Observe(s Sample) bool {
+	key := s.Workload + "/" + s.Pod
+	est, ok := d.byPod[key]
+	if !ok {
+		est = failuremodes.NewSaturation()
+		d.byPod[key] = est
+	}
+	e, has := est.Observe(s.At, s.MemoryBytes, s.LimitBytes, s.Restarts)
+	return has && e.ETF <= warningETF
+}
+
+func TestReplay_SaturationDetector(t *testing.T) {
+	samples, err := Load(recording)
+	if err != nil {
+		t.Fatal(err)
+	}
+	detector := &saturationDetector{byPod: map[string]*failuremodes.Saturation{}}
+	result := Score(samples, detector, defaultOptions)
+	t.Logf("saturation: %+v", result)
+	if result.Predicted != 1 || result.Eligible != 1 {
+		t.Fatalf("predicted = %d of eligible %d, want 1 of 1", result.Predicted, result.Eligible)
+	}
+	if result.FalseAlarms != 0 {
+		t.Fatalf("false alarms = %d, want 0", result.FalseAlarms)
+	}
+	if len(result.LeadMinutes) == 0 || result.LeadMinutes[0] < 10 {
+		t.Fatalf("lead = %v, want at least 10 minutes", result.LeadMinutes)
+	}
+}
