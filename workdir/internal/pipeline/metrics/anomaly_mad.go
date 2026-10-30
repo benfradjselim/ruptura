@@ -121,7 +121,36 @@ func (m *MADDetector) IsAnomaly(v float64) (anomaly bool, expected, score float6
 		return false, med, 0
 	}
 	z := math.Abs(v-med) / sigma
-	return z > m.k, med, z
+	if z <= m.k {
+		return false, med, z
+	}
+	return math.Abs(v-med) >= m.minAbsDeviation(v, med), med, z
+}
+
+const (
+	// madBoundedFraction is the minimum absolute deviation, as a fraction of
+	// the 0 to 1 range, for a bounded metric to alert.
+	madBoundedFraction = 0.02
+	// madMedianFraction is the minimum absolute deviation, as a fraction of the
+	// median, for any other metric to alert.
+	madMedianFraction = 0.20
+)
+
+// minAbsDeviation returns the smallest absolute distance from the median that
+// may raise an alert. A metric is bounded when the window and v all lie in
+// [0, 1]; its floor is 2 percent of that unit range. Other metrics use 20
+// percent of the absolute median.
+func (m *MADDetector) minAbsDeviation(v, med float64) float64 {
+	bounded := v >= 0 && v <= 1
+	for i := 0; bounded && i < m.n; i++ {
+		if w := m.window[i]; w < 0 || w > 1 {
+			bounded = false
+		}
+	}
+	if bounded {
+		return madBoundedFraction
+	}
+	return madMedianFraction * math.Abs(med)
 }
 
 // MADAnomalyDetector manages per-metric MAD detectors with thread safety.

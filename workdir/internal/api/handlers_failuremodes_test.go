@@ -136,3 +136,27 @@ func TestTrackedRisk_IgnoresRawRuptureIndex(t *testing.T) {
 		t.Fatalf("with tracking = %v, want 0", got)
 	}
 }
+
+func TestApplyCrashLoop_ReportsRiskNine(t *testing.T) {
+	tests := []struct {
+		name      string
+		state     string
+		risk      float64
+		restarts  int
+		wantState string
+		wantRisk  float64
+	}{
+		{"detected loop gets risk 9", "critical", 0, crashLoopRestartThreshold, "critical", 9},
+		{"higher risk is kept", "critical", 9.5, crashLoopRestartThreshold, "critical", 9.5},
+		{"no loop leaves risk", "healthy", 0, 0, "healthy", 0},
+		{"below threshold leaves risk", "degraded", 2, crashLoopRestartThreshold - 1, "degraded", 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			state, risk := applyCrashLoop(tc.state, tc.risk, tc.restarts)
+			if state != tc.wantState || risk != tc.wantRisk {
+				t.Errorf("got (%q, %v), want (%q, %v)", state, risk, tc.wantState, tc.wantRisk)
+			}
+		})
+	}
+}

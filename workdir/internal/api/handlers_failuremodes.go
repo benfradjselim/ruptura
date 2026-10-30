@@ -64,6 +64,19 @@ func (h *Handlers) baseRisk(fused float64) float64 {
 	return fused
 }
 
+// crashLoopRisk is the risk reported for a workload in a detected crash loop.
+const crashLoopRisk = 9.0
+
+// applyCrashLoop raises the risk of a workload in a detected crash loop to
+// crashLoopRisk so a critical state never reports a zero rupture index. It
+// never lowers a higher risk.
+func applyCrashLoop(state string, risk float64, restarts int) (string, float64) {
+	if restarts < crashLoopRestartThreshold {
+		return state, risk
+	}
+	return state, math.Max(risk, crashLoopRisk)
+}
+
 // applyEstimate raises a workload's state and risk from its time to failure.
 // It never lowers a state or a risk that is already higher.
 func applyEstimate(state string, risk float64, est failuremodes.Estimate) (string, float64) {
