@@ -49,6 +49,46 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Engine selector labels (selectorLabels plus the engine component, so engine
+selectors never match UI pods).
+*/}}
+{{- define "ruptura.engineSelectorLabels" -}}
+{{ include "ruptura.selectorLabels" . }}
+app.kubernetes.io/component: engine
+{{- end }}
+
+{{/*
+Engine labels (common labels plus the engine component).
+*/}}
+{{- define "ruptura.engineLabels" -}}
+{{ include "ruptura.labels" . }}
+app.kubernetes.io/component: engine
+{{- end }}
+
+{{/*
+Engine pod security context; runAsUser and fsGroup are omitted on OpenShift,
+where the restricted SCC assigns them.
+*/}}
+{{- define "ruptura.podSecurityContext" -}}
+{{- if .Values.openshift.enabled -}}
+{{- toYaml (omit .Values.podSecurityContext "runAsUser" "fsGroup") -}}
+{{- else -}}
+{{- toYaml .Values.podSecurityContext -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Thanos querier URL: explicit value wins, OpenShift gets the in-cluster default.
+*/}}
+{{- define "ruptura.thanosUrl" -}}
+{{- if .Values.thanos.url -}}
+{{- .Values.thanos.url -}}
+{{- else if .Values.openshift.enabled -}}
+https://thanos-querier.openshift-monitoring.svc:9091
+{{- end -}}
+{{- end }}
+
+{{/*
 ServiceAccount name.
 */}}
 {{- define "ruptura.serviceAccountName" -}}
@@ -69,4 +109,12 @@ Image reference.
 {{- $tag := .Values.image.tag | default (printf "v%s" .Chart.AppVersion) -}}
 {{ .Values.image.repository }}:{{ $tag }}
 {{- end }}
+{{- end }}
+
+{{/*
+UI image reference.
+*/}}
+{{- define "ruptura.uiImage" -}}
+{{- $tag := .Values.ui.image.tag | default (printf "ui-v%s" .Chart.AppVersion) -}}
+{{ .Values.ui.image.repository }}:{{ $tag }}
 {{- end }}
