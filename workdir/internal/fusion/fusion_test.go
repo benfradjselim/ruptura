@@ -71,11 +71,11 @@ func TestFusion_conflictDetected(t *testing.T) {
 
 func TestFusion_insufficientSignals_zero(t *testing.T) {
 	e := NewEngine()
-	e.SetMetricR("h1", 1.0, time.Now())
-	
+	e.SetMetricR("h1", 1.0, time.Now().Add(-2*staleThreshold))
+
 	_, _, err := e.FusedR("h1")
 	if err == nil {
-		t.Error("expected error for insufficient signals, got nil")
+		t.Error("expected error when every signal is stale, got nil")
 	}
 }
 
@@ -220,7 +220,7 @@ func TestFusion_StateByWorkload_Unknown(t *testing.T) {
 	}
 }
 
-func TestFusion_StateByWorkload_InsufficientSignals(t *testing.T) {
+func TestFusion_StateByWorkload_SingleSignal(t *testing.T) {
 	e := NewEngine()
 	now := time.Now()
 	e.SetMetricR("ns/Deployment/lonely", 2.0, now)
@@ -229,8 +229,33 @@ func TestFusion_StateByWorkload_InsufficientSignals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// FusedR should be 0 when only one signal available
-	if st.FusedR != 0 {
-		t.Errorf("expected FusedR=0 with single signal, got %.3f", st.FusedR)
+	if st.FusedR != 2.0 {
+		t.Errorf("expected FusedR=2 with single signal, got %.3f", st.FusedR)
+	}
+}
+
+func TestFusedR_SingleSignalSource(t *testing.T) {
+	tests := []struct {
+		name string
+		set  func(e *Engine, now time.Time)
+		want float64
+	}{
+		{"metric only", func(e *Engine, now time.Time) { e.SetMetricR("w", 5, now) }, 5},
+		{"log only", func(e *Engine, now time.Time) { e.SetLogR("w", 3, now) }, 3},
+		{"trace only", func(e *Engine, now time.Time) { e.SetTraceR("w", 2, now) }, 2},
+		{"metric zero stays zero", func(e *Engine, now time.Time) { e.SetMetricR("w", 0, now) }, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := NewEngine()
+			tc.set(e, time.Now())
+			got, _, err := e.FusedR("w")
+			if err != nil {
+				t.Fatalf("FusedR returned error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("FusedR = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
