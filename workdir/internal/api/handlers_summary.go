@@ -34,7 +34,7 @@ func (h *Handlers) handleWorkloadSummary(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, WorkloadSummary{
 			Headline:          estimateHeadline(name, est),
 			Confidence:        est.Confidence,
-			RecommendedAction: "Review the memory limit or restart the pod before it is killed",
+			RecommendedAction: estimateAction(est),
 		})
 		return
 	}

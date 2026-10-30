@@ -147,6 +147,16 @@ func (t *Thanos) query(ctx context.Context, q string) (map[string]sample, map[st
 	return out, ids, nil
 }
 
+// optionalQuery runs q, or returns no samples when q is empty (condition
+// signals have only a usage query).
+func (t *Thanos) optionalQuery(ctx context.Context, q string) (map[string]sample, error) {
+	if q == "" {
+		return nil, nil
+	}
+	out, _, err := t.query(ctx, q)
+	return out, err
+}
+
 // Collect runs the usage, capacity and restarts queries and joins them on
 // namespace and pod. Pods without usage are dropped; missing capacity or
 // restarts yield zero.
@@ -155,11 +165,11 @@ func (t *Thanos) Collect(ctx context.Context, sig Signal) ([]Reading, error) {
 	if err != nil {
 		return nil, err
 	}
-	capacity, _, err := t.query(ctx, sig.Capacity)
+	capacity, err := t.optionalQuery(ctx, sig.Capacity)
 	if err != nil {
 		return nil, err
 	}
-	restarts, _, err := t.query(ctx, sig.Restarts)
+	restarts, err := t.optionalQuery(ctx, sig.Restarts)
 	if err != nil {
 		return nil, err
 	}

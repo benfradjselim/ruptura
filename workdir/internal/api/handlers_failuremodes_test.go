@@ -76,3 +76,44 @@ func TestStateRestarts_PrefersRecentCount(t *testing.T) {
 		t.Fatalf("with tracking = %d, want the recent count", got)
 	}
 }
+
+func TestApplyEstimate_ThrottlingIsDegradedNeverCritical(t *testing.T) {
+	tests := []struct {
+		name      string
+		state     string
+		wantState string
+	}{
+		{"healthy becomes degraded", "healthy", "degraded"},
+		{"calibrating becomes degraded", "calibrating", "degraded"},
+		{"critical is kept", "critical", "critical"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			state, risk := applyEstimate(tc.state, 0, failuremodes.Estimate{Mode: failuremodes.ModeCPUThrottling, Usage: 0.4})
+			if state != tc.wantState {
+				t.Errorf("state = %q, want %q", state, tc.wantState)
+			}
+			if risk < 1.5 {
+				t.Errorf("risk = %v, want alerting", risk)
+			}
+		})
+	}
+}
+
+func TestSummary_AnnouncesCPUThrottling(t *testing.T) {
+	h := New(nil, nil, nil, nil, nil, nil, nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
+	h.SetFailureModes(fixedEstimates{
+		"demo/Deployment/orders": {Mode: failuremodes.ModeCPUThrottling, Confidence: 1, Usage: 0.4},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/workloads/demo/Deployment/orders/summary", nil)
+	req.Header.Set("Authorization", "Bearer key")
+	rec := httptest.NewRecorder()
+	h.NewRouter().ServeHTTP(rec, req)
+	var body WorkloadSummary
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if want := "orders is CPU throttled 40 percent of the time."; body.Headline != want {
+		t.Fatalf("headline = %q, want %q", body.Headline, want)
+	}
+}

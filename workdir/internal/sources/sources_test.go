@@ -164,3 +164,41 @@ Wf86aX6PepsntZv2GYlA5UpabfT2EZICICpJ5h/iI+i341gBmLiAFQOyTDT+/wQc
 		t.Skip("running in cluster")
 	}
 }
+
+func TestLoadCatalog_CPUThrottling(t *testing.T) {
+	cat, err := LoadCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range cat.Signals {
+		if s.Name != "cpu_throttling" {
+			continue
+		}
+		if s.Mode != "condition" || s.Capacity != "" || s.Restarts != "" {
+			t.Fatalf("signal = %+v", s)
+		}
+		for _, part := range []string{"container_cpu_cfs_throttled_periods_total", "container_cpu_cfs_periods_total", `container!=""`, "[5m]"} {
+			if !strings.Contains(s.Usage, part) {
+				t.Errorf("usage query lacks %q: %s", part, s.Usage)
+			}
+		}
+		return
+	}
+	t.Fatal("cpu_throttling signal missing")
+}
+
+func TestCollect_ConditionSignalRunsOnlyUsageQuery(t *testing.T) {
+	var queries int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		queries++
+		_, _ = w.Write([]byte(vec(row("n", "p", "0.4"))))
+	}))
+	defer srv.Close()
+	got, err := NewThanos(srv.URL, "", srv.Client()).Collect(context.Background(), Signal{Name: "cpu_throttling", Mode: "condition", Usage: "q"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if queries != 1 || len(got) != 1 || got[0].Usage != 0.4 {
+		t.Fatalf("queries = %d readings = %+v", queries, got)
+	}
+}

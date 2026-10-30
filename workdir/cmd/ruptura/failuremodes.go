@@ -66,7 +66,12 @@ func pollFailureModes(ctx context.Context, source *sources.Thanos, catalog sourc
 				continue
 			}
 			workload := reading.Namespace + "/" + kind + "/" + name
-			tracker.Observe(workload, reading.Namespace+"/"+reading.Pod, now, reading.Usage, reading.Capacity, reading.Restarts)
+			pod := reading.Namespace + "/" + reading.Pod
+			if signal.Mode == "condition" {
+				tracker.ObserveCondition(workload, pod, now, reading.Usage)
+				continue
+			}
+			tracker.Observe(workload, pod, now, reading.Usage, reading.Capacity, reading.Restarts)
 		}
 	}
 	tracker.Prune(now.Add(-failureModePodTTL))

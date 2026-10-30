@@ -12,7 +12,9 @@ const (
 	degradedETF = 30 * time.Minute
 	criticalETF = 10 * time.Minute
 	riskHorizon = time.Hour
-	maxRisk     = 10.0
+	// conditionRisk is the risk of a condition that is already happening.
+	conditionRisk = 5.0
+	maxRisk       = 10.0
 
 	// restartWindow is the period in which restarts count as active instability.
 	restartWindow = 30 * time.Minute
@@ -47,6 +49,12 @@ func (h *Handlers) stateRestarts(workload string, lifetime int) int {
 // applyEstimate raises a workload's state and risk from its time to failure.
 // It never lowers a state or a risk that is already higher.
 func applyEstimate(state string, risk float64, est failuremodes.Estimate) (string, float64) {
+	if est.Mode == failuremodes.ModeCPUThrottling {
+		if state != "critical" {
+			state = "degraded"
+		}
+		return state, math.Max(risk, conditionRisk)
+	}
 	if est.ETF > riskHorizon {
 		return state, risk
 	}
@@ -61,5 +69,15 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate) (strin
 }
 
 func estimateHeadline(name string, est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeCPUThrottling {
+		return fmt.Sprintf("%s is CPU throttled %d percent of the time.", name, int(math.Round(est.Usage*100)))
+	}
 	return fmt.Sprintf("%s is projected to reach its memory limit in %d minutes.", name, int(math.Round(est.ETF.Minutes())))
+}
+
+func estimateAction(est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeCPUThrottling {
+		return "Raise the CPU limit or reduce the workload's CPU demand"
+	}
+	return "Review the memory limit or restart the pod before it is killed"
 }

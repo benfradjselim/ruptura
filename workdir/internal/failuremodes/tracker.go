@@ -17,9 +17,14 @@ type podState struct {
 	estimate Estimate
 	valid    bool
 	seen     time.Time
-	restarts int
-	counted  bool
-	history  []time.Time
+
+	condition    *Condition
+	condEstimate Estimate
+	condValid    bool
+	condSeen     time.Time
+	restarts     int
+	counted      bool
+	history      []time.Time
 }
 
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
@@ -36,10 +41,9 @@ func NewTracker() *Tracker { return &Tracker{pods: make(map[string]*podState)} }
 func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity float64, restarts int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	state, ok := t.pods[pod]
-	if !ok {
-		state = &podState{workload: workload, detector: NewSaturation()}
-		t.pods[pod] = state
+	state := t.podLocked(workload, pod)
+	if state.detector == nil {
+		state.detector = NewSaturation()
 	}
 	if state.counted && restarts > state.restarts {
 		state.history = append(state.history, at)
@@ -53,18 +57,51 @@ func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity fl
 	state.seen = at
 }
 
-// Worst returns the shortest fresh time to failure across a workload's pods.
+func (t *Tracker) podLocked(workload, pod string) *podState {
+	state, ok := t.pods[pod]
+	if !ok {
+		state = &podState{workload: workload}
+		t.pods[pod] = state
+	}
+	return state
+}
+
+// ObserveCondition records one throttling ratio for a pod that belongs to
+// workload.
+func (t *Tracker) ObserveCondition(workload, pod string, at time.Time, ratio float64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	state := t.podLocked(workload, pod)
+	if state.condition == nil {
+		state.condition = NewCondition()
+	}
+	state.condEstimate, state.condValid = state.condition.Observe(at, ratio)
+	state.condEstimate.Pod = pod
+	state.condSeen = at
+}
+
+// Worst returns the most urgent fresh estimate across a workload's pods and
+// modes. An imminent failure outranks a condition already in progress, which
+// outranks a slower projection.
 func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	var worst Estimate
 	found := false
+	consider := func(est Estimate) {
+		if !found || est.urgency() < worst.urgency() {
+			worst, found = est, true
+		}
+	}
 	for _, state := range t.pods {
-		if state.workload != workload || !state.valid || now.Sub(state.seen) > estimateMaxAge {
+		if state.workload != workload {
 			continue
 		}
-		if !found || state.estimate.ETF < worst.ETF {
-			worst, found = state.estimate, true
+		if state.valid && now.Sub(state.seen) <= estimateMaxAge {
+			consider(state.estimate)
+		}
+		if state.condValid && now.Sub(state.condSeen) <= estimateMaxAge {
+			consider(state.condEstimate)
 		}
 	}
 	return worst, found
@@ -94,7 +131,7 @@ func (t *Tracker) Prune(cutoff time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for pod, state := range t.pods {
-		if state.seen.Before(cutoff) {
+		if state.seen.Before(cutoff) && state.condSeen.Before(cutoff) {
 			delete(t.pods, pod)
 		}
 	}
