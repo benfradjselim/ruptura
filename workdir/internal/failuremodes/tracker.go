@@ -8,12 +8,18 @@ import (
 // estimateMaxAge is how long an estimate stays valid without a new reading.
 const estimateMaxAge = 3 * time.Minute
 
+// maxRestartHistory bounds the restart times kept per pod.
+const maxRestartHistory = 64
+
 type podState struct {
 	workload string
 	detector *Saturation
 	estimate Estimate
 	valid    bool
 	seen     time.Time
+	restarts int
+	counted  bool
+	history  []time.Time
 }
 
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
@@ -35,6 +41,13 @@ func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity fl
 		state = &podState{workload: workload, detector: NewSaturation()}
 		t.pods[pod] = state
 	}
+	if state.counted && restarts > state.restarts {
+		state.history = append(state.history, at)
+		if len(state.history) > maxRestartHistory {
+			state.history = state.history[len(state.history)-maxRestartHistory:]
+		}
+	}
+	state.restarts, state.counted = restarts, true
 	state.estimate, state.valid = state.detector.Observe(at, usage, capacity, restarts)
 	state.estimate.Pod = pod
 	state.seen = at
@@ -55,6 +68,25 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 		}
 	}
 	return worst, found
+}
+
+// RecentRestarts counts restarts observed for a workload inside the window.
+// Counts that predate the first observation are history and are not included.
+func (t *Tracker) RecentRestarts(workload string, now time.Time, window time.Duration) int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	total := 0
+	for _, state := range t.pods {
+		if state.workload != workload {
+			continue
+		}
+		for _, at := range state.history {
+			if now.Sub(at) <= window {
+				total++
+			}
+		}
+	}
+	return total
 }
 
 // Prune forgets pods that have not been seen since the cutoff.

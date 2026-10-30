@@ -63,3 +63,16 @@ func TestSummary_AnnouncesTimeToFailure(t *testing.T) {
 		t.Fatalf("headline = %q, want %q", body.Headline, want)
 	}
 }
+
+func (f fixedEstimates) RecentRestarts(string, time.Time, time.Duration) int { return 1 }
+
+func TestStateRestarts_PrefersRecentCount(t *testing.T) {
+	h := New(nil, nil, nil, nil, nil, nil, nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
+	if got := h.stateRestarts("demo/Deployment/orders", 9); got != 9 {
+		t.Fatalf("without tracking = %d, want the lifetime count", got)
+	}
+	h.SetFailureModes(fixedEstimates{})
+	if got := h.stateRestarts("demo/Deployment/orders", 9); got != 1 {
+		t.Fatalf("with tracking = %d, want the recent count", got)
+	}
+}

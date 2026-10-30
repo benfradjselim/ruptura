@@ -188,7 +188,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		}
 		knownHosts[name] = true
 
-		state := snapshotState(s, restarts)
+		state := snapshotState(s, h.stateRestarts(name, restarts))
 		risk := s.FusedRuptureIndex
 		etfSeconds, failureMode := 0, ""
 		if est, ok := h.workloadEstimate(name); ok {
@@ -251,7 +251,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 			// "pending_telemetry" forever despite obviously being broken.
 			restarts := h.workloadRestartCount(s.Workload.Namespace, s.Workload.Kind, s.Workload.Name)
 			state := "pending_telemetry"
-			if restarts >= crashLoopRestartThreshold {
+			if h.stateRestarts(name, restarts) >= crashLoopRestartThreshold {
 				state = "critical"
 				resp.CriticalHosts++
 			}

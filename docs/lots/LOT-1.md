@@ -19,3 +19,5 @@ Stop rule: 2 attempts with no score change means stop and re-diagnose.
 Also found: the UI image listens on port 80 and needs port 8080 for OpenShift (installation lot).
 
 Superseded: M3 and M4 move to the failure-mode design. See `docs/graph/components.yaml`.
+
+Packaging defects found on the lab, for P3: the engine Deployment and Service selectors also match UI pods, because UI labels are a superset.
