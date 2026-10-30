@@ -22,6 +22,7 @@ const (
 // Estimate is a time-to-failure prediction.
 type Estimate struct {
 	Mode       Mode
+	Pod        string
 	ETF        time.Duration
 	Confidence float64
 	Usage      float64

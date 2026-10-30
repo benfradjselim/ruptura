@@ -53,6 +53,7 @@ type Handlers struct {
     discovery     *discovery.Informer
     infraRegistry *dag.Registry
     demoMode      bool
+    failureModes  FailureEstimates
 }
 
 // SetDemoMode marks the server as running with synthetic demo data

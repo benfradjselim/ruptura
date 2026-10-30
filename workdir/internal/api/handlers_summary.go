@@ -30,6 +30,15 @@ func (h *Handlers) handleWorkloadSummary(w http.ResponseWriter, r *http.Request)
 	ns, kind, name := vars["namespace"], vars["kind"], vars["name"]
 	ref := models.WorkloadRef{Namespace: ns, Kind: kind, Name: name}
 
+	if est, ok := h.workloadEstimate(ref.Key()); ok && est.ETF <= riskHorizon {
+		writeJSON(w, http.StatusOK, WorkloadSummary{
+			Headline:          estimateHeadline(name, est),
+			Confidence:        est.Confidence,
+			RecommendedAction: "Review the memory limit or restart the pod before it is killed",
+		})
+		return
+	}
+
 	if h.store == nil {
 		writeJSON(w, http.StatusOK, noDataSummary(ref))
 		return

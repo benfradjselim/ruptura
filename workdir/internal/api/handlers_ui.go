@@ -81,6 +81,8 @@ type fleetHost struct {
 	CalibrationProgress int                    `json:"calibration_progress"`
 	HealthForecast      *models.HealthForecast `json:"health_forecast,omitempty"`
 	RestartCount        int                    `json:"restart_count,omitempty"`
+	ETFSeconds          int                    `json:"etf_seconds,omitempty"`
+	FailureMode         string                 `json:"failure_mode,omitempty"`
 }
 
 // crashLoopRestartThreshold is the container restart count (summed across a
@@ -187,6 +189,12 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		knownHosts[name] = true
 
 		state := snapshotState(s, restarts)
+		risk := s.FusedRuptureIndex
+		etfSeconds, failureMode := 0, ""
+		if est, ok := h.workloadEstimate(name); ok {
+			state, risk = applyEstimate(state, risk, est)
+			etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
+		}
 		resp.TotalHosts++
 		// Explicit cases only — a bare "default: critical" here previously
 		// counted every "calibrating" workload (state=calibrating is grey,
@@ -211,10 +219,12 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 			Fatigue:             s.Fatigue.Value,
 			Contagion:           s.Contagion.Value,
 			LastSeen:            s.Timestamp,
-			FusedRuptureIndex:   s.FusedRuptureIndex,
+			FusedRuptureIndex:   risk,
 			CalibrationProgress: s.CalibrationProgress,
 			HealthForecast:      s.HealthForecast,
 			RestartCount:        restarts,
+			ETFSeconds:          etfSeconds,
+			FailureMode:         failureMode,
 		})
 	}
 
