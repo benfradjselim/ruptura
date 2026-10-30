@@ -46,7 +46,7 @@ func TestSaturation_Estimate(t *testing.T) {
 			e := NewSaturation()
 			var est Estimate
 			var ok bool
-			for i := 0; i < 10; i++ {
+			for i := 0; i <= 10; i++ {
 				est, ok = e.Observe(t0.Add(time.Duration(i)*time.Minute), tt.usage(i)*tt.limit, tt.limit, 0)
 			}
 			if ok != tt.wantOK {
@@ -76,7 +76,7 @@ func TestSaturation_Estimate(t *testing.T) {
 
 func TestSaturation_ResetsAfterRestart(t *testing.T) {
 	e := NewSaturation()
-	if _, ok := feed(e, 0, 10, time.Minute, func(i int) float64 { return 0.5 + 0.01*float64(i) }, 0); !ok {
+	if _, ok := feed(e, 0, 11, time.Minute, func(i int) float64 { return 0.5 + 0.01*float64(i) }, 0); !ok {
 		t.Fatal("expected estimate before restart")
 	}
 	if _, ok := feed(e, 10, 1, time.Minute, func(int) float64 { return 0.1 }, 1); ok {

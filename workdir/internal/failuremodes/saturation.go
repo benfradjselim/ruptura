@@ -13,10 +13,13 @@ type Mode string
 const ModeSaturation Mode = "saturation"
 
 const (
-	saturationWindow      = 10 * time.Minute
+	saturationWindow      = 20 * time.Minute
 	saturationMinSamples  = 5
 	saturationMaxSamples  = 120
 	saturationMinAgreeing = 0.8
+	// saturationMinSpan is the history required before any estimate, so that a
+	// single ramp of a sawtooth is not mistaken for a trend.
+	saturationMinSpan = 10 * time.Minute
 )
 
 // Estimate is a time-to-failure prediction.
@@ -65,11 +68,14 @@ func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, resta
 	}
 	s.points = append([]point(nil), s.points[cut:]...)
 
-	if len(s.points) < saturationMinSamples {
+	if len(s.points) < saturationMinSamples || at.Sub(s.points[0].at) < saturationMinSpan {
 		return Estimate{}, false
 	}
 	slope, agree := theilSen(s.points)
 	if slope <= 0 || agree < saturationMinAgreeing {
+		return Estimate{}, false
+	}
+	if !sustained(s.points, slope) {
 		return Estimate{}, false
 	}
 	remaining := 1 - usage
@@ -78,6 +84,23 @@ func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, resta
 	}
 	etf := time.Duration(remaining / slope * float64(time.Second))
 	return Estimate{Mode: ModeSaturation, ETF: etf, Confidence: agree, Usage: usage}, true
+}
+
+// sustained reports whether both halves of the window, split by time, show a
+// slope of at least half the full-window slope. A level shift or a transient
+// spike fails because one half of the window is flat.
+func sustained(points []point, slope float64) bool {
+	mid := points[0].at.Add(points[len(points)-1].at.Sub(points[0].at) / 2)
+	split := sort.Search(len(points), func(i int) bool { return points[i].at.After(mid) })
+	if split < 2 || len(points)-split < 2 {
+		return false
+	}
+	for _, half := range [][]point{points[:split], points[split:]} {
+		if hs, _ := theilSen(half); hs < slope/2 {
+			return false
+		}
+	}
+	return true
 }
 
 // theilSen returns the median pairwise slope in usage per second and the
