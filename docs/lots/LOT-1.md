@@ -17,3 +17,5 @@ Stop rule: 2 attempts with no score change means stop and re-diagnose.
 | M8 | M | Alerts fire on negligible changes | `internal/predictor/anomaly_mad.go` |
 
 Also found: the UI image listens on port 80 and needs port 8080 for OpenShift (installation lot).
+
+Superseded: M3 and M4 move to the failure-mode design. See `docs/graph/components.yaml`.

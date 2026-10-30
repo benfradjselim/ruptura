@@ -1,0 +1,16 @@
+# Component map. Mission agents read only their own entry and allowed paths.
+components:
+  C1-sources: {paths: [workdir/internal/ingest, workdir/internal/sources], next: [C3-normalizer]}
+  C2-catalog: {paths: [workdir/configs/signals], next: [C1-sources]}
+  C3-normalizer: {paths: [workdir/internal/normalize], next: [C4-failure-modes, C5-forecast]}
+  C4-failure-modes: {paths: [workdir/internal/failuremodes], next: [C7-risk]}
+  C5-forecast: {paths: [workdir/internal/predictor], next: [C4-failure-modes]}
+  C6-infra-signals: {paths: [workdir/internal/collector/infra], next: [C7-risk]}
+  C7-risk: {paths: [workdir/internal/fusion], next: [C8-decision]}
+  C8-decision: {paths: [workdir/internal/analyzer, workdir/internal/actions], next: [C9-api, C12-autopilot]}
+  C9-api: {paths: [workdir/internal/api], next: [C10-ui, C11-cli]}
+  C10-ui: {paths: [workdir/ui], next: []}
+  C11-cli: {paths: [workdir/cmd/ruptura-ctl], next: []}
+  C12-autopilot: {repo: Ruptura-autopilot, next: []}
+  C13-packaging: {paths: [helm, install, operators, bundle, workdir/operator], next: []}
+  C14-lab-eval: {paths: [scripts/lab-eval], next: []}
