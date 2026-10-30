@@ -71,6 +71,10 @@ func pollFailureModes(ctx context.Context, source *sources.Thanos, catalog sourc
 				tracker.ObserveCondition(workload, pod, now, reading.Usage)
 				continue
 			}
+			if reading.RestartsOnly {
+				tracker.ObserveRestarts(workload, pod, now, reading.Restarts)
+				continue
+			}
 			tracker.Observe(workload, pod, now, reading.Usage, reading.Capacity, reading.Restarts)
 		}
 	}

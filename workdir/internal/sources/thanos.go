@@ -31,6 +31,9 @@ type Reading struct {
 	Capacity  float64
 	Restarts  int
 	At        time.Time
+	// RestartsOnly marks a pod with no usage reading, such as one in
+	// CrashLoopBackOff. Only Restarts is meaningful.
+	RestartsOnly bool
 }
 
 // Thanos queries a Prometheus-compatible HTTP API.
@@ -169,9 +172,12 @@ func (t *Thanos) Collect(ctx context.Context, sig Signal) ([]Reading, error) {
 	if err != nil {
 		return nil, err
 	}
-	restarts, err := t.optionalQuery(ctx, sig.Restarts)
-	if err != nil {
-		return nil, err
+	var restarts map[string]sample
+	var restartIDs map[string][2]string
+	if sig.Restarts != "" {
+		if restarts, restartIDs, err = t.query(ctx, sig.Restarts); err != nil {
+			return nil, err
+		}
 	}
 	out := make([]Reading, 0, len(usage))
 	for key, u := range usage {
@@ -182,6 +188,18 @@ func (t *Thanos) Collect(ctx context.Context, sig Signal) ([]Reading, error) {
 			Capacity:  capacity[key].v,
 			Restarts:  int(restarts[key].v),
 			At:        u.at,
+		})
+	}
+	for key, r := range restarts {
+		if _, ok := usage[key]; ok {
+			continue
+		}
+		out = append(out, Reading{
+			Namespace:    restartIDs[key][0],
+			Pod:          restartIDs[key][1],
+			Restarts:     int(r.v),
+			At:           r.at,
+			RestartsOnly: true,
 		})
 	}
 	return out, nil

@@ -37,6 +37,26 @@ type Tracker struct {
 // NewTracker returns an empty tracker.
 func NewTracker() *Tracker { return &Tracker{pods: make(map[string]*podState)} }
 
+func (s *podState) recordRestarts(at time.Time, restarts int) {
+	if s.counted && restarts > s.restarts {
+		s.history = append(s.history, at)
+		if len(s.history) > maxRestartHistory {
+			s.history = s.history[len(s.history)-maxRestartHistory:]
+		}
+	}
+	s.restarts, s.counted = restarts, true
+}
+
+// ObserveRestarts records the restart count of a pod with no usage reading,
+// which is the normal case for a pod in CrashLoopBackOff.
+func (t *Tracker) ObserveRestarts(workload, pod string, at time.Time, restarts int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	state := t.podLocked(workload, pod)
+	state.recordRestarts(at, restarts)
+	state.seen = at
+}
+
 // Observe records one reading for a pod that belongs to workload.
 func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity float64, restarts int) {
 	t.mu.Lock()
@@ -45,13 +65,7 @@ func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity fl
 	if state.detector == nil {
 		state.detector = NewSaturation()
 	}
-	if state.counted && restarts > state.restarts {
-		state.history = append(state.history, at)
-		if len(state.history) > maxRestartHistory {
-			state.history = state.history[len(state.history)-maxRestartHistory:]
-		}
-	}
-	state.restarts, state.counted = restarts, true
+	state.recordRestarts(at, restarts)
 	state.estimate, state.valid = state.detector.Observe(at, usage, capacity, restarts)
 	state.estimate.Pod = pod
 	state.seen = at

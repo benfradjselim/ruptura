@@ -38,9 +38,9 @@ func TestCollect(t *testing.T) {
 		{name: "missing capacity", resp: map[string]string{
 			"U": vec(row("a", "p1", "50")), "C": vec(), "R": vec(),
 		}, want: map[string]Reading{"a/p1": {Namespace: "a", Pod: "p1", Usage: 50}}},
-		{name: "missing usage drops pod", resp: map[string]string{
+		{name: "missing usage keeps restarts only", resp: map[string]string{
 			"U": vec(), "C": vec(row("a", "p1", "100")), "R": vec(row("a", "p1", "1")),
-		}, want: map[string]Reading{}},
+		}, want: map[string]Reading{"a/p1": {Namespace: "a", Pod: "p1", Restarts: 1, RestartsOnly: true}}},
 		{name: "http error", status: 500, wantErr: true},
 		{name: "prometheus error status", resp: map[string]string{
 			"U": `{"status":"error","errorType":"bad","error":"boom"}`, "C": vec(), "R": vec(),

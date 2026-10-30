@@ -49,3 +49,15 @@ func TestTracker_RecentRestartsUsesWindow(t *testing.T) {
 		t.Fatalf("restarts in 2 hours = %d, want 2, the initial count is history", got)
 	}
 }
+
+func TestTracker_CountsRestartsWithoutUsage(t *testing.T) {
+	start := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
+	tracker := NewTracker()
+	for i, restarts := range []int{5, 6, 7, 8} {
+		tracker.ObserveRestarts("ns/Deployment/app", "pod", start.Add(time.Duration(i)*5*time.Minute), restarts)
+	}
+	got := tracker.RecentRestarts("ns/Deployment/app", start.Add(15*time.Minute), 30*time.Minute)
+	if got != 3 {
+		t.Fatalf("restarts = %d, want 3", got)
+	}
+}
