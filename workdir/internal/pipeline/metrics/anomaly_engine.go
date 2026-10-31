@@ -96,10 +96,10 @@ func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time
 		}
 	}
 
-	if len(results) > 0 && !e.throttle.allow(fullMetric, results[0].Severity, ts) {
+	if len(results) == 0 || !e.throttle.allow(fullMetric, results[0].Severity, ts) {
 		return nil
 	}
-	return results
+	return results[:1]
 }
 
 // alertCooldown is the reminder interval of an anomaly that keeps firing.
@@ -145,35 +145,56 @@ var cumulativeMetrics = map[string]bool{
 	"k8s.container.cpu.time": true,
 }
 
+// counterRateWindow is the span of a counter rate. Idle pods send short bursts
+// that are normal for them, so a 15 second rate is too heavy tailed to score.
+const counterRateWindow = 5 * time.Minute
+
 type counterSample struct {
 	value float64
 	ts    time.Time
 }
 
-// counterRates converts cumulative samples into per-second rates.
+// counterRates converts cumulative samples into per-second rates over
+// counterRateWindow.
 type counterRates struct {
-	mu   sync.Mutex
-	last map[string]counterSample
+	mu      sync.Mutex
+	history map[string][]counterSample
 }
 
 func newCounterRates() *counterRates {
-	return &counterRates{last: make(map[string]counterSample)}
+	return &counterRates{history: make(map[string][]counterSample)}
 }
 
-// rate returns the per-second rate since the previous sample of key. It returns
-// false for the first sample, a repeated timestamp and a counter reset.
+// rate returns the per-second rate of key over counterRateWindow. It returns
+// false for a repeated timestamp, a counter reset and until the window is
+// covered.
 func (c *counterRates) rate(key string, value float64, ts time.Time) (float64, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	prev, ok := c.last[key]
-	if ok && !ts.After(prev.ts) {
+	history := c.history[key]
+	if n := len(history); n > 0 {
+		last := history[n-1]
+		if !ts.After(last.ts) {
+			return 0, false
+		}
+		if value < last.value {
+			history = nil
+		}
+	}
+	history = append(history, counterSample{value: value, ts: ts})
+
+	oldest := 0
+	for oldest+1 < len(history) && !history[oldest+1].ts.After(ts.Add(-counterRateWindow)) {
+		oldest++
+	}
+	history = history[oldest:]
+	c.history[key] = history
+
+	base := history[0]
+	if ts.Sub(base.ts) < counterRateWindow {
 		return 0, false
 	}
-	c.last[key] = counterSample{value: value, ts: ts}
-	if !ok || value < prev.value {
-		return 0, false
-	}
-	return (value - prev.value) / ts.Sub(prev.ts).Seconds(), true
+	return (value - base.value) / ts.Sub(base.ts).Seconds(), true
 }
 
 // dropNegligible removes events whose absolute deviation is too small to act

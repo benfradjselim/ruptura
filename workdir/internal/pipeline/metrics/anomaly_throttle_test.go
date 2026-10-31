@@ -35,3 +35,19 @@ func TestAlertThrottle_Allow(t *testing.T) {
 		}
 	}
 }
+
+func TestAnomalyEngine_OneAlertPerObservation(t *testing.T) {
+	e := NewAnomalyEngine()
+	ts := time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 400; i++ {
+		ts = ts.Add(15 * time.Second)
+		e.Observe("h", "m", 100+float64(i%3), ts)
+	}
+	got := e.Observe("h", "m", 100000, ts.Add(15*time.Second))
+	if len(got) != 1 {
+		t.Fatalf("alerts = %d, want 1: %+v", len(got), got)
+	}
+	if got[0].Severity != models.SeverityCritical {
+		t.Errorf("severity = %s, want critical when methods agree", got[0].Severity)
+	}
+}
