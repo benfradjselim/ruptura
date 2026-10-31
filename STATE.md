@@ -25,6 +25,14 @@ Rewrite it before any wait over 10 minutes, after each deploy, and at the end of
 - Next action: after 23:54 UTC run `/root/lab.sh < scripts/lab-eval/measure-alerts.sh`. It counts 22:54 to 23:54 UTC, all 3 detectors active. Target 3 per minute or less. Do not redeploy before that. Update START and END in the script after any later deploy.
 - Then: review metric coverage. The engine uses under 5 percent of available metrics, and the owner requires this addressed before leaving the engine.
 
+## Maintainability audit 2026-10-31
+No code changed. Priorities once LOT-1 passes:
+- Merge the near identical `internal/predictor` and `internal/pipeline/metrics` (7 files differ by 2 to 15 lines).
+- Fix docs that disagree with code: README 5 models, ARCHITECTURE places the ensemble in `fusion/`, `components.yaml` lists a missing `internal/normalize`.
+- Raise tests on `internal/actions/providers` 34.8 percent and `internal/api` 39.1 percent. `gofmt` flags 87 files.
+- Check `processor`, `notifier`, `billing`, `vault`: no import in this repository, Autopilot may use them.
+- One maintainer listed. CI status unverified because `gh run` is blocked.
+
 ## History
 - Baseline 2026-10-30: leak predicted 0/2, FRI > 0 on 0/98 hosts, control false alarms 0.
 - Latest: FRI > 0 on 18/98 hosts after M1. M2 and M5 are merged here, forecast GET returns 200 on the lab.
