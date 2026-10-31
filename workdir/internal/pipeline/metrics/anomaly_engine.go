@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -74,6 +75,8 @@ func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time
 		})
 	}
 
+	results = dropNegligible(results)
+
 	// Escalate to critical if ≥2 methods agree
 	if len(results) >= 2 {
 		for i := range results {
@@ -82,6 +85,30 @@ func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time
 	}
 
 	return results
+}
+
+// dropNegligible removes events whose absolute deviation is too small to act
+// on, whichever method raised them.
+func dropNegligible(events []models.AnomalyEvent) []models.AnomalyEvent {
+	kept := events[:0]
+	for _, ev := range events {
+		if !negligibleDeviation(ev.Value, ev.Expected) {
+			kept = append(kept, ev)
+		}
+	}
+	return kept
+}
+
+// negligibleDeviation reports whether value is too close to expected to alert.
+// Values within the 0 to 1 unit range use the bounded floor. A seasonal
+// expected value may dip slightly below 0, so the check uses magnitudes. Other
+// values use a fraction of the expected value.
+func negligibleDeviation(value, expected float64) bool {
+	dev := math.Abs(value - expected)
+	if math.Abs(value) <= 1 && math.Abs(expected) <= 1 {
+		return dev < madBoundedFraction
+	}
+	return dev < madMedianFraction*math.Abs(expected)
 }
 
 // AnomalyStore is an in-memory ring buffer of recent anomaly events.
