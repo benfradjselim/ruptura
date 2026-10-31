@@ -16,6 +16,7 @@ type AnomalyEngine struct {
 	mad      *MADAnomalyDetector
 	seasonal *SeasonalAnomalyDetector
 	counters *counterRates
+	throttle *alertThrottle
 }
 
 // NewAnomalyEngine creates an engine with sane defaults.
@@ -25,6 +26,7 @@ func NewAnomalyEngine() *AnomalyEngine {
 		mad:      NewMADAnomalyDetector(300, 3.0),
 		seasonal: NewSeasonalAnomalyDetector(240, 3.0), // 1h season at 15s
 		counters: newCounterRates(),
+		throttle: newAlertThrottle(),
 	}
 }
 
@@ -94,7 +96,42 @@ func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time
 		}
 	}
 
+	if len(results) > 0 && !e.throttle.allow(fullMetric, results[0].Severity, ts) {
+		return nil
+	}
 	return results
+}
+
+// alertCooldown is the reminder interval of an anomaly that keeps firing.
+const alertCooldown = 5 * time.Minute
+
+type alertState struct {
+	severity string
+	ts       time.Time
+}
+
+// alertThrottle keeps one alert per anomaly episode. A series alerts once, then
+// again after alertCooldown or as soon as it escalates to critical.
+type alertThrottle struct {
+	mu   sync.Mutex
+	last map[string]alertState
+}
+
+func newAlertThrottle() *alertThrottle {
+	return &alertThrottle{last: make(map[string]alertState)}
+}
+
+// allow reports whether an anomaly of key at ts must be published.
+func (t *alertThrottle) allow(key string, severity string, ts time.Time) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	prev, ok := t.last[key]
+	escalated := severity == models.SeverityCritical && prev.severity != models.SeverityCritical
+	if ok && !escalated && ts.Sub(prev.ts) < alertCooldown {
+		return false
+	}
+	t.last[key] = alertState{severity: severity, ts: ts}
+	return true
 }
 
 // cumulativeMetrics lists monotonic counters. Their raw value always drifts away
