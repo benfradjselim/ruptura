@@ -11,7 +11,7 @@ Rewrite it before any wait over 10 minutes, after each deploy, and at the end of
 - Updated: 2026-10-31 15:05 UTC
 - Plan: fix the engine first. Other components (Helm, operator, UI, CLI, site) start only once the engine passes its gate. Deadline 2026-11-24, Red Hat Summit Paris.
 - Work location: `/root/ruptura-fix`, branch `fix/engine-prediction`, pushed at `dc971d6`.
-- Lab: OpenShift, reach it with `/tmp/audit/lab.sh`, not the Civo kubeconfig. Deploy with `/tmp/audit/redeploy.sh`, which deletes `/var/tmp/fleet.jsonl`, so copy that file first. `/tmp` may not survive a reboot.
+- Lab: OpenShift, reach it with `/root/lab.sh`, not the Civo kubeconfig. Deploy with `/root/redeploy.sh`, which deletes `/var/tmp/fleet.jsonl`, so copy that file first.
 - `gh api` and `gh run` are blocked by policy. Do not bypass this, verify locally.
 - Active gate: LOT-1, alerts reduced by at least 90 percent. Baseline is at least 30 alerts per minute (capped 1000 in 33 min, `14a97f1`), so the target is 3 per minute or less.
 - Measures: `14a97f1` 30 per minute or more. `7793f07` 7.1 per minute (320 in 45 min).
