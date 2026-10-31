@@ -26,9 +26,9 @@ Rewrite it before any wait over 10 minutes, after each deploy, and at the end of
 - Then: review metric coverage. The engine uses under 5 percent of available metrics, and the owner requires this addressed before leaving the engine.
 
 ## Maintainability audit 2026-10-31
-No code changed. Priorities once LOT-1 passes:
+Owner approved 2026-10-31: once LOT-1 passes, do these in order, after the metric coverage review, one commit per step:
 - Merge the near identical `internal/predictor` and `internal/pipeline/metrics` (7 files differ by 2 to 15 lines).
-- Fix docs that disagree with code: README 5 models, ARCHITECTURE places the ensemble in `fusion/`, `components.yaml` lists a missing `internal/normalize`.
+- Fix docs that disagree with code: README 5 models (verify EWMA and the 60 s reweighting), ARCHITECTURE places the ensemble in `fusion/`, `components.yaml` lists a missing `internal/normalize`.
 - Raise tests on `internal/actions/providers` 34.8 percent and `internal/api` 39.1 percent. `gofmt` flags 87 files.
 - Check `processor`, `notifier`, `billing`, `vault`: no import in this repository, Autopilot may use them.
 - One maintainer listed. CI status unverified because `gh run` is blocked.
