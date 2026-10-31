@@ -15,6 +15,7 @@ type AnomalyEngine struct {
 	zscore   *AnomalyDetector
 	mad      *MADAnomalyDetector
 	seasonal *SeasonalAnomalyDetector
+	counters *counterRates
 }
 
 // NewAnomalyEngine creates an engine with sane defaults.
@@ -23,6 +24,7 @@ func NewAnomalyEngine() *AnomalyEngine {
 		zscore:   NewAnomalyDetector(3.0),
 		mad:      NewMADAnomalyDetector(300, 3.0),
 		seasonal: NewSeasonalAnomalyDetector(240, 3.0), // 1h season at 15s
+		counters: newCounterRates(),
 	}
 }
 
@@ -30,6 +32,14 @@ func NewAnomalyEngine() *AnomalyEngine {
 // Anomalies from ≥2 methods are tagged severity "critical"; single-method ones "warning".
 func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time) []models.AnomalyEvent {
 	fullMetric := host + ":" + metric
+
+	if cumulativeMetrics[metric] {
+		rate, ok := e.counters.rate(fullMetric, value, ts)
+		if !ok {
+			return nil
+		}
+		value = rate
+	}
 
 	var results []models.AnomalyEvent
 
@@ -85,6 +95,48 @@ func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time
 	}
 
 	return results
+}
+
+// cumulativeMetrics lists monotonic counters. Their raw value always drifts away
+// from any baseline, so anomaly detection runs on their per-second rate.
+var cumulativeMetrics = map[string]bool{
+	"k8s.pod.network.io":     true,
+	"k8s.pod.cpu.time":       true,
+	"k8s.node.network.io":    true,
+	"k8s.node.cpu.time":      true,
+	"container.cpu.time":     true,
+	"k8s.container.cpu.time": true,
+}
+
+type counterSample struct {
+	value float64
+	ts    time.Time
+}
+
+// counterRates converts cumulative samples into per-second rates.
+type counterRates struct {
+	mu   sync.Mutex
+	last map[string]counterSample
+}
+
+func newCounterRates() *counterRates {
+	return &counterRates{last: make(map[string]counterSample)}
+}
+
+// rate returns the per-second rate since the previous sample of key. It returns
+// false for the first sample, a repeated timestamp and a counter reset.
+func (c *counterRates) rate(key string, value float64, ts time.Time) (float64, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	prev, ok := c.last[key]
+	if ok && !ts.After(prev.ts) {
+		return 0, false
+	}
+	c.last[key] = counterSample{value: value, ts: ts}
+	if !ok || value < prev.value {
+		return 0, false
+	}
+	return (value - prev.value) / ts.Sub(prev.ts).Seconds(), true
 }
 
 // dropNegligible removes events whose absolute deviation is too small to act
