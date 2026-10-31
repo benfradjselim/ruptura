@@ -2,8 +2,9 @@ curl -s -m 30 -H "Authorization: Bearer $(cat /var/tmp/.k)" http://172.30.10.124
 python3 - <<'P'
 import json,collections as C
 a=json.load(open('/tmp/al3.json'))
-a=[x for x in a if x['timestamp'][:19]>='2026-10-31T21:53:40']
-print('alerts',len(a),'per min over 45',round(len(a)/45,2),'span',min(x['timestamp'] for x in a)[:19] if a else '',max(x['timestamp'] for x in a)[:19] if a else '')
+START,END,MINUTES='2026-10-31T22:54:00','2026-10-31T23:54:00',60
+a=[x for x in a if START<=x['timestamp'][:19]<END]
+print('alerts',len(a),'per min',round(len(a)/MINUTES,2),'span',min(x['timestamp'] for x in a)[:19] if a else '',max(x['timestamp'] for x in a)[:19] if a else '')
 print(C.Counter(x['metric'] for x in a).most_common(10)); print(C.Counter(x['method'] for x in a).most_common()); print(C.Counter(x['severity'] for x in a).most_common())
 s=C.Counter((x['host'],x['metric']) for x in a); print('series',len(s),s.most_common(6))
 print('by 5min',sorted(C.Counter(x['timestamp'][11:15] for x in a).items()))
