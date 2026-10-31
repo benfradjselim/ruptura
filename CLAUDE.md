@@ -4,6 +4,10 @@
 All comments, docstrings, inline documentation, and code annotations must be in **English only**.
 No Spanish, French, or other languages anywhere in source files — including folder tree comments, inline notes, or variable names.
 
+## Session handoff
+Read the Handoff section of `STATE.md` before any work and continue from its "Next action".
+Rewrite that section before any wait over 10 minutes, after each deploy, and at the end of a session.
+
 ## What this project is
 Ruptura is a predictive AIOps engine for Kubernetes written in Go.
 It ingests OTLP + Prometheus metrics and computes a Fused Rupture Index (FRI) using a 5-model ML ensemble to detect workload failures before they happen.
