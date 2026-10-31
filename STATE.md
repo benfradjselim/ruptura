@@ -8,7 +8,7 @@ This section is how sessions pass work to each other. Read it first, continue fr
 
 Rewrite it before any wait over 10 minutes, after each deploy, and at the end of a session. A session can stop without warning, so never leave this for the end. Replace the old content and keep it short. Numbers must come from a real measure.
 
-- Updated: 2026-10-31 20:50 UTC
+- Updated: 2026-10-31 21:55 UTC
 - Plan: fix the engine first. Other components (Helm, operator, UI, CLI, site) start only once the engine passes its gate. Deadline 2026-11-24, Red Hat Summit Paris.
 - Work location: `/root/ruptura-fix`, branch `fix/engine-prediction`, pushed at `dc971d6`.
 - Lab: OpenShift, reach it with `/root/lab.sh`, not the Civo kubeconfig. Deploy with `/root/redeploy.sh`, which deletes `/var/tmp/fleet.jsonl`, so copy that file first.
@@ -19,8 +19,8 @@ Rewrite it before any wait over 10 minutes, after each deploy, and at the end of
 - Findings so far: one observation can publish up to 3 alerts, one per method. The 5 minute cooldown is the main limit on the flow, gaps peak at 5 minutes. 771 of 885 values are above expected, 53 are zero. Noisiest workloads have one pod, so replica mixing is not their cause.
 - Cause found: bursts are real, not an artifact. Kubelet counters sampled 15 s for 12 min on the 4 noisiest workloads: rx medians 27 to 990 B/s match the engine's expected values, and 44 of 172 rx samples exceed 5 times the median. The 15 s rate of idle pods is heavy tailed, so the MAD and z-score tests fire on normal traffic. The rate code itself is correct.
 - Side defect: `handleOTLPMetrics` drops data point attributes, so rx and tx share one key and `counterRates` drops the second point at the same timestamp. Only one direction is scored.
-- Fix: counters scored on a 5 minute rate, one alert per observation. Tested on simulated data only until the lab measure is read.
-- Next action: read `GET /api/v2/alerts` on the lab 45 min after the deploy, compute alerts per minute, target 3 or less. Then recheck leak warning, crash-pay critical and stable-web healthy, because the P1 gate predates these changes.
+- Fix: `0f6335d` counters scored on a 5 minute rate, one alert per observation, deployed 21:53 UTC, not pushed. Measure due 22:39 UTC. Previous data saved as `/var/tmp/*-20261031-dc971d6.*` on the lab.
+- Next action: after 22:39 UTC run `/root/lab.sh < scripts/lab-eval/measure-alerts.sh`. It counts alerts since 21:53:40 UTC and prints demo-shop states. Update the timestamp in the script for a later deploy. Target 3 per minute or less. Then recheck leak warning, crash-pay critical and stable-web healthy, because the P1 gate predates these changes.
 - Then: review metric coverage. The engine uses under 5 percent of available metrics, and the owner requires this addressed before leaving the engine.
 
 ## History
