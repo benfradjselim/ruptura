@@ -138,6 +138,9 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 	if est, ok := t.rolloutEstimate(workload, now); ok {
 		consider(est)
 	}
+	if est, ok := t.recurrenceEstimate(workload, now); ok {
+		consider(est)
+	}
 	return worst, found
 }
 
