@@ -42,13 +42,13 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Manage Services and PVCs; read Secrets for apiKeyRef
+  # Manage Services, PVCs, ServiceAccounts and the generated API key Secret
   - apiGroups: [""]
-    resources: ["services", "persistentvolumeclaims"]
+    resources: ["services", "persistentvolumeclaims", "serviceaccounts"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # OpenShift Routes (no-op on vanilla K8s — API simply won't be present)
   - apiGroups: ["route.openshift.io"]
     resources: ["routes"]
