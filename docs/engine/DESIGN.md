@@ -298,7 +298,7 @@ recommendedAction: raise the memory limit
 
 | Version | Content | Done when |
 |---|---|---|
-| Summit, 2026-11-24 | CRD and operator, 5 pod failures, 2 or 3 workload failures | Exit criteria met on the lab |
+| Summit, 2026-11-24 | CRD and operator, 5 pod failures, 2 or 3 workload failures | Exit criteria met on the lab, benchmark published |
 | Next | Complete workload, add node | 5 proven per level |
 | Later | Namespace, then cluster | 5 proven per level |
 
@@ -328,6 +328,21 @@ input:
     - kubernetesEvents: {enabled: true}
     - otlp: {signals: [metrics, logs, traces]}
 ```
+
+### Benchmark
+
+Agreed with the owner, 2026-11-01. A public benchmark is a mandatory exit criterion of each version.
+
+| Item | Choice |
+|---|---|
+| Opponents | Alerts shipped with OpenShift, and well tuned `predict_linear` rules |
+| Terrain | The same faults on the same lab, at least 3 runs per fault |
+| Measures | Failures detected, lead time, false alarms on healthy workloads, resources used, configuration effort |
+| Publication | Reproducible scripts and all results, losses included |
+
+Win rule, fixed in advance: on a given failure, Ruptura warns earlier or with fewer false alarms than the opponent, at comparable configuration effort.
+
+A tie on a steady memory leak is acceptable. On a loss, improve the recipe or state the result, and never present it as an advantage.
 
 ### Open
 
