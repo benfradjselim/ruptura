@@ -73,33 +73,50 @@ func (a *ARIMA) Update(y float64) {
 	a.ciResiduals.push(residual)
 }
 
-// Forecast returns the predicted value m steps ahead on the original scale.
+// maxForecastSteps bounds the recursion. It is 2 hours at 15s intervals.
+const maxForecastSteps = 480
+
+// Forecast returns the predicted value m steps ahead on the original scale. Each
+// step feeds the next one, around the mean change of the buffered series.
 func (a *ARIMA) Forecast(steps int) float64 {
 	if a.n < 10 || steps < 1 {
 		return a.prev
 	}
-	if steps > 20 {
-		steps = 20 // accuracy degrades beyond ~20 steps
+	if steps > maxForecastSteps {
+		steps = maxForecastSteps
 	}
 
-	// Multi-step: integrate differenced predictions back to original scale.
-	// At step s=0 the MA residuals are the last observed residuals (r0, r1).
-	// For s>0 the true future residuals are unknown; the ARIMA convention is
-	// E[ε_{t+s}] = 0 for s≥1, so we zero them out after the first step.
-	// Setting r0 = predicted dy (as before) would propagate phantom autocorrelation
-	// and cause the MA component to diverge — hence the correct zero-out below.
+	drift := a.meanChange()
+	var lags [3]float64
+	for lag := range lags {
+		if lag < a.obsN {
+			lags[lag] = a.obs[(a.obsPos-1-lag+64*2)%64] - drift
+		}
+	}
 	total := a.prev
 	r0, r1 := a.residuals[0], a.residuals[1]
 	for s := 0; s < steps; s++ {
-		arPred := a.arPredictStep(s)
-		maPred := a.theta[0]*r0 + a.theta[1]*r1
-		dy := arPred + maPred
-		total += dy
-		// After step 0 the expected future innovation is zero
-		r1 = r0
-		r0 = 0
+		deviation := a.theta[0]*r0 + a.theta[1]*r1
+		for lag, value := range lags {
+			deviation += a.phi[lag] * value
+		}
+		total += drift + deviation
+		lags[2], lags[1], lags[0] = lags[1], lags[0], deviation
+		// After step 0 the expected future innovation is zero.
+		r1, r0 = r0, 0
 	}
 	return total
+}
+
+func (a *ARIMA) meanChange() float64 {
+	if a.obsN == 0 {
+		return 0
+	}
+	sum := 0.0
+	for i := 0; i < a.obsN; i++ {
+		sum += a.obs[(a.obsPos-1-i+64*2)%64]
+	}
+	return sum / float64(a.obsN)
 }
 
 // ResidualStdDev returns stddev of recent one-step residuals.
@@ -171,11 +188,6 @@ func (a *ARIMA) arPredict(ahead int) float64 {
 		}
 	}
 	return pred
-}
-
-// arPredictStep predicts for step s into the future.
-func (a *ARIMA) arPredictStep(s int) float64 {
-	return a.arPredict(s)
 }
 
 // levinsonDurbin solves the Yule-Walker equations for AR(p).
