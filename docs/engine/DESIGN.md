@@ -146,7 +146,7 @@ apiVersion: ruptura.io/v1alpha1
 kind: RupturaInstance
 metadata: {name: prod, namespace: ruptura}
 spec:
-  image: quay.io/ruptura/ruptura:8.0.0
+  image: docker.io/<account>/ruptura:8.0.0
   deployment:
     mode: Deployment       # StatefulSet, DaemonSet, Sidecar
     replicas: 1
@@ -346,7 +346,7 @@ A tie on a steady memory leak is acceptable. On a loss, improve the recipe or st
 
 ### Open
 
-README message, and the plan of phases around the operator and CRD.
+README message, final list of pod and workload failures, and CI access.
 
 ## Evidence protocol
 
@@ -357,18 +357,24 @@ README message, and the plan of phases around the operator and CRD.
 
 Constraint: learned weights need labelled failures. Until the library exists, use only rules that the evidence supports.
 
-## Phases
+## Plan to the Summit
 
-| Phase | Output | Exit test |
+Approved by the owner, 2026-11-01. Results freeze on 2026-11-17.
+
+| Dates | Work | Exit |
 |---|---|---|
-| 0 | LOT-1 result | Alert gate decided |
-| 1 | Missing data explicit, one signal implementation | Absent input no longer changes health |
-| 2 | Catalog and normalizer, broad collection | Coverage and memory cost measured |
-| 2b | `RupturaInstance` with level, input, output and status blocks | Two instances at different levels run side by side, an invalid one deploys nothing |
-| 3 | Fault library and replay scoring | Each fault recorded at least 3 times |
-| 4 | Signal review with evidence | Each signal has a keep or delete decision |
-| 5 | Risk and state built on proven signals | FRI agrees across API endpoints |
-| 6 | Docs, tests, API contract | A new contributor runs and scores the engine from the docs |
+| Nov 2 to 8 | Phase 1 closed, one operator chosen, catalog and normalizer for pod and workload, Kubernetes Events, structured output, fault library, first benchmark bench | Memory saturation compared with `predict_linear` end to end |
+| Nov 9 to 15 | `RupturaInstance` blocks, validation, status, object generation, pod failures, workload failures, Alertmanager and webhook | Install from zero through the operator, 7 failures recorded at least 3 times |
+| Nov 16 to 17 | Full benchmark | Results frozen on Nov 17 |
+| Nov 18 to 23 | Bug fixes only, README and install docs, minimal UI, published images, rehearsal, backup video | Demonstration ready |
+
+Cut first if late, in order: `StatefulSet` mode, rollout stuck failure, `standard` profile, local disk full failure.
+
+Never cut: benchmark, honest missing data, install through the operator.
+
+After the Summit: full duplicate merge unless the catalog needs it, API surface reduction, unused package cleanup, tests on actions, `gofmt`, OpenShift Console plugin, eBPF, logs, levels node, namespace and cluster.
+
+Images stay on Docker Hub. Quay.io can be a mirror later.
 
 ## Owner decisions, 2026-11-01
 
