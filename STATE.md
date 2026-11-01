@@ -8,7 +8,7 @@ This section is how sessions pass work to each other. Read it first, continue fr
 
 Rewrite it before any wait over 10 minutes, after each deploy, and at the end of a session. A session can stop without warning, so never leave this for the end. Replace the old content and keep it short. Numbers must come from a real measure.
 
-- Updated: 2026-11-01 01:26 UTC
+- Updated: 2026-11-01 01:52 UTC
 - Plan: fix the engine first. Other components (Helm, operator, UI, CLI, site) start only once the engine passes its gate. Deadline 2026-11-24, Red Hat Summit Paris.
 - Work location: `/root/ruptura-fix`, branch `fix/engine-prediction`, pushed. Push with `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push`, plain push has no credentials.
 - Lab: OpenShift, reach it with `/root/lab.sh`, not the Civo kubeconfig. Deploy with `/root/redeploy.sh`, which deletes `/var/tmp/fleet.jsonl`, so copy that file first.
@@ -26,6 +26,7 @@ Rewrite it before any wait over 10 minutes, after each deploy, and at the end of
 - `dropUnconfirmedSeasonal` commit deployed 00:37 UTC, pushed. Expected near 2.45 per minute if the same alerts recur, not measured yet. Data saved as `/var/tmp/*-20261101-0f6335d.*` on the lab.
 - Next action: after 02:37 UTC run `/root/lab.sh < scripts/lab-eval/measure-alerts.sh`, it counts the second hour after the deploy. Target 3 per minute or less, and 0 false alarms on stable-web, which is part of the LOT-1 gate: it had 3 anomaly alerts in the 22:54 hour, seasonal 2 and zscore 1, so check it explicitly. Also confirm leak warned at least 10 min before OOM on 3 cycles. Then metric coverage review, then the audit steps in order.
 - Then: review metric coverage, owner requires it before leaving the engine. Inventory done 2026-11-01, no code changed: the lab Prometheus exposes 2594 metric names, `sources/catalog.yaml` reads 5 of them (0.2 percent), plus kubeletstats over OTLP. Most names are internal and not useful.
+- Signals finding 2026-11-01, one reading of `/api/v2/metrics` on 98 workloads: contagion, fatigue, humidity, mood, resilience, throughput are 0 everywhere, pressure is 0.5 everywhere. Alive: stress (max 0.30), entropy, velocity, health_score (min 0.79, above the 0.70 degraded limit). The analyzer reads `error_rate`, `timeout_rate`, `latency`, `load_avg_1`, but `mapToAnalyzerSignals` in `cmd/ruptura/main.go` maps only cpu and memory, and the lab collector sends only kubeletstats, no traces or logs. Degraded and critical on the demos appear to come from failure modes and restarts, not from these signals, to confirm in code. FRI also disagrees: `/metrics` shows 10 on 25 workloads while `/fleet` shows 3 nonzero. Owner expects the 10 signals to be the core of the product, so feeding them comes first in the coverage work, before any new failure mode.
 - Proposed failure modes, by priority, pending owner approval: volume full (`kubelet_volume_stats_*`, 3 names), container stuck waiting (`kube_pod_container_status_*`, 8), node pressure (`kube_node_status_condition`), ephemeral disk (`container_fs_*`, 17), HTTP errors (`haproxy_backend_http_*`, 4), etcd slowdown (`etcd_disk_*`, 17). Each needs its own gate.
 
 ## Maintainability audit 2026-10-31
