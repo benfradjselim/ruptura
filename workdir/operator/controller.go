@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -98,6 +99,11 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 		if err := c.patchFinalizers(inst, updated); err != nil {
 			return fmt.Errorf("add finalizer: %w", err)
 		}
+	}
+
+	if err := validateSpec(inst.Spec); err != nil {
+		log.Printf("invalid RupturaInstance %s/%s: %v", inst.Metadata.Namespace, inst.Metadata.Name, err)
+		return writeInvalidStatus(c, inst, err)
 	}
 
 	ns := inst.Metadata.Namespace
@@ -210,6 +216,7 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 	if isOCP {
 		env = append(env, EnvVar{Name: "RUPTURA_THANOS_URL", Value: thanosURL})
 	}
+	env = append(env, configEnv(spec)...)
 	if spec.IngestRPS > 0 {
 		env = append(env, EnvVar{
 			Name:  "RUPTURA_INGEST_RPS",
@@ -383,6 +390,36 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 
 	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s", ns, name)
 	return c.patchStatus(path, status)
+}
+
+// writeInvalidStatus reports a spec that was refused. Nothing is deployed.
+func writeInvalidStatus(c *k8sClient, inst RupturaInstance, problem error) error {
+	status := RupturaInstanceStatus{
+		Phase:              "Failed",
+		Message:            problem.Error(),
+		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
+		ObservedGeneration: inst.Metadata.Generation,
+	}
+	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s", inst.Metadata.Namespace, inst.Metadata.Name)
+	return c.patchStatus(path, status)
+}
+
+// configEnv passes the declared configuration to the engine.
+func configEnv(spec RupturaInstanceSpec) []EnvVar {
+	values := []EnvVar{
+		{Name: "RUPTURA_LEVEL_SCOPE", Value: spec.Level.Scope},
+		{Name: "RUPTURA_INPUT_PROFILE", Value: spec.Input.Profile},
+		{Name: "RUPTURA_SENSITIVITY", Value: spec.Analysis.Sensitivity},
+		{Name: "RUPTURA_HORIZON", Value: spec.Analysis.Horizon},
+		{Name: "LOG_LEVEL", Value: spec.Logging.Level},
+	}
+	env := make([]EnvVar, 0, len(values))
+	for _, value := range values {
+		if value.Value != "" {
+			env = append(env, value)
+		}
+	}
+	return env
 }
 
 // generatedSecretName returns the name of the operator-generated API key Secret.

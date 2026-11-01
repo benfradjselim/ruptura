@@ -31,6 +31,66 @@ type RupturaInstanceSpec struct {
 	IngestRPS int32 `json:"ingestRPS,omitempty"`
 	// Resources sets CPU/memory requests and limits for the Ruptura container.
 	Resources ResourceRequirements `json:"resources,omitempty"`
+	// Deployment selects how the engine runs.
+	Deployment DeploymentConfig `json:"deployment,omitempty"`
+	// Level selects what the instance watches.
+	Level LevelConfig `json:"level,omitempty"`
+	// Input selects how much telemetry the instance collects.
+	Input InputConfig `json:"input,omitempty"`
+	// Analysis tunes predictions.
+	Analysis AnalysisConfig `json:"analysis,omitempty"`
+	// Alerting lists where results are sent.
+	Alerting AlertingConfig `json:"alerting,omitempty"`
+	// Logging sets the engine log level.
+	Logging LoggingConfig `json:"logging,omitempty"`
+}
+
+// DeploymentConfig selects how the engine runs.
+type DeploymentConfig struct {
+	Mode string `json:"mode,omitempty"`
+}
+
+// LabelSelector selects objects by label.
+type LabelSelector struct {
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+}
+
+// LevelConfig selects the watched level and objects.
+type LevelConfig struct {
+	Scope    string        `json:"scope,omitempty"`
+	Selector LabelSelector `json:"selector,omitempty"`
+}
+
+// InputConfig selects the input profile.
+type InputConfig struct {
+	Profile string `json:"profile,omitempty"`
+}
+
+// AnalysisConfig tunes predictions.
+type AnalysisConfig struct {
+	Sensitivity string `json:"sensitivity,omitempty"`
+	Horizon     string `json:"horizon,omitempty"`
+}
+
+// AlertmanagerChannel sends results to an Alertmanager.
+type AlertmanagerChannel struct {
+	URL string `json:"url"`
+}
+
+// AlertChannel is one named destination for results.
+type AlertChannel struct {
+	Name         string               `json:"name"`
+	Alertmanager *AlertmanagerChannel `json:"alertmanager,omitempty"`
+}
+
+// AlertingConfig lists alert destinations.
+type AlertingConfig struct {
+	Channels []AlertChannel `json:"channels,omitempty"`
+}
+
+// LoggingConfig sets the engine log level.
+type LoggingConfig struct {
+	Level string `json:"level,omitempty"`
 }
 
 // RupturaInstanceStatus is the observed state written back by the operator.
