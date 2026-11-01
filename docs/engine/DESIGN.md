@@ -122,61 +122,114 @@ Design patterns:
 | Value that may be absent | Explicit type, value plus availability |
 | Storage | Repository |
 
-## User configuration
+## Product vision
 
-Status: proposal from the owner, 2026-11-01. Not implemented.
+Agreed with the owner, 2026-11-01. Not implemented. Supersedes the earlier `RupturaPipeline` proposal.
 
-Same model as an OpenTelemetry Collector or a ClusterLogForwarder: the engine stays fixed, the user declares what it does. The user chooses sources, targets, analysis level and outputs. The algorithms and calculation principles do not change per user.
+Ruptura is a customizable predictive observability tool and a cloud native standard. The engine stays the same: same algorithms, same calculation principles. The user declares what it does through one central CRD, as with an OpenTelemetry Collector or a ClusterLogForwarder.
 
-Current: `RupturaInstance` (`ruptura.io/v1alpha1`) only deploys the engine: image, replicas, storage, edition, ingest rate, resources. Weights are set through a REST call. Nothing declares what to watch.
+### Operator lifecycle
 
-Proposed resource, with the same shape as a collector pipeline:
+1. The user installs the operator with OpenShift Console (OLM), Helm, Kustomize or Argo CD.
+2. The user creates a `RupturaInstance`. Each team can have its own instance, each runs its own engine.
+3. Validation has three layers: CRD schema and webhook reject at apply, the operator deploys nothing and logs the error, `status` gives the reason.
+4. When valid, the operator generates standard Kubernetes objects. The user sees only `RupturaInstance`. Internal CRDs are added only if a component later justifies one.
+5. The operator keeps objects in the declared state, applies changes, and removes generated objects with `ownerReferences` and a finalizer.
+6. The operator upgrades versions without losing data.
+
+Today `RupturaInstance` deploys only the engine, and the repository has two operators: `internal/operator` and `workdir/operator`. One must remain.
+
+### CRD
 
 ```yaml
 apiVersion: ruptura.io/v1alpha1
-kind: RupturaPipeline            # ClusterRupturaPipeline for cluster owners
-metadata:
-  name: shop-team
-  namespace: shop
+kind: RupturaInstance
+metadata: {name: prod, namespace: ruptura}
 spec:
-  receivers:
-    - prometheus: {url: https://thanos-querier.openshift-monitoring.svc:9091}
-    - otlp: {signals: [metrics, traces, logs]}
-  targets:
-    - level: workload
-      selector: {matchLabels: {team: shop}}
-    - level: custom
-      resources:
-        - {group: kafka.strimzi.io, kind: Kafka}
+  image: quay.io/ruptura/ruptura:8.0.0
+  deployment:
+    mode: Deployment       # StatefulSet, DaemonSet, Sidecar
+    replicas: 1
+    resources: {}
+  level:
+    scope: namespace       # container, pod, workload, namespace, service,
+                           # node, cluster, application, customResource
+    selector: {matchLabels: {team: shop}}
+    exclude: {namespaces: [kube-system]}
+  input:
+    profile: standard      # minimal, standard, full, deep
+    sources:
+      - prometheus: {url: https://thanos-querier.openshift-monitoring.svc:9091}
+      - otlp: {}
   analysis:
-    failureModes: [saturation, crashLoop, httpErrors]
+    sensitivity: balanced  # conservative, balanced, aggressive
     horizon: 30m
-    sensitivity: balanced        # conservative, balanced, aggressive
-  exporters:
-    - alertmanager: {url: http://alertmanager:9093}
-    - webhook: {secretRef: {name: chat-hook}}
+  output:
+    ui: {enabled: true}
+    consolePlugin: {enabled: false}
+    metrics: {prometheus: true}
+    otlp: {endpoint: ""}
+  alerting:
+    routes:
+      - severity: critical
+        channels: [ops]
+    channels:
+      - name: ops
+        alertmanager: {url: http://alertmanager:9093}  # webhook, slack, teams, pagerduty, email
+  actions:
+    mode: suggest          # disabled, suggest, auto (Autopilot)
+  storage: {size: 10Gi, retention: 7d}
+  security: {tls: {}, apiKeyRef: {name: ruptura-key}}
+  logging: {level: info, format: json}
+status:
+  conditions: []
+  inputs: []               # available and missing data
 ```
 
-Levels:
+Generated objects:
 
-| Level | Examples | Owner |
+| Block | Objects |
+|---|---|
+| `deployment` | `Deployment` or `StatefulSet`, `Service`, `ServiceAccount` |
+| `input` | RBAC, source connections, `DaemonSet` for `deep` |
+| `output` | UI, `Route` or `Ingress`, `ConsolePlugin`, `ServiceMonitor` |
+| `alerting` | Configuration, `PrometheusRule` or `AlertmanagerConfig` |
+| `storage` | `PersistentVolumeClaim` |
+| `security` | `Secret`, `NetworkPolicy`, certificates |
+
+Input is chosen by aggressiveness, not by metric name:
+
+| Profile | Coverage | Cost |
 |---|---|---|
-| workload | Deployment, StatefulSet, Job | Application team |
-| namespace | Quotas, all workloads of a team | Application team |
-| network | Service, Route, Ingress, CNI | Cluster owner |
-| infra | Node, etcd, API server, storage | Cluster owner |
-| custom | Any CRD, read through its status conditions and metrics | Either |
+| `minimal` | What prediction needs at the chosen level | Low |
+| `standard` | Plus errors, latency, network | Medium |
+| `full` | All metrics available at the level | High, to be measured |
+| `deep` | Plus calls between containers, through eBPF | Very high, needs a privileged DaemonSet and an SCC on OpenShift |
 
-Rules:
+### Multi-level signals
 
-1. Zero configuration must work. Without a pipeline, a default one covers workloads.
-2. Kubernetes RBAC is the tenancy model. A namespaced pipeline sees its namespace only, a cluster pipeline needs a cluster role.
-3. The user selects from proven failure modes and bounded presets. Raw weights are an advanced option, reported as unverified in the result.
-4. Status reports each input as available or missing, so a user sees what the engine cannot see.
-5. A custom CRD has no proven failure mode at first. It gets conditions and anomaly detection, and it is labelled as such.
-6. The same scope can serve metrics, traces and logs, and the engine stays compatible with other stacks through adapters.
+A signal keeps one meaning at every level. Only what it observes changes. Each level supplies its elements and its links, and the calculation is written once.
 
-Dependency: pipelines need the catalog and semantic roles of phase 2.
+| Level | Elements | Contagion link |
+|---|---|---|
+| pod | Containers | Shared resources, internal calls |
+| workload | Pods of one application | Load shared between replicas |
+| namespace | Workloads | Calls, shared quotas |
+| node | Pods on the node | Shared CPU, memory, disk, network |
+| service | Services | Network calls |
+| cluster | Nodes, components | Control plane, network, storage |
+
+Constraints:
+
+1. Common cause is not contagion. Real propagation has an order in time.
+2. Data differs by level. Calls between containers need eBPF or a mesh, services need traces.
+3. Evidence is per level. A level without proven prediction reports conditions and anomaly detection only, and `status` says so.
+
+### Status of the remaining discussion
+
+Open: definition of each signal per level, README message, plan of the phases around the operator and CRD.
+
+Proposed Summit scope, to confirm: `Deployment` and `StatefulSet`, levels pod, workload and namespace, profiles `minimal` and `standard`, alerting, node contagion as the demonstration.
 
 ## Evidence protocol
 
@@ -194,7 +247,7 @@ Constraint: learned weights need labelled failures. Until the library exists, us
 | 0 | LOT-1 result | Alert gate decided |
 | 1 | Missing data explicit, one signal implementation | Absent input no longer changes health |
 | 2 | Catalog and normalizer, broad collection | Coverage and memory cost measured |
-| 2b | `RupturaPipeline` v1alpha1 with default pipeline and status | Two pipelines at different levels run side by side, one team cannot read the other |
+| 2b | `RupturaInstance` with level, input, output and status blocks | Two instances at different levels run side by side, an invalid one deploys nothing |
 | 3 | Fault library and replay scoring | Each fault recorded at least 3 times |
 | 4 | Signal review with evidence | Each signal has a keep or delete decision |
 | 5 | Risk and state built on proven signals | FRI agrees across API endpoints |
@@ -203,7 +256,7 @@ Constraint: learned weights need labelled failures. Until the library exists, us
 ## Owner decisions, 2026-11-01
 
 1. Signal names stay in the API for signals that pass the evidence test. Any rename needs a version plan.
-2. Summit scope on 2026-11-24: a simple `RupturaPipeline`, honest missing data, a few failures predicted with evidence. The rest is roadmap.
+2. Summit scope on 2026-11-24: a simple `RupturaInstance` configuration, honest missing data, a few failures predicted with evidence. The rest is roadmap.
 3. Traces are a recommended input.
 4. Edition: basic configuration goes in community, automatic actions stay in Autopilot. This updates the frozen feature set note in `CLAUDE.md`.
 5. Surface reduction is approved in principle, one component at a time, with each removal stated.
