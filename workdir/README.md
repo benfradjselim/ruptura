@@ -1,6 +1,6 @@
 # Ruptura
 
-> **Project status.** Parts of this page describe earlier versions. The current vision and status are in the [root README](../README.md) and [docs/engine/DESIGN.md](../docs/engine/DESIGN.md).
+> **Project status.** Parts of this page describe earlier versions. The current status is in the [root README](../README.md).
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/benfradjselim/ruptura/main/assets/logo/ruptura-icon-256.png" alt="Ruptura" width="120" /><br><br>
