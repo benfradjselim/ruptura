@@ -198,9 +198,9 @@ Point a Prometheus datasource at `http://ruptura:8080/api/v2/metrics`.
 
 Ruptura uses BadgerDB embedded — storage scales with the number of workloads and retention settings.
 
-### Memory notes (v6.8.2+)
+### Memory notes
 
-Ruptura v6.8.2 and later tune BadgerDB's memory footprint to stay well within the container limit:
+Ruptura tunes BadgerDB's memory footprint to stay well within the container limit:
 
 - **MemTable**: 8 MB × 2 = 16 MB active write buffer (default was 320 MB)
 - **Block cache**: 32 MB read cache (default was 256 MB)
