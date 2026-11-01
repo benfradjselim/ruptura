@@ -2,7 +2,6 @@
 **Applies to:** v8.x · **Updated:** 2026-07-05
 
 This document is the single authoritative reference for contributors and operators.
-For the whitepaper and formal specs, see `docs/v6.1.0/SPECS.md`.
 
 ---
 

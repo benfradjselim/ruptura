@@ -168,28 +168,3 @@ Response: 202 Accepted
 
 ---
 
-## Lab Setup (Civo / k3s)
-
-The fastest way to get a live cluster with realistic workloads:
-
-```bash
-export KUBECONFIG=~/civo-lab-ruptura-kubeconfig
-bash lab-setup/setup.sh
-```
-
-This deploys:
-
-| Component | Purpose |
-|-----------|---------|
-| Prometheus + kube-state-metrics | Scrapes test apps → remote-write to Ruptura |
-| OpenTelemetry Collector | Receives OTLP from test apps → forwards to Ruptura |
-| Ruptura community engine | Core engine on NodePort 31468 |
-| Ruptura UI | Dashboard on NodePort 31469 |
-| `gateway` | Stable, healthy (2 replicas) |
-| `order-service` | Degraded — CPU stress + 8 MB/min memory leak |
-| `payment-api` | At-risk — 18% error rate + dependency failure contagion |
-| `cache-worker` | Spike — burst every 120s (4.5× CPU, 8× latency) |
-| `ml-inference` | Calibrating — new workload, no baseline yet |
-| `db-proxy` | Healthy — very low resource, stable |
-
-After ~10 minutes you will see all 6 states in the Fleet dashboard simultaneously.

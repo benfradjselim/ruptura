@@ -2,7 +2,6 @@
 **Version:** 7.1.0 · **Updated:** 2026-06-18
 
 This document is the single authoritative reference for contributors and operators.
-For the whitepaper and formal specs, see `docs/v6.1.0/SPECS.md`.
 
 ---
 

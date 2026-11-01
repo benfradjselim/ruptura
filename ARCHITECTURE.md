@@ -36,7 +36,6 @@ documented here instead.
 ├── bundle/, catalog/     OLM bundle + catalog for OperatorHub distribution
 ├── docs/                 REFERENCE.md (API + config surface), fable.md (roadmap), history/
 ├── site/                 GitHub Pages marketing/docs site
-├── lab-setup/            scripts for the maintainer's live validation cluster
 ├── testapp/              a sample app used to exercise the full pipeline end-to-end
 └── scripts/              simulate.py and other operator conveniences
 ```
