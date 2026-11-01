@@ -87,7 +87,7 @@ func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time
 		})
 	}
 
-	results = dropNegligible(results)
+	results = dropUnconfirmedSeasonal(dropNegligible(results))
 
 	// Escalate to critical if ≥2 methods agree
 	if len(results) >= 2 {
@@ -195,6 +195,16 @@ func (c *counterRates) rate(key string, value float64, ts time.Time) (float64, b
 		return 0, false
 	}
 	return (value - base.value) / ts.Sub(base.ts).Seconds(), true
+}
+
+// dropUnconfirmedSeasonal removes a seasonal event that no other method raised.
+// One hour of history cannot establish an hourly cycle, so the seasonal method
+// only confirms the other methods.
+func dropUnconfirmedSeasonal(events []models.AnomalyEvent) []models.AnomalyEvent {
+	if len(events) == 1 && events[0].Method == "seasonal" {
+		return nil
+	}
+	return events
 }
 
 // dropNegligible removes events whose absolute deviation is too small to act

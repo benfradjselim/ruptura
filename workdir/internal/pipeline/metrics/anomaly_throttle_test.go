@@ -51,3 +51,23 @@ func TestAnomalyEngine_OneAlertPerObservation(t *testing.T) {
 		t.Errorf("severity = %s, want critical when methods agree", got[0].Severity)
 	}
 }
+
+func TestDropUnconfirmedSeasonal(t *testing.T) {
+	seasonal := models.AnomalyEvent{Method: "seasonal"}
+	mad := models.AnomalyEvent{Method: "mad"}
+	cases := []struct {
+		name   string
+		events []models.AnomalyEvent
+		want   int
+	}{
+		{"no event", nil, 0},
+		{"seasonal alone is dropped", []models.AnomalyEvent{seasonal}, 0},
+		{"another method alone stays", []models.AnomalyEvent{mad}, 1},
+		{"confirmed seasonal stays", []models.AnomalyEvent{mad, seasonal}, 2},
+	}
+	for _, c := range cases {
+		if got := len(dropUnconfirmedSeasonal(c.events)); got != c.want {
+			t.Errorf("%s: events = %d, want %d", c.name, got, c.want)
+		}
+	}
+}
