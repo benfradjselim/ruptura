@@ -20,6 +20,8 @@ func TestTracker_StartupStuck(t *testing.T) {
 		{"scheduling failure", "FailedScheduling", "", start, start.Add(time.Minute), true, "FailedScheduling"},
 		{"image pull failure", "Failed", "Error: ErrImagePull", start, start.Add(time.Minute), true, "ImagePull"},
 		{"image backoff", "Failed", "Error: ImagePullBackOff", start, start.Add(time.Minute), true, "ImagePull"},
+		{"waiting to pull again", "BackOff", "Back-off pulling image \"x\"", start, start.Add(time.Minute), true, "ImagePull"},
+		{"crash backoff is not a start failure", "BackOff", "Back-off restarting failed container", start, start.Add(time.Minute), false, ""},
 		{"another Failed event", "Failed", "Error: failed to start", start, start.Add(time.Minute), false, ""},
 		{"unrelated reason", "Unhealthy", "", start, start.Add(time.Minute), false, ""},
 		{"event too old", "FailedMount", "", start, start.Add(startupEventMaxAge + time.Second), false, ""},

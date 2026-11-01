@@ -32,7 +32,9 @@ func startupFailure(reason, message string) (string, bool) {
 	if startupFailureReasons[reason] {
 		return reason, true
 	}
-	if reason == "Failed" && (strings.Contains(message, "ErrImagePull") || strings.Contains(message, "ImagePullBackOff")) {
+	failedPull := reason == "Failed" && (strings.Contains(message, "ErrImagePull") || strings.Contains(message, "ImagePullBackOff"))
+	waitingPull := reason == "BackOff" && strings.Contains(message, "pulling image")
+	if failedPull || waitingPull {
 		return imagePullReason, true
 	}
 	return "", false
