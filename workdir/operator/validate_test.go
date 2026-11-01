@@ -109,3 +109,31 @@ func TestReconcile_ConfigReachesTheEngine(t *testing.T) {
 		}
 	}
 }
+
+func TestReconcile_ReaderBinding(t *testing.T) {
+	for _, isOCP := range []bool{true, false} {
+		c, rec := recordingClient(t, false)
+		if err := reconcile(context.Background(), c, makeInstance("ri", testNS), isOCP); err != nil {
+			t.Fatal(err)
+		}
+		crb, ok := rec.get(http.MethodPatch, readerBindingPath(testNS, "ri"))
+		if !ok {
+			t.Fatalf("isOCP=%v: reader binding was not applied", isOCP)
+		}
+		if crb["roleRef"].(map[string]interface{})["name"] != readerRole {
+			t.Errorf("isOCP=%v: binding = %v", isOCP, crb)
+		}
+	}
+}
+
+func TestCleanup_DeletesReaderBinding(t *testing.T) {
+	c, rec := recordingClient(t, false)
+	inst := makeInstance("ri", testNS)
+	inst.Metadata.Finalizers = []string{finalizer}
+	if err := cleanup(c, inst, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := rec.get(http.MethodDelete, readerBindingPath(testNS, "ri")); !ok {
+		t.Error("reader binding was not deleted")
+	}
+}

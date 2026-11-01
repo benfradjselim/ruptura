@@ -21,6 +21,8 @@ const (
 	thanosURL = "https://thanos-querier.openshift-monitoring.svc:9091"
 	// monitoringViewRole is the ClusterRole granting read access to cluster metrics.
 	monitoringViewRole = "cluster-monitoring-view"
+	// readerRole grants instances read access to workloads and events.
+	readerRole = "ruptura-instance-reader"
 	// instanceServiceAccount is the ServiceAccount used by instance pods.
 	instanceServiceAccount = "ruptura-instance"
 	// apiKeySecretKey is the Secret data key holding the engine API key.
@@ -63,6 +65,9 @@ func cleanup(c *k8sClient, inst RupturaInstance, isOCP bool) error {
 		if err := c.delete(clusterRoleBindingPath(ns, name)); err != nil {
 			return fmt.Errorf("delete ClusterRoleBinding: %w", err)
 		}
+	}
+	if err := c.delete(readerBindingPath(ns, name)); err != nil {
+		return fmt.Errorf("delete reader ClusterRoleBinding: %w", err)
 	}
 	if err := c.delete(fmt.Sprintf("/api/v1/namespaces/%s/secrets/%s", ns, generatedSecretName(name))); err != nil {
 		return fmt.Errorf("delete Secret: %w", err)
@@ -144,6 +149,9 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 		if err := ensureAPIKeySecret(c, ns, apiKeyRef, labels); err != nil {
 			return fmt.Errorf("API key Secret: %w", err)
 		}
+	}
+	if err := reconcileBinding(c, readerBindingPath(ns, name), readerBindingName(ns, name), readerRole, ns, labels); err != nil {
+		return fmt.Errorf("reader ClusterRoleBinding: %w", err)
 	}
 	if isOCP {
 		if err := reconcileMonitoringBinding(c, ns, name, labels); err != nil {
@@ -473,17 +481,28 @@ func clusterRoleBindingPath(ns, name string) string {
 // reconcileMonitoringBinding binds the instance ServiceAccount to
 // cluster-monitoring-view so the engine can query Thanos on OpenShift.
 func reconcileMonitoringBinding(c *k8sClient, ns, name string, labels map[string]string) error {
+	return reconcileBinding(c, clusterRoleBindingPath(ns, name), fmt.Sprintf("ruptura-%s-%s-monitoring-view", ns, name), monitoringViewRole, ns, labels)
+}
+
+func readerBindingName(ns, name string) string { return fmt.Sprintf("ruptura-%s-%s-reader", ns, name) }
+
+func readerBindingPath(ns, name string) string {
+	return "/apis/rbac.authorization.k8s.io/v1/clusterrolebindings/" + readerBindingName(ns, name)
+}
+
+// reconcileBinding binds the instance ServiceAccount to a cluster role.
+func reconcileBinding(c *k8sClient, path, bindingName, role, ns string, labels map[string]string) error {
 	crb := map[string]interface{}{
 		"apiVersion": "rbac.authorization.k8s.io/v1",
 		"kind":       "ClusterRoleBinding",
 		"metadata": map[string]interface{}{
-			"name":   fmt.Sprintf("ruptura-%s-%s-monitoring-view", ns, name),
+			"name":   bindingName,
 			"labels": labels,
 		},
 		"roleRef": map[string]interface{}{
 			"apiGroup": "rbac.authorization.k8s.io",
 			"kind":     "ClusterRole",
-			"name":     monitoringViewRole,
+			"name":     role,
 		},
 		"subjects": []interface{}{map[string]interface{}{
 			"kind":      "ServiceAccount",
@@ -491,5 +510,5 @@ func reconcileMonitoringBinding(c *k8sClient, ns, name string, labels map[string
 			"namespace": ns,
 		}},
 	}
-	return c.apply(clusterRoleBindingPath(ns, name), crb)
+	return c.apply(path, crb)
 }

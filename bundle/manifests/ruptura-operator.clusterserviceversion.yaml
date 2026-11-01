@@ -237,7 +237,7 @@ spec:
               verbs: ["get", "create", "update", "patch", "delete"]
             - apiGroups: ["rbac.authorization.k8s.io"]
               resources: ["clusterroles"]
-              resourceNames: ["cluster-monitoring-view"]
+              resourceNames: ["cluster-monitoring-view", "ruptura-instance-reader"]
               verbs: ["bind"]
             - apiGroups: [""]
               resources: ["pods"]
