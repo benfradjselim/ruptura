@@ -12,4 +12,4 @@ Ruptura is an open-source project by Selim Benfradj, licensed under Apache 2.0.
 ## Get involved
 
 - [Contributing →](contributing.md) — how to submit PRs, report bugs, propose features
-- [Roadmap →](roadmap.md) — what's planned for v6.2 and beyond
+- [Roadmap →](roadmap.md) — what is planned

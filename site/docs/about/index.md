@@ -4,15 +4,9 @@
 
 ## Origins
 
-Ruptura is the v6.0 clean-room rewrite of the **Observability Holistic Engine (OHE)**, a project that began in 2025 with a core insight: existing observability tools answer *"What is broken?"* — none answer *"When will it break, and why?"*
+Ruptura is an open source predictive observability tool for Kubernetes and OpenShift.
 
-OHE v5.0 proved the thesis with a single Go binary delivering dual-scale CA-ILR predictions, dissipative fatigue formulas, and the METRICS.md explainability standard. Ruptura (v6.0+) extends this into a production-grade platform with a Kubernetes operator, gRPC ingest, eventbus integration, and official SDKs.
-
-## Philosophy
-
-> **Prevention is better than cure.**
-
-Three principles that have been non-negotiable since v4.0:
+Three principles guide the project:
 
 1. **Transparent AI** — every prediction traceable to a published formula. No black boxes.
 2. **Sovereign deployment** — a single static binary, no external database, runs on a Raspberry Pi 4.

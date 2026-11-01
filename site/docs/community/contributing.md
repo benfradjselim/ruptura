@@ -7,8 +7,7 @@ Contributions are welcome — bug reports, features, documentation improvements,
 | Branch | Purpose |
 |--------|---------|
 | `main` | Stable release — no direct pushes |
-| `v6.1` | Current development branch — target PRs here |
-| `v6.1_*` | Feature branches (e.g. `v6.1_india`, `v6.1_juliet`) |
+| `main` | Current development branch, target PRs here |
 
 ## Development setup
 
@@ -34,7 +33,7 @@ Requires: **Go 1.18+**
 
 ## Pull request checklist
 
-- [ ] Targets `v6.1` branch
+- [ ] Targets `main`
 - [ ] `go build ./...` passes
 - [ ] `go test -race ./...` passes with ≥ 80% coverage on changed packages
 - [ ] No hardcoded credentials or secrets

@@ -396,7 +396,6 @@ workdir/                      Go engine source
   ui/                         ACTIVE Svelte 4 UI (workdir/ui/)
 docs/                         internal planning + specs
   REFERENCE.md                this file
-  v6.1.0/SPECS.md             formal technical specifications
 helm/                         Helm chart for community edition
 site/                         MkDocs source → GitHub Pages
 scripts/simulate.py           workload simulator for demos
