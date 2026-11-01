@@ -52,7 +52,7 @@ Line counts exclude tests. "Not imported" means no import from `cmd` or `interna
 | Notification | `alerter` 551, `notify` 237, `notifier` 106 | Merge, then favour Alertmanager | Three implementations |
 | Events | `eventbus` 349, `events` 143 | Review | Possible overlap |
 | Actions | `actions` 781 | Keep, raise tests first | Touches clusters, provider coverage 34.8 percent |
-| Operator | `internal/operator` 198, `workdir/operator` | Merge into one | Add pipelines here |
+| Operator | `workdir/operator` | Keep, the only operator | Generates objects from `RupturaInstance` |
 | Not imported | `billing`, `grpcserver`, `notifier`, `orchestrator`, `plugin`, `processor`, `vault`, about 1250 lines | Check, then delete | Unused in this binary |
 | Duplicate tooling | Dashboards, datasources, orgs, users, notifications UI and routes | Reduce | Overlaps Grafana, Alertmanager and cluster RBAC. 106 routes is too large a surface |
 | UI | `workdir/ui` | Refocus | Prediction, evidence and status, plus an OpenShift Console plugin as an option |
@@ -137,7 +137,7 @@ Ruptura is a customizable predictive observability tool and a cloud native stand
 5. The operator keeps objects in the declared state, applies changes, and removes generated objects with `ownerReferences` and a finalizer.
 6. The operator upgrades versions without losing data.
 
-Today `RupturaInstance` deploys only the engine, and the repository has two operators: `internal/operator` and `workdir/operator`. One must remain.
+Today `RupturaInstance` deploys only the engine.
 
 ### CRD
 
@@ -363,7 +363,7 @@ Approved by the owner, 2026-11-01. Results freeze on 2026-11-17.
 
 | Dates | Work | Exit |
 |---|---|---|
-| Nov 2 to 8 | Phase 1 closed, one operator chosen, catalog and normalizer for pod and workload, Kubernetes Events, structured output, fault library, first benchmark bench | Memory saturation compared with `predict_linear` end to end |
+| Nov 2 to 8 | Phase 1 closed, catalog and normalizer for pod and workload, Kubernetes Events, structured output, fault library, first benchmark bench | Memory saturation compared with `predict_linear` end to end |
 | Nov 9 to 15 | `RupturaInstance` blocks, validation, status, object generation, pod failures, workload failures, Alertmanager and webhook | Install from zero through the operator, 7 failures recorded at least 3 times |
 | Nov 16 to 17 | Full benchmark | Results frozen on Nov 17 |
 | Nov 18 to 23 | Bug fixes only, README and install docs, minimal UI, published images, rehearsal, backup video | Demonstration ready |
