@@ -8,7 +8,7 @@ This section is how sessions pass work to each other. Read it first, continue fr
 
 Rewrite it before any wait over 10 minutes, after each deploy, and at the end of a session. A session can stop without warning, so never leave this for the end. Replace the old content and keep it short. Numbers must come from a real measure.
 
-- Updated: 2026-10-31 22:42 UTC
+- Updated: 2026-11-01 00:37 UTC
 - Plan: fix the engine first. Other components (Helm, operator, UI, CLI, site) start only once the engine passes its gate. Deadline 2026-11-24, Red Hat Summit Paris.
 - Work location: `/root/ruptura-fix`, branch `fix/engine-prediction`, pushed at `dc971d6`.
 - Lab: OpenShift, reach it with `/root/lab.sh`, not the Civo kubeconfig. Deploy with `/root/redeploy.sh`, which deletes `/var/tmp/fleet.jsonl`, so copy that file first.
@@ -22,7 +22,9 @@ Rewrite it before any wait over 10 minutes, after each deploy, and at the end of
 - Fix: `0f6335d` counters scored on a 5 minute rate, one alert per observation, deployed 21:53 UTC, not pushed. Previous data saved as `/var/tmp/*-20261031-dc971d6.*` on the lab.
 - `0f6335d` measured 21:53 to 22:39 UTC: 142 alerts, 3.16 per minute, about 2.4 per minute after 22:20 (45 alerts in 19 min). Seasonal detector has no alerts yet because it needs 1 hour of warm-up, so this figure is incomplete and the gate is not passed.
 - Demo checks passed over the run: crash-pay critical, stable-web healthy, leak-orders reached degraded and critical with etf 1278 to 48 s, failure_mode saturation.
-- Next action: after 23:54 UTC run `/root/lab.sh < scripts/lab-eval/measure-alerts.sh`. It counts 22:54 to 23:54 UTC, all 3 detectors active. Target 3 per minute or less. Do not redeploy before that. Update START and END in the script after any later deploy.
+- `0f6335d` warm hour 22:54 to 23:54 UTC: 233 alerts, 3.88 per minute, gate failed. 86 came from the seasonal method alone. Demo states still correct.
+- `dropUnconfirmedSeasonal` commit deployed 00:37 UTC, not pushed. Expected near 2.45 per minute if the same alerts recur, not measured yet. Data saved as `/var/tmp/*-20261101-0f6335d.*` on the lab.
+- Next action: after 02:37 UTC run `/root/lab.sh < scripts/lab-eval/measure-alerts.sh`, it counts the second hour after the deploy. Target 3 per minute or less, then metric coverage review, then the audit steps in order.
 - Then: review metric coverage. The engine uses under 5 percent of available metrics, and the owner requires this addressed before leaving the engine.
 
 ## Maintainability audit 2026-10-31
