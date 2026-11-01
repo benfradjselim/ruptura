@@ -386,6 +386,11 @@ After the Summit: full duplicate merge unless the catalog needs it, API surface 
 
 Images stay on Docker Hub. Quay.io can be a mirror later.
 
+Lab findings, 2026-11-01:
+
+- Only 26 of 125 pods have a memory limit, so memory saturation against a limit cannot cover the rest. `/api/v2/inputs` must make this visible.
+- `kube_pod_container_resource_limits{resource="ephemeral_storage"}` and `kubelet_volume_stats_*` return nothing on this lab, so local disk full has no limit to compare with. It is the first candidate to replace.
+
 ## Owner decisions, 2026-11-01
 
 1. Signal names stay in the API for signals that pass the evidence test. Any rename needs a version plan.

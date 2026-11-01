@@ -107,6 +107,23 @@ type sample struct {
 }
 
 func (t *Thanos) query(ctx context.Context, q string) (map[string]sample, map[string][2]string, error) {
+	return t.queryBy(ctx, q, "pod")
+}
+
+// CollectRole returns the value of a role per namespace/target.
+func (t *Thanos) CollectRole(ctx context.Context, role Role) (map[string]float64, error) {
+	samples, _, err := t.queryBy(ctx, role.Query, role.Target)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]float64, len(samples))
+	for key, s := range samples {
+		out[key] = s.v
+	}
+	return out, nil
+}
+
+func (t *Thanos) queryBy(ctx context.Context, q, targetLabel string) (map[string]sample, map[string][2]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		t.baseURL+"/api/v1/query?query="+url.QueryEscape(q), nil)
 	if err != nil {
@@ -142,7 +159,7 @@ func (t *Thanos) query(ctx context.Context, q string) (map[string]sample, map[st
 		if err != nil {
 			return nil, nil, fmt.Errorf("sources: parse value: %w", err)
 		}
-		ns, pod := r.Metric["namespace"], r.Metric["pod"]
+		ns, pod := r.Metric["namespace"], r.Metric[targetLabel]
 		key := ns + "/" + pod
 		out[key] = sample{v: v, at: time.Unix(int64(ts), 0)}
 		ids[key] = [2]string{ns, pod}

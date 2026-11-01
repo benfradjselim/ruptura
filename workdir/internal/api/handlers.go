@@ -54,6 +54,7 @@ type Handlers struct {
     infraRegistry *dag.Registry
     demoMode      bool
     failureModes  FailureEstimates
+	inputs InputCoverage
 }
 
 // SetDemoMode marks the server as running with synthetic demo data
