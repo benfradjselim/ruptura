@@ -68,17 +68,9 @@ func nextFailure(times []time.Time, now time.Time) (time.Duration, float64, bool
 	return remaining, 1 - spread, true
 }
 
-// recurrenceEstimate reads failure times across all pods of a workload, since a
-// failing workload may replace its pods.
+// recurrenceEstimate reads the failure times of a workload.
 func (t *Tracker) recurrenceEstimate(workload string, now time.Time) (Estimate, bool) {
-	var times []time.Time
-	for _, state := range t.pods {
-		if state.workload == workload {
-			times = append(times, state.history...)
-		}
-	}
-	sort.Slice(times, func(i, j int) bool { return times[i].Before(times[j]) })
-	remaining, confidence, ok := nextFailure(times, now)
+	remaining, confidence, ok := nextFailure(t.failures[workload], now)
 	if !ok {
 		return Estimate{}, false
 	}

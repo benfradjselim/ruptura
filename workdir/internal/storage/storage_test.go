@@ -122,3 +122,28 @@ func TestStorage(t *testing.T) {
 		}
 	})
 }
+
+func TestFailures_RoundTrip(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	first := time.Date(2026, 11, 1, 1, 0, 0, 0, time.UTC)
+	second := first.Add(time.Hour)
+	for _, at := range []time.Time{second, first} {
+		if err := s.PutFailure("n/Deployment/w", at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.PutFailure("n/Deployment/x", first); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.ListFailures()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || len(got["n/Deployment/w"]) != 2 || !got["n/Deployment/w"][0].Equal(first) {
+		t.Errorf("failures = %v", got)
+	}
+}

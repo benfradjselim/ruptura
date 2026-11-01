@@ -495,7 +495,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		handlers.SetDiscovery(inf)
 	}
 	handlers.SetInfraRegistry(infraRegistry)
-	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf)
+	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store)
 	if tracker != nil {
 		handlers.SetFailureModes(tracker)
 	}

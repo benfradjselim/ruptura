@@ -446,6 +446,36 @@ func (s *Store) rangeQueryKPI(prefix string, from, to time.Time) ([]KPISample, e
 	return results, err
 }
 
+// --- Failure history ---
+//
+//	ff:{workload}:{ts}   failure time of a workload   35d
+const failureTTL = 35 * 24 * time.Hour
+
+// PutFailure stores the time of one workload failure.
+func (s *Store) PutFailure(workload string, at time.Time) error {
+	return s.set(tsKey("ff:"+workload+":", at), at.UnixNano(), failureTTL)
+}
+
+// ListFailures returns failure times per workload, oldest first.
+func (s *Store) ListFailures() (map[string][]time.Time, error) {
+	out := map[string][]time.Time{}
+	err := s.listByPrefix("ff:", func(key, val []byte) error {
+		var nanos int64
+		if err := json.Unmarshal(val, &nanos); err != nil {
+			return err
+		}
+		name := strings.TrimPrefix(string(key), "ff:")
+		cut := strings.LastIndex(name, ":")
+		if cut < 0 {
+			return fmt.Errorf("failure key %q has no timestamp", key)
+		}
+		workload := name[:cut]
+		out[workload] = append(out[workload], time.Unix(0, nanos).UTC())
+		return nil
+	})
+	return out, err
+}
+
 // --- Infra signal history (v8.0 Infrastructure & Cluster Intelligence Layer) ---
 // Key schema (docs/v8.0.0/RUPTURA-PLATFORM-EXTENSION.md §6.4, additive-only,
 // never change existing prefixes):

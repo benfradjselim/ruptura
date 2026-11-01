@@ -38,21 +38,51 @@ type Tracker struct {
 	pods     map[string]*podState
 	replicas map[string]replicaState
 	rollouts map[string]time.Time
+	failures map[string][]time.Time
+	recorder func(workload string, at time.Time)
 }
 
 // NewTracker returns an empty tracker.
 func NewTracker() *Tracker {
-	return &Tracker{pods: make(map[string]*podState), replicas: make(map[string]replicaState), rollouts: make(map[string]time.Time)}
+	return &Tracker{pods: make(map[string]*podState), replicas: make(map[string]replicaState), rollouts: make(map[string]time.Time), failures: make(map[string][]time.Time)}
 }
 
-func (s *podState) recordRestarts(at time.Time, restarts int) {
-	if s.counted && restarts > s.restarts {
+func (s *podState) recordRestarts(at time.Time, restarts int) bool {
+	grew := s.counted && restarts > s.restarts
+	if grew {
 		s.history = append(s.history, at)
 		if len(s.history) > maxRestartHistory {
 			s.history = s.history[len(s.history)-maxRestartHistory:]
 		}
 	}
 	s.restarts, s.counted = restarts, true
+	return grew
+}
+
+// recordFailure keeps failure times per workload, because pods are replaced.
+func (t *Tracker) recordFailure(workload string, at time.Time) {
+	history := append(t.failures[workload], at)
+	if len(history) > maxRestartHistory {
+		history = history[len(history)-maxRestartHistory:]
+	}
+	t.failures[workload] = history
+	if t.recorder != nil {
+		t.recorder(workload, at)
+	}
+}
+
+// SetFailureRecorder sets a callback that receives each new failure.
+func (t *Tracker) SetFailureRecorder(recorder func(workload string, at time.Time)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.recorder = recorder
+}
+
+// RestoreFailures loads failure times saved by an earlier run, oldest first.
+func (t *Tracker) RestoreFailures(workload string, times []time.Time) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.failures[workload] = append([]time.Time(nil), times...)
 }
 
 // ObserveRestarts records the restart count of a pod with no usage reading,
@@ -61,7 +91,9 @@ func (t *Tracker) ObserveRestarts(workload, pod string, at time.Time, restarts i
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	state := t.podLocked(workload, pod)
-	state.recordRestarts(at, restarts)
+	if state.recordRestarts(at, restarts) {
+		t.recordFailure(workload, at)
+	}
 	state.seen = at
 }
 
@@ -73,7 +105,9 @@ func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity fl
 	if state.detector == nil {
 		state.detector = NewSaturation()
 	}
-	state.recordRestarts(at, restarts)
+	if state.recordRestarts(at, restarts) {
+		t.recordFailure(workload, at)
+	}
 	state.estimate, state.valid = state.detector.Observe(at, usage, capacity, restarts)
 	state.estimate.Pod = pod
 	state.seen = at

@@ -92,3 +92,42 @@ func TestTracker_RecurrenceSpansReplacedPods(t *testing.T) {
 		t.Errorf("estimate = %+v, %v", est, ok)
 	}
 }
+
+func TestTracker_HistorySurvivesPrunedPods(t *testing.T) {
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	tr := NewTracker()
+	for i := 0; i <= 3; i++ {
+		tr.ObserveRestarts("w", "n/old", start.Add(time.Duration(i)*30*time.Minute), i)
+	}
+	tr.Prune(start.Add(2 * time.Hour))
+	for i := 0; i <= 4; i++ {
+		tr.ObserveRestarts("w", "n/new", start.Add(time.Duration(i+4)*30*time.Minute), i)
+	}
+	if est, ok := tr.Worst("w", start.Add(245*time.Minute)); !ok || est.Mode != ModeRecurrentFailure {
+		t.Errorf("estimate = %+v, %v", est, ok)
+	}
+}
+
+func TestTracker_FailureRecorderAndRestore(t *testing.T) {
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	recorded := map[string][]time.Time{}
+	tr := NewTracker()
+	tr.SetFailureRecorder(func(workload string, at time.Time) {
+		recorded[workload] = append(recorded[workload], at)
+	})
+	tr.ObserveRestarts("w", "n/p", start, 0)
+	tr.ObserveRestarts("w", "n/p", start.Add(time.Minute), 1)
+	if len(recorded["w"]) != 1 {
+		t.Fatalf("recorded = %v", recorded)
+	}
+
+	var times []time.Time
+	for i := 0; i < 7; i++ {
+		times = append(times, start.Add(time.Duration(i)*30*time.Minute))
+	}
+	restored := NewTracker()
+	restored.RestoreFailures("w", times)
+	if est, ok := restored.Worst("w", start.Add(185*time.Minute)); !ok || est.Mode != ModeRecurrentFailure {
+		t.Errorf("estimate after restore = %+v, %v", est, ok)
+	}
+}
