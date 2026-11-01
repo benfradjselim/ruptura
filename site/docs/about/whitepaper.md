@@ -207,7 +207,6 @@ Three principles non-negotiable since v4.0:
 
 The v5.0 whitepaper contains the complete mathematical formalization and canonical METRICS.md standard:
 
-[Read OHE v5.0 Whitepaper (GitHub) →](https://github.com/benfradjselim/ruptura/blob/v6.1/workdir/docs/v5.0.0/WHITEPAPER-v5.0.0.md)
 
 > "Stop staring at dashboards hoping for the best. Sleep. Ruptura watches."
 >

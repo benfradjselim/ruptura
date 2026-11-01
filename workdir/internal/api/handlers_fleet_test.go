@@ -106,7 +106,7 @@ func TestWorkloadRestartCount_NoDiscovery(t *testing.T) {
 // time in CrashLoopBackOff (not Running) is rarely alive at the moment
 // resource-usage telemetry gets scraped, so it may sit in
 // "pending_telemetry" indefinitely (the exact live shape observed for
-// demo-crashloop/crash-app on the Civo lab). With no discovery informer
+// demo-crashloop/crash-app on the lab). With no discovery informer
 // wired up (the common case in tests, and for non-k8s/demo-mode
 // deployments), workloadRestartCount fails closed to 0, so this must stay
 // "pending_telemetry" rather than panicking or misreporting critical.
