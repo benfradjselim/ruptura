@@ -499,7 +499,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if tracker != nil {
 		handlers.SetFailureModes(tracker)
 	}
-	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker); inputs != nil {
+	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker, inf); inputs != nil {
 		handlers.SetInputs(inputs)
 	}
 	handlers.SetLevelScope(os.Getenv("RUPTURA_LEVEL_SCOPE"))

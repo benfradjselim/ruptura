@@ -93,10 +93,10 @@ func applyCrashLoop(state string, risk float64, restarts int) (string, float64) 
 // applyEstimate raises a workload's state and risk from its time to failure.
 // It never lowers a state or a risk that is already higher.
 func applyEstimate(state string, risk float64, est failuremodes.Estimate, horizon time.Duration) (string, float64) {
-	if est.Mode == failuremodes.ModeStartupStuck {
+	if est.Mode == failuremodes.ModeStartupStuck || est.Mode == failuremodes.ModeOOMKilled {
 		return "critical", math.Max(risk, crashLoopRisk)
 	}
-	if est.Mode == failuremodes.ModeReplicasUnavailable || est.Mode == failuremodes.ModeCPUThrottling {
+	if est.Mode == failuremodes.ModeReplicasUnavailable || est.Mode == failuremodes.ModeCPUThrottling || est.Mode == failuremodes.ModeRolloutStuck {
 		if state != "critical" {
 			state = "degraded"
 		}
@@ -116,6 +116,12 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate, horizo
 }
 
 func estimateHeadline(name string, est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeRolloutStuck {
+		return fmt.Sprintf("%s rollout has stopped progressing.", name)
+	}
+	if est.Mode == failuremodes.ModeOOMKilled {
+		return fmt.Sprintf("%s was killed for exceeding its memory limit.", name)
+	}
 	if est.Mode == failuremodes.ModeReplicasUnavailable {
 		return fmt.Sprintf("%s is missing %d replicas.", name, int(est.Usage))
 	}
@@ -129,6 +135,12 @@ func estimateHeadline(name string, est failuremodes.Estimate) string {
 }
 
 func estimateAction(est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeRolloutStuck {
+		return "Inspect the new revision or roll back"
+	}
+	if est.Mode == failuremodes.ModeOOMKilled {
+		return "Raise the memory limit or find the memory spike"
+	}
 	if est.Mode == failuremodes.ModeReplicasUnavailable {
 		return "Check why the missing pods are not ready"
 	}

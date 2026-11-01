@@ -27,3 +27,5 @@ roles:
   - {name: replicas.desired, level: workload, profile: minimal, target: deployment, query: 'sum by (namespace,deployment) (kube_deployment_spec_replicas)'}
   - {name: replicas.available, level: workload, profile: minimal, target: deployment, query: 'sum by (namespace,deployment) (kube_deployment_status_replicas_available)'}
   - {name: replicas.unavailable, level: workload, profile: minimal, target: deployment, query: 'sum by (namespace,deployment) (kube_deployment_status_replicas_unavailable)'}
+  - {name: rollout.stalled, level: workload, profile: minimal, target: deployment, query: 'sum by (namespace,deployment) (kube_deployment_status_condition{condition="Progressing",status="false"})'}
+  - {name: container.oom, level: pod, profile: minimal, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"})'}

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/discovery"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/internal/normalize"
 	"github.com/benfradjselim/ruptura/internal/sources"
@@ -18,6 +19,8 @@ const (
 	inputProfileEnv   = "RUPTURA_INPUT_PROFILE"
 
 	replicasUnavailableRole = "replicas.unavailable"
+	rolloutStalledRole      = "rollout.stalled"
+	containerOOMRole        = "container.oom"
 )
 
 var inputLevels = []string{"pod", "workload"}
@@ -79,6 +82,30 @@ func (c *inputCollector) observeReplicas(tracker *failuremodes.Tracker, now time
 	}
 }
 
+// observeWorkloads feeds rollout state and OOM kills to the tracker.
+func (c *inputCollector) observeWorkloads(tracker *failuremodes.Tracker, inf *discovery.Informer, now time.Time) {
+	c.observeReplicas(tracker, now)
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, frame := range c.frames["workload"] {
+		stalled, ok := frame.Values[rolloutStalledRole]
+		parts := strings.SplitN(frame.Target, "/", 2)
+		if ok && len(parts) == 2 {
+			tracker.ObserveRollout(parts[0]+"/Deployment/"+parts[1], stalled > 0, now)
+		}
+	}
+	for _, frame := range c.frames["pod"] {
+		oom, ok := frame.Values[containerOOMRole]
+		parts := strings.SplitN(frame.Target, "/", 2)
+		if !ok || len(parts) != 2 {
+			continue
+		}
+		if kind, name, known := inf.ResolvePodOwner(parts[0], parts[1]); known {
+			tracker.ObserveOOM(parts[0]+"/"+kind+"/"+name, frame.Target, oom > 0, now)
+		}
+	}
+}
+
 // inputProfile returns the configured profile, standard by default.
 func inputProfile() string {
 	if profile := os.Getenv(inputProfileEnv); profile != "" {
@@ -88,7 +115,7 @@ func inputProfile() string {
 }
 
 // startInputs polls the catalog roles. It returns nil without a Thanos endpoint.
-func startInputs(ctx context.Context, url string, tracker *failuremodes.Tracker) *inputCollector {
+func startInputs(ctx context.Context, url string, tracker *failuremodes.Tracker, inf *discovery.Informer) *inputCollector {
 	if url == "" {
 		return nil
 	}
@@ -110,7 +137,7 @@ func startInputs(ctx context.Context, url string, tracker *failuremodes.Tracker)
 		for {
 			collector.collect(ctx, source, catalog, profile)
 			if tracker != nil {
-				collector.observeReplicas(tracker, time.Now())
+				collector.observeWorkloads(tracker, inf, time.Now())
 			}
 			select {
 			case <-ctx.Done():

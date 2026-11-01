@@ -28,6 +28,7 @@ type podState struct {
 
 	eventSeen   time.Time
 	eventReason string
+	lastOOM     bool
 }
 
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
@@ -36,11 +37,12 @@ type Tracker struct {
 	mu       sync.RWMutex
 	pods     map[string]*podState
 	replicas map[string]replicaState
+	rollouts map[string]time.Time
 }
 
 // NewTracker returns an empty tracker.
 func NewTracker() *Tracker {
-	return &Tracker{pods: make(map[string]*podState), replicas: make(map[string]replicaState)}
+	return &Tracker{pods: make(map[string]*podState), replicas: make(map[string]replicaState), rollouts: make(map[string]time.Time)}
 }
 
 func (s *podState) recordRestarts(at time.Time, restarts int) {
@@ -123,11 +125,17 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 		if state.condValid && now.Sub(state.condSeen) <= estimateMaxAge {
 			consider(state.condEstimate)
 		}
+		if est, ok := state.oomEstimate(pod, now); ok {
+			consider(est)
+		}
 		if !state.eventSeen.IsZero() && now.Sub(state.eventSeen) <= startupEventMaxAge {
 			consider(Estimate{Mode: ModeStartupStuck, Pod: pod, Confidence: 1, Reason: state.eventReason})
 		}
 	}
 	if est, ok := t.replicaEstimate(workload, now); ok {
+		consider(est)
+	}
+	if est, ok := t.rolloutEstimate(workload, now); ok {
 		consider(est)
 	}
 	return worst, found

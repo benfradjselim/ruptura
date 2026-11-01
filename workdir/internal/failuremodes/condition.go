@@ -79,6 +79,10 @@ func (e Estimate) urgency() time.Duration {
 		return startupStuckUrgency
 	case ModeReplicasUnavailable:
 		return replicasUrgency
+	case ModeRolloutStuck:
+		return rolloutUrgency
+	case ModeOOMKilled:
+		return oomUrgency
 	}
 	return e.ETF
 }
