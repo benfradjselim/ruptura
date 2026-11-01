@@ -18,6 +18,45 @@ Every signal must earn its place with measured evidence on real failures.
 5. Every conclusion names its inputs, so a result can be explained and audited.
 6. One implementation per stage.
 
+## Product position
+
+Status: proposal, 2026-11-01. Nothing below has been removed or changed.
+
+To be indispensable, Ruptura must answer one question that the standard stack does not: which part of this cluster will fail, when, why, what else it will hit, and what to do.
+
+Prometheus, Alertmanager, Grafana and OpenShift Console already collect, alert and display. Ruptura sits on top of them and adds the conclusion. It does not replace them.
+
+| Product rule | Meaning |
+|---|---|
+| Integrate first | Read existing telemetry, write conclusions to existing tools |
+| Native outputs | Prometheus metrics, Alertmanager, Kubernetes Events, CRD status, OpenShift Console |
+| Trust is the product | Each prediction shows evidence and confidence, and misses are measured |
+| Small footprint | Cost stays measured and bounded |
+
+Evidence still needed: the difference from tools such as `predict_linear` rules must be measured, and competing products reviewed.
+
+## Component review
+
+Line counts exclude tests. "Not imported" means no import from `cmd` or `internal`. Go forbids importing `internal` from another module, so Autopilot cannot use these directly, but check it before removal.
+
+| Area | Components | Verdict | Why |
+|---|---|---|---|
+| Failure prediction | `failuremodes` 364, `replay` 159 | Keep, core | The part with measured results |
+| Forecast | `pipeline/metrics` 2521 with `pipeline`, `predictor` 1568 | Merge | Near identical copies |
+| Signals | `analyzer` 1495, `pkg/composites` | Redesign | See current state |
+| Risk | `fusion` 325 | Redesign | FRI disagrees across endpoints |
+| Explanation | `explain` 393, `context` 211 | Keep, rebuild on proven data | Core of user trust |
+| Infra levels | `collector` 4679, `/infra/*` routes | Keep, connect | Already covers nodes, network, storage, operators, MCP, and maps to pipeline levels |
+| Topology | `correlator` 478, `discovery` 1020 | Keep | Needed for blast radius |
+| Ingestion | `ingest` 794, `receiver` 859, `sources` 241 | Merge | Two OTLP paths, target is one adapter layer |
+| Notification | `alerter` 551, `notify` 237, `notifier` 106 | Merge, then favour Alertmanager | Three implementations |
+| Events | `eventbus` 349, `events` 143 | Review | Possible overlap |
+| Actions | `actions` 781 | Keep, raise tests first | Touches clusters, provider coverage 34.8 percent |
+| Operator | `internal/operator` 198, `workdir/operator` | Merge into one | Add pipelines here |
+| Not imported | `billing`, `grpcserver`, `notifier`, `orchestrator`, `plugin`, `processor`, `vault`, about 1250 lines | Check, then delete | Unused in this binary |
+| Duplicate tooling | Dashboards, datasources, orgs, users, notifications UI and routes | Reduce | Overlaps Grafana, Alertmanager and cluster RBAC. 106 routes is too large a surface |
+| UI | `workdir/ui` | Refocus | Prediction, evidence and status, plus an OpenShift Console plugin as an option |
+
 ## Current state
 
 Measured on the lab, one reading of `/api/v2/metrics` on 98 workloads.
