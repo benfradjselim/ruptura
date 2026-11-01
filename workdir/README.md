@@ -324,7 +324,6 @@ c := client.New("http://ruptura:8080", client.WithAPIKey("your-key"))
 rupture, _ := c.RuptureIndex(ctx, "default", "payment-api")
 ```
 
-For REST-only access from any language, use the API directly with a Bearer token — see [API reference](../docs/v6.0.0/SPECS.md).
 
 ---
 
