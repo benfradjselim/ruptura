@@ -34,7 +34,7 @@ func TestApplyEstimate(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			state, risk := applyEstimate(tc.state, 0, failuremodes.Estimate{ETF: tc.etf})
+			state, risk := applyEstimate(tc.state, 0, failuremodes.Estimate{ETF: tc.etf}, degradedETF)
 			if state != tc.wantState {
 				t.Errorf("state = %q, want %q", state, tc.wantState)
 			}
@@ -97,7 +97,7 @@ func TestApplyEstimate_ThrottlingIsDegradedNeverCritical(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			state, risk := applyEstimate(tc.state, 0, failuremodes.Estimate{Mode: failuremodes.ModeCPUThrottling, Usage: 0.4})
+			state, risk := applyEstimate(tc.state, 0, failuremodes.Estimate{Mode: failuremodes.ModeCPUThrottling, Usage: 0.4}, degradedETF)
 			if state != tc.wantState {
 				t.Errorf("state = %q, want %q", state, tc.wantState)
 			}

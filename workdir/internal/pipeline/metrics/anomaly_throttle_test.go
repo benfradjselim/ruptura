@@ -71,3 +71,17 @@ func TestDropUnconfirmedSeasonal(t *testing.T) {
 		}
 	}
 }
+
+func observeShift(e *AnomalyEngine) int {
+	ts := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	alerts := 0
+	for i := 0; i < 500; i++ {
+		ts = ts.Add(alertCooldown)
+		value := 60 + 20*float64(i%5)
+		if i%20 == 19 {
+			value = 200
+		}
+		alerts += len(e.Observe("h", "m", value, ts))
+	}
+	return alerts
+}

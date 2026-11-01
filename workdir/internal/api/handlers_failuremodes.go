@@ -31,6 +31,19 @@ type FailureEstimates interface {
 	RecentRestarts(workload string, now time.Time, window time.Duration) int
 }
 
+// SetHorizon sets how long before a failure a workload turns degraded.
+func (h *Handlers) SetHorizon(horizon time.Duration) { h.horizon = horizon }
+
+func (h *Handlers) warningHorizon() time.Duration {
+	if h.horizon > 0 {
+		return h.horizon
+	}
+	return degradedETF
+}
+
+// SetLevelScope sets the level failure results are reported at.
+func (h *Handlers) SetLevelScope(scope string) { h.levelScope = scope }
+
 // SetFailureModes wires the failure-mode estimates into the API.
 func (h *Handlers) SetFailureModes(f FailureEstimates) { h.failureModes = f }
 
@@ -79,7 +92,7 @@ func applyCrashLoop(state string, risk float64, restarts int) (string, float64) 
 
 // applyEstimate raises a workload's state and risk from its time to failure.
 // It never lowers a state or a risk that is already higher.
-func applyEstimate(state string, risk float64, est failuremodes.Estimate) (string, float64) {
+func applyEstimate(state string, risk float64, est failuremodes.Estimate, horizon time.Duration) (string, float64) {
 	if est.Mode == failuremodes.ModeStartupStuck {
 		return "critical", math.Max(risk, crashLoopRisk)
 	}
@@ -89,14 +102,14 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate) (strin
 		}
 		return state, math.Max(risk, conditionRisk)
 	}
-	if est.ETF > riskHorizon {
+	if est.ETF > riskHorizon && est.ETF > horizon {
 		return state, risk
 	}
 	risk = math.Max(risk, maxRisk*(1-est.ETF.Seconds()/riskHorizon.Seconds()))
 	switch {
 	case est.ETF <= criticalETF:
 		return "critical", risk
-	case est.ETF <= degradedETF && state != "critical":
+	case est.ETF <= horizon && state != "critical":
 		return "degraded", risk
 	}
 	return state, risk

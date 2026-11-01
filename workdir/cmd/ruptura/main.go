@@ -182,7 +182,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	defer bus.Close()
 
 	// --- core pipeline ---
-	pipelineEngine := pipelinemetrics.NewEngine()
+	engineConfig := pipelinemetrics.DefaultEngineConfig()
+	engineConfig.AnomalySigma = pipelinemetrics.SensitivitySigma(os.Getenv("RUPTURA_SENSITIVITY"))
+	pipelineEngine := pipelinemetrics.NewEngineWithConfig(engineConfig)
 	burstDet := correlator.NewBurstDetector(256)
 	topoBuilder := correlator.NewTopologyBuilder()
 	logSink := &burstLogSink{detector: burstDet}
@@ -499,6 +501,15 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker); inputs != nil {
 		handlers.SetInputs(inputs)
+	}
+	handlers.SetLevelScope(os.Getenv("RUPTURA_LEVEL_SCOPE"))
+	if horizon := os.Getenv("RUPTURA_HORIZON"); horizon != "" {
+		parsed, err := time.ParseDuration(horizon)
+		if err != nil {
+			logger.Default.Warn("invalid RUPTURA_HORIZON, using the default", "err", err)
+		} else {
+			handlers.SetHorizon(parsed)
+		}
 	}
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)

@@ -55,6 +55,8 @@ type Handlers struct {
     demoMode      bool
     failureModes  FailureEstimates
 	inputs InputCoverage
+	horizon time.Duration
+	levelScope string
 }
 
 // SetDemoMode marks the server as running with synthetic demo data

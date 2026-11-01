@@ -201,7 +201,7 @@ func (h *Handlers) buildFleet() fleetResponse {
 		etfSeconds, failureMode := 0, ""
 		var estimate *failuremodes.Estimate
 		if est, ok := h.workloadEstimate(name); ok {
-			state, risk = applyEstimate(state, risk, est)
+			state, risk = applyEstimate(state, risk, est, h.warningHorizon())
 			etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
 			estimate = &est
 		}

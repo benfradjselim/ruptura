@@ -22,6 +22,8 @@ type EngineConfig struct {
     // EnsembleMode selects adaptive (default) or fixed-weight ensemble.
     EnsembleMode EnsembleMode
     AnomalyStoreCapacity int
+    // AnomalySigma is the detection threshold. Zero uses the default.
+    AnomalySigma float64
 }
 
 // DefaultEngineConfig returns production defaults.

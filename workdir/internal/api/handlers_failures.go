@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 )
@@ -51,11 +52,24 @@ func failureResult(workload, state string, est *failuremodes.Estimate, crashLoop
 	return &result
 }
 
+// scopeResult reports a result at the configured level. A result with no pod
+// stays at workload level, because it cannot be narrowed further.
+func scopeResult(result FailureResult, scope string) FailureResult {
+	switch {
+	case scope == "pod" && result.Pod != "":
+		result.Level, result.Target = "pod", result.Pod
+	case scope == "namespace":
+		result.Level, result.Target = "namespace", strings.SplitN(result.Target, "/", 2)[0]
+	}
+	return result
+}
+
 func (h *Handlers) handleFailures(w http.ResponseWriter, _ *http.Request) {
 	results := []*FailureResult{}
 	for _, host := range h.buildFleet().Hosts {
 		if host.Failure != nil {
-			results = append(results, host.Failure)
+			scoped := scopeResult(*host.Failure, h.levelScope)
+			results = append(results, &scoped)
 		}
 	}
 	writeJSON(w, http.StatusOK, results)

@@ -21,10 +21,28 @@ type AnomalyEngine struct {
 
 // NewAnomalyEngine creates an engine with sane defaults.
 func NewAnomalyEngine() *AnomalyEngine {
+	return newAnomalyEngineWithSigma(defaultAnomalySigma)
+}
+
+const defaultAnomalySigma = 3.0
+
+// SensitivitySigma converts a sensitivity name to a detection threshold.
+// Unknown names use the default.
+func SensitivitySigma(sensitivity string) float64 {
+	switch sensitivity {
+	case "conservative":
+		return 4
+	case "aggressive":
+		return 2.5
+	}
+	return defaultAnomalySigma
+}
+
+func newAnomalyEngineWithSigma(sigma float64) *AnomalyEngine {
 	return &AnomalyEngine{
-		zscore:   NewAnomalyDetector(3.0),
-		mad:      NewMADAnomalyDetector(300, 3.0),
-		seasonal: NewSeasonalAnomalyDetector(240, 3.0), // 1h season at 15s
+		zscore:   NewAnomalyDetector(sigma),
+		mad:      NewMADAnomalyDetector(300, sigma),
+		seasonal: NewSeasonalAnomalyDetector(240, sigma), // 1h season at 15s
 		counters: newCounterRates(),
 		throttle: newAlertThrottle(),
 	}
