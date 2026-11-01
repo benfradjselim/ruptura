@@ -108,3 +108,28 @@ func TestSignalVector_UnavailableIsNotTheWorstValue(t *testing.T) {
 		}
 	}
 }
+
+func TestAdaptiveScore_IgnoresNegligibleDeviation(t *testing.T) {
+	baseline := func(values ...float64) *workloadState {
+		ws := &workloadState{}
+		for i := 0; i < 96; i++ {
+			ws.updateBaseline(map[string]float64{"stress": values[i%len(values)]})
+		}
+		return ws
+	}
+	cases := []struct {
+		name string
+		ws   *workloadState
+		raw  float64
+		want float64
+	}{
+		{"tiny move on a quiet workload", baseline(0.0005, 0.0006), 0.0009, 0.002},
+		{"real move on a quiet workload", baseline(0.0005, 0.0006), 0.5, 1},
+		{"usual level", baseline(0.5, 0.5), 0.5, 0},
+	}
+	for _, c := range cases {
+		if got := adaptiveScore(c.ws, "stress", c.raw); math.Abs(got-c.want) > 0.01 {
+			t.Errorf("%s: score = %v, want %v", c.name, got, c.want)
+		}
+	}
+}

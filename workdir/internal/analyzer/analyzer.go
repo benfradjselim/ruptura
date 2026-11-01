@@ -556,6 +556,11 @@ func (ws *workloadState) updateBaseline(signals map[string]float64) {
 	}
 }
 
+// minBaselineSigma keeps a workload with almost no variance from turning a
+// negligible move into a full penalty. Signals are in [0,1], so the score reaches
+// its maximum no sooner than 0.15 above the baseline mean.
+const minBaselineSigma = 0.05
+
 // adaptiveScore converts a raw signal value to a workload-relative score in [0,1].
 // When the value equals the workload's baseline mean it returns 0 (healthy).
 // A 3σ deviation above the mean returns 1 (max penalty).
@@ -572,9 +577,8 @@ func adaptiveScore(ws *workloadState, signal string, raw float64) float64 {
 	m2 := ws.baselineM2[signal]
 	variance := m2 / float64(count-1)
 	sigma := math.Sqrt(variance)
-	if sigma < 1e-6 {
-		// Near-zero variance: workload is very stable; any deviation is notable.
-		sigma = 0.05
+	if sigma < minBaselineSigma {
+		sigma = minBaselineSigma
 	}
 	z := (raw - mean) / sigma
 	return utils.Clamp(z/3.0, 0, 1) // 3σ above normal = max penalty

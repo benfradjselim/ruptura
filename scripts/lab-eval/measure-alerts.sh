@@ -16,5 +16,11 @@ print(last['t'],{k:last['fleet'].get(k) for k in('total_hosts','healthy_hosts','
 for h in last['fleet']['hosts']:
     if h['host'].split('/')[0]=='demo-shop': print(h['host'],h['state'],h.get('fused_rupture_index'),h.get('active_alerts'),h.get('etf_seconds'),h.get('failure_mode'))
 P
+python3 - <<'Q'
+import json,collections as C
+L=[json.loads(l) for l in open('/var/tmp/fleet.jsonl')][30:]
+bad=C.Counter(x['host'] for r in L for x in r['fleet']['hosts'] if x['state'] in('degraded','critical') and not x['host'].startswith('demo-shop'))
+print('non demo workloads degraded or critical at least once',len(bad),bad.most_common(6))
+Q
 tail -2 /var/tmp/pods.log | cut -c1-300
 export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost.kubeconfig; oc get pods -n ruptura-h --no-headers | grep '^ruptura-[0-9a-f]*-'
