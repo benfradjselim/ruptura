@@ -64,7 +64,8 @@ func scopeResult(result FailureResult, scope string) FailureResult {
 	return result
 }
 
-func (h *Handlers) handleFailures(w http.ResponseWriter, _ *http.Request) {
+// Failures returns the known failures at the configured level.
+func (h *Handlers) Failures() []*FailureResult {
 	results := []*FailureResult{}
 	for _, host := range h.buildFleet().Hosts {
 		if host.Failure != nil {
@@ -72,5 +73,9 @@ func (h *Handlers) handleFailures(w http.ResponseWriter, _ *http.Request) {
 			results = append(results, &scoped)
 		}
 	}
-	writeJSON(w, http.StatusOK, results)
+	return results
+}
+
+func (h *Handlers) handleFailures(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, h.Failures())
 }

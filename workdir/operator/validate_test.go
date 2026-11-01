@@ -90,6 +90,7 @@ func TestReconcile_ConfigReachesTheEngine(t *testing.T) {
 			Input:    InputConfig{Profile: "minimal"},
 			Analysis: AnalysisConfig{Sensitivity: "conservative", Horizon: "45m"},
 			Logging:  LoggingConfig{Level: "debug"},
+			Alerting: AlertingConfig{Channels: []AlertChannel{{Name: "ops", Alertmanager: &AlertmanagerChannel{URL: "http://am:9093"}}}},
 		},
 	}
 	if err := reconcile(context.Background(), c, inst, false); err != nil {
@@ -97,11 +98,12 @@ func TestReconcile_ConfigReachesTheEngine(t *testing.T) {
 	}
 	env := envOf(t, rec)
 	want := map[string]string{
-		"RUPTURA_LEVEL_SCOPE":   "namespace",
-		"RUPTURA_INPUT_PROFILE": "minimal",
-		"RUPTURA_SENSITIVITY":   "conservative",
-		"RUPTURA_HORIZON":       "45m",
-		"LOG_LEVEL":             "debug",
+		"RUPTURA_LEVEL_SCOPE":       "namespace",
+		"RUPTURA_INPUT_PROFILE":     "minimal",
+		"RUPTURA_SENSITIVITY":       "conservative",
+		"RUPTURA_HORIZON":           "45m",
+		"LOG_LEVEL":                 "debug",
+		"RUPTURA_ALERTMANAGER_URLS": "http://am:9093",
 	}
 	for name, value := range want {
 		if env[name] == nil || env[name]["value"] != value {

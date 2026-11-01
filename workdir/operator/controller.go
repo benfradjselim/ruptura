@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -412,6 +413,16 @@ func writeInvalidStatus(c *k8sClient, inst RupturaInstance, problem error) error
 	return c.patchStatus(path, status)
 }
 
+func alertmanagerURLs(channels []AlertChannel) string {
+	urls := make([]string, 0, len(channels))
+	for _, channel := range channels {
+		if channel.Alertmanager != nil {
+			urls = append(urls, channel.Alertmanager.URL)
+		}
+	}
+	return strings.Join(urls, ",")
+}
+
 // configEnv passes the declared configuration to the engine.
 func configEnv(spec RupturaInstanceSpec) []EnvVar {
 	values := []EnvVar{
@@ -420,6 +431,7 @@ func configEnv(spec RupturaInstanceSpec) []EnvVar {
 		{Name: "RUPTURA_SENSITIVITY", Value: spec.Analysis.Sensitivity},
 		{Name: "RUPTURA_HORIZON", Value: spec.Analysis.Horizon},
 		{Name: "LOG_LEVEL", Value: spec.Logging.Level},
+		{Name: "RUPTURA_ALERTMANAGER_URLS", Value: alertmanagerURLs(spec.Alerting.Channels)},
 	}
 	env := make([]EnvVar, 0, len(values))
 	for _, value := range values {

@@ -503,6 +503,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		handlers.SetInputs(inputs)
 	}
 	handlers.SetLevelScope(os.Getenv("RUPTURA_LEVEL_SCOPE"))
+	startAlerts(ctx, handlers)
 	if horizon := os.Getenv("RUPTURA_HORIZON"); horizon != "" {
 		parsed, err := time.ParseDuration(horizon)
 		if err != nil {
