@@ -14,6 +14,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/gorilla/mux"
 )
@@ -84,6 +85,7 @@ type fleetHost struct {
 	ETFSeconds          int                    `json:"etf_seconds,omitempty"`
 	FailureMode         string                 `json:"failure_mode,omitempty"`
 	UnavailableSignals  []string               `json:"unavailable_signals,omitempty"`
+	Failure             *FailureResult         `json:"failure,omitempty"`
 }
 
 // crashLoopRestartThreshold is the container restart count (summed across a
@@ -165,10 +167,13 @@ func (h *Handlers) workloadRestartCount(ns, kind, name string) int {
 	return total
 }
 
-func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) handleFleet(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, h.buildFleet())
+}
+
+func (h *Handlers) buildFleet() fleetResponse {
 	if h.store == nil {
-		writeJSON(w, http.StatusOK, fleetResponse{Hosts: []fleetHost{}})
-		return
+		return fleetResponse{Hosts: []fleetHost{}}
 	}
 
 	snapshots := h.store.AllSnapshots()
@@ -194,9 +199,11 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		risk := h.baseRisk(s.FusedRuptureIndex)
 		state, risk = applyCrashLoop(state, risk, stateRestarts)
 		etfSeconds, failureMode := 0, ""
+		var estimate *failuremodes.Estimate
 		if est, ok := h.workloadEstimate(name); ok {
 			state, risk = applyEstimate(state, risk, est)
 			etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
+			estimate = &est
 		}
 		resp.TotalHosts++
 		// Explicit cases only — a bare "default: critical" here previously
@@ -229,6 +236,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 			ETFSeconds:          etfSeconds,
 			FailureMode:         failureMode,
 			UnavailableSignals:  s.UnavailableSignals,
+			Failure:             failureResult(name, state, estimate, stateRestarts >= crashLoopRestartThreshold),
 		})
 	}
 
@@ -282,7 +290,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		return resp.Hosts[i].HealthScore < resp.Hosts[j].HealthScore
 	})
 
-	writeJSON(w, http.StatusOK, resp)
+	return resp
 }
 
 // ── /api/v2/alerts ────────────────────────────────────────────────────────────
