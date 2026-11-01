@@ -310,9 +310,9 @@ func TestWeightConfigRoundtrip(t *testing.T) {
 func TestAdaptiveBaseline_IdleWorkload(t *testing.T) {
 	a := NewAnalyzer()
 	ref := models.WorkloadRef{Namespace: "test", Kind: "host", Name: "idle-pod"}
-	// Feed 100 cycles of idle metrics (no cpu, no memory, no requests — pure zeros).
+	// Feed 100 cycles of idle metrics, measured zeros for cpu and memory.
 	// 96 cycles is the threshold for baselineReady; 100 ensures it trips.
-	idleMetrics := map[string]float64{}
+	idleMetrics := map[string]float64{"cpu_percent": 0, "memory_percent": 0}
 	var lastSnap models.KPISnapshot
 	for i := 0; i < 100; i++ {
 		lastSnap = a.Update(ref, idleMetrics)

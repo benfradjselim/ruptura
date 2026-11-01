@@ -374,9 +374,15 @@ func runWithContext(ctx context.Context, cfg Config) error {
 						predictorEngine.Feed(host, metric, val, now)
 					}
 					// Also feed the composite KPI signals.
-					predictorEngine.Feed(host, "health_score", snap.HealthScore.Value, now)
-					predictorEngine.Feed(host, "stress", snap.Stress.Value, now)
-					predictorEngine.Feed(host, "fatigue", snap.Fatigue.Value, now)
+					for name, kpi := range map[string]models.KPI{
+						"health_score": snap.HealthScore,
+						"stress":       snap.Stress,
+						"fatigue":      snap.Fatigue,
+					} {
+						if !kpi.Unavailable {
+							predictorEngine.Feed(host, name, kpi.Value, now)
+						}
+					}
 
 					// Record an explain entry for any workload in warning or worse state.
 					if fusedR >= 1.5 {

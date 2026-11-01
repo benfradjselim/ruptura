@@ -43,7 +43,7 @@ Line counts exclude tests. "Not imported" means no import from `cmd` or `interna
 |---|---|---|---|
 | Failure prediction | `failuremodes` 364, `replay` 159 | Keep, core | The part with measured results |
 | Forecast | `pipeline/metrics` 2521 with `pipeline`, `predictor` 1568 | Merge | Near identical copies |
-| Signals | `analyzer` 1495, `pkg/composites` | Redesign | See current state |
+| Signals | `analyzer` | Redesign | See current state |
 | Risk | `fusion` 325 | Redesign | FRI disagrees across endpoints |
 | Explanation | `explain` 393, `context` 211 | Keep, rebuild on proven data | Core of user trust |
 | Infra levels | `collector` 4679, `/infra/*` routes | Keep, connect | Already covers nodes, network, storage, operators, MCP, and maps to pipeline levels |
@@ -66,7 +66,7 @@ The lab collector sends no traces or logs.
 
 | Signal | Current formula | Lab value | Defect |
 |---|---|---|---|
-| stress | `.30 cpu + .20 ram + .20 load + .20 errors + .10 timeouts` | 0 to 0.30 | Fixed weights. Half the inputs are absent. `load_avg_1` stands in for latency. A second version with other weights is in `pkg/composites`. |
+| stress | `.30 cpu + .20 ram + .20 load + .20 errors + .10 timeouts` | 0 to 0.30 | Fixed weights. Half the inputs are absent. `load_avg_1` stands in for latency. |
 | fatigue | Accumulates `stress - threshold` | 0 | Stress never reaches the threshold, because of the defect above. |
 | mood | `log(uptime * requests / (errors * timeouts * restarts + e)) / 35` | 0 | A product of absent inputs. Scale depends on `e`. Reported as `1 - mood`, so absence counts as a full penalty. |
 | pressure | Z-score of latency and errors, mapped to 0 to 1 | 0.5 | Inputs absent, 0.5 is the neutral value. |

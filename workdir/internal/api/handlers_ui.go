@@ -83,6 +83,7 @@ type fleetHost struct {
 	RestartCount        int                    `json:"restart_count,omitempty"`
 	ETFSeconds          int                    `json:"etf_seconds,omitempty"`
 	FailureMode         string                 `json:"failure_mode,omitempty"`
+	UnavailableSignals  []string               `json:"unavailable_signals,omitempty"`
 }
 
 // crashLoopRestartThreshold is the container restart count (summed across a
@@ -132,7 +133,7 @@ func snapshotState(snap models.KPISnapshot, restarts int) string {
 		return "calibrating"
 	}
 	hs := snap.HealthScore.Value
-	if math.IsNaN(hs) {
+	if snap.HealthScore.Unavailable || math.IsNaN(hs) {
 		return "calibrating"
 	}
 	if hs >= 0.70 {
@@ -227,6 +228,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 			RestartCount:        restarts,
 			ETFSeconds:          etfSeconds,
 			FailureMode:         failureMode,
+			UnavailableSignals:  s.UnavailableSignals,
 		})
 	}
 

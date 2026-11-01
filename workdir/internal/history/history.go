@@ -20,25 +20,28 @@ type Point struct {
 	Pressure          float64   `json:"pressure"`
 	Mood              float64   `json:"mood"`
 	CalibrationPct    int       `json:"calibration_pct"`
+	// UnavailableSignals lists the fields above whose inputs were absent.
+	UnavailableSignals []string `json:"unavailable_signals,omitempty"`
 }
 
 func PointFromSnapshot(snap models.KPISnapshot) Point {
 	return Point{
-		TS:                time.Now(),
-		HealthScore:       snap.HealthScore.Value,
-		FusedRuptureIndex: snap.FusedRuptureIndex,
-		Stress:            snap.Stress.Value,
-		Fatigue:           snap.Fatigue.Value,
-		Contagion:         snap.Contagion.Value,
-		Pressure:          snap.Pressure.Value,
-		Mood:              snap.Mood.Value,
-		CalibrationPct:    snap.CalibrationProgress,
+		TS:                 time.Now(),
+		HealthScore:        snap.HealthScore.Value,
+		FusedRuptureIndex:  snap.FusedRuptureIndex,
+		Stress:             snap.Stress.Value,
+		Fatigue:            snap.Fatigue.Value,
+		Contagion:          snap.Contagion.Value,
+		Pressure:           snap.Pressure.Value,
+		Mood:               snap.Mood.Value,
+		CalibrationPct:     snap.CalibrationProgress,
+		UnavailableSignals: snap.UnavailableSignals,
 	}
 }
 
 type Manager struct {
-	mu      sync.RWMutex
-	data    map[string][]Point
+	mu       sync.RWMutex
+	data     map[string][]Point
 	lastPush map[string]time.Time
 }
 
