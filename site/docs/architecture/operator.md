@@ -181,10 +181,10 @@ EOF
 
 ```bash
 # Apply CRD
-kubectl apply -f https://raw.githubusercontent.com/benfradjselim/ruptura/main/workdir/deploy/crd/rupturainstances.ruptura.io.yaml
+kubectl apply -f https://raw.githubusercontent.com/benfradjselim/ruptura/main/bundle/manifests/ruptura.io_rupturainstances.yaml
 
 # Apply operator Deployment + RBAC
-kubectl apply -f https://raw.githubusercontent.com/benfradjselim/ruptura/main/workdir/deploy/operator.yaml
+kubectl apply -f https://raw.githubusercontent.com/benfradjselim/ruptura/main/install/operator.yaml
 
 # Verify the operator is running
 kubectl get pods -n ruptura-system -l app.kubernetes.io/component=operator

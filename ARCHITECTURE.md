@@ -1,57 +1,56 @@
 # Architecture
 
-## Why `workdir/` exists
-
-The Go module root, `cmd/`, `internal/`, `pkg/`, and the embedded UI all live
-under `workdir/` instead of the repository root. This is historical: early
-prototyping happened alongside non-Go tooling (lab automation, the OLM
-bundle, the marketing site) at the repo root, and `workdir/` was the
-boundary that kept `go build ./...` from trying to walk those trees.
-
-Moving `workdir/` contents up to the repo root would change the Go module's
-canonical import paths for every package under it — a breaking change for
-anything vendoring or importing this module — for a cosmetic improvement.
-That churn is not worth it right now, so the layout stays as-is and is
-documented here instead.
-
 ## Repository layout
 
 ```
 .
-├── workdir/              Go module root — the actual engine source
-│   ├── cmd/ruptura/      main binary entrypoint (HTTP API, OTLP/Prometheus receivers)
-│   ├── cmd/ruptura-ctl/  CLI client
-│   ├── cmd/ruptura-sim/  synthetic workload generator (used by scripts/simulate.py's Go path)
-│   ├── internal/         everything not part of the public API:
-│   │   ├── analyzer/         composite KPI → Fused Rupture Index scoring
-│   │   ├── collector/infra/  v8 dual-axis infrastructure collectors (Object-Group model)
-│   │   ├── fusion/           the 5-model adaptive prediction ensemble
-│   │   ├── actions/          3-tier action engine (auto / approve / alert-only)
-│   │   ├── api/              HTTP handlers for /api/v2/*
-│   │   └── storage/          BadgerDB-backed time-series + key-prefix registry
-│   ├── pkg/               stable, externally-referenceable types (client, models, rupture)
-│   ├── operator/          OLM operator controller (reconciles RupturaInstance CRs)
-│   └── ui/                Svelte 4 + Vite 5 dashboard, embedded into the Go binary
-├── helm/                 Helm chart (the primary install path)
-├── bundle/, catalog/     OLM bundle + catalog for OperatorHub distribution
-├── docs/                 REFERENCE.md (API + config surface), fable.md (roadmap), history/
-├── site/                 GitHub Pages marketing/docs site
-└── scripts/              simulate.py and other operator conveniences
+├── workdir/          Go module and engine source
+│   ├── cmd/          ruptura (engine), ruptura-ctl (CLI), ruptura-sim (simulator)
+│   ├── internal/     engine packages
+│   ├── pkg/          public Go packages
+│   ├── operator/     Kubernetes operator, a separate Go module
+│   └── ui/           Svelte web UI
+├── helm/             Helm chart
+├── install/          Single file install manifest
+├── bundle/ catalog/ operators/   OperatorHub packaging
+├── site/             Documentation website
+├── docs/             API and configuration reference
+└── scripts/          Simulator and repository tooling
 ```
 
-## Runtime shape
+The Go module lives in `workdir/` for historical reasons.
+
+## Engine pipeline
 
 ```
-ruptura (community engine, this repo)
-  ├── OTLP + Prometheus remote-write receivers  → ingest telemetry
-  ├── analyzer/fusion                            → per-workload Fused Rupture Index
-  ├── actions engine                             → Tier-1/2/3 remediation (edition-gated)
-  └── /api/v2/*                                  → the only contract other services rely on
-
-Ruptura Autopilot (private repo) is a separate process that talks to this
-engine over /api/v2/* as an authenticated HTTP client — it does not import
-any package from this repo. See that repo's CLAUDE.md SS3.3 for why.
+Prometheus · OTLP · Kubernetes API
+  → sources, ingest    collect telemetry
+  → normalize          per target data, explicit missing values
+  → pipeline, predictor  forecasts and anomaly detection
+  → analyzer           per workload signals
+  → failuremodes       known failures, predicted or detected
+  → api                REST API under /api/v2
 ```
 
-See `docs/REFERENCE.md` for the full API surface and configuration reference,
-and `docs/fable.md` for the current roadmap and what's still in flight.
+| Package | Role |
+|---|---|
+| `internal/sources` | Metric catalog and Prometheus queries |
+| `internal/ingest`, `internal/receiver` | OTLP and remote write ingestion |
+| `internal/normalize` | Frames per target, with missing data listed |
+| `internal/pipeline` | Forecasting and anomaly detection |
+| `internal/analyzer` | Workload signals and health |
+| `internal/failuremodes` | Failure recipes |
+| `internal/fusion` | Risk fusion |
+| `internal/discovery` | Kubernetes workload discovery |
+| `internal/collector` | Infrastructure collectors |
+| `internal/actions` | Remediation engine |
+| `internal/storage` | BadgerDB storage |
+| `internal/api` | REST handlers |
+
+## Rules
+
+- Missing data is never a zero.
+- A stage reads only from earlier stages.
+- `/api/v2` is the contract for external clients.
+
+See [docs/REFERENCE.md](docs/REFERENCE.md) for the API and configuration reference.

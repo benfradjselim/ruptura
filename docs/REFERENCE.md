@@ -383,7 +383,6 @@ python3 scripts/simulate.py --host <YOUR_NODE_IP> --port 31470
 ## Project Files
 
 ```
-CLAUDE.md                     Claude Code instructions (English-only, rules)
 workdir/                      Go engine source
   cmd/ruptura/                main binary entry point
   internal/pipeline/metrics/  CA-ILR ensemble (core engine)

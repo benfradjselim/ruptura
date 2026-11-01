@@ -448,7 +448,7 @@ func (s *Store) rangeQueryKPI(prefix string, from, to time.Time) ([]KPISample, e
 
 // --- Infra signal history (v8.0 Infrastructure & Cluster Intelligence Layer) ---
 // Key schema (docs/v8.0.0/RUPTURA-PLATFORM-EXTENSION.md §6.4, additive-only,
-// never change existing prefixes — see CLAUDE.md §3.1):
+// never change existing prefixes):
 //
 //	is:{group}:{scope}:{ns}:{kind}:{name}:{signal}:{ts}   raw object signal   7d
 //	is5:  / is1h:                                          rollups            35d / 400d
