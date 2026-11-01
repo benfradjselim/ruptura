@@ -219,12 +219,6 @@ spec:
 EOF
 ```
 
-## Install with Kustomize
-
-```bash
-kubectl apply -k https://github.com/benfradjselim/ruptura/install
-```
-
 ## Install manually (without OLM)
 
 ```bash
