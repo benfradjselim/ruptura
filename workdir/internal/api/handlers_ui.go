@@ -263,16 +263,34 @@ func (h *Handlers) buildFleet() fleetResponse {
 			// "pending_telemetry" forever despite obviously being broken.
 			restarts := h.workloadRestartCount(s.Workload.Namespace, s.Workload.Kind, s.Workload.Name)
 			state := "pending_telemetry"
-			if h.stateRestarts(name, restarts) >= crashLoopRestartThreshold {
+			crashLoop := h.stateRestarts(name, restarts) >= crashLoopRestartThreshold
+			if crashLoop {
 				state = "critical"
+			}
+			risk := 0.0
+			etfSeconds, failureMode := 0, ""
+			var estimate *failuremodes.Estimate
+			if est, ok := h.workloadEstimate(name); ok {
+				state, risk = applyEstimate(state, risk, est, h.warningHorizon())
+				etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
+				estimate = &est
+			}
+			switch state {
+			case "critical":
 				resp.CriticalHosts++
+			case "degraded":
+				resp.DegradedHosts++
 			}
 			resp.Hosts = append(resp.Hosts, fleetHost{
-				Host:         name,
-				State:        state,
-				HealthScore:  0,
-				LastSeen:     s.Timestamp,
-				RestartCount: restarts,
+				Host:              name,
+				State:             state,
+				HealthScore:       0,
+				LastSeen:          s.Timestamp,
+				FusedRuptureIndex: risk,
+				ETFSeconds:        etfSeconds,
+				FailureMode:       failureMode,
+				Failure:           failureResult(name, state, estimate, crashLoop),
+				RestartCount:      restarts,
 			})
 		}
 	}

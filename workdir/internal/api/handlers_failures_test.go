@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/analyzer"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 func TestFailureResult(t *testing.T) {
@@ -134,5 +136,26 @@ func TestSelectFailures(t *testing.T) {
 		if got := selectFailures(results, c.selector, lookup); len(got) != c.want {
 			t.Errorf("%s: kept %d, want %d", c.name, len(got), c.want)
 		}
+	}
+}
+
+func TestFailures_WorkloadWithoutTelemetry(t *testing.T) {
+	a := analyzer.NewAnalyzer()
+	ref := models.WorkloadRef{Namespace: "n", Kind: "Deployment", Name: "w"}
+	a.RegisterWorkload(ref)
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+	h := &Handlers{store: store, analyzer: a}
+	h.SetFailureModes(fixedEstimates{ref.Key(): {Mode: failuremodes.ModeSaturation, Pod: "n/p", ETF: 5 * time.Minute, Confidence: 0.9}})
+
+	results := h.Failures()
+	if len(results) != 1 {
+		t.Fatalf("results = %d, want the failure of a workload with no telemetry", len(results))
+	}
+	if results[0].FailureMode != "saturation" || results[0].State != "critical" {
+		t.Errorf("result = %+v", results[0])
+	}
+	if fleet := h.buildFleet(); fleet.CriticalHosts != 1 {
+		t.Errorf("critical hosts = %d, want 1", fleet.CriticalHosts)
 	}
 }
