@@ -83,6 +83,62 @@ Design patterns:
 | Value that may be absent | Explicit type, value plus availability |
 | Storage | Repository |
 
+## User configuration
+
+Status: proposal from the owner, 2026-11-01. Not implemented.
+
+Same model as an OpenTelemetry Collector or a ClusterLogForwarder: the engine stays fixed, the user declares what it does. The user chooses sources, targets, analysis level and outputs. The algorithms and calculation principles do not change per user.
+
+Current: `RupturaInstance` (`ruptura.io/v1alpha1`) only deploys the engine: image, replicas, storage, edition, ingest rate, resources. Weights are set through a REST call. Nothing declares what to watch.
+
+Proposed resource, with the same shape as a collector pipeline:
+
+```yaml
+apiVersion: ruptura.io/v1alpha1
+kind: RupturaPipeline            # ClusterRupturaPipeline for cluster owners
+metadata:
+  name: shop-team
+  namespace: shop
+spec:
+  receivers:
+    - prometheus: {url: https://thanos-querier.openshift-monitoring.svc:9091}
+    - otlp: {signals: [metrics, traces, logs]}
+  targets:
+    - level: workload
+      selector: {matchLabels: {team: shop}}
+    - level: custom
+      resources:
+        - {group: kafka.strimzi.io, kind: Kafka}
+  analysis:
+    failureModes: [saturation, crashLoop, httpErrors]
+    horizon: 30m
+    sensitivity: balanced        # conservative, balanced, aggressive
+  exporters:
+    - alertmanager: {url: http://alertmanager:9093}
+    - webhook: {secretRef: {name: chat-hook}}
+```
+
+Levels:
+
+| Level | Examples | Owner |
+|---|---|---|
+| workload | Deployment, StatefulSet, Job | Application team |
+| namespace | Quotas, all workloads of a team | Application team |
+| network | Service, Route, Ingress, CNI | Cluster owner |
+| infra | Node, etcd, API server, storage | Cluster owner |
+| custom | Any CRD, read through its status conditions and metrics | Either |
+
+Rules:
+
+1. Zero configuration must work. Without a pipeline, a default one covers workloads.
+2. Kubernetes RBAC is the tenancy model. A namespaced pipeline sees its namespace only, a cluster pipeline needs a cluster role.
+3. The user selects from proven failure modes and bounded presets. Raw weights are an advanced option, reported as unverified in the result.
+4. Status reports each input as available or missing, so a user sees what the engine cannot see.
+5. A custom CRD has no proven failure mode at first. It gets conditions and anomaly detection, and it is labelled as such.
+6. The same scope can serve metrics, traces and logs, and the engine stays compatible with other stacks through adapters.
+
+Dependency: pipelines need the catalog and semantic roles of phase 2.
+
 ## Evidence protocol
 
 1. Fault library: reproducible faults on the lab, recorded with labels. Start with memory leak, crash loop, CPU starvation, disk full, dependency down, HTTP error burst, slow dependency, node pressure.
@@ -99,6 +155,7 @@ Constraint: learned weights need labelled failures. Until the library exists, us
 | 0 | LOT-1 result | Alert gate decided |
 | 1 | Missing data explicit, one signal implementation | Absent input no longer changes health |
 | 2 | Catalog and normalizer, broad collection | Coverage and memory cost measured |
+| 2b | `RupturaPipeline` v1alpha1 with default pipeline and status | Two pipelines at different levels run side by side, one team cannot read the other |
 | 3 | Fault library and replay scoring | Each fault recorded at least 3 times |
 | 4 | Signal review with evidence | Each signal has a keep or delete decision |
 | 5 | Risk and state built on proven signals | FRI agrees across API endpoints |
@@ -109,3 +166,4 @@ Constraint: learned weights need labelled failures. Until the library exists, us
 1. Keep the current signal names in the API, or rename them to plain terms. Names are public, so a change needs a version plan.
 2. Scope for the Summit on 2026-11-24. Phases 1 and 2 look feasible. Phase 4 depends on how many faults are recorded.
 3. Whether traces become a recommended input, since contagion and internal traffic need them.
+4. Edition boundary for pipelines. `CLAUDE.md` says the community edition is frozen at the v7.0.25 feature set, which conflicts with adding `RupturaPipeline` there.

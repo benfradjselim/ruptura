@@ -8,8 +8,8 @@ This section is how sessions pass work to each other. Read it first, continue fr
 
 Rewrite it before any wait over 10 minutes, after each deploy, and at the end of a session. A session can stop without warning, so never leave this for the end. Replace the old content and keep it short. Numbers must come from a real measure.
 
-- Updated: 2026-11-01 02:10 UTC
-- Direction from the owner 2026-11-01: reanalyse the formulas, keep only signals proven useful, consume broadly, clear system design. Read `docs/engine/DESIGN.md`, draft awaiting owner review, its phases replace the failure mode list below.
+- Updated: 2026-11-01 02:18 UTC
+- Direction from the owner 2026-11-01: reanalyse the formulas, keep only signals proven useful, consume broadly, clear system design. Read `docs/engine/DESIGN.md`, draft awaiting owner review, its phases replace the failure mode list below. Owner also wants user configuration by CRD, like an OpenTelemetry Collector: fixed engine, user declared sources, targets, levels and outputs, see `RupturaPipeline` in that file.
 - Plan: fix the engine first. Other components (Helm, operator, UI, CLI, site) start only once the engine passes its gate. Deadline 2026-11-24, Red Hat Summit Paris.
 - Work location: `/root/ruptura-fix`, branch `fix/engine-prediction`, pushed. Push with `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push`, plain push has no credentials.
 - Lab: OpenShift, reach it with `/root/lab.sh`, not the Civo kubeconfig. Deploy with `/root/redeploy.sh`, which deletes `/var/tmp/fleet.jsonl`, so copy that file first.
