@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ── Stage 1: Build Go binary ──────────────────────────────────────────────────
-# The Svelte UI is pre-built locally and committed to internal/ui/static/.
+# The Svelte UI is pre-built locally and built by the UI image.
 # Running npm inside Docker for a multi-arch build (amd64 + arm64 via QEMU)
 # can take 60+ minutes. Building locally and committing the bundle is faster
 # and more reliable — the Vite content hash guarantees correctness.

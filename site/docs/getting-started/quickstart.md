@@ -216,7 +216,6 @@ Datasource URL: http://<node-ip>:31468/api/v2/metrics
 Import the bundled dashboard:
 
 ```bash
-# File path: workdir/deploy/grafana/dashboards/ruptura_overview.json
 # Or enable via Helm: --set grafana.dashboards.enabled=true
 ```
 

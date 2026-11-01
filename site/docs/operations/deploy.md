@@ -84,7 +84,7 @@ kubectl create secret generic ruptura-secrets \
   --from-literal=api-key=$(openssl rand -hex 32)
 
 # Apply all manifests
-kubectl apply -f workdir/deploy/
+kubectl apply -f install/ruptura.yaml
 
 # Verify
 kubectl get pods -n ruptura-system
@@ -183,7 +183,6 @@ helm upgrade ruptura helm -n ruptura-system \
   --set grafana.dashboards.enabled=true
 
 # Or import manually
-# File: workdir/deploy/grafana/dashboards/ruptura_overview.json
 ```
 
 Point a Prometheus datasource at `http://ruptura:8080/api/v2/metrics`.

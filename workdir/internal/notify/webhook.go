@@ -1,7 +1,7 @@
 // Package notify delivers outbound webhook notifications for Tier-2+ rupture
 // events. Community edition supports Slack (incoming webhook) and a generic
 // JSON webhook. PagerDuty/OpsGenie routing and Tier-1 auto-execution stay in
-// the paid autopilot edition — see CLAUDE.md's edition boundary: community
+// the paid autopilot edition: community
 // fires alerts, autopilot acts on them.
 package notify
 
