@@ -344,6 +344,16 @@ Win rule, fixed in advance: on a given failure, Ruptura warns earlier or with fe
 
 A tie on a steady memory leak is acceptable. On a loss, improve the recipe or state the result, and never present it as an advantage.
 
+First result, 2026-11-01, memory leak on the lab, 11 OOM over 6 hours, one lab with a linear synthetic leak. Script: `scripts/lab-eval/benchmark-predict-linear.sh`.
+
+| Tool | Caught at 10 min or more | Lead | Pods firing without a recorded OOM |
+|---|---|---|---|
+| `predict_linear`, 5m window, 30m horizon | 11 of 11 | 26 to 28 min, one cycle read 31 | 3 pods in `ruptura-h`, not yet classified |
+| `predict_linear`, 10m window, 20m horizon | 11 of 11 | 19 to 21 min, one cycle read 31 | 1 pod in `ruptura-h`, not yet classified |
+| Ruptura `78bf127`, 2 hours | 4 of 4 | 10, 20, 21, 21.1 min | 0 on the stable-web control, other workloads not scored |
+
+Reading: on a steady linear leak, a tuned `predict_linear` rule equals or beats Ruptura. This is a loss, not a tie, on this scenario. The two tests differ in length and false alarm scope, so a same-window run is still needed. Value must come from what a single rule cannot do. Next scenarios: stepped or irregular leak, sawtooth batch workload, restarts near the window, and failures that have no linear trend.
+
 ### Open
 
 README message, final list of pod and workload failures, and CI access.
