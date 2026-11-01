@@ -64,16 +64,70 @@ func scopeResult(result FailureResult, scope string) FailureResult {
 	return result
 }
 
-// Failures returns the known failures at the configured level.
+// ParseSelector reads "key=value,key=value". Entries without "=" are ignored.
+func ParseSelector(raw string) map[string]string {
+	if raw == "" {
+		return nil
+	}
+	selector := map[string]string{}
+	for _, entry := range strings.Split(raw, ",") {
+		if pair := strings.SplitN(entry, "=", 2); len(pair) == 2 {
+			selector[strings.TrimSpace(pair[0])] = strings.TrimSpace(pair[1])
+		}
+	}
+	return selector
+}
+
+// SetLevelSelector limits failure results to workloads with these labels.
+func (h *Handlers) SetLevelSelector(selector map[string]string) { h.levelSelector = selector }
+
+// selectFailures keeps results whose target has every selected label. A target
+// with unknown labels is left out, because it cannot be shown to match.
+func selectFailures(results []*FailureResult, selector map[string]string, labelsOf func(string) (map[string]string, bool)) []*FailureResult {
+	if len(selector) == 0 {
+		return results
+	}
+	kept := []*FailureResult{}
+	for _, result := range results {
+		labels, ok := labelsOf(result.Target)
+		if !ok {
+			continue
+		}
+		matches := true
+		for key, value := range selector {
+			matches = matches && labels[key] == value
+		}
+		if matches {
+			kept = append(kept, result)
+		}
+	}
+	return kept
+}
+
+func (h *Handlers) workloadLabels(target string) (map[string]string, bool) {
+	parts := strings.SplitN(target, "/", 3)
+	if h.discovery == nil || len(parts) != 3 {
+		return nil, false
+	}
+	meta, ok := h.discovery.GetWorkloadMeta(parts[0], parts[1], parts[2])
+	return meta.Labels, ok
+}
+
+// Failures returns the known failures selected and scoped by the configuration.
 func (h *Handlers) Failures() []*FailureResult {
 	results := []*FailureResult{}
 	for _, host := range h.buildFleet().Hosts {
 		if host.Failure != nil {
-			scoped := scopeResult(*host.Failure, h.levelScope)
-			results = append(results, &scoped)
+			results = append(results, host.Failure)
 		}
 	}
-	return results
+	selected := selectFailures(results, h.levelSelector, h.workloadLabels)
+	scoped := make([]*FailureResult, 0, len(selected))
+	for _, result := range selected {
+		copied := scopeResult(*result, h.levelScope)
+		scoped = append(scoped, &copied)
+	}
+	return scoped
 }
 
 func (h *Handlers) handleFailures(w http.ResponseWriter, _ *http.Request) {

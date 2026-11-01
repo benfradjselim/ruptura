@@ -57,6 +57,7 @@ type Handlers struct {
 	inputs InputCoverage
 	horizon time.Duration
 	levelScope string
+	levelSelector map[string]string
 }
 
 // SetDemoMode marks the server as running with synthetic demo data

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 )
@@ -413,6 +414,17 @@ func writeInvalidStatus(c *k8sClient, inst RupturaInstance, problem error) error
 	return c.patchStatus(path, status)
 }
 
+// selectorString renders labels in a stable order, so a Deployment is not
+// rewritten when nothing changed.
+func selectorString(labels map[string]string) string {
+	pairs := make([]string, 0, len(labels))
+	for key, value := range labels {
+		pairs = append(pairs, key+"="+value)
+	}
+	sort.Strings(pairs)
+	return strings.Join(pairs, ",")
+}
+
 func alertmanagerURLs(channels []AlertChannel) string {
 	urls := make([]string, 0, len(channels))
 	for _, channel := range channels {
@@ -427,6 +439,7 @@ func alertmanagerURLs(channels []AlertChannel) string {
 func configEnv(spec RupturaInstanceSpec) []EnvVar {
 	values := []EnvVar{
 		{Name: "RUPTURA_LEVEL_SCOPE", Value: spec.Level.Scope},
+		{Name: "RUPTURA_LEVEL_SELECTOR", Value: selectorString(spec.Level.Selector.MatchLabels)},
 		{Name: "RUPTURA_INPUT_PROFILE", Value: spec.Input.Profile},
 		{Name: "RUPTURA_SENSITIVITY", Value: spec.Analysis.Sensitivity},
 		{Name: "RUPTURA_HORIZON", Value: spec.Analysis.Horizon},

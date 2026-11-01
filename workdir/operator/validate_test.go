@@ -86,7 +86,7 @@ func TestReconcile_ConfigReachesTheEngine(t *testing.T) {
 	inst := RupturaInstance{
 		Metadata: ObjectMeta{Name: "ri", Namespace: "ruptura-system", Finalizers: []string{finalizer}},
 		Spec: RupturaInstanceSpec{
-			Level:    LevelConfig{Scope: "namespace"},
+			Level:    LevelConfig{Scope: "namespace", Selector: LabelSelector{MatchLabels: map[string]string{"tier": "db", "team": "shop"}}},
 			Input:    InputConfig{Profile: "minimal"},
 			Analysis: AnalysisConfig{Sensitivity: "conservative", Horizon: "45m"},
 			Logging:  LoggingConfig{Level: "debug"},

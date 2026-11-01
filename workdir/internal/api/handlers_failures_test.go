@@ -87,3 +87,52 @@ func TestScopeResult(t *testing.T) {
 		t.Errorf("a result without a pod must stay at workload level: %+v", got)
 	}
 }
+
+func TestParseSelector(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want map[string]string
+	}{
+		{"", nil},
+		{"team=shop", map[string]string{"team": "shop"}},
+		{"team=shop,tier=db", map[string]string{"team": "shop", "tier": "db"}},
+		{"broken", map[string]string{}},
+	}
+	for _, c := range cases {
+		got := ParseSelector(c.raw)
+		if len(got) != len(c.want) {
+			t.Errorf("%q: got %v", c.raw, got)
+		}
+		for k, v := range c.want {
+			if got[k] != v {
+				t.Errorf("%q: got %v", c.raw, got)
+			}
+		}
+	}
+}
+
+func TestSelectFailures(t *testing.T) {
+	results := []*FailureResult{{Target: "n/Deployment/a"}, {Target: "n/Deployment/b"}, {Target: "n/Deployment/unknown"}}
+	labels := map[string]map[string]string{
+		"n/Deployment/a": {"team": "shop", "tier": "web"},
+		"n/Deployment/b": {"team": "pay"},
+	}
+	lookup := func(target string) (map[string]string, bool) {
+		l, ok := labels[target]
+		return l, ok
+	}
+	cases := []struct {
+		name     string
+		selector map[string]string
+		want     int
+	}{
+		{"no selector keeps all", nil, 3},
+		{"match", map[string]string{"team": "shop"}, 1},
+		{"all labels must match", map[string]string{"team": "shop", "tier": "db"}, 0},
+	}
+	for _, c := range cases {
+		if got := selectFailures(results, c.selector, lookup); len(got) != c.want {
+			t.Errorf("%s: kept %d, want %d", c.name, len(got), c.want)
+		}
+	}
+}
