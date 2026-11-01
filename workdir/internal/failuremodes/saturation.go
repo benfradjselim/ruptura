@@ -88,9 +88,12 @@ func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, resta
 	return Estimate{Mode: ModeSaturation, ETF: etf, Confidence: agree, Usage: usage}, true
 }
 
+// minHalfRise is the share of the expected rise each half of the window must show.
+const minHalfRise = 0.2
+
 // sustained reports whether both halves of the window, split by time, rose by at
-// least half of what the full-window slope predicts. Net rise accepts a leak that
-// grows in steps, while a level shift or a spike fails because one half is flat.
+// least minHalfRise of what the full-window slope predicts. Net rise accepts a leak
+// that grows in steps, while a level shift or a spike fails because one half is flat.
 func sustained(points []point, slope float64) bool {
 	mid := points[0].at.Add(points[len(points)-1].at.Sub(points[0].at) / 2)
 	split := sort.Search(len(points), func(i int) bool { return points[i].at.After(mid) })
@@ -99,7 +102,7 @@ func sustained(points []point, slope float64) bool {
 	}
 	for _, half := range [][]point{points[:split], points[split:]} {
 		span := half[len(half)-1].at.Sub(half[0].at).Seconds()
-		if netRise(half) < slope*span/2 {
+		if netRise(half) < slope*span*minHalfRise {
 			return false
 		}
 	}

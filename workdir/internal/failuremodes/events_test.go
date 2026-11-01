@@ -64,6 +64,17 @@ func TestSaturation_Shapes(t *testing.T) {
 		return 0.1 + 0.075*float64(phase)
 	}
 	steady := func(minutes int) float64 { return 0.3 }
+	longPlateau := func(minutes int) float64 {
+		switch {
+		case minutes < 3:
+			return 0.19
+		case minutes < 6:
+			return 0.38
+		case minutes < 15:
+			return 0.57
+		}
+		return 0.76
+	}
 	cases := []struct {
 		name  string
 		usage func(int) float64
@@ -72,6 +83,7 @@ func TestSaturation_Shapes(t *testing.T) {
 		want  bool
 	}{
 		{"irregular step leak warns before the limit", stepLeak, 0, 22, true},
+		{"long plateau before the last steps warns early", longPlateau, 0, 16, true},
 		{"sawtooth stays silent once a drop was seen", sawtooth, 15, 180, false},
 		{"flat usage stays silent", steady, 0, 60, false},
 	}
