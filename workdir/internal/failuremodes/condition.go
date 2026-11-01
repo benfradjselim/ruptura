@@ -72,8 +72,11 @@ func (c *Condition) Observe(at time.Time, ratio float64) (Estimate, bool) {
 
 // urgency orders estimates: the smallest value is the most urgent.
 func (e Estimate) urgency() time.Duration {
-	if e.Mode == ModeCPUThrottling {
+	switch e.Mode {
+	case ModeCPUThrottling:
 		return conditionUrgencyETF
+	case ModeStartupStuck:
+		return startupStuckUrgency
 	}
 	return e.ETF
 }

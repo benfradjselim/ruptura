@@ -80,6 +80,9 @@ func applyCrashLoop(state string, risk float64, restarts int) (string, float64) 
 // applyEstimate raises a workload's state and risk from its time to failure.
 // It never lowers a state or a risk that is already higher.
 func applyEstimate(state string, risk float64, est failuremodes.Estimate) (string, float64) {
+	if est.Mode == failuremodes.ModeStartupStuck {
+		return "critical", math.Max(risk, crashLoopRisk)
+	}
 	if est.Mode == failuremodes.ModeCPUThrottling {
 		if state != "critical" {
 			state = "degraded"
@@ -100,6 +103,9 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate) (strin
 }
 
 func estimateHeadline(name string, est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeStartupStuck {
+		return fmt.Sprintf("%s cannot start: %s.", name, est.Reason)
+	}
 	if est.Mode == failuremodes.ModeCPUThrottling {
 		return fmt.Sprintf("%s is CPU throttled %d percent of the time.", name, int(math.Round(est.Usage*100)))
 	}
@@ -107,6 +113,9 @@ func estimateHeadline(name string, est failuremodes.Estimate) string {
 }
 
 func estimateAction(est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeStartupStuck {
+		return "Read the pod events and fix the " + est.Reason + " cause"
+	}
 	if est.Mode == failuremodes.ModeCPUThrottling {
 		return "Raise the CPU limit or reduce the workload's CPU demand"
 	}

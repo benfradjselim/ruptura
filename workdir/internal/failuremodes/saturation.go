@@ -29,6 +29,8 @@ type Estimate struct {
 	ETF        time.Duration
 	Confidence float64
 	Usage      float64
+	// Reason is the Kubernetes event reason behind a detected failure.
+	Reason string
 }
 
 type point struct {

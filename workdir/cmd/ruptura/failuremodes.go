@@ -78,5 +78,22 @@ func pollFailureModes(ctx context.Context, source *sources.Thanos, catalog sourc
 			tracker.Observe(workload, pod, now, reading.Usage, reading.Capacity, reading.Restarts)
 		}
 	}
+	observeWarningEvents(ctx, inf, tracker)
 	tracker.Prune(now.Add(-failureModePodTTL))
+}
+
+func observeWarningEvents(ctx context.Context, inf *discovery.Informer, tracker *failuremodes.Tracker) {
+	events, err := inf.ListWarningEvents(ctx)
+	if err != nil {
+		logger.Default.Warn("failure modes: list events failed", "err", err)
+		return
+	}
+	for _, event := range events {
+		kind, name, ok := inf.ResolvePodOwner(event.Namespace, event.Pod)
+		if !ok {
+			continue
+		}
+		workload := event.Namespace + "/" + kind + "/" + name
+		tracker.ObserveEvent(workload, event.Namespace+"/"+event.Pod, event.Reason, event.At)
+	}
 }

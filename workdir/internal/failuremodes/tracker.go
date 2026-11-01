@@ -25,6 +25,9 @@ type podState struct {
 	restarts     int
 	counted      bool
 	history      []time.Time
+
+	eventSeen   time.Time
+	eventReason string
 }
 
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
@@ -107,7 +110,7 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 			worst, found = est, true
 		}
 	}
-	for _, state := range t.pods {
+	for pod, state := range t.pods {
 		if state.workload != workload {
 			continue
 		}
@@ -116,6 +119,9 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 		}
 		if state.condValid && now.Sub(state.condSeen) <= estimateMaxAge {
 			consider(state.condEstimate)
+		}
+		if !state.eventSeen.IsZero() && now.Sub(state.eventSeen) <= startupEventMaxAge {
+			consider(Estimate{Mode: ModeStartupStuck, Pod: pod, Confidence: 1, Reason: state.eventReason})
 		}
 	}
 	return worst, found
@@ -145,7 +151,7 @@ func (t *Tracker) Prune(cutoff time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for pod, state := range t.pods {
-		if state.seen.Before(cutoff) && state.condSeen.Before(cutoff) {
+		if state.seen.Before(cutoff) && state.condSeen.Before(cutoff) && state.eventSeen.Before(cutoff) {
 			delete(t.pods, pod)
 		}
 	}
