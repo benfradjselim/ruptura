@@ -8,27 +8,31 @@ import (
 func TestTracker_StartupStuck(t *testing.T) {
 	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 	cases := []struct {
-		name   string
-		reason string
-		seenAt time.Time
-		now    time.Time
-		want   bool
+		name    string
+		reason  string
+		message string
+		seenAt  time.Time
+		now     time.Time
+		want    bool
+		wantWhy string
 	}{
-		{"mount failure", "FailedMount", start, start.Add(time.Minute), true},
-		{"scheduling failure", "FailedScheduling", start, start.Add(time.Minute), true},
-		{"image pull failure", "ErrImagePull", start, start.Add(time.Minute), true},
-		{"unrelated reason", "Unhealthy", start, start.Add(time.Minute), false},
-		{"event too old", "FailedMount", start, start.Add(startupEventMaxAge + time.Second), false},
+		{"mount failure", "FailedMount", "", start, start.Add(time.Minute), true, "FailedMount"},
+		{"scheduling failure", "FailedScheduling", "", start, start.Add(time.Minute), true, "FailedScheduling"},
+		{"image pull failure", "Failed", "Error: ErrImagePull", start, start.Add(time.Minute), true, "ImagePull"},
+		{"image backoff", "Failed", "Error: ImagePullBackOff", start, start.Add(time.Minute), true, "ImagePull"},
+		{"another Failed event", "Failed", "Error: failed to start", start, start.Add(time.Minute), false, ""},
+		{"unrelated reason", "Unhealthy", "", start, start.Add(time.Minute), false, ""},
+		{"event too old", "FailedMount", "", start, start.Add(startupEventMaxAge + time.Second), false, ""},
 	}
 	for _, c := range cases {
 		tr := NewTracker()
-		tr.ObserveEvent("w", "n/p", c.reason, c.seenAt)
+		tr.ObserveEvent("w", "n/p", c.reason, c.message, c.seenAt)
 		est, ok := tr.Worst("w", c.now)
 		if ok != c.want {
 			t.Errorf("%s: found = %v, want %v", c.name, ok, c.want)
 			continue
 		}
-		if ok && (est.Mode != ModeStartupStuck || est.Pod != "n/p" || est.Reason != c.reason) {
+		if ok && (est.Mode != ModeStartupStuck || est.Pod != "n/p" || est.Reason != c.wantWhy) {
 			t.Errorf("%s: estimate = %+v", c.name, est)
 		}
 	}
@@ -37,7 +41,7 @@ func TestTracker_StartupStuck(t *testing.T) {
 func TestTracker_PruneKeepsFreshEventState(t *testing.T) {
 	now := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 	tr := NewTracker()
-	tr.ObserveEvent("w", "n/p", "FailedMount", now)
+	tr.ObserveEvent("w", "n/p", "FailedMount", "", now)
 	tr.Prune(now.Add(-time.Minute))
 	if _, ok := tr.Worst("w", now); !ok {
 		t.Error("a fresh startup failure was pruned")

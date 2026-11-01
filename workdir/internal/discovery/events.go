@@ -16,12 +16,14 @@ type WarningEvent struct {
 	Namespace string
 	Pod       string
 	Reason    string
+	Message   string
 	At        time.Time
 }
 
 type eventList struct {
 	Items []struct {
 		Reason        string    `json:"reason"`
+		Message       string    `json:"message"`
 		LastTimestamp time.Time `json:"lastTimestamp"`
 		EventTime     time.Time `json:"eventTime"`
 		Series        struct {
@@ -56,6 +58,7 @@ func parseWarningEvents(body []byte) ([]WarningEvent, error) {
 			Namespace: item.InvolvedObject.Namespace,
 			Pod:       item.InvolvedObject.Name,
 			Reason:    item.Reason,
+			Message:   item.Message,
 			At:        at,
 		})
 	}

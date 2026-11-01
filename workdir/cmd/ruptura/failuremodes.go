@@ -94,6 +94,6 @@ func observeWarningEvents(ctx context.Context, inf *discovery.Informer, tracker 
 			continue
 		}
 		workload := event.Namespace + "/" + kind + "/" + name
-		tracker.ObserveEvent(workload, event.Namespace+"/"+event.Pod, event.Reason, event.At)
+		tracker.ObserveEvent(workload, event.Namespace+"/"+event.Pod, event.Reason, event.Message, event.At)
 	}
 }

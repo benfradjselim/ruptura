@@ -1,6 +1,9 @@
 package failuremodes
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // ModeStartupStuck is a pod that cannot start. It is detected, not predicted.
 const ModeStartupStuck Mode = "startup_stuck"
@@ -16,16 +19,30 @@ var startupFailureReasons = map[string]bool{
 	"FailedAttachVolume":     true,
 	"FailedScheduling":       true,
 	"FailedCreatePodSandBox": true,
-	"ErrImagePull":           true,
-	"ImagePullBackOff":       true,
 	"InvalidImageName":       true,
 	"FailedCreate":           true,
 }
 
+// imagePullReason names image failures, which Kubernetes reports with the generic
+// reason Failed and details in the message.
+const imagePullReason = "ImagePull"
+
+// startupFailure returns the cause of an event that blocks a start.
+func startupFailure(reason, message string) (string, bool) {
+	if startupFailureReasons[reason] {
+		return reason, true
+	}
+	if reason == "Failed" && (strings.Contains(message, "ErrImagePull") || strings.Contains(message, "ImagePullBackOff")) {
+		return imagePullReason, true
+	}
+	return "", false
+}
+
 // ObserveEvent records a Kubernetes warning event for a pod of workload.
 // Reasons that do not block a start are ignored.
-func (t *Tracker) ObserveEvent(workload, pod, reason string, at time.Time) {
-	if !startupFailureReasons[reason] {
+func (t *Tracker) ObserveEvent(workload, pod, reason, message string, at time.Time) {
+	cause, ok := startupFailure(reason, message)
+	if !ok {
 		return
 	}
 	t.mu.Lock()
@@ -33,6 +50,6 @@ func (t *Tracker) ObserveEvent(workload, pod, reason string, at time.Time) {
 	state := t.podLocked(workload, pod)
 	if at.After(state.eventSeen) {
 		state.eventSeen = at
-		state.eventReason = reason
+		state.eventReason = cause
 	}
 }
