@@ -200,9 +200,10 @@ Constraint: learned weights need labelled failures. Until the library exists, us
 | 5 | Risk and state built on proven signals | FRI agrees across API endpoints |
 | 6 | Docs, tests, API contract | A new contributor runs and scores the engine from the docs |
 
-## Open decisions for the owner
+## Owner decisions, 2026-11-01
 
-1. Keep the current signal names in the API, or rename them to plain terms. Names are public, so a change needs a version plan.
-2. Scope for the Summit on 2026-11-24. Phases 1 and 2 look feasible. Phase 4 depends on how many faults are recorded.
-3. Whether traces become a recommended input, since contagion and internal traffic need them.
-4. Edition boundary for pipelines. `CLAUDE.md` says the community edition is frozen at the v7.0.25 feature set, which conflicts with adding `RupturaPipeline` there.
+1. Signal names stay in the API for signals that pass the evidence test. Any rename needs a version plan.
+2. Summit scope on 2026-11-24: a simple `RupturaPipeline`, honest missing data, a few failures predicted with evidence. The rest is roadmap.
+3. Traces are a recommended input.
+4. Edition: basic configuration goes in community, automatic actions stay in Autopilot. This updates the frozen feature set note in `CLAUDE.md`.
+5. Surface reduction is approved in principle, one component at a time, with each removal stated.
