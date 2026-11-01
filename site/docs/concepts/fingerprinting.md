@@ -1,6 +1,6 @@
 # Rupture Fingerprinting & Business Signals
 
-Two intelligence layers added in v6.4 that turn raw rupture data into institutional memory and business context.
+Two intelligence layers that turn raw rupture data into institutional memory and business context.
 
 ---
 

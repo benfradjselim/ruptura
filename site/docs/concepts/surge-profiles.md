@@ -1,6 +1,6 @@
 # Adaptive Ensemble (Surge Profiles)
 
-Ruptura v6.1 introduces **adaptive ensemble weighting** — the engine continuously learns which prediction model fits your infrastructure's traffic patterns best, and shifts weight toward it automatically.
+Ruptura uses **adaptive ensemble weighting** — the engine continuously learns which prediction model fits your infrastructure's traffic patterns best, and shifts weight toward it automatically.
 
 ## The five models
 

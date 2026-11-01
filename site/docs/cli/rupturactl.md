@@ -249,7 +249,7 @@ ruptura-ctl health -o json
 Example output:
 
 ```
-Server:   ruptura v6.8.13 (community)
+Server:   ruptura v8.2.3 (community)
 Uptime:   14h32m
 Status:   ok
 

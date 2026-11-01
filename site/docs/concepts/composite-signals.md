@@ -158,7 +158,7 @@ Default weights: `stress=0.25, fatigue=0.20, mood=0.20, pressure=0.15, humidity=
 
 Additive-penalty model. A single high signal degrades the score proportionally — it does not collapse the score the way a multiplicative model would. Below 60 indicates a workload needing attention.
 
-Weights are configurable per workload or namespace (v6.6.0+). See [Signal Weight Configuration](../api/reference.md#signal-weight-configuration) for the API reference and Helm `workloadWeights` for static bootstrap config.
+Weights are configurable per workload or namespace. See [Signal Weight Configuration](../api/reference.md#signal-weight-configuration) for the API reference and Helm `workloadWeights` for static bootstrap config.
 
 | health_score | State |
 |-------------|-------|

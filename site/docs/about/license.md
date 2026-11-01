@@ -31,4 +31,4 @@ limitations under the License.
 
 The Apache 2.0 license is compatible with most open-source and commercial use cases. SDKs (`sdk/go`, `sdk/python`) are also Apache 2.0.
 
-Full license text: [LICENSE](https://github.com/benfradjselim/ruptura/blob/v6.1/LICENSE)
+Full license text: [LICENSE](https://github.com/benfradjselim/ruptura/blob/main/LICENSE)
