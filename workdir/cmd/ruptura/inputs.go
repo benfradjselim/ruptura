@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/internal/normalize"
 	"github.com/benfradjselim/ruptura/internal/sources"
 	"github.com/benfradjselim/ruptura/pkg/logger"
@@ -14,6 +16,8 @@ import (
 const (
 	inputPollInterval = time.Minute
 	inputProfileEnv   = "RUPTURA_INPUT_PROFILE"
+
+	replicasUnavailableRole = "replicas.unavailable"
 )
 
 var inputLevels = []string{"pod", "workload"}
@@ -57,6 +61,24 @@ func (c *inputCollector) collect(ctx context.Context, source *sources.Thanos, ca
 	c.frames = frames
 }
 
+// observeReplicas feeds workload frames to the tracker. A frame without the role
+// is skipped, because an absent reading says nothing about the replicas.
+func (c *inputCollector) observeReplicas(tracker *failuremodes.Tracker, now time.Time) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, frame := range c.frames["workload"] {
+		missing, ok := frame.Values[replicasUnavailableRole]
+		if !ok {
+			continue
+		}
+		parts := strings.SplitN(frame.Target, "/", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		tracker.ObserveReplicas(parts[0]+"/Deployment/"+parts[1], int(missing), now)
+	}
+}
+
 // inputProfile returns the configured profile, standard by default.
 func inputProfile() string {
 	if profile := os.Getenv(inputProfileEnv); profile != "" {
@@ -66,7 +88,7 @@ func inputProfile() string {
 }
 
 // startInputs polls the catalog roles. It returns nil without a Thanos endpoint.
-func startInputs(ctx context.Context, url string) *inputCollector {
+func startInputs(ctx context.Context, url string, tracker *failuremodes.Tracker) *inputCollector {
 	if url == "" {
 		return nil
 	}
@@ -87,6 +109,9 @@ func startInputs(ctx context.Context, url string) *inputCollector {
 		defer ticker.Stop()
 		for {
 			collector.collect(ctx, source, catalog, profile)
+			if tracker != nil {
+				collector.observeReplicas(tracker, time.Now())
+			}
 			select {
 			case <-ctx.Done():
 				return

@@ -33,12 +33,15 @@ type podState struct {
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
 // concurrent use.
 type Tracker struct {
-	mu   sync.RWMutex
-	pods map[string]*podState
+	mu       sync.RWMutex
+	pods     map[string]*podState
+	replicas map[string]replicaState
 }
 
 // NewTracker returns an empty tracker.
-func NewTracker() *Tracker { return &Tracker{pods: make(map[string]*podState)} }
+func NewTracker() *Tracker {
+	return &Tracker{pods: make(map[string]*podState), replicas: make(map[string]replicaState)}
+}
 
 func (s *podState) recordRestarts(at time.Time, restarts int) {
 	if s.counted && restarts > s.restarts {
@@ -123,6 +126,9 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 		if !state.eventSeen.IsZero() && now.Sub(state.eventSeen) <= startupEventMaxAge {
 			consider(Estimate{Mode: ModeStartupStuck, Pod: pod, Confidence: 1, Reason: state.eventReason})
 		}
+	}
+	if est, ok := t.replicaEstimate(workload, now); ok {
+		consider(est)
 	}
 	return worst, found
 }

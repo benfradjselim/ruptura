@@ -77,6 +77,8 @@ func (e Estimate) urgency() time.Duration {
 		return conditionUrgencyETF
 	case ModeStartupStuck:
 		return startupStuckUrgency
+	case ModeReplicasUnavailable:
+		return replicasUrgency
 	}
 	return e.ETF
 }

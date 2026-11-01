@@ -83,7 +83,7 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate) (strin
 	if est.Mode == failuremodes.ModeStartupStuck {
 		return "critical", math.Max(risk, crashLoopRisk)
 	}
-	if est.Mode == failuremodes.ModeCPUThrottling {
+	if est.Mode == failuremodes.ModeReplicasUnavailable || est.Mode == failuremodes.ModeCPUThrottling {
 		if state != "critical" {
 			state = "degraded"
 		}
@@ -103,6 +103,9 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate) (strin
 }
 
 func estimateHeadline(name string, est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeReplicasUnavailable {
+		return fmt.Sprintf("%s is missing %d replicas.", name, int(est.Usage))
+	}
 	if est.Mode == failuremodes.ModeStartupStuck {
 		return fmt.Sprintf("%s cannot start: %s.", name, est.Reason)
 	}
@@ -113,6 +116,9 @@ func estimateHeadline(name string, est failuremodes.Estimate) string {
 }
 
 func estimateAction(est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeReplicasUnavailable {
+		return "Check why the missing pods are not ready"
+	}
 	if est.Mode == failuremodes.ModeStartupStuck {
 		return "Read the pod events and fix the " + est.Reason + " cause"
 	}

@@ -493,11 +493,12 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		handlers.SetDiscovery(inf)
 	}
 	handlers.SetInfraRegistry(infraRegistry)
-	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL")); inputs != nil {
-		handlers.SetInputs(inputs)
-	}
-	if tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf); tracker != nil {
+	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf)
+	if tracker != nil {
 		handlers.SetFailureModes(tracker)
+	}
+	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker); inputs != nil {
+		handlers.SetInputs(inputs)
 	}
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)
