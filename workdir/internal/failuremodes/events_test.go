@@ -43,3 +43,50 @@ func TestTracker_PruneKeepsFreshEventState(t *testing.T) {
 		t.Error("a fresh startup failure was pruned")
 	}
 }
+
+func TestSaturation_Shapes(t *testing.T) {
+	const step = 30 * time.Second
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	stepLeak := func(minutes int) float64 {
+		level, elapsed, pause := 0.1, 0, 3
+		for elapsed+pause <= minutes {
+			elapsed += pause
+			level += 0.19
+			pause = 3 + (pause % 9)
+		}
+		return level
+	}
+	sawtooth := func(minutes int) float64 {
+		phase := minutes % 12
+		if phase >= 10 {
+			return 0.1
+		}
+		return 0.1 + 0.075*float64(phase)
+	}
+	steady := func(minutes int) float64 { return 0.3 }
+	cases := []struct {
+		name  string
+		usage func(int) float64
+		from  int
+		until int
+		want  bool
+	}{
+		{"irregular step leak warns before the limit", stepLeak, 0, 22, true},
+		{"sawtooth stays silent once a drop was seen", sawtooth, 15, 180, false},
+		{"flat usage stays silent", steady, 0, 60, false},
+	}
+	for _, c := range cases {
+		s := NewSaturation()
+		warned := false
+		for i := 0; i < c.until*2; i++ {
+			at := start.Add(time.Duration(i) * step)
+			minutes := i / 2
+			if _, ok := s.Observe(at, c.usage(minutes)*100, 100, 0); ok && minutes >= c.from {
+				warned = true
+			}
+		}
+		if warned != c.want {
+			t.Errorf("%s: warned = %v, want %v", c.name, warned, c.want)
+		}
+	}
+}

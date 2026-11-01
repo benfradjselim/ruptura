@@ -13,7 +13,7 @@ type Mode string
 const ModeSaturation Mode = "saturation"
 
 const (
-	saturationWindow      = 20 * time.Minute
+	saturationWindow      = 30 * time.Minute
 	saturationMinSamples  = 5
 	saturationMaxSamples  = 120
 	saturationMinAgreeing = 0.8
@@ -88,9 +88,9 @@ func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, resta
 	return Estimate{Mode: ModeSaturation, ETF: etf, Confidence: agree, Usage: usage}, true
 }
 
-// sustained reports whether both halves of the window, split by time, show a
-// slope of at least half the full-window slope. A level shift or a transient
-// spike fails because one half of the window is flat.
+// sustained reports whether both halves of the window, split by time, rose by at
+// least half of what the full-window slope predicts. Net rise accepts a leak that
+// grows in steps, while a level shift or a spike fails because one half is flat.
 func sustained(points []point, slope float64) bool {
 	mid := points[0].at.Add(points[len(points)-1].at.Sub(points[0].at) / 2)
 	split := sort.Search(len(points), func(i int) bool { return points[i].at.After(mid) })
@@ -98,15 +98,35 @@ func sustained(points []point, slope float64) bool {
 		return false
 	}
 	for _, half := range [][]point{points[:split], points[split:]} {
-		if hs, _ := theilSen(half); hs < slope/2 {
+		span := half[len(half)-1].at.Sub(half[0].at).Seconds()
+		if netRise(half) < slope*span/2 {
 			return false
 		}
 	}
 	return true
 }
 
+// netRise compares the average of the last and first samples of a range, so that
+// one noisy sample does not decide the result.
+func netRise(points []point) float64 {
+	edge := len(points) / 4
+	if edge < 1 {
+		edge = 1
+	}
+	return average(points[len(points)-edge:]) - average(points[:edge])
+}
+
+func average(points []point) float64 {
+	sum := 0.0
+	for _, p := range points {
+		sum += p.usage
+	}
+	return sum / float64(len(points))
+}
+
 // theilSen returns the median pairwise slope in usage per second and the
-// fraction of pairs whose slope has the same sign as the median.
+// fraction of changing pairs that rise. Flat pairs are ignored, because a leak
+// that grows in steps has long plateaus.
 func theilSen(points []point) (float64, float64) {
 	var slopes []float64
 	for i := 0; i < len(points); i++ {
@@ -125,11 +145,17 @@ func theilSen(points []point) (float64, float64) {
 	if len(slopes)%2 == 0 {
 		median = (slopes[len(slopes)/2-1] + slopes[len(slopes)/2]) / 2
 	}
-	positive := 0
+	positive, changing := 0, 0
 	for _, v := range slopes {
+		if v != 0 {
+			changing++
+		}
 		if v > 0 {
 			positive++
 		}
 	}
-	return median, float64(positive) / float64(len(slopes))
+	if changing == 0 {
+		return median, 0
+	}
+	return median, float64(positive) / float64(changing)
 }
