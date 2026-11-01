@@ -8,8 +8,9 @@ import (
 // ModeStartupStuck is a pod that cannot start. It is detected, not predicted.
 const ModeStartupStuck Mode = "startup_stuck"
 
-// startupEventMaxAge is how long a startup failure event stays valid.
-const startupEventMaxAge = 5 * time.Minute
+// startupEventMaxAge is how long a startup failure event stays valid. Kubernetes
+// repeats these events every few minutes, up to its 5 minute back-off.
+const startupEventMaxAge = 10 * time.Minute
 
 // startupStuckUrgency ranks a pod that cannot start as already failing.
 const startupStuckUrgency = time.Minute
