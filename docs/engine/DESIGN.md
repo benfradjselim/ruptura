@@ -225,15 +225,117 @@ Constraints:
 2. Data differs by level. Calls between containers need eBPF or a mesh, services need traces.
 3. Evidence is per level. A level without proven prediction reports conditions and anomaly detection only, and `status` says so.
 
-### Status of the remaining discussion
+### Signals and recipes
 
-Open: definition of each signal per level, README message, plan of the phases around the operator and CRD.
+Agreed with the owner, 2026-11-01.
 
-Proposed Summit scope, to confirm: `Deployment` and `StatefulSet`, levels pod, workload and namespace, profiles `minimal` and `standard`, alerting, node contagion as the demonstration.
+Metrics are ingredients, signals are transformed ingredients, the engine is the pot, and the failure result is the dish. The user never sees a formula.
+
+A shared vocabulary keeps one meaning at every level, and each level has its own recipe:
+
+| Signal | Meaning |
+|---|---|
+| `stress` | Under strain now |
+| `fatigue` | Under strain for too long |
+| `pressure` | Quality of service is degrading |
+| `entropy` | Behaviour became unstable |
+| `contagion` | Spreads a problem or suffers from one |
+| `resilience` | Recovers well, or less and less well |
+
+Some signals exist at one level only, such as post-deploy regression at workload level or quota headroom at namespace level. `mood` and `humidity` are candidates to merge, `throughput` is a candidate workload signal. These are opinions until measured.
+
+Each signal has one card per level: question, ingredients with the required minimum, baseline from the element's own history, failure it announces, measured score, verdict. A signal without proof does not exist at that level.
+
+### Scope and release rule
+
+Coverage of every failure is impossible, so the scope is closed per version.
+
+1. Each level targets 5 failures. A version lists its failures in advance, and is done when they are proven, not when everything is covered.
+2. Exit criteria are written in advance: detection rate, lead time, false alarms.
+3. A new failure is a new recipe in the catalog, without changing the engine.
+4. Failures are chosen by frequency in real clusters. Rare cases wait.
+5. Fewer failures fully proven are better than many partly proven.
+
+Three outcomes only:
+
+| Case | Output |
+|---|---|
+| Known failure | Failure name, estimated time, evidence |
+| Abnormal behaviour | Signal state and moving metrics, no invented cause |
+| Out of scope | `unavailable` |
+
+Each failure is labelled predicted or detected, because some can only be detected. Lead time is reported separately.
+
+Candidates, ordered by assumed frequency, to confirm:
+
+| Level | Failures |
+|---|---|
+| pod | Memory saturation, crash loop, CPU throttling, startup stuck, local disk full |
+| workload | Replicas unavailable, rollout stuck, post-deploy regression, traffic drop, error rise |
+| namespace | Memory quota, CPU quota, volume full, object quota, secret or certificate expiry |
+| node | Memory pressure, disk pressure, noisy neighbour, `NotReady`, pod capacity |
+| cluster | Capacity shortage, slow etcd, API server overload, certificate expiry, degraded operator |
+
+Output is a structured result, not a sentence:
+
+```yaml
+level: workload
+target: shop/orders
+failureMode: memorySaturation
+state: critical
+etaSeconds: 720
+confidence: 0.85
+evidence:
+  - metric: memory_working_set_bytes
+    value: 91% of limit
+    trend: +2%/min
+recommendedAction: raise the memory limit
+```
+
+`confidence` must come from measurements. The UI and notifications are built from this result.
+
+### Versions
+
+| Version | Content | Done when |
+|---|---|---|
+| Summit, 2026-11-24 | CRD and operator, 5 pod failures, 2 or 3 workload failures | Exit criteria met on the lab |
+| Next | Complete workload, add node | 5 proven per level |
+| Later | Namespace, then cluster | 5 proven per level |
+
+The schema and catalog cover all levels from the start. Node contagion moves to the next version.
+
+### Logs and events
+
+Metrics and Kubernetes Events are the base input. Logs are an optional ingredient, used to confirm and explain, and no recipe may depend on them.
+
+Formats are not parsed per tool. OTLP is the single entry point, and the user's collector normalizes. Read adapters such as Loki or Elasticsearch can come later through `input.sources`.
+
+Kubernetes Events come first: structured, identical across clusters, and they need no collector. Examples: `FailedMount`, `BackOff`, `FailedScheduling`, `Evicted`, `Unhealthy`.
+
+Logs yield indicators, not text understanding. Order: error rate and bursts, then known patterns, then new patterns if they prove their value. A log without severity makes the indicator `unavailable`.
+
+| Version | Inputs |
+|---|---|
+| Summit | Metrics and Kubernetes Events |
+| Next | Logs through OTLP, error rate and bursts, gain measured |
+| Later | Known and new patterns, if proven |
+
+```yaml
+input:
+  profile: standard
+  sources:
+    - prometheus: {url: https://thanos-querier.openshift-monitoring.svc:9091}
+    - kubernetesEvents: {enabled: true}
+    - otlp: {signals: [metrics, logs, traces]}
+```
+
+### Open
+
+README message, and the plan of phases around the operator and CRD.
 
 ## Evidence protocol
 
-1. Fault library: reproducible faults on the lab, recorded with labels. Start with memory leak, crash loop, CPU starvation, disk full, dependency down, HTTP error burst, slow dependency, node pressure.
+1. Fault library: reproducible faults on the lab, recorded with labels, starting with the failures of the current version.
 2. Replay: extend `internal/replay` so any signal is scored on recordings.
 3. Score: detection rate, lead time, false alarms on healthy workloads, and gain against the simplest baseline.
 4. Decision: keep, change or delete the signal. The result goes in this file.
@@ -256,7 +358,7 @@ Constraint: learned weights need labelled failures. Until the library exists, us
 ## Owner decisions, 2026-11-01
 
 1. Signal names stay in the API for signals that pass the evidence test. Any rename needs a version plan.
-2. Summit scope on 2026-11-24: a simple `RupturaInstance` configuration, honest missing data, a few failures predicted with evidence. The rest is roadmap.
+2. Summit scope on 2026-11-24: see Versions. The rest is roadmap.
 3. Traces are a recommended input.
 4. Edition: basic configuration goes in community, automatic actions stay in Autopilot. This updates the frozen feature set note in `CLAUDE.md`.
 5. Surface reduction is approved in principle, one component at a time, with each removal stated.
