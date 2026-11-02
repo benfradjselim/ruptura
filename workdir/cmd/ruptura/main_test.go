@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/benfradjselim/ruptura/internal/normalize"
 	"net"
 	"net/http"
 	"syscall"
@@ -296,7 +297,6 @@ func TestRun_SIGTERM(t *testing.T) {
 	}
 }
 
-
 func TestMapToAnalyzerSignals_PrefersLimitUtilization(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -352,6 +352,25 @@ func TestPublishedRuptureIndex(t *testing.T) {
 	for _, c := range cases {
 		if got := publishedRuptureIndex(c.raw, c.failureModes); got != c.want {
 			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestReplicaGaps(t *testing.T) {
+	frames := []normalize.Frame{
+		{Target: "n/web", Values: map[string]float64{replicasUnavailableRole: 2}},
+		{Target: "n/db", Values: map[string]float64{"replicas.unavailable.statefulset": 1}},
+		{Target: "n/agent", Values: map[string]float64{"replicas.unavailable.daemonset": 0}},
+		{Target: "n/other", Values: map[string]float64{"rollout.stalled": 1}},
+	}
+	want := map[string]int{"n/Deployment/web": 2, "n/StatefulSet/db": 1, "n/DaemonSet/agent": 0}
+	got := replicaGaps(frames)
+	if len(got) != len(want) {
+		t.Fatalf("gaps = %+v", got)
+	}
+	for _, gap := range got {
+		if want[gap.workload] != gap.missing {
+			t.Errorf("%s = %d, want %d", gap.workload, gap.missing, want[gap.workload])
 		}
 	}
 }

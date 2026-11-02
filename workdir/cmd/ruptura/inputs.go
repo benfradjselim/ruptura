@@ -64,21 +64,42 @@ func (c *inputCollector) collect(ctx context.Context, source *sources.Thanos, ca
 	c.frames = frames
 }
 
-// observeReplicas feeds workload frames to the tracker. A frame without the role
+// replicaRoles maps each role to the workload kind it describes.
+var replicaRoles = map[string]string{
+	replicasUnavailableRole:            "Deployment",
+	"replicas.unavailable.statefulset": "StatefulSet",
+	"replicas.unavailable.daemonset":   "DaemonSet",
+}
+
+type replicaGap struct {
+	workload string
+	missing  int
+}
+
+// replicaGaps reads the unavailable replicas of each frame. A frame without a role
 // is skipped, because an absent reading says nothing about the replicas.
-func (c *inputCollector) observeReplicas(tracker *failuremodes.Tracker, now time.Time) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, frame := range c.frames["workload"] {
-		missing, ok := frame.Values[replicasUnavailableRole]
-		if !ok {
-			continue
-		}
+func replicaGaps(frames []normalize.Frame) []replicaGap {
+	var gaps []replicaGap
+	for _, frame := range frames {
 		parts := strings.SplitN(frame.Target, "/", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		tracker.ObserveReplicas(parts[0]+"/Deployment/"+parts[1], int(missing), now)
+		for role, kind := range replicaRoles {
+			if missing, ok := frame.Values[role]; ok {
+				gaps = append(gaps, replicaGap{parts[0] + "/" + kind + "/" + parts[1], int(missing)})
+			}
+		}
+	}
+	return gaps
+}
+
+// observeReplicas feeds workload frames to the tracker.
+func (c *inputCollector) observeReplicas(tracker *failuremodes.Tracker, now time.Time) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, gap := range replicaGaps(c.frames["workload"]) {
+		tracker.ObserveReplicas(gap.workload, gap.missing, now)
 	}
 }
 
