@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/analyzer"
+	"github.com/benfradjselim/ruptura/internal/discovery"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/pkg/models"
 )
@@ -189,5 +190,36 @@ func TestEstimateAction_RecurrentFailure(t *testing.T) {
 	}
 	if got := estimateHeadline("w", est); got != "w fails about every 31 minutes." {
 		t.Errorf("headline = %q", got)
+	}
+}
+
+func TestTimelineEvents(t *testing.T) {
+	now := time.Date(2026, 11, 2, 1, 0, 0, 0, time.UTC)
+	failures := map[string][]time.Time{"n/Deployment/a": {now.Add(-5 * time.Minute)}}
+	changes := []discovery.Change{{Workload: "n/Deployment/a", Image: "app:2", At: now.Add(-20 * time.Minute)}}
+	got := timelineEvents(failures, changes, now)
+	if len(got) != 2 {
+		t.Fatalf("events = %+v", got)
+	}
+	if got[0].Type != "change" || got[0].MinutesAgo != 20 || got[0].Detail != "app:2" {
+		t.Errorf("first = %+v", got[0])
+	}
+	if got[1].Type != "failure" || got[1].MinutesAgo != 5 {
+		t.Errorf("second = %+v", got[1])
+	}
+}
+
+func TestChangeEvidence(t *testing.T) {
+	now := time.Date(2026, 11, 2, 1, 0, 0, 0, time.UTC)
+	changes := []discovery.Change{
+		{Workload: "w", Image: "app:1", At: now.Add(-3 * time.Hour)},
+		{Workload: "w", Image: "app:2", At: now.Add(-12 * time.Minute)},
+		{Workload: "x", Image: "z", At: now.Add(-time.Minute)},
+	}
+	if got := changeEvidence("w", changes, now); got != "Changed 12 min ago: app:2" {
+		t.Errorf("evidence = %q", got)
+	}
+	if got := changeEvidence("none", changes, now); got != "" {
+		t.Errorf("evidence = %q", got)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // k8sWorkload is the rich parsed shape of a Deployment/StatefulSet/DaemonSet.
@@ -16,6 +17,7 @@ type k8sWorkload struct {
 		Labels            map[string]string `json:"labels"`
 		CreationTimestamp string            `json:"creationTimestamp"`
 		ResourceVersion   string            `json:"resourceVersion"`
+		Generation        int64             `json:"generation"`
 	} `json:"metadata"`
 	Spec struct {
 		Replicas int `json:"replicas"`
@@ -63,7 +65,7 @@ type k8sPod struct {
 		NodeName string `json:"nodeName"`
 	} `json:"spec"`
 	Status struct {
-		Phase            string `json:"phase"`
+		Phase             string `json:"phase"`
 		ContainerStatuses []struct {
 			RestartCount int `json:"restartCount"`
 		} `json:"containerStatuses"`
@@ -111,6 +113,7 @@ func toWorkloadMeta(w k8sWorkload, kind string) WorkloadMeta {
 			Ready:     w.Status.ReadyReplicas,
 			Available: w.Status.AvailableReplicas,
 		},
+		Generation: w.Metadata.Generation,
 		LastDeploy: w.Metadata.CreationTimestamp,
 	}
 
@@ -221,7 +224,9 @@ func (inf *Informer) watchWorkloads(ctx context.Context, path, kind, rv string) 
 		}
 		switch ev.Type {
 		case "ADDED", "MODIFIED":
-			inf.cache.setWorkload(m.Metadata.Namespace, kind, m.Metadata.Name, toWorkloadMeta(m, kind))
+			meta := toWorkloadMeta(m, kind)
+			inf.cache.recordChange(m.Metadata.Namespace, kind, m.Metadata.Name, meta.Image, meta.Generation, time.Now())
+			inf.cache.setWorkload(m.Metadata.Namespace, kind, m.Metadata.Name, meta)
 		case "DELETED":
 			inf.cache.deleteWorkload(m.Metadata.Namespace, kind, m.Metadata.Name)
 		}

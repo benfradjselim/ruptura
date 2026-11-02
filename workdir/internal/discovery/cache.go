@@ -14,6 +14,7 @@ type WorkloadMeta struct {
 	Image      string            `json:"image"`
 	Resources  ResourceInfo      `json:"resources"`
 	Labels     map[string]string `json:"labels"`
+	Generation int64             `json:"generation,omitempty"`
 	LastDeploy string            `json:"last_deploy"` // RFC3339, empty when unknown
 	Pods       []PodInfo         `json:"pods"`
 }
@@ -57,7 +58,8 @@ type cachedPod struct {
 type MetadataCache struct {
 	mu        sync.RWMutex
 	workloads map[string]*WorkloadMeta // key: "namespace/kind/name"
-	pods      []cachedPod              // all known pods across namespaces
+	changes   []Change
+	pods      []cachedPod // all known pods across namespaces
 }
 
 func newMetadataCache() *MetadataCache {

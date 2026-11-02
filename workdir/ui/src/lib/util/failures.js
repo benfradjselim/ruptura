@@ -29,5 +29,13 @@ export function measuredSignal(workload, key, value) {
 
 export function horizonPlacement(failure, horizonSeconds) {
   const seconds = failure.etaSeconds || 0
-  return { position: Math.min(100, (seconds / horizonSeconds) * 100), beyond: seconds > horizonSeconds }
+  return { position: 50 + Math.min(50, (seconds / horizonSeconds) * 50), beyond: seconds > horizonSeconds }
+}
+
+export function pastPlacement(minutesAgo, windowMinutes) {
+  return Math.max(0, 50 - (minutesAgo / windowMinutes) * 50)
+}
+
+export function relatedEvents(events, target) {
+  return events.filter(event => event.target === target).sort((a, b) => a.minutesAgo - b.minutesAgo)
 }

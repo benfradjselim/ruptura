@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal, horizonPlacement } from './failures.js'
+import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal, horizonPlacement, pastPlacement, relatedEvents } from './failures.js'
 
 describe('formatEta', () => {
   it.each([
@@ -66,12 +66,35 @@ describe('measuredSignal', () => {
 })
 
 describe('horizonPlacement', () => {
-  it('places detected failures at now and forecasts on the axis', () => {
-    expect(horizonPlacement({}, 1800)).toEqual({ position: 0, beyond: false })
-    expect(horizonPlacement({ etaSeconds: 900 }, 1800)).toEqual({ position: 50, beyond: false })
+  it('places detected failures at now, the middle of the axis', () => {
+    expect(horizonPlacement({}, 1800)).toEqual({ position: 50, beyond: false })
+  })
+
+  it('places forecasts on the future half', () => {
+    expect(horizonPlacement({ etaSeconds: 900 }, 1800)).toEqual({ position: 75, beyond: false })
   })
 
   it('holds a later failure at the edge', () => {
     expect(horizonPlacement({ etaSeconds: 3600 }, 1800)).toEqual({ position: 100, beyond: true })
+  })
+})
+
+describe('pastPlacement', () => {
+  it('places past events on the first half', () => {
+    expect(pastPlacement(0, 30)).toBe(50)
+    expect(pastPlacement(15, 30)).toBe(25)
+    expect(pastPlacement(30, 30)).toBe(0)
+    expect(pastPlacement(45, 30)).toBe(0)
+  })
+})
+
+describe('relatedEvents', () => {
+  it('keeps events of one target, newest first', () => {
+    const events = [
+      { target: 'a', minutesAgo: 20 },
+      { target: 'b', minutesAgo: 5 },
+      { target: 'a', minutesAgo: 3 },
+    ]
+    expect(relatedEvents(events, 'a').map(e => e.minutesAgo)).toEqual([3, 20])
   })
 })
