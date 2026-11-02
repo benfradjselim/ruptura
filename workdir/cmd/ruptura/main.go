@@ -194,6 +194,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	ingestEngine.SetLogStore(store)
 	logPipelineEng := pipelinelogs.NewEngine(pipelineEngine)
 	ingestEngine.SetLogPipeline(logPipelineEng)
+	failureModesEnabled := os.Getenv("RUPTURA_THANOS_URL") != ""
 	analyzerEngine := analyzer.NewAnalyzer()
 	analyzerEngine.SetTopology(topoBuilder)
 	if raw := os.Getenv("RUPTURA_WORKLOAD_WEIGHTS"); raw != "" {
@@ -358,7 +359,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					// Annotate snapshot with current FusedR before persisting.
 					var fusedR float64
 					if fr, _, err := fusionEngine.FusedR(host); err == nil {
-						fusedR = fr
+						fusedR = publishedRuptureIndex(fr, failureModesEnabled)
 						snap.FusedRuptureIndex = fusedR
 					}
 
@@ -615,6 +616,15 @@ func pickPrimaryMetric(metrics map[string]float64) string {
 		return name
 	}
 	return ""
+}
+
+// publishedRuptureIndex drops the raw index when failure modes are active. On flat
+// series the raw ratio saturates, and risk then comes from failure modes only.
+func publishedRuptureIndex(raw float64, failureModes bool) float64 {
+	if failureModes {
+		return 0
+	}
+	return raw
 }
 
 // buildExplainRecord constructs a RuptureRecord from live pipeline state.

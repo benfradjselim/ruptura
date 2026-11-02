@@ -337,3 +337,21 @@ func TestMapToAnalyzerSignals_PrefersLimitUtilization(t *testing.T) {
 		})
 	}
 }
+
+func TestPublishedRuptureIndex(t *testing.T) {
+	cases := []struct {
+		name         string
+		raw          float64
+		failureModes bool
+		want         float64
+	}{
+		{"raw index without failure modes", 7, false, 7},
+		{"failure modes replace the raw index", 10, true, 0},
+		{"nothing to publish", 0, true, 0},
+	}
+	for _, c := range cases {
+		if got := publishedRuptureIndex(c.raw, c.failureModes); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}
