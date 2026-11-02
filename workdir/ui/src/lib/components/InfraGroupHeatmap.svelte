@@ -1,4 +1,5 @@
 <script>
+  import { groupName } from '../util/anomalies.js'
   // groups: array of { group, namespace, health, spread, gni, agitated, objectCount }
   // health is 0–1 where 1=fully healthy, 0=critical
   export let groups = []
@@ -61,10 +62,10 @@
     <div class="grid">
       {#each byGroup as g (g.group)}
         <div class="cell {healthClass(g.health)}" class:agitated={g.agitated}
-          title="{GROUP_LABELS[g.group] || g.group} · health {Math.round(g.health * 100)}% · {g.objectCount} objects{g.namespaces?.length ? '\nNamespaces: ' + g.namespaces.join(', ') : ''}">
+          title="{groupName(g.group)} · health {Math.round(g.health * 100)}% · {g.objectCount} objects{g.namespaces?.length ? '\nNamespaces: ' + g.namespaces.join(', ') : ''}">
           <div class="cell-indicator" style="background:{healthColor(g.health)}"></div>
           <div class="cell-body">
-            <span class="cell-name">{GROUP_LABELS[g.group] || g.group}</span>
+            <span class="cell-name">{groupName(g.group)}</span>
             <span class="cell-health" style="color:{healthColor(g.health)}">{Math.round(g.health * 100)}%</span>
           </div>
           <div class="cell-meta">
