@@ -171,6 +171,7 @@ func TestFailureEvidence(t *testing.T) {
 		{"throttling", failuremodes.Estimate{Mode: failuremodes.ModeCPUThrottling, Usage: 0.4}, "CPU throttled 40% of the time"},
 		{"startup", failuremodes.Estimate{Mode: failuremodes.ModeStartupStuck, Reason: "FailedMount"}, "Kubernetes reports FailedMount"},
 		{"replicas", failuremodes.Estimate{Mode: failuremodes.ModeReplicasUnavailable, Usage: 2}, "2 replicas unavailable for over 5 minutes"},
+		{"one replica", failuremodes.Estimate{Mode: failuremodes.ModeReplicasUnavailable, Usage: 1}, "1 replica unavailable for over 5 minutes"},
 		{"rhythm", failuremodes.Estimate{Mode: failuremodes.ModeRecurrentFailure, Interval: 31 * time.Minute, Failures: 7}, "7 failures, about every 31 min"},
 		{"rollout", failuremodes.Estimate{Mode: failuremodes.ModeRolloutStuck}, "Rollout passed its progress deadline"},
 		{"oom", failuremodes.Estimate{Mode: failuremodes.ModeOOMKilled}, "Last exit was OOMKilled"},

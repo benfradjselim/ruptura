@@ -95,6 +95,13 @@ func (h *Handlers) handleEventHistory(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, timelineEvents(failures, h.discovery.RecentChanges(since), now))
 }
 
+func replicaCount(n int) string {
+	if n == 1 {
+		return "1 replica"
+	}
+	return fmt.Sprintf("%d replicas", n)
+}
+
 // failureEvidence states the measurement behind a result, in plain words.
 func failureEvidence(est failuremodes.Estimate) []string {
 	switch est.Mode {
@@ -105,7 +112,7 @@ func failureEvidence(est failuremodes.Estimate) []string {
 	case failuremodes.ModeStartupStuck:
 		return []string{"Kubernetes reports " + est.Reason}
 	case failuremodes.ModeReplicasUnavailable:
-		return []string{fmt.Sprintf("%d replicas unavailable for over 5 minutes", int(est.Usage))}
+		return []string{fmt.Sprintf("%s unavailable for over 5 minutes", replicaCount(int(est.Usage)))}
 	case failuremodes.ModeRecurrentFailure:
 		return []string{fmt.Sprintf("%d failures, about every %d min", est.Failures, int(math.Round(est.Interval.Minutes())))}
 	case failuremodes.ModeRolloutStuck:

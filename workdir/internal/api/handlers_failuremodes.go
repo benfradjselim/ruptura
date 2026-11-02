@@ -136,7 +136,7 @@ func estimateHeadline(name string, est failuremodes.Estimate) string {
 		return fmt.Sprintf("%s was killed for exceeding its memory limit.", name)
 	}
 	if est.Mode == failuremodes.ModeReplicasUnavailable {
-		return fmt.Sprintf("%s is missing %d replicas.", name, int(est.Usage))
+		return fmt.Sprintf("%s is missing %s.", name, replicaCount(int(est.Usage)))
 	}
 	if est.Mode == failuremodes.ModeStartupStuck {
 		return fmt.Sprintf("%s cannot start: %s.", name, est.Reason)
