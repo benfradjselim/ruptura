@@ -26,7 +26,7 @@ The Go module lives in `workdir/` for historical reasons.
 Prometheus · OTLP · Kubernetes API
   → sources, ingest    collect telemetry
   → normalize          per target data, explicit missing values
-  → pipeline, predictor  forecasts and anomaly detection
+  → pipeline           forecasts and anomaly detection
   → analyzer           per workload signals
   → failuremodes       known failures, predicted or detected
   → api                REST API under /api/v2

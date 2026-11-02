@@ -18,7 +18,6 @@ import (
     "github.com/benfradjselim/ruptura/internal/fusion"
     "github.com/benfradjselim/ruptura/internal/history"
     pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
-    "github.com/benfradjselim/ruptura/internal/predictor"
     "github.com/benfradjselim/ruptura/internal/storage"
     "github.com/benfradjselim/ruptura/internal/telemetry"
 )
@@ -33,7 +32,7 @@ type Handlers struct {
     engine     *engine.Engine
     explainer  *explain.Engine
     alerter    *alerter.Alerter
-    predictor  *predictor.Predictor
+    predictor  *pipelinemetrics.Predictor
     pipeline   pipelinemetrics.MetricPipeline
     ctxStore   *apicontext.ManualContextStore
     detector   *apicontext.DeploymentDetector
@@ -85,7 +84,7 @@ func NewHandlers(
     eng *engine.Engine,
     exp *explain.Engine,
     al  *alerter.Alerter,
-    pred *predictor.Predictor,
+    pred *pipelinemetrics.Predictor,
     pipe pipelinemetrics.MetricPipeline,
     ctx *apicontext.ManualContextStore,
     det *apicontext.DeploymentDetector,
@@ -106,7 +105,7 @@ func New(
 	eng *engine.Engine,
 	exp *explain.Engine,
 	al  *alerter.Alerter,
-	pred *predictor.Predictor,
+	pred *pipelinemetrics.Predictor,
 	pipe pipelinemetrics.MetricPipeline,
 	ctx *apicontext.ManualContextStore,
 	det *apicontext.DeploymentDetector,

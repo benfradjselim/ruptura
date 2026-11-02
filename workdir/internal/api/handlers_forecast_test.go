@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benfradjselim/ruptura/internal/predictor"
+	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
 )
 
 func TestForecastRoute_ResolvesKubernetesWorkloads(t *testing.T) {
 	const workload = "demo/Deployment/orders"
-	pred := predictor.NewPredictor()
+	pred := pipelinemetrics.NewPredictor()
 	start := time.Now().Add(-10 * time.Minute)
 	for i := 0; i < 40; i++ {
 		pred.Feed(workload, "memory_percent", 0.2+float64(i)*0.01, start.Add(time.Duration(i)*15*time.Second))

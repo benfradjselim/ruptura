@@ -38,7 +38,6 @@ import (
 	pipelinelogs "github.com/benfradjselim/ruptura/internal/pipeline/logs"
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/notify"
-	"github.com/benfradjselim/ruptura/internal/predictor"
 	"github.com/benfradjselim/ruptura/internal/sim"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
@@ -189,7 +188,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	topoBuilder := correlator.NewTopologyBuilder()
 	logSink := &burstLogSink{detector: burstDet}
 	fusionEngine := fusion.NewEngine()
-	predictorEngine := predictor.NewPredictor()
+	predictorEngine := pipelinemetrics.NewPredictor()
 	sentSink := &busSentimentSink{bus: bus, ctx: ctx}
 	ingestEngine := ingest.New(pipelineEngine, logSink, nil, sentSink, fusionEngine)
 	ingestEngine.SetLogStore(store)
