@@ -28,3 +28,23 @@ func TestTrackRecord(t *testing.T) {
 		t.Errorf("window record = %+v", got)
 	}
 }
+
+func TestTrackRecord_Restored(t *testing.T) {
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	var saved []time.Duration
+	tr := NewTracker()
+	tr.SetOutcomeRecorder(func(_ time.Time, lead time.Duration) { saved = append(saved, lead) })
+	tr.ObserveRestarts("w", "n/p", start, 0)
+	tr.NoteForecast("w", start.Add(10*time.Minute))
+	tr.ObserveRestarts("w", "n/p", start.Add(30*time.Minute), 1)
+	if len(saved) != 1 || saved[0] != 20*time.Minute {
+		t.Fatalf("saved = %v", saved)
+	}
+
+	restored := NewTracker()
+	restored.RestoreOutcome(start.Add(30*time.Minute), saved[0])
+	got := restored.TrackRecord(start, start.Add(time.Hour))
+	if got.Failures != 1 || got.Warned != 1 || got.MedianLead != 20*time.Minute {
+		t.Errorf("record = %+v", got)
+	}
+}

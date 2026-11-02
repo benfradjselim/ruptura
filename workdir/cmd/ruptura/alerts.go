@@ -16,16 +16,14 @@ const (
 	alertTargetsEnv = "RUPTURA_ALERTMANAGER_URLS"
 )
 
-// startAlerts repeats active failures to each configured Alertmanager.
+// startAlerts reads failures every minute, which also notes forecasts for the track
+// record, and repeats them to each configured Alertmanager.
 func startAlerts(ctx context.Context, handlers *api.Handlers) {
 	var clients []*alertmanager.Client
 	for _, url := range strings.Split(os.Getenv(alertTargetsEnv), ",") {
 		if url = strings.TrimSpace(url); url != "" {
 			clients = append(clients, alertmanager.NewClient(url, nil))
 		}
-	}
-	if len(clients) == 0 {
-		return
 	}
 	go func() {
 		ticker := time.NewTicker(alertInterval)

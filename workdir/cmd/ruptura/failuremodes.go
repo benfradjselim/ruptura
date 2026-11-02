@@ -110,6 +110,18 @@ func restoreFailureHistory(tracker *failuremodes.Tracker, store *storage.Store) 
 	for workload, times := range saved {
 		tracker.RestoreFailures(workload, times)
 	}
+	outcomes, err := store.ListOutcomes()
+	if err != nil {
+		logger.Default.Warn("failure modes: track record not restored", "err", err)
+	}
+	for _, outcome := range outcomes {
+		tracker.RestoreOutcome(outcome.At, outcome.Lead)
+	}
+	tracker.SetOutcomeRecorder(func(at time.Time, lead time.Duration) {
+		if err := store.PutOutcome(at, lead); err != nil {
+			logger.Default.Warn("failure modes: track record not saved", "err", err)
+		}
+	})
 	tracker.SetFailureRecorder(func(workload string, at time.Time) {
 		if err := store.PutFailure(workload, at); err != nil {
 			logger.Default.Warn("failure modes: history not saved", "err", err)
