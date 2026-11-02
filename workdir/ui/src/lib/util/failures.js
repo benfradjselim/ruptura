@@ -6,7 +6,7 @@ export function formatEta(seconds) {
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`
 }
 
-const eta = failure => failure.etaSeconds || Number.MAX_SAFE_INTEGER
+const eta = failure => failure.etaSeconds || 0
 
 export function sortFailures(failures) {
   const rank = state => (state === 'critical' ? 0 : 1)
@@ -25,4 +25,9 @@ export function recentAnomalies(anomalies, now) {
 
 export function measuredSignal(workload, key, value) {
   return (workload.unavailable_signals || []).includes(key) ? null : value
+}
+
+export function horizonPlacement(failure, horizonSeconds) {
+  const seconds = failure.etaSeconds || 0
+  return { position: Math.min(100, (seconds / horizonSeconds) * 100), beyond: seconds > horizonSeconds }
 }
