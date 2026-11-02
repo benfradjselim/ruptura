@@ -14,6 +14,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/gorilla/mux"
 )
@@ -81,6 +82,10 @@ type fleetHost struct {
 	CalibrationProgress int                    `json:"calibration_progress"`
 	HealthForecast      *models.HealthForecast `json:"health_forecast,omitempty"`
 	RestartCount        int                    `json:"restart_count,omitempty"`
+	ETFSeconds          int                    `json:"etf_seconds,omitempty"`
+	FailureMode         string                 `json:"failure_mode,omitempty"`
+	UnavailableSignals  []string               `json:"unavailable_signals,omitempty"`
+	Failure             *FailureResult         `json:"failure,omitempty"`
 }
 
 // crashLoopRestartThreshold is the container restart count (summed across a
@@ -130,7 +135,7 @@ func snapshotState(snap models.KPISnapshot, restarts int) string {
 		return "calibrating"
 	}
 	hs := snap.HealthScore.Value
-	if math.IsNaN(hs) {
+	if snap.HealthScore.Unavailable || math.IsNaN(hs) {
 		return "calibrating"
 	}
 	if hs >= 0.70 {
@@ -162,10 +167,13 @@ func (h *Handlers) workloadRestartCount(ns, kind, name string) int {
 	return total
 }
 
-func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) handleFleet(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, h.buildFleet())
+}
+
+func (h *Handlers) buildFleet() fleetResponse {
 	if h.store == nil {
-		writeJSON(w, http.StatusOK, fleetResponse{Hosts: []fleetHost{}})
-		return
+		return fleetResponse{Hosts: []fleetHost{}}
 	}
 
 	snapshots := h.store.AllSnapshots()
@@ -186,7 +194,17 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		}
 		knownHosts[name] = true
 
-		state := snapshotState(s, restarts)
+		stateRestarts := h.stateRestarts(name, restarts)
+		state := snapshotState(s, stateRestarts)
+		risk := h.baseRisk(s.FusedRuptureIndex)
+		state, risk = applyCrashLoop(state, risk, stateRestarts)
+		etfSeconds, failureMode := 0, ""
+		var estimate *failuremodes.Estimate
+		if est, ok := h.workloadEstimate(name); ok {
+			state, risk = applyEstimate(state, risk, est, h.warningHorizon())
+			etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
+			estimate = &est
+		}
 		resp.TotalHosts++
 		// Explicit cases only — a bare "default: critical" here previously
 		// counted every "calibrating" workload (state=calibrating is grey,
@@ -211,10 +229,14 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 			Fatigue:             s.Fatigue.Value,
 			Contagion:           s.Contagion.Value,
 			LastSeen:            s.Timestamp,
-			FusedRuptureIndex:   s.FusedRuptureIndex,
+			FusedRuptureIndex:   risk,
 			CalibrationProgress: s.CalibrationProgress,
 			HealthForecast:      s.HealthForecast,
 			RestartCount:        restarts,
+			ETFSeconds:          etfSeconds,
+			FailureMode:         failureMode,
+			UnavailableSignals:  s.UnavailableSignals,
+			Failure:             failureResult(name, state, estimate, stateRestarts >= crashLoopRestartThreshold),
 		})
 	}
 
@@ -241,16 +263,34 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 			// "pending_telemetry" forever despite obviously being broken.
 			restarts := h.workloadRestartCount(s.Workload.Namespace, s.Workload.Kind, s.Workload.Name)
 			state := "pending_telemetry"
-			if restarts >= crashLoopRestartThreshold {
+			crashLoop := h.stateRestarts(name, restarts) >= crashLoopRestartThreshold
+			if crashLoop {
 				state = "critical"
+			}
+			risk := 0.0
+			etfSeconds, failureMode := 0, ""
+			var estimate *failuremodes.Estimate
+			if est, ok := h.workloadEstimate(name); ok {
+				state, risk = applyEstimate(state, risk, est, h.warningHorizon())
+				etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
+				estimate = &est
+			}
+			switch state {
+			case "critical":
 				resp.CriticalHosts++
+			case "degraded":
+				resp.DegradedHosts++
 			}
 			resp.Hosts = append(resp.Hosts, fleetHost{
-				Host:         name,
-				State:        state,
-				HealthScore:  0,
-				LastSeen:     s.Timestamp,
-				RestartCount: restarts,
+				Host:              name,
+				State:             state,
+				HealthScore:       0,
+				LastSeen:          s.Timestamp,
+				FusedRuptureIndex: risk,
+				ETFSeconds:        etfSeconds,
+				FailureMode:       failureMode,
+				Failure:           failureResult(name, state, estimate, crashLoop),
+				RestartCount:      restarts,
 			})
 		}
 	}
@@ -268,7 +308,7 @@ func (h *Handlers) handleFleet(w http.ResponseWriter, r *http.Request) {
 		return resp.Hosts[i].HealthScore < resp.Hosts[j].HealthScore
 	})
 
-	writeJSON(w, http.StatusOK, resp)
+	return resp
 }
 
 // ── /api/v2/alerts ────────────────────────────────────────────────────────────

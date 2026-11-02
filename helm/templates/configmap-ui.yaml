@@ -10,7 +10,7 @@ metadata:
 data:
   default.conf: |
     server {
-        listen 80;
+        listen {{ .Values.ui.port }};
         server_name _;
         root /usr/share/nginx/html;
 

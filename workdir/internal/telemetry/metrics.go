@@ -83,17 +83,22 @@ func (r *Registry) RecordKPISnapshot(snap models.KPISnapshot) {
     set := func(signal string, v float64) {
         r.setFloat(&r.kpiSignals, ns+"/"+kind+"/"+name+"/"+signal, v)
     }
-    set("stress", snap.Stress.Value)
-    set("fatigue", snap.Fatigue.Value)
-    set("mood", snap.Mood.Value)
-    set("pressure", snap.Pressure.Value)
-    set("humidity", snap.Humidity.Value)
-    set("contagion", snap.Contagion.Value)
-    set("resilience", snap.Resilience.Value)
-    set("entropy", snap.Entropy.Value)
-    set("velocity", snap.Velocity.Value)
-    set("health_score", snap.HealthScore.Value)
-    set("throughput", snap.Throughput.Value)
+    setKPI := func(signal string, k models.KPI) {
+        if !k.Unavailable {
+            set(signal, k.Value)
+        }
+    }
+    setKPI("stress", snap.Stress)
+    setKPI("fatigue", snap.Fatigue)
+    setKPI("mood", snap.Mood)
+    setKPI("pressure", snap.Pressure)
+    setKPI("humidity", snap.Humidity)
+    setKPI("contagion", snap.Contagion)
+    setKPI("resilience", snap.Resilience)
+    setKPI("entropy", snap.Entropy)
+    setKPI("velocity", snap.Velocity)
+    setKPI("health_score", snap.HealthScore)
+    setKPI("throughput", snap.Throughput)
     if snap.FusedRuptureIndex > 0 {
         set("fused_rupture_index", snap.FusedRuptureIndex)
     }

@@ -4,7 +4,7 @@ metadata:
   name: {{ include "ruptura.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "ruptura.labels" . | nindent 4 }}
+    {{- include "ruptura.engineLabels" . | nindent 4 }}
   {{- with .Values.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -12,7 +12,7 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   selector:
-    {{- include "ruptura.selectorLabels" . | nindent 4 }}
+    {{- include "ruptura.engineSelectorLabels" . | nindent 4 }}
   ports:
     - name: api
       port: 80
@@ -25,7 +25,7 @@ metadata:
   name: {{ include "ruptura.fullname" . }}-otlp
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "ruptura.labels" . | nindent 4 }}
+    {{- include "ruptura.engineLabels" . | nindent 4 }}
   {{- with .Values.otlpService.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -33,7 +33,7 @@ metadata:
 spec:
   type: {{ .Values.otlpService.type }}
   selector:
-    {{- include "ruptura.selectorLabels" . | nindent 4 }}
+    {{- include "ruptura.engineSelectorLabels" . | nindent 4 }}
   ports:
     - name: otlp-http
       port: 4317

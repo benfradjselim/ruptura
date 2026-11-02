@@ -28,6 +28,13 @@ metadata:
     app.kubernetes.io/component: operator
 rules:
   # Manage RupturaInstance CRDs
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterrolebindings"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["cluster-monitoring-view", "ruptura-instance-reader"]
+    verbs: ["bind"]
   - apiGroups: ["ruptura.io"]
     resources: ["rupturainstances", "rupturainstances/status"]
     verbs: ["get", "list", "watch", "update", "patch"]
@@ -35,13 +42,13 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Manage Services and PVCs; read Secrets for apiKeyRef
+  # Manage Services, PVCs, ServiceAccounts and the generated API key Secret
   - apiGroups: [""]
-    resources: ["services", "persistentvolumeclaims"]
+    resources: ["services", "persistentvolumeclaims", "serviceaccounts"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # OpenShift Routes (no-op on vanilla K8s — API simply won't be present)
   - apiGroups: ["route.openshift.io"]
     resources: ["routes"]
@@ -132,7 +139,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: ruptura-operator
-          image: ghcr.io/benfradjselim/ruptura-operator:v0.8.9
+          image: ghcr.io/benfradjselim/ruptura-operator:v1.1.0
           imagePullPolicy: IfNotPresent
           args: ["--interval=30s", "--metrics-addr=:9090"]
           ports:
@@ -162,3 +169,20 @@ spec:
             limits:
               cpu: "200m"
               memory: "128Mi"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ruptura-instance-reader
+  labels:
+    app.kubernetes.io/name: ruptura
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "namespaces", "services", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]

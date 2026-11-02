@@ -169,7 +169,7 @@ func TestHandleFleet_CalibratingWorkloadsNeverCountAsCritical(t *testing.T) {
 	idleRef := models.WorkloadRef{Namespace: "prod", Kind: "Deployment", Name: "web-stable"}
 	var lastSnap models.KPISnapshot
 	for i := 0; i < 100; i++ {
-		lastSnap = a.Update(idleRef, map[string]float64{})
+		lastSnap = a.Update(idleRef, map[string]float64{"cpu_percent": 0, "memory_percent": 0})
 	}
 	store.StoreSnapshot(lastSnap)
 

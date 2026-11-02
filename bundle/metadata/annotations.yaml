@@ -11,8 +11,8 @@ annotations:
   operators.coreos.com/capabilities: Basic Install
   operators.coreos.com/categories: Monitoring,Logging & Tracing
   operators.coreos.com/certified: "false"
-  operators.coreos.com/containerImage: ghcr.io/benfradjselim/ruptura-operator:v0.6.9
-  operators.coreos.com/createdAt: "2026-05-06T00:00:00Z"
+  operators.coreos.com/containerImage: ghcr.io/benfradjselim/ruptura-operator:v0.10.0
+  operators.coreos.com/createdAt: "2026-10-30T00:00:00Z"
   operators.coreos.com/description: >-
     Predictive workload health platform for Kubernetes — detect ruptures before they happen.
   operators.coreos.com/displayName: Ruptura Operator
@@ -24,4 +24,4 @@ annotations:
   operators.coreos.com/maturity: alpha
 
   # OpenShift compatibility
-  com.redhat.openshift.versions: "v4.12-v4.16"
+  com.redhat.openshift.versions: "v4.12"

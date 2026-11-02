@@ -38,7 +38,6 @@ import (
 	pipelinelogs "github.com/benfradjselim/ruptura/internal/pipeline/logs"
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/notify"
-	"github.com/benfradjselim/ruptura/internal/predictor"
 	"github.com/benfradjselim/ruptura/internal/sim"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
@@ -47,7 +46,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "8.2.3"
+const version = "8.4.0"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -182,17 +181,20 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	defer bus.Close()
 
 	// --- core pipeline ---
-	pipelineEngine := pipelinemetrics.NewEngine()
+	engineConfig := pipelinemetrics.DefaultEngineConfig()
+	engineConfig.AnomalySigma = pipelinemetrics.SensitivitySigma(os.Getenv("RUPTURA_SENSITIVITY"))
+	pipelineEngine := pipelinemetrics.NewEngineWithConfig(engineConfig)
 	burstDet := correlator.NewBurstDetector(256)
 	topoBuilder := correlator.NewTopologyBuilder()
 	logSink := &burstLogSink{detector: burstDet}
 	fusionEngine := fusion.NewEngine()
-	predictorEngine := predictor.NewPredictor()
+	predictorEngine := pipelinemetrics.NewPredictor()
 	sentSink := &busSentimentSink{bus: bus, ctx: ctx}
 	ingestEngine := ingest.New(pipelineEngine, logSink, nil, sentSink, fusionEngine)
 	ingestEngine.SetLogStore(store)
 	logPipelineEng := pipelinelogs.NewEngine(pipelineEngine)
 	ingestEngine.SetLogPipeline(logPipelineEng)
+	failureModesEnabled := os.Getenv("RUPTURA_THANOS_URL") != ""
 	analyzerEngine := analyzer.NewAnalyzer()
 	analyzerEngine.SetTopology(topoBuilder)
 	if raw := os.Getenv("RUPTURA_WORKLOAD_WEIGHTS"); raw != "" {
@@ -357,7 +359,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 					// Annotate snapshot with current FusedR before persisting.
 					var fusedR float64
 					if fr, _, err := fusionEngine.FusedR(host); err == nil {
-						fusedR = fr
+						fusedR = publishedRuptureIndex(fr, failureModesEnabled)
 						snap.FusedRuptureIndex = fusedR
 					}
 
@@ -374,9 +376,15 @@ func runWithContext(ctx context.Context, cfg Config) error {
 						predictorEngine.Feed(host, metric, val, now)
 					}
 					// Also feed the composite KPI signals.
-					predictorEngine.Feed(host, "health_score", snap.HealthScore.Value, now)
-					predictorEngine.Feed(host, "stress", snap.Stress.Value, now)
-					predictorEngine.Feed(host, "fatigue", snap.Fatigue.Value, now)
+					for name, kpi := range map[string]models.KPI{
+						"health_score": snap.HealthScore,
+						"stress":       snap.Stress,
+						"fatigue":      snap.Fatigue,
+					} {
+						if !kpi.Unavailable {
+							predictorEngine.Feed(host, name, kpi.Value, now)
+						}
+					}
 
 					// Record an explain entry for any workload in warning or worse state.
 					if fusedR >= 1.5 {
@@ -487,6 +495,24 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		handlers.SetDiscovery(inf)
 	}
 	handlers.SetInfraRegistry(infraRegistry)
+	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store)
+	if tracker != nil {
+		handlers.SetFailureModes(tracker)
+	}
+	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker, inf); inputs != nil {
+		handlers.SetInputs(inputs)
+	}
+	handlers.SetLevelScope(os.Getenv("RUPTURA_LEVEL_SCOPE"))
+	handlers.SetLevelSelector(api.ParseSelector(os.Getenv("RUPTURA_LEVEL_SELECTOR")))
+	startAlerts(ctx, handlers)
+	if horizon := os.Getenv("RUPTURA_HORIZON"); horizon != "" {
+		parsed, err := time.ParseDuration(horizon)
+		if err != nil {
+			logger.Default.Warn("invalid RUPTURA_HORIZON, using the default", "err", err)
+		} else {
+			handlers.SetHorizon(parsed)
+		}
+	}
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)
 	handlers.SetDemoMode(cfg.DemoMode)
@@ -543,6 +569,7 @@ func mapToAnalyzerSignals(raw map[string]float64) map[string]float64 {
 
 	// kubeletstats CPU utilization [0,1] → cpu_percent
 	for _, key := range []string{
+		"k8s.pod.cpu_limit_utilization",
 		"k8s.pod.cpu.node.utilization",
 		"k8s.pod.cpu.utilization",
 		"k8s.container.cpu.utilization",
@@ -556,6 +583,7 @@ func mapToAnalyzerSignals(raw map[string]float64) map[string]float64 {
 
 	// kubeletstats memory utilization [0,1] → memory_percent
 	for _, key := range []string{
+		"k8s.pod.memory_limit_utilization",
 		"k8s.pod.memory.working_set.utilization",
 		"k8s.pod.memory.utilization",
 		"k8s.container.memory.working_set.utilization",
@@ -588,6 +616,15 @@ func pickPrimaryMetric(metrics map[string]float64) string {
 		return name
 	}
 	return ""
+}
+
+// publishedRuptureIndex drops the raw index when failure modes are active. On flat
+// series the raw ratio saturates, and risk then comes from failure modes only.
+func publishedRuptureIndex(raw float64, failureModes bool) float64 {
+	if failureModes {
+		return 0
+	}
+	return raw
 }
 
 // buildExplainRecord constructs a RuptureRecord from live pipeline state.

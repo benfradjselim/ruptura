@@ -1,0 +1,87 @@
+package metrics
+
+import (
+	"testing"
+	"time"
+
+	"github.com/benfradjselim/ruptura/pkg/models"
+)
+
+func TestAlertThrottle_Allow(t *testing.T) {
+	start := time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)
+	steps := []struct {
+		name     string
+		key      string
+		after    time.Duration
+		critical bool
+		want     bool
+	}{
+		{"first alert passes", "a", 0, false, true},
+		{"repeat in cooldown is dropped", "a", 15 * time.Second, false, false},
+		{"other series passes", "b", 30 * time.Second, false, true},
+		{"escalation passes", "a", 45 * time.Second, true, true},
+		{"repeat critical is dropped", "a", time.Minute, true, false},
+		{"warning after critical is dropped", "a", 75 * time.Second, false, false},
+		{"reminder after cooldown passes", "a", 45*time.Second + alertCooldown, false, true},
+	}
+	th := newAlertThrottle()
+	for _, s := range steps {
+		severity := models.SeverityWarning
+		if s.critical {
+			severity = models.SeverityCritical
+		}
+		if got := th.allow(s.key, severity, start.Add(s.after)); got != s.want {
+			t.Errorf("%s: allow = %v, want %v", s.name, got, s.want)
+		}
+	}
+}
+
+func TestAnomalyEngine_OneAlertPerObservation(t *testing.T) {
+	e := NewAnomalyEngine()
+	ts := time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 400; i++ {
+		ts = ts.Add(15 * time.Second)
+		e.Observe("h", "m", 100+float64(i%3), ts)
+	}
+	got := e.Observe("h", "m", 100000, ts.Add(15*time.Second))
+	if len(got) != 1 {
+		t.Fatalf("alerts = %d, want 1: %+v", len(got), got)
+	}
+	if got[0].Severity != models.SeverityCritical {
+		t.Errorf("severity = %s, want critical when methods agree", got[0].Severity)
+	}
+}
+
+func TestDropUnconfirmedSeasonal(t *testing.T) {
+	seasonal := models.AnomalyEvent{Method: "seasonal"}
+	mad := models.AnomalyEvent{Method: "mad"}
+	cases := []struct {
+		name   string
+		events []models.AnomalyEvent
+		want   int
+	}{
+		{"no event", nil, 0},
+		{"seasonal alone is dropped", []models.AnomalyEvent{seasonal}, 0},
+		{"another method alone stays", []models.AnomalyEvent{mad}, 1},
+		{"confirmed seasonal stays", []models.AnomalyEvent{mad, seasonal}, 2},
+	}
+	for _, c := range cases {
+		if got := len(dropUnconfirmedSeasonal(c.events)); got != c.want {
+			t.Errorf("%s: events = %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
+func observeShift(e *AnomalyEngine) int {
+	ts := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	alerts := 0
+	for i := 0; i < 500; i++ {
+		ts = ts.Add(alertCooldown)
+		value := 60 + 20*float64(i%5)
+		if i%20 == 19 {
+			value = 200
+		}
+		alerts += len(e.Observe("h", "m", value, ts))
+	}
+	return alerts
+}

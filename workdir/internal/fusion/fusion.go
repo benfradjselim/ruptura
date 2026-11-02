@@ -13,6 +13,9 @@ import (
 
 const staleThreshold = 5 * time.Minute
 
+// MaxFusedR is the upper bound of the Fused Rupture Index.
+const MaxFusedR = 10.0
+
 type Engine struct {
 	mu    sync.RWMutex
 	hosts map[string]*hostData
@@ -134,7 +137,7 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 	if !data.traceTs.IsZero() { count++ }
 	if !data.infraTs.IsZero() { count++ }
 
-	if count < 2 {
+	if count == 0 {
 		return 0, time.Time{}, fmt.Errorf("fusion: insufficient signals for host %s", host)
 	}
 
@@ -149,7 +152,7 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 	}
 
 	val, _ := e.fusedR(&data)
-	return val, latest, nil
+	return math.Min(val, MaxFusedR), latest, nil
 }
 
 // fusedR computes the fused R for a hostData snapshot (caller must not hold e.mu).
@@ -186,8 +189,13 @@ func (e *Engine) fusedR(data *hostData) (float64, bool) {
 		if !d.metricTs.IsZero() { count++ }
 		if !d.logTs.IsZero() { count++ }
 		if !d.traceTs.IsZero() { count++ }
-		if count < 2 {
+		if count == 0 {
 			return 0, false
+		}
+		if count == 1 {
+			// A single active pipeline is authoritative: metrics-only clusters
+			// are the default deployment and must still produce a fused value.
+			return d.metricVal + d.logVal + d.traceVal, true
 		}
 		if count == 3 {
 			return 0.6*d.metricVal + 0.2*d.logVal + 0.2*d.traceVal, true

@@ -20,7 +20,8 @@ import (
 	"time"
 )
 
-const operatorVersion = "0.6.9"
+// operatorVersion is the single source of truth for the operator version.
+const operatorVersion = "1.1.0"
 
 var logger = log.New(os.Stdout, "", 0)
 
@@ -40,12 +41,17 @@ func fmtKVs(level, msg string, kvs ...interface{}) string {
 	return s
 }
 
+// startupMessage builds the startup log line carrying the operator version.
+func startupMessage(interval string) string {
+	return fmtKVs("INFO", "ruptura-operator starting", "version", operatorVersion, "interval", interval)
+}
+
 func main() {
-	interval    := flag.Duration("interval", 30*time.Second, "reconcile poll interval")
+	interval := flag.Duration("interval", 30*time.Second, "reconcile poll interval")
 	metricsAddr := flag.String("metrics-addr", ":9090", "address for the Prometheus metrics server")
 	flag.Parse()
 
-	logInfo("ruptura-operator starting", "version", operatorVersion, "interval", interval.String())
+	logger.Print(startupMessage(interval.String()))
 
 	metricsSrv := startMetricsServer(*metricsAddr)
 	logInfo("metrics server listening", "addr", *metricsAddr)

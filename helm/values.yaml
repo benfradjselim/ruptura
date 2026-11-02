@@ -5,7 +5,7 @@ replicaCount: 1
 
 image:
   repository: docker.io/selimbf/ruptura
-  tag: ""  # defaults to Chart.appVersion
+  tag: ""  # defaults to v<Chart.appVersion>
   pullPolicy: Always
 
 imagePullSecrets: []
@@ -20,10 +20,9 @@ apiKey: ""
 # -- When true and apiKey is empty, a one-shot Job generates a random API key
 # on first install, stores it in the same Secret apiKey would use, and prints
 # it in the Job's logs (kubectl logs -n <ns> job/<release>-init-apikey).
-# Used by the single-manifest install path (install/ruptura.yaml); off by
-# default for normal `helm install`, where setting --set apiKey=... directly
-# is the documented production path.
-autoGenerateApiKey: false
+# On by default so the API never answers 503 for lack of a key; setting
+# --set apiKey=... directly remains the documented production path.
+autoGenerateApiKey: true
 
 # -- Product edition: "community" (default) or "autopilot".
 # community: action recommendations are visible (read-only); approve endpoint returns 402.
@@ -42,9 +41,10 @@ ui:
   enabled: false
   image:
     repository: ghcr.io/benfradjselim/ruptura-ui
-    tag: ""         # defaults to Chart.appVersion
+    tag: ""         # defaults to ui-v<Chart.appVersion>
     pullPolicy: Always
-  port: 80
+  # nginx listen port (unprivileged, works with arbitrary non-root UIDs).
+  port: 8080
   service:
     type: ClusterIP
     annotations: {}
@@ -57,6 +57,18 @@ ui:
     limits:
       cpu: 100m
       memory: 64Mi
+
+# -- OpenShift mode: omit fixed runAsUser/fsGroup (restricted SCC assigns them),
+# default thanos.url to the in-cluster Thanos querier, bind cluster-monitoring-view,
+# grant read on OpenShift cluster operators/machine config pools, and create a
+# Route for the UI (requires ui.enabled).
+openshift:
+  enabled: false
+
+# -- Thanos/Prometheus query endpoint (RUPTURA_THANOS_URL). Empty by default;
+# when openshift.enabled it defaults to https://thanos-querier.openshift-monitoring.svc:9091.
+thanos:
+  url: ""
 
 ports:
   api: 8080    # REST API + Prometheus metrics

@@ -42,9 +42,10 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/rupture/{namespace}/{workload}", h.handleRuptureByWorkload).Methods("GET")
 	api.HandleFunc("/kpi/{name}/{namespace}/{workload}", h.handleKPIByWorkload).Methods("GET")
 
+	api.HandleFunc("/failures", h.handleFailures).Methods("GET")
+	api.HandleFunc("/inputs", h.handleInputs).Methods("GET")
 	api.HandleFunc("/forecast", h.handleForecast).Methods("POST")
-	api.HandleFunc("/forecast/{metric}/{host}", h.handleForecast).Methods("GET")
-	api.HandleFunc("/forecast/{metric}/{namespace}/{workload}", h.handleForecast).Methods("GET")
+	api.HandleFunc("/forecast/{metric}/{host:.+}", h.handleForecast).Methods("GET")
 
 	api.HandleFunc("/kpi/{name}/{host}", h.handleKPI).Methods("GET")
 	api.HandleFunc("/kpi/{name}/{host}/history", h.handleKPI).Methods("GET")

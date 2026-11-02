@@ -34,16 +34,25 @@ func signalVector(snap models.KPISnapshot, fusedR float64) [11]float64 {
 	return [11]float64{
 		snap.Stress.Value,
 		snap.Fatigue.Value,
-		1 - snap.Mood.Value,       // inverted: bad = high
+		inverted(snap.Mood),
 		snap.Pressure.Value,
 		snap.Humidity.Value,
 		snap.Contagion.Value,
-		1 - snap.Resilience.Value, // inverted: bad = high
+		inverted(snap.Resilience),
 		snap.Entropy.Value,
 		snap.Velocity.Value,
 		snap.Throughput.Value,
 		math.Min(fusedR/10.0, 1.0),
 	}
+}
+
+// inverted returns the penalty of a KPI where high is good. An unavailable KPI
+// carries no evidence, so it adds no penalty.
+func inverted(k models.KPI) float64 {
+	if k.Unavailable {
+		return 0
+	}
+	return 1 - k.Value
 }
 
 func cosineSimilarity(a, b [11]float64) float64 {

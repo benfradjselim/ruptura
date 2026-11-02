@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -14,14 +15,36 @@ type AnomalyEngine struct {
 	zscore   *AnomalyDetector
 	mad      *MADAnomalyDetector
 	seasonal *SeasonalAnomalyDetector
+	counters *counterRates
+	throttle *alertThrottle
 }
 
 // NewAnomalyEngine creates an engine with sane defaults.
 func NewAnomalyEngine() *AnomalyEngine {
+	return newAnomalyEngineWithSigma(defaultAnomalySigma)
+}
+
+const defaultAnomalySigma = 3.0
+
+// SensitivitySigma converts a sensitivity name to a detection threshold.
+// Unknown names use the default.
+func SensitivitySigma(sensitivity string) float64 {
+	switch sensitivity {
+	case "conservative":
+		return 4
+	case "aggressive":
+		return 2.5
+	}
+	return defaultAnomalySigma
+}
+
+func newAnomalyEngineWithSigma(sigma float64) *AnomalyEngine {
 	return &AnomalyEngine{
-		zscore:   NewAnomalyDetector(3.0),
-		mad:      NewMADAnomalyDetector(300, 3.0),
-		seasonal: NewSeasonalAnomalyDetector(240, 3.0), // 1h season at 15s
+		zscore:   NewAnomalyDetector(sigma),
+		mad:      NewMADAnomalyDetector(300, sigma),
+		seasonal: NewSeasonalAnomalyDetector(240, sigma), // 1h season at 15s
+		counters: newCounterRates(),
+		throttle: newAlertThrottle(),
 	}
 }
 
@@ -29,6 +52,14 @@ func NewAnomalyEngine() *AnomalyEngine {
 // Anomalies from ≥2 methods are tagged severity "critical"; single-method ones "warning".
 func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time) []models.AnomalyEvent {
 	fullMetric := host + ":" + metric
+
+	if cumulativeMetrics[metric] {
+		rate, ok := e.counters.rate(fullMetric, value, ts)
+		if !ok {
+			return nil
+		}
+		value = rate
+	}
 
 	var results []models.AnomalyEvent
 
@@ -74,6 +105,8 @@ func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time
 		})
 	}
 
+	results = dropUnconfirmedSeasonal(dropNegligible(results))
+
 	// Escalate to critical if ≥2 methods agree
 	if len(results) >= 2 {
 		for i := range results {
@@ -81,7 +114,139 @@ func (e *AnomalyEngine) Observe(host, metric string, value float64, ts time.Time
 		}
 	}
 
-	return results
+	if len(results) == 0 || !e.throttle.allow(fullMetric, results[0].Severity, ts) {
+		return nil
+	}
+	return results[:1]
+}
+
+// alertCooldown is the reminder interval of an anomaly that keeps firing.
+const alertCooldown = 5 * time.Minute
+
+type alertState struct {
+	severity string
+	ts       time.Time
+}
+
+// alertThrottle keeps one alert per anomaly episode. A series alerts once, then
+// again after alertCooldown or as soon as it escalates to critical.
+type alertThrottle struct {
+	mu   sync.Mutex
+	last map[string]alertState
+}
+
+func newAlertThrottle() *alertThrottle {
+	return &alertThrottle{last: make(map[string]alertState)}
+}
+
+// allow reports whether an anomaly of key at ts must be published.
+func (t *alertThrottle) allow(key string, severity string, ts time.Time) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	prev, ok := t.last[key]
+	escalated := severity == models.SeverityCritical && prev.severity != models.SeverityCritical
+	if ok && !escalated && ts.Sub(prev.ts) < alertCooldown {
+		return false
+	}
+	t.last[key] = alertState{severity: severity, ts: ts}
+	return true
+}
+
+// cumulativeMetrics lists monotonic counters. Their raw value always drifts away
+// from any baseline, so anomaly detection runs on their per-second rate.
+var cumulativeMetrics = map[string]bool{
+	"k8s.pod.network.io":     true,
+	"k8s.pod.cpu.time":       true,
+	"k8s.node.network.io":    true,
+	"k8s.node.cpu.time":      true,
+	"container.cpu.time":     true,
+	"k8s.container.cpu.time": true,
+}
+
+// counterRateWindow is the span of a counter rate. Idle pods send short bursts
+// that are normal for them, so a 15 second rate is too heavy tailed to score.
+const counterRateWindow = 5 * time.Minute
+
+type counterSample struct {
+	value float64
+	ts    time.Time
+}
+
+// counterRates converts cumulative samples into per-second rates over
+// counterRateWindow.
+type counterRates struct {
+	mu      sync.Mutex
+	history map[string][]counterSample
+}
+
+func newCounterRates() *counterRates {
+	return &counterRates{history: make(map[string][]counterSample)}
+}
+
+// rate returns the per-second rate of key over counterRateWindow. It returns
+// false for a repeated timestamp, a counter reset and until the window is
+// covered.
+func (c *counterRates) rate(key string, value float64, ts time.Time) (float64, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	history := c.history[key]
+	if n := len(history); n > 0 {
+		last := history[n-1]
+		if !ts.After(last.ts) {
+			return 0, false
+		}
+		if value < last.value {
+			history = nil
+		}
+	}
+	history = append(history, counterSample{value: value, ts: ts})
+
+	oldest := 0
+	for oldest+1 < len(history) && !history[oldest+1].ts.After(ts.Add(-counterRateWindow)) {
+		oldest++
+	}
+	history = history[oldest:]
+	c.history[key] = history
+
+	base := history[0]
+	if ts.Sub(base.ts) < counterRateWindow {
+		return 0, false
+	}
+	return (value - base.value) / ts.Sub(base.ts).Seconds(), true
+}
+
+// dropUnconfirmedSeasonal removes a seasonal event that no other method raised.
+// One hour of history cannot establish an hourly cycle, so the seasonal method
+// only confirms the other methods.
+func dropUnconfirmedSeasonal(events []models.AnomalyEvent) []models.AnomalyEvent {
+	if len(events) == 1 && events[0].Method == "seasonal" {
+		return nil
+	}
+	return events
+}
+
+// dropNegligible removes events whose absolute deviation is too small to act
+// on, whichever method raised them.
+func dropNegligible(events []models.AnomalyEvent) []models.AnomalyEvent {
+	kept := events[:0]
+	for _, ev := range events {
+		if !negligibleDeviation(ev.Value, ev.Expected) {
+			kept = append(kept, ev)
+		}
+	}
+	return kept
+}
+
+// negligibleDeviation reports whether value is too close to expected to alert.
+// Values within the 0 to 1 unit range use the bounded floor. A seasonal
+// expected value may dip slightly below 0, so the check uses magnitudes. Other
+// values use a fraction of the expected value.
+func negligibleDeviation(value, expected float64) bool {
+	dev := math.Abs(value - expected)
+	if math.Abs(value) <= 1 && math.Abs(expected) <= 1 {
+		return dev < madBoundedFraction
+	}
+	return dev < madMedianFraction*math.Abs(expected)
 }
 
 // AnomalyStore is an in-memory ring buffer of recent anomaly events.

@@ -56,12 +56,14 @@ spec:
       serviceAccountName: {{ include "ruptura.fullname" . }}-init-apikey
       securityContext:
         runAsNonRoot: true
+        {{- if not .Values.openshift.enabled }}
         runAsUser: 65532
+        {{- end }}
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: init-apikey
-          image: "bitnami/kubectl:1.29"
+          image: "registry.access.redhat.com/openshift4/ose-cli:latest"
           securityContext:
             allowPrivilegeEscalation: false
             # Not read-only: kubectl writes a discovery cache under $HOME

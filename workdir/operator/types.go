@@ -31,28 +31,88 @@ type RupturaInstanceSpec struct {
 	IngestRPS int32 `json:"ingestRPS,omitempty"`
 	// Resources sets CPU/memory requests and limits for the Ruptura container.
 	Resources ResourceRequirements `json:"resources,omitempty"`
+	// Deployment selects how the engine runs.
+	Deployment DeploymentConfig `json:"deployment,omitempty"`
+	// Level selects what the instance watches.
+	Level LevelConfig `json:"level,omitempty"`
+	// Input selects how much telemetry the instance collects.
+	Input InputConfig `json:"input,omitempty"`
+	// Analysis tunes predictions.
+	Analysis AnalysisConfig `json:"analysis,omitempty"`
+	// Alerting lists where results are sent.
+	Alerting AlertingConfig `json:"alerting,omitempty"`
+	// Logging sets the engine log level.
+	Logging LoggingConfig `json:"logging,omitempty"`
+}
+
+// DeploymentConfig selects how the engine runs.
+type DeploymentConfig struct {
+	Mode string `json:"mode,omitempty"`
+}
+
+// LabelSelector selects objects by label.
+type LabelSelector struct {
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+}
+
+// LevelConfig selects the watched level and objects.
+type LevelConfig struct {
+	Scope    string        `json:"scope,omitempty"`
+	Selector LabelSelector `json:"selector,omitempty"`
+}
+
+// InputConfig selects the input profile.
+type InputConfig struct {
+	Profile string `json:"profile,omitempty"`
+}
+
+// AnalysisConfig tunes predictions.
+type AnalysisConfig struct {
+	Sensitivity string `json:"sensitivity,omitempty"`
+	Horizon     string `json:"horizon,omitempty"`
+}
+
+// AlertmanagerChannel sends results to an Alertmanager.
+type AlertmanagerChannel struct {
+	URL string `json:"url"`
+}
+
+// AlertChannel is one named destination for results.
+type AlertChannel struct {
+	Name         string               `json:"name"`
+	Alertmanager *AlertmanagerChannel `json:"alertmanager,omitempty"`
+}
+
+// AlertingConfig lists alert destinations.
+type AlertingConfig struct {
+	Channels []AlertChannel `json:"channels,omitempty"`
+}
+
+// LoggingConfig sets the engine log level.
+type LoggingConfig struct {
+	Level string `json:"level,omitempty"`
 }
 
 // RupturaInstanceStatus is the observed state written back by the operator.
 type RupturaInstanceStatus struct {
-	Phase             string `json:"phase"`
-	ReadyReplicas     int32  `json:"readyReplicas"`
-	AvailableReplicas int32  `json:"availableReplicas"`
-	Message           string `json:"message,omitempty"`
-	LastReconcileTime string `json:"lastReconcileTime,omitempty"`
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	Phase              string `json:"phase"`
+	ReadyReplicas      int32  `json:"readyReplicas"`
+	AvailableReplicas  int32  `json:"availableReplicas"`
+	Message            string `json:"message,omitempty"`
+	LastReconcileTime  string `json:"lastReconcileTime,omitempty"`
+	ObservedGeneration int64  `json:"observedGeneration,omitempty"`
 }
 
 // ObjectMeta is a minimal subset of k8s ObjectMeta.
 type ObjectMeta struct {
-	Name                string            `json:"name"`
-	Namespace           string            `json:"namespace"`
-	Generation          int64             `json:"generation,omitempty"`
-	ResourceVersion     string            `json:"resourceVersion,omitempty"`
-	DeletionTimestamp   *string           `json:"deletionTimestamp,omitempty"`
-	Finalizers          []string          `json:"finalizers,omitempty"`
-	Labels              map[string]string `json:"labels,omitempty"`
-	Annotations         map[string]string `json:"annotations,omitempty"`
+	Name              string            `json:"name"`
+	Namespace         string            `json:"namespace"`
+	Generation        int64             `json:"generation,omitempty"`
+	ResourceVersion   string            `json:"resourceVersion,omitempty"`
+	DeletionTimestamp *string           `json:"deletionTimestamp,omitempty"`
+	Finalizers        []string          `json:"finalizers,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
+	Annotations       map[string]string `json:"annotations,omitempty"`
 }
 
 type ListMeta struct {
@@ -87,10 +147,10 @@ type PodTemplateSpec struct {
 }
 
 type PodSpec struct {
-	ServiceAccountName string      `json:"serviceAccountName,omitempty"`
+	ServiceAccountName string              `json:"serviceAccountName,omitempty"`
 	SecurityContext    *PodSecurityContext `json:"securityContext,omitempty"`
-	Containers         []Container `json:"containers"`
-	Volumes            []Volume    `json:"volumes,omitempty"`
+	Containers         []Container         `json:"containers"`
+	Volumes            []Volume            `json:"volumes,omitempty"`
 }
 
 type PodSecurityContext struct {
@@ -100,15 +160,15 @@ type PodSecurityContext struct {
 }
 
 type Container struct {
-	Name            string               `json:"name"`
-	Image           string               `json:"image"`
-	Args            []string             `json:"args,omitempty"`
-	Ports           []ContainerPort      `json:"ports,omitempty"`
-	Env             []EnvVar             `json:"env,omitempty"`
-	VolumeMounts    []VolumeMount        `json:"volumeMounts,omitempty"`
-	LivenessProbe   *Probe               `json:"livenessProbe,omitempty"`
-	ReadinessProbe  *Probe               `json:"readinessProbe,omitempty"`
-	Resources       ResourceRequirements `json:"resources,omitempty"`
+	Name            string                    `json:"name"`
+	Image           string                    `json:"image"`
+	Args            []string                  `json:"args,omitempty"`
+	Ports           []ContainerPort           `json:"ports,omitempty"`
+	Env             []EnvVar                  `json:"env,omitempty"`
+	VolumeMounts    []VolumeMount             `json:"volumeMounts,omitempty"`
+	LivenessProbe   *Probe                    `json:"livenessProbe,omitempty"`
+	ReadinessProbe  *Probe                    `json:"readinessProbe,omitempty"`
+	Resources       ResourceRequirements      `json:"resources,omitempty"`
 	SecurityContext *ContainerSecurityContext `json:"securityContext,omitempty"`
 }
 
@@ -154,8 +214,8 @@ type HTTPGetAction struct {
 }
 
 type Volume struct {
-	Name                  string               `json:"name"`
-	PersistentVolumeClaim *PVCVolumeSource     `json:"persistentVolumeClaim,omitempty"`
+	Name                  string           `json:"name"`
+	PersistentVolumeClaim *PVCVolumeSource `json:"persistentVolumeClaim,omitempty"`
 }
 
 type PVCVolumeSource struct {
@@ -199,7 +259,7 @@ type PVC struct {
 }
 
 type PVCSpec struct {
-	AccessModes []string              `json:"accessModes"`
+	AccessModes []string                `json:"accessModes"`
 	Resources   PVCResourceRequirements `json:"resources"`
 }
 
@@ -210,10 +270,10 @@ type PVCResourceRequirements struct {
 // OpenShift Route shapes
 
 type Route struct {
-	APIVersion string      `json:"apiVersion"`
-	Kind       string      `json:"kind"`
-	Metadata   ObjectMeta  `json:"metadata"`
-	Spec       RouteSpec   `json:"spec"`
+	APIVersion string     `json:"apiVersion"`
+	Kind       string     `json:"kind"`
+	Metadata   ObjectMeta `json:"metadata"`
+	Spec       RouteSpec  `json:"spec"`
 }
 
 type RouteSpec struct {
@@ -233,7 +293,8 @@ type RoutePort struct {
 }
 
 type RouteTLS struct {
-	Termination string `json:"termination"`
+	Termination                   string `json:"termination"`
+	InsecureEdgeTerminationPolicy string `json:"insecureEdgeTerminationPolicy,omitempty"`
 }
 
 // DeploymentWithStatus is used to read replica counts from the API.

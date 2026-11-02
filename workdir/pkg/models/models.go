@@ -44,6 +44,8 @@ type KPI struct {
 	Timestamp time.Time   `json:"timestamp"`
 	Host      string      `json:"host"`
 	Workload  WorkloadRef `json:"workload,omitempty"` // K8s workload identity
+	// Unavailable marks a KPI whose inputs are absent. Value is then meaningless.
+	Unavailable bool `json:"unavailable,omitempty"`
 }
 
 // KPISnapshot holds all current KPIs for a host
@@ -64,6 +66,8 @@ type KPISnapshot struct {
 	HealthScore KPI `json:"health_score"` // single composite executive KPI [0-100]
 	// v6.1: throughput collapse signal
 	Throughput KPI `json:"throughput"`
+	// UnavailableSignals lists the KPIs whose inputs are absent.
+	UnavailableSignals []string `json:"unavailable_signals,omitempty"`
 	// v6.2: fused rupture index (metric R + log R + trace R combined)
 	FusedRuptureIndex float64 `json:"fused_rupture_index"`
 	// v5.0: dual-scale CA-ILR rupture events (omitted when none detected)

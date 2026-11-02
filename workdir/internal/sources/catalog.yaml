@@ -1,0 +1,33 @@
+signals:
+  - name: memory_saturation
+    mode: saturation
+    usage: 'sum by (namespace,pod) (container_memory_working_set_bytes{container!="",container!="POD"})'
+    capacity: 'sum by (namespace,pod) (kube_pod_container_resource_limits{resource="memory"})'
+    restarts: 'sum by (namespace,pod) (kube_pod_container_status_restarts_total)'
+  - name: cpu_throttling
+    mode: condition
+    usage: 'sum by (namespace,pod) (rate(container_cpu_cfs_throttled_periods_total{container!=""}[5m])) / sum by (namespace,pod) (rate(container_cpu_cfs_periods_total{container!=""}[5m]))'
+
+roles:
+  - {name: memory.usage, level: pod, profile: minimal, target: pod, query: 'sum by (namespace,pod) (container_memory_working_set_bytes{container!="",container!="POD"})'}
+  - {name: memory.limit, level: pod, profile: minimal, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_resource_limits{resource="memory"})'}
+  - {name: cpu.throttled, level: pod, profile: minimal, target: pod, query: 'sum by (namespace,pod) (rate(container_cpu_cfs_throttled_periods_total{container!=""}[5m])) / sum by (namespace,pod) (rate(container_cpu_cfs_periods_total{container!=""}[5m]))'}
+  - {name: container.restarts, level: pod, profile: minimal, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_status_restarts_total)'}
+  - {name: container.waiting, level: pod, profile: minimal, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_status_waiting)'}
+  - {name: pod.ready, level: pod, profile: minimal, target: pod, query: 'sum by (namespace,pod) (kube_pod_status_ready{condition="true"})'}
+  - {name: cpu.usage, level: pod, profile: standard, target: pod, query: 'sum by (namespace,pod) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m]))'}
+  - {name: cpu.limit, level: pod, profile: standard, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_resource_limits{resource="cpu"})'}
+  - {name: memory.request, level: pod, profile: standard, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_resource_requests{resource="memory"})'}
+  - {name: cpu.request, level: pod, profile: standard, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_resource_requests{resource="cpu"})'}
+  - {name: network.receive, level: pod, profile: standard, target: pod, query: 'sum by (namespace,pod) (rate(container_network_receive_bytes_total[5m]))'}
+  - {name: network.transmit, level: pod, profile: standard, target: pod, query: 'sum by (namespace,pod) (rate(container_network_transmit_bytes_total[5m]))'}
+  - {name: network.drops, level: pod, profile: standard, target: pod, query: 'sum by (namespace,pod) (rate(container_network_receive_packets_dropped_total[5m]))'}
+  - {name: disk.usage, level: pod, profile: standard, target: pod, query: 'sum by (namespace,pod) (container_fs_usage_bytes{container!=""})'}
+  - {name: disk.limit, level: pod, profile: standard, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_resource_limits{resource="ephemeral_storage"})'}
+  - {name: replicas.desired, level: workload, profile: minimal, target: deployment, query: 'sum by (namespace,deployment) (kube_deployment_spec_replicas)'}
+  - {name: replicas.available, level: workload, profile: minimal, target: deployment, query: 'sum by (namespace,deployment) (kube_deployment_status_replicas_available)'}
+  - {name: replicas.unavailable, level: workload, profile: minimal, target: deployment, query: 'sum by (namespace,deployment) (kube_deployment_status_replicas_unavailable)'}
+  - {name: rollout.stalled, level: workload, profile: minimal, target: deployment, query: 'sum by (namespace,deployment) (kube_deployment_status_condition{condition="Progressing",status="false"})'}
+  - {name: container.oom, level: pod, profile: minimal, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"})'}
+  - {name: replicas.unavailable.statefulset, level: workload, profile: minimal, target: statefulset, query: 'sum by (namespace,statefulset) (kube_statefulset_replicas - kube_statefulset_status_replicas_ready)'}
+  - {name: replicas.unavailable.daemonset, level: workload, profile: minimal, target: daemonset, query: 'sum by (namespace,daemonset) (kube_daemonset_status_number_unavailable)'}

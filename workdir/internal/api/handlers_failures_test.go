@@ -1,0 +1,161 @@
+package api
+
+import (
+	"testing"
+	"time"
+
+	"github.com/benfradjselim/ruptura/internal/analyzer"
+	"github.com/benfradjselim/ruptura/internal/failuremodes"
+	"github.com/benfradjselim/ruptura/pkg/models"
+)
+
+func TestFailureResult(t *testing.T) {
+	saturation := failuremodes.Estimate{Mode: failuremodes.ModeSaturation, Pod: "n/p", ETF: 12 * time.Minute, Confidence: 0.8, Usage: 900}
+	throttled := failuremodes.Estimate{Mode: failuremodes.ModeCPUThrottling, Pod: "n/p", Confidence: 1, Usage: 0.4}
+	cases := []struct {
+		name      string
+		est       *failuremodes.Estimate
+		crashLoop bool
+		wantMode  string
+		wantKind  string
+		wantETA   int
+	}{
+		{"no finding", nil, false, "", "", 0},
+		{"saturation is predicted", &saturation, false, "saturation", failureKindPredicted, 720},
+		{"throttling is detected", &throttled, false, "cpu_throttling", failureKindDetected, 0},
+		{"crash loop is detected", nil, true, failureModeCrashLoop, failureKindDetected, 0},
+		{"crash loop outranks a forecast", &saturation, true, failureModeCrashLoop, failureKindDetected, 0},
+	}
+	for _, c := range cases {
+		got := failureResult("n/Deployment/w", "critical", c.est, c.crashLoop)
+		if c.wantMode == "" {
+			if got != nil {
+				t.Errorf("%s: got %+v, want none", c.name, got)
+			}
+			continue
+		}
+		if got == nil {
+			t.Fatalf("%s: got none", c.name)
+		}
+		if got.FailureMode != c.wantMode || got.Kind != c.wantKind || got.ETASeconds != c.wantETA {
+			t.Errorf("%s: got %+v", c.name, got)
+		}
+		if got.Level != "workload" || got.Target != "n/Deployment/w" || got.State != "critical" || got.RecommendedAction == "" {
+			t.Errorf("%s: incomplete result %+v", c.name, got)
+		}
+	}
+}
+
+func TestApplyEstimate_UsesHorizon(t *testing.T) {
+	est := failuremodes.Estimate{Mode: failuremodes.ModeSaturation, ETF: 40 * time.Minute}
+	cases := []struct {
+		name    string
+		horizon time.Duration
+		want    string
+	}{
+		{"inside a long horizon", time.Hour, "degraded"},
+		{"outside the default horizon", 30 * time.Minute, "healthy"},
+		{"unset uses the default", 0, "healthy"},
+	}
+	for _, c := range cases {
+		h := &Handlers{}
+		h.SetHorizon(c.horizon)
+		if got, _ := applyEstimate("healthy", 0, est, h.warningHorizon()); got != c.want {
+			t.Errorf("%s: state = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestScopeResult(t *testing.T) {
+	base := FailureResult{Level: failureLevelWorkload, Target: "n/Deployment/w", Pod: "n/p"}
+	cases := []struct {
+		scope      string
+		wantLevel  string
+		wantTarget string
+	}{
+		{"", "workload", "n/Deployment/w"},
+		{"workload", "workload", "n/Deployment/w"},
+		{"pod", "pod", "n/p"},
+		{"namespace", "namespace", "n"},
+	}
+	for _, c := range cases {
+		got := scopeResult(base, c.scope)
+		if got.Level != c.wantLevel || got.Target != c.wantTarget {
+			t.Errorf("scope %q: got %+v", c.scope, got)
+		}
+	}
+	noPod := FailureResult{Level: failureLevelWorkload, Target: "n/Deployment/w"}
+	if got := scopeResult(noPod, "pod"); got.Level != "workload" {
+		t.Errorf("a result without a pod must stay at workload level: %+v", got)
+	}
+}
+
+func TestParseSelector(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want map[string]string
+	}{
+		{"", nil},
+		{"team=shop", map[string]string{"team": "shop"}},
+		{"team=shop,tier=db", map[string]string{"team": "shop", "tier": "db"}},
+		{"broken", map[string]string{}},
+	}
+	for _, c := range cases {
+		got := ParseSelector(c.raw)
+		if len(got) != len(c.want) {
+			t.Errorf("%q: got %v", c.raw, got)
+		}
+		for k, v := range c.want {
+			if got[k] != v {
+				t.Errorf("%q: got %v", c.raw, got)
+			}
+		}
+	}
+}
+
+func TestSelectFailures(t *testing.T) {
+	results := []*FailureResult{{Target: "n/Deployment/a"}, {Target: "n/Deployment/b"}, {Target: "n/Deployment/unknown"}}
+	labels := map[string]map[string]string{
+		"n/Deployment/a": {"team": "shop", "tier": "web"},
+		"n/Deployment/b": {"team": "pay"},
+	}
+	lookup := func(target string) (map[string]string, bool) {
+		l, ok := labels[target]
+		return l, ok
+	}
+	cases := []struct {
+		name     string
+		selector map[string]string
+		want     int
+	}{
+		{"no selector keeps all", nil, 3},
+		{"match", map[string]string{"team": "shop"}, 1},
+		{"all labels must match", map[string]string{"team": "shop", "tier": "db"}, 0},
+	}
+	for _, c := range cases {
+		if got := selectFailures(results, c.selector, lookup); len(got) != c.want {
+			t.Errorf("%s: kept %d, want %d", c.name, len(got), c.want)
+		}
+	}
+}
+
+func TestFailures_WorkloadWithoutTelemetry(t *testing.T) {
+	a := analyzer.NewAnalyzer()
+	ref := models.WorkloadRef{Namespace: "n", Kind: "Deployment", Name: "w"}
+	a.RegisterWorkload(ref)
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+	h := &Handlers{store: store, analyzer: a}
+	h.SetFailureModes(fixedEstimates{ref.Key(): {Mode: failuremodes.ModeSaturation, Pod: "n/p", ETF: 5 * time.Minute, Confidence: 0.9}})
+
+	results := h.Failures()
+	if len(results) != 1 {
+		t.Fatalf("results = %d, want the failure of a workload with no telemetry", len(results))
+	}
+	if results[0].FailureMode != "saturation" || results[0].State != "critical" {
+		t.Errorf("result = %+v", results[0])
+	}
+	if fleet := h.buildFleet(); fleet.CriticalHosts != 1 {
+		t.Errorf("critical hosts = %d, want 1", fleet.CriticalHosts)
+	}
+}

@@ -168,6 +168,7 @@ type workloadState struct {
 	baselineReady    bool
 	baselineMeans    map[string]float64 // per-signal rolling mean
 	baselineM2       map[string]float64 // Welford M2 for stddev
+	baselineCounts   map[string]int     // observations per signal
 
 	// v6.4: business signals
 	sloConfig     *models.SLOConfig
@@ -241,16 +242,19 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 
 	// --- Stress Index ---
 	// S = α·CPU + β·RAM + γ·Latency + δ·Errors + ε·Timeouts
-	cpu := getMetric(metrics, "cpu_percent")
-	ram := getMetric(metrics, "memory_percent")
-	latency := getMetric(metrics, "load_avg_1") // use load as latency proxy
-	errors := getMetric(metrics, "error_rate")
-	timeouts := getMetric(metrics, "timeout_rate")
+	cpu := readMetric(metrics, "cpu_percent")
+	ram := readMetric(metrics, "memory_percent")
+	latency := readMetric(metrics, "latency", "load_avg_1")
+	errors := readMetric(metrics, "error_rate")
+	timeouts := readMetric(metrics, "timeout_rate")
 
-	stress := 0.30*cpu + 0.20*ram + 0.20*latency + 0.20*errors + 0.10*timeouts
-	stress = utils.Clamp(stress, 0, 1)
-
-	ws.stressHistory.Push(stress)
+	stress := weightedMean([]weightedInput{
+		{0.30, cpu}, {0.20, ram}, {0.20, latency}, {0.20, errors}, {0.10, timeouts},
+	})
+	if stress.available {
+		stress.value = utils.Clamp(stress.value, 0, 1)
+		ws.stressHistory.Push(stress.value)
+	}
 
 	// --- Fatigue (v5.0 — Dissipative) ---
 	// F_t = max(0, F_{t−1} + (S_t − R_threshold) − λ_eff)
@@ -264,66 +268,73 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 		dt = maxDt
 	}
 	lambdaEff := ws.fatigueLambda * (dt / nominalInterval)
-	ws.fatigue = math.Max(0, ws.fatigue+(stress-ws.fatigueRThreshold)-lambdaEff)
-	ws.fatigue = utils.Clamp(ws.fatigue, 0, 1)
+	fatigue := reading{}
+	if stress.available {
+		ws.fatigue = math.Max(0, ws.fatigue+(stress.value-ws.fatigueRThreshold)-lambdaEff)
+		ws.fatigue = utils.Clamp(ws.fatigue, 0, 1)
+		fatigue = measured(ws.fatigue)
+	}
 
 	// --- Mood ---
 	// M = (Uptime × Throughput) / (Errors × Timeouts × Restarts + ε)
 	// ε guards the WHOLE denominator product (not individual factors) per spec.
 	// Log normalization: log(rawMood + 1) / log(max_expected + 1) maps to [0, 1].
-	uptime := getMetric(metrics, "uptime_seconds")
-	ws.uptime = uptime // always update (including 0) to avoid stale value
+	uptime := readMetric(metrics, "uptime_seconds")
+	ws.uptime = uptime.value // always update (including 0) to avoid stale value
 
-	requests := getMetric(metrics, "request_rate")
-	ws.requestHistory.Push(requests)
-	ws.errorHistory.Push(errors)
-	ws.timeoutHistory.Push(timeouts)
+	requests := readMetric(metrics, "request_rate")
+	ws.requestHistory.Push(requests.value)
+	ws.errorHistory.Push(errors.value)
+	ws.timeoutHistory.Push(timeouts.value)
 
-	restarts := ws.restartCount + 1 // always at least 1 to avoid division by zero
-	// Denominator: errors × timeouts × restarts with ε protecting against zero
-	denominator := errors*timeouts*restarts + epsilon
-	rawMood := (ws.uptime * (requests + epsilon)) / denominator
-	// Log-normalize: log(1 + rawMood) / log(1 + expectedMax)
-	// expectedMax ≈ uptime(86400s) × throughput(1) / epsilon ≈ 8.64e14 → use log ceiling 35
-	const moodLogCeiling = 35.0
-	mood := utils.Clamp(math.Log1p(rawMood)/moodLogCeiling, 0, 1)
+	mood := reading{}
+	if allAvailable(uptime, requests, errors, timeouts) {
+		restarts := ws.restartCount + 1 // always at least 1 to avoid division by zero
+		// Denominator: errors × timeouts × restarts with ε protecting against zero
+		denominator := errors.value*timeouts.value*restarts + epsilon
+		rawMood := (ws.uptime * (requests.value + epsilon)) / denominator
+		// Log-normalize: log(1 + rawMood) / log(1 + expectedMax)
+		// expectedMax ≈ uptime(86400s) × throughput(1) / epsilon ≈ 8.64e14 → use log ceiling 35
+		const moodLogCeiling = 35.0
+		mood = measured(utils.Clamp(math.Log1p(rawMood)/moodLogCeiling, 0, 1))
+	}
 
 	// --- Atmospheric Pressure (EWMA z-score, ported from composites engine) ---
-	lat := getMetric(metrics, "latency")
-	if lat == 0 {
-		lat = getMetric(metrics, "load_avg_1")
+	pressure := reading{}
+	var zScores []weightedInput
+	if latency.available {
+		ws.muLat = 0.9*ws.muLat + 0.1*latency.value
+		ws.sigma2Lat = 0.9*ws.sigma2Lat + 0.1*math.Pow(latency.value-ws.muLat, 2)
+		sigmaLat := math.Sqrt(ws.sigma2Lat)
+		if sigmaLat < 1e-6 {
+			sigmaLat = 1.0
+		}
+		zScores = append(zScores, weightedInput{0.5, measured((latency.value - ws.muLat) / sigmaLat)})
 	}
-	errRate := getMetric(metrics, "error_rate")
-
-	ws.muLat = 0.9*ws.muLat + 0.1*lat
-	ws.sigma2Lat = 0.9*ws.sigma2Lat + 0.1*math.Pow(lat-ws.muLat, 2)
-	ws.muErr = 0.9*ws.muErr + 0.1*errRate
-	ws.sigma2Err = 0.9*ws.sigma2Err + 0.1*math.Pow(errRate-ws.muErr, 2)
-
-	sigmaLat := math.Sqrt(ws.sigma2Lat)
-	if sigmaLat < 1e-6 {
-		sigmaLat = 1.0
+	if errors.available {
+		ws.muErr = 0.9*ws.muErr + 0.1*errors.value
+		ws.sigma2Err = 0.9*ws.sigma2Err + 0.1*math.Pow(errors.value-ws.muErr, 2)
+		sigmaErr := math.Sqrt(ws.sigma2Err)
+		if sigmaErr < 1e-6 {
+			sigmaErr = 1.0
+		}
+		zScores = append(zScores, weightedInput{0.5, measured((errors.value - ws.muErr) / sigmaErr)})
 	}
-	sigmaErr := math.Sqrt(ws.sigma2Err)
-	if sigmaErr < 1e-6 {
-		sigmaErr = 1.0
+	if rawPressure := weightedMean(zScores); rawPressure.available {
+		pressure = measured(utils.Clamp((rawPressure.value+3)/6.0, 0, 1)) // map [-3,+3] z-score to [0,1]
 	}
-
-	latencyZ := (lat - ws.muLat) / sigmaLat
-	errorZ := (errRate - ws.muErr) / sigmaErr
-	rawPressure := 0.5*latencyZ + 0.5*errorZ
-	pressureNorm := utils.Clamp((rawPressure+3)/6.0, 0, 1) // map [-3,+3] z-score to [0,1]
 
 	// --- Error Humidity ---
 	// H = (E × T) / Q
-	throughputQ := requests + epsilon
-	humidity := (errors * timeouts) / throughputQ
-	humidity = utils.Clamp(humidity, 0, 1)
+	humidity := reading{}
+	if allAvailable(errors, timeouts, requests) {
+		humidity = measured(utils.Clamp((errors.value*timeouts.value)/(requests.value+epsilon), 0, 1))
+	}
 
 	// --- Contagion Index ---
 	// If topology is available: max incoming error propagation across upstream callers.
 	// Fallback: errors×cpu proxy when no trace edges exist for this workload.
-	var contagion float64
+	contagion := reading{}
 	if a.topology != nil {
 		edges := a.topology.Edges()
 		for _, e := range edges {
@@ -331,82 +342,100 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 				errRate := float64(e.Errors) / float64(e.Calls)
 				weight := utils.Clamp(float64(e.Calls)/1000.0, 0, 1) // edge weight by call volume
 				prop := errRate * weight
-				if prop > contagion {
-					contagion = prop
+				if !contagion.available || prop > contagion.value {
+					contagion = measured(prop)
 				}
 			}
 		}
 	}
-	if contagion == 0 {
-		contagion = errors * cpu
+	if contagion.value == 0 && allAvailable(errors, cpu) {
+		contagion = measured(errors.value * cpu.value)
 	}
-	contagion = utils.Clamp(contagion, 0, 1)
 
 	// --- v8.0: Infra + CGPM integration (nil-safe; defaults to v7 behavior when absent) ---
-	infraStress := 0.0
-	networkHealth := 1.0
+	infraStress := reading{}
+	networkHealth := reading{}
 	if a.infraRegistry != nil {
 		nsSnap := a.infraRegistry.NamespaceSnapshot(ref.Namespace)
-		infraStress = nsSnap.InfraStress
-		networkHealth = nsSnap.NetworkHealth
+		infraStress = measured(nsSnap.InfraStress)
+		networkHealth = measured(nsSnap.NetworkHealth)
 		// Fold CGPM PropPressure into contagion via max() — existing contagion never decreases.
-		if nsSnap.PropPressure > contagion {
-			contagion = nsSnap.PropPressure
+		if nsSnap.PropPressure > contagion.value {
+			contagion = measured(nsSnap.PropPressure)
 		}
-		contagion = utils.Clamp(contagion, 0, 1)
+	}
+	if contagion.available {
+		contagion.value = utils.Clamp(contagion.value, 0, 1)
 	}
 
 	// --- Throughput collapse signal (v6.1) ---
-	reqRate := getMetric(metrics, "request_rate")
-	throughputDrop := 0.0
-	if ws.prevRequestRate > 0.01 && reqRate < ws.prevRequestRate {
-		drop := (ws.prevRequestRate - reqRate) / ws.prevRequestRate
-		throughputDrop = utils.Clamp(drop, 0, 1)
+	throughputDrop := reading{}
+	if requests.available {
+		throughputDrop = measured(0)
+		if ws.prevRequestRate > 0.01 && requests.value < ws.prevRequestRate {
+			drop := (ws.prevRequestRate - requests.value) / ws.prevRequestRate
+			throughputDrop = measured(utils.Clamp(drop, 0, 1))
+		}
+		ws.prevRequestRate = requests.value
 	}
-	ws.prevRequestRate = reqRate
 
 	// --- ETF-style Composed KPIs ---
 
 	// Resilience: ability to absorb disruption without failing
 	// High mood + low fatigue + low contagion = resilient
 	// R = mood × (1 - fatigue) × (1 - contagion)
-	resilience := utils.Clamp(mood*(1-ws.fatigue)*(1-contagion), 0, 1)
+	resilience := reading{}
+	if allAvailable(mood, fatigue, contagion) {
+		resilience = measured(utils.Clamp(mood.value*(1-ws.fatigue)*(1-contagion.value), 0, 1))
+	}
 
 	// HealthScore: additive weighted penalty (avoids multiplicative collapse).
 	// Weights are resolved per-workload; fall back to global defaults when no override matches.
 	w := a.resolveWeights(ref.Key())
-	penalty := w.Stress*stress + w.Fatigue*ws.fatigue + w.Mood*(1-mood) + w.Pressure*pressureNorm + w.Humidity*humidity + w.Contagion*contagion + w.InfraStress*infraStress + w.NetworkHealth*(1-networkHealth)
-	healthScore := utils.Clamp(1-penalty, 0, 1)
+	moodPenalty := reading{value: 1 - mood.value, available: mood.available}
+	networkPenalty := reading{value: 1 - networkHealth.value, available: networkHealth.available}
+	healthScore := reading{}
+	if penalty := weightedMean([]weightedInput{
+		{w.Stress, stress}, {w.Fatigue, fatigue}, {w.Mood, moodPenalty}, {w.Pressure, pressure},
+		{w.Humidity, humidity}, {w.Contagion, contagion}, {w.InfraStress, infraStress},
+		{w.NetworkHealth, networkPenalty},
+	}); penalty.available {
+		healthScore = measured(utils.Clamp(1-penalty.value, 0, 1))
+	}
 
 	// Entropy: system disorder — how much KPI values deviate from their rolling mean
 	// Computed as mean absolute deviation of health history (normalized)
-	ws.healthHistory.Push(healthScore)
-	healthVals := ws.healthHistory.Values()
-	entropy := 0.0
-	if len(healthVals) > 1 {
-		// mean
-		sum := 0.0
-		for _, v := range healthVals {
-			sum += v
+	entropy := reading{}
+	if healthScore.available {
+		ws.healthHistory.Push(healthScore.value)
+		entropy = measured(0)
+		healthVals := ws.healthHistory.Values()
+		if len(healthVals) > 1 {
+			sum := 0.0
+			for _, v := range healthVals {
+				sum += v
+			}
+			mean := sum / float64(len(healthVals))
+			mad := 0.0
+			for _, v := range healthVals {
+				mad += math.Abs(v - mean)
+			}
+			mad /= float64(len(healthVals))
+			// normalize: max theoretical MAD for [0,1] values is 0.5
+			entropy = measured(utils.Clamp(mad/0.5, 0, 1))
 		}
-		mean := sum / float64(len(healthVals))
-		// mean absolute deviation
-		mad := 0.0
-		for _, v := range healthVals {
-			mad += math.Abs(v - mean)
-		}
-		mad /= float64(len(healthVals))
-		// normalize: max theoretical MAD for [0,1] values is 0.5
-		entropy = utils.Clamp(mad/0.5, 0, 1)
 	}
 
 	// Velocity: rate of change of HealthScore (momentum)
 	// High velocity = system changing fast (could be recovering or crashing)
-	velocity := 0.0
-	if !ws.firstUpdate && dt > 0 {
-		delta := math.Abs(healthScore - ws.lastHealthScore)
-		// normalize by expected max change rate: 0.1 per second = extreme
-		velocity = utils.Clamp(delta/(0.1*dt), 0, 1)
+	velocity := reading{}
+	if healthScore.available {
+		velocity = measured(0)
+		if !ws.firstUpdate && dt > 0 {
+			delta := math.Abs(healthScore.value - ws.lastHealthScore)
+			// normalize by expected max change rate: 0.1 per second = extreme
+			velocity = measured(utils.Clamp(delta/(0.1*dt), 0, 1))
+		}
 	}
 
 	// --- Adaptive baseline update (Welford online algorithm) ---
@@ -414,131 +443,87 @@ func (a *Analyzer) Update(ref models.WorkloadRef, metrics map[string]float64) mo
 	// computes a z-score relative to the workload's normal penalty level, not its raw mood.
 	// Without this, idle workloads (mood=0 always, baseline=0) produce z=(1-0)/sigma_guard=20
 	// → full penalty every tick → healthScore stuck at exactly 0.80 regardless of activity.
-	signals := map[string]float64{
+	signals := map[string]reading{
 		"stress":          stress,
-		"fatigue":         ws.fatigue,
-		"mood":            1 - mood,
-		"pressure":        pressureNorm,
+		"fatigue":         fatigue,
+		"mood":            moodPenalty,
+		"pressure":        pressure,
 		"humidity":        humidity,
 		"contagion":       contagion,
 		"throughput_drop": throughputDrop,
 		"health_score":    healthScore,
 	}
-	ws.updateBaseline(signals)
+	baselineInputs := make(map[string]float64, len(signals))
+	for name, signal := range signals {
+		if signal.available {
+			baselineInputs[name] = signal.value
+		}
+	}
+	ws.updateBaseline(baselineInputs)
 
 	// After baseline is established, recalculate HealthScore using workload-relative
 	// z-scores so global thresholds don't produce false positives for heavy-load workloads.
 	// Fatigue keeps its absolute threshold — sustained effort is fatigue regardless of "normal".
 	if ws.baselineReady {
-		relStress := adaptiveScore(ws, "stress", stress)
-		relMood := adaptiveScore(ws, "mood", 1-mood) // mood positive: penalize below-baseline mood
-		relPressure := adaptiveScore(ws, "pressure", pressureNorm)
-		relHumidity := adaptiveScore(ws, "humidity", humidity)
-		relContagion := adaptiveScore(ws, "contagion", contagion)
+		relative := func(name string, r reading) reading {
+			if !r.available {
+				return r
+			}
+			return measured(adaptiveScore(ws, name, r.value))
+		}
 		// infraStress and networkHealth are registry-sourced; not adaptive per-workload baseline.
-		penalty = w.Stress*relStress + w.Fatigue*ws.fatigue + w.Mood*relMood + w.Pressure*relPressure + w.Humidity*relHumidity + w.Contagion*relContagion + w.InfraStress*infraStress + w.NetworkHealth*(1-networkHealth)
-		healthScore = utils.Clamp(1-penalty, 0, 1)
+		if penalty := weightedMean([]weightedInput{
+			{w.Stress, relative("stress", stress)}, {w.Fatigue, fatigue},
+			{w.Mood, relative("mood", moodPenalty)}, {w.Pressure, relative("pressure", pressure)},
+			{w.Humidity, relative("humidity", humidity)}, {w.Contagion, relative("contagion", contagion)},
+			{w.InfraStress, infraStress}, {w.NetworkHealth, networkPenalty},
+		}); penalty.available {
+			healthScore = measured(utils.Clamp(1-penalty.value, 0, 1))
+		}
 	}
 
 	// Update last state
-	ws.lastStress = stress
-	ws.lastHealthScore = healthScore
+	ws.lastStress = stress.value
+	if healthScore.available {
+		ws.lastHealthScore = healthScore.value
+	}
 	ws.lastUpdate = now
 	ws.firstUpdate = false
 
 	key := ref.Key()
+	host := models.FirstNonEmpty(ref.Node, ref.Name)
+	kpi := func(name string, r reading, state func(float64) string) models.KPI {
+		k := models.KPI{Name: name, Timestamp: now, Host: host, Workload: ref}
+		if !r.available {
+			k.State = stateUnavailable
+			k.Unavailable = true
+			return k
+		}
+		k.Value = utils.RoundTo(r.value, 4)
+		k.State = state(r.value)
+		return k
+	}
 	snap := models.KPISnapshot{
-		Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-		Workload:  ref,
-		Timestamp: now,
-		Stress: models.KPI{
-			Name:      "stress",
-			Value:     utils.RoundTo(stress, 4),
-			State:     stressState(stress),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		Fatigue: models.KPI{
-			Name:      "fatigue",
-			Value:     utils.RoundTo(ws.fatigue, 4),
-			State:     fatigueState(ws.fatigue),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		Mood: models.KPI{
-			Name:      "mood",
-			Value:     utils.RoundTo(mood, 4),
-			State:     moodState(mood),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		Pressure: models.KPI{
-			Name:      "pressure",
-			Value:     utils.RoundTo(pressureNorm, 4),
-			State:     pressureState(pressureNorm),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		Humidity: models.KPI{
-			Name:      "humidity",
-			Value:     utils.RoundTo(humidity, 4),
-			State:     humidityState(humidity),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		Contagion: models.KPI{
-			Name:      "contagion",
-			Value:     utils.RoundTo(contagion, 4),
-			State:     contagionState(contagion),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		Resilience: models.KPI{
-			Name:      "resilience",
-			Value:     utils.RoundTo(resilience, 4),
-			State:     resilienceState(resilience),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		Entropy: models.KPI{
-			Name:      "entropy",
-			Value:     utils.RoundTo(entropy, 4),
-			State:     entropyState(entropy),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		Velocity: models.KPI{
-			Name:      "velocity",
-			Value:     utils.RoundTo(velocity, 4),
-			State:     velocityState(velocity),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		Throughput: models.KPI{
-			Name:      "throughput",
-			Value:     utils.RoundTo(throughputDrop, 4),
-			State:     throughputState(throughputDrop),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
-		HealthScore: models.KPI{
-			Name:      "health_score",
-			Value:     utils.RoundTo(healthScore, 4),
-			State:     healthScoreState(healthScore),
-			Timestamp: now,
-			Host:      models.FirstNonEmpty(ref.Node, ref.Name),
-			Workload:  ref,
-		},
+		Host:        host,
+		Workload:    ref,
+		Timestamp:   now,
+		Stress:      kpi("stress", stress, stressState),
+		Fatigue:     kpi("fatigue", fatigue, fatigueState),
+		Mood:        kpi("mood", mood, moodState),
+		Pressure:    kpi("pressure", pressure, pressureState),
+		Humidity:    kpi("humidity", humidity, humidityState),
+		Contagion:   kpi("contagion", contagion, contagionState),
+		Resilience:  kpi("resilience", resilience, resilienceState),
+		Entropy:     kpi("entropy", entropy, entropyState),
+		Velocity:    kpi("velocity", velocity, velocityState),
+		Throughput:  kpi("throughput", throughputDrop, throughputState),
+		HealthScore: kpi("health_score", healthScore, healthScoreState),
+		UnavailableSignals: unavailableSignals(map[string]reading{
+			"stress": stress, "fatigue": fatigue, "mood": mood, "pressure": pressure,
+			"humidity": humidity, "contagion": contagion, "resilience": resilience,
+			"entropy": entropy, "velocity": velocity, "throughput": throughputDrop,
+			"health_score": healthScore,
+		}),
 	}
 	a.snapshots[key] = snap
 	return snap
@@ -557,17 +542,24 @@ func (ws *workloadState) updateBaseline(signals map[string]float64) {
 	if ws.baselineMeans == nil {
 		ws.baselineMeans = make(map[string]float64)
 		ws.baselineM2 = make(map[string]float64)
+		ws.baselineCounts = make(map[string]int)
 	}
 	for k, v := range signals {
-		n := float64(ws.observationCount)
+		ws.baselineCounts[k]++
+		n := float64(ws.baselineCounts[k])
 		delta := v - ws.baselineMeans[k]
 		ws.baselineMeans[k] += delta / n
 		ws.baselineM2[k] += delta * (v - ws.baselineMeans[k])
 	}
-	if ws.observationCount >= 96 { // 24h at 15s intervals
+	if ws.observationCount >= 96 { // 24 minutes at 15s intervals
 		ws.baselineReady = true
 	}
 }
+
+// minBaselineSigma keeps a workload with almost no variance from turning a
+// negligible move into a full penalty. Signals are in [0,1], so the score reaches
+// its maximum no sooner than 0.15 above the baseline mean.
+const minBaselineSigma = 0.05
 
 // adaptiveScore converts a raw signal value to a workload-relative score in [0,1].
 // When the value equals the workload's baseline mean it returns 0 (healthy).
@@ -578,22 +570,22 @@ func adaptiveScore(ws *workloadState, signal string, raw float64) float64 {
 		return raw
 	}
 	mean, ok := ws.baselineMeans[signal]
-	if !ok {
+	count := ws.baselineCounts[signal]
+	if !ok || count < 2 {
 		return raw
 	}
 	m2 := ws.baselineM2[signal]
-	variance := m2 / float64(ws.observationCount-1)
+	variance := m2 / float64(count-1)
 	sigma := math.Sqrt(variance)
-	if sigma < 1e-6 {
-		// Near-zero variance: workload is very stable; any deviation is notable.
-		sigma = 0.05
+	if sigma < minBaselineSigma {
+		sigma = minBaselineSigma
 	}
 	z := (raw - mean) / sigma
 	return utils.Clamp(z/3.0, 0, 1) // 3σ above normal = max penalty
 }
 
 // BaselineReady returns true if the workload has accumulated enough observations
-// to use adaptive baseline thresholding (96 observations, ~24h at 15s intervals).
+// to use adaptive baseline thresholding (96 observations, about 24 minutes at 15s intervals).
 func (a *Analyzer) BaselineReady(ref models.WorkloadRef) bool {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -615,10 +607,11 @@ func (a *Analyzer) BaselineSigma(ref models.WorkloadRef, signal string) float64 
 		return 0
 	}
 	m2, ok := ws.baselineM2[signal]
-	if !ok {
+	count := ws.baselineCounts[signal]
+	if !ok || count < 2 {
 		return 0
 	}
-	variance := m2 / float64(ws.observationCount-1)
+	variance := m2 / float64(count-1)
 	return math.Sqrt(variance)
 }
 
@@ -674,13 +667,6 @@ func (a *Analyzer) SetFatigueConfig(host string, rThreshold, lambda float64) {
 	ws := a.getOrCreate(models.WorkloadRefFromHost(host))
 	ws.fatigueRThreshold = rThreshold
 	ws.fatigueLambda = lambda
-}
-
-func getMetric(metrics map[string]float64, name string) float64 {
-	if v, ok := metrics[name]; ok {
-		return v
-	}
-	return 0
 }
 
 // --- State classification functions ---

@@ -136,7 +136,7 @@ rules:
     resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-    resources: ["pods", "nodes", "namespaces", "services"]
+    resources: ["pods", "nodes", "namespaces", "services", "events"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["batch"]
     resources: ["jobs", "cronjobs"]
@@ -302,7 +302,7 @@ spec:
   template:
     metadata:
       annotations:
-        deploy/ui-image: "v8.2.3"
+        deploy/ui-image: "v8.4.0"
       labels:
         app.kubernetes.io/name: ruptura
         app.kubernetes.io/instance: ruptura
@@ -316,7 +316,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ruptura-ui
-          image: "ghcr.io/benfradjselim/ruptura-ui:v8.2.3"
+          image: "ghcr.io/benfradjselim/ruptura-ui:v8.4.0"
           imagePullPolicy: Always
           ports:
             - name: http
@@ -404,7 +404,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: ruptura
-          image: docker.io/selimbf/ruptura:v8.2.3
+          image: docker.io/selimbf/ruptura:v8.4.0
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false

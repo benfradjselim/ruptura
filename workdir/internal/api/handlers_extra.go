@@ -329,6 +329,7 @@ func (h *Handlers) handleForecast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	host = h.forecastKey(host, metric)
 	result, ok := h.predictor.Forecast(host, metric, horizon)
 	if !ok {
 		// Predictor is warming up — return current stub with warming_up flag
@@ -350,6 +351,22 @@ func (h *Handlers) handleForecast(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// forecastKey expands a namespace/name pair to the namespace/Kind/name key the
+// predictor stores. Any other host value is returned unchanged.
+func (h *Handlers) forecastKey(host, metric string) string {
+	parts := strings.Split(host, "/")
+	if len(parts) != 2 {
+		return host
+	}
+	for _, kind := range []string{"Deployment", "StatefulSet", "DaemonSet"} {
+		key := parts[0] + "/" + kind + "/" + parts[1]
+		if _, ok := h.predictor.Forecast(key, metric, 1); ok {
+			return key
+		}
+	}
+	return host
 }
 
 // handleActions returns action recommendations or handles action operations.

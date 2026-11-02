@@ -29,6 +29,48 @@ spec:
       memory: "512Mi"
 ```
 
+### Choosing what Ruptura watches
+
+```yaml
+apiVersion: ruptura.io/v1alpha1
+kind: RupturaInstance
+metadata:
+  name: shop
+  namespace: ruptura-system
+spec:
+  level:
+    scope: workload            # pod | workload | namespace
+    selector:
+      matchLabels:
+        team: shop
+  input:
+    profile: standard          # minimal | standard
+  analysis:
+    sensitivity: balanced      # conservative | balanced | aggressive
+    horizon: 30m
+  alerting:
+    channels:
+      - name: ops
+        alertmanager:
+          url: http://alertmanager:9093
+  logging:
+    level: info                # debug | info | warn | error
+```
+
+| Field | Purpose |
+|---|---|
+| `level.scope` | Level at which failures are reported |
+| `level.selector.matchLabels` | Reports only workloads with these labels |
+| `input.profile` | How much telemetry is collected |
+| `analysis.sensitivity` | Anomaly detection threshold |
+| `analysis.horizon` | How long before a failure a workload turns degraded |
+| `alerting.channels` | Alertmanager instances that receive active failures |
+| `logging.level` | Engine log level |
+
+An invalid resource deploys nothing. The operator logs the problem and reports it in `status.message` with phase `Failed`. Values reserved for later versions are refused with a clear message.
+
+`level.selector` filters reported results. It does not isolate data between teams.
+
 ### Spec field reference
 
 | Field | Type | Default | Description |

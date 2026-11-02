@@ -31,9 +31,16 @@ func NewEngineWithConfig(cfg EngineConfig) *Engine {
 		ensemble:     make(map[string]*seriesEnsemble),
 		start:        time.Now(),
 		cfg:          cfg,
-		anomalyEng:   NewAnomalyEngine(),
+		anomalyEng:   newAnomalyEngineWithSigma(sigmaOrDefault(cfg.AnomalySigma)),
 		anomalyStore: NewAnomalyStore(cap),
 	}
+}
+
+func sigmaOrDefault(sigma float64) float64 {
+	if sigma > 0 {
+		return sigma
+	}
+	return defaultAnomalySigma
 }
 
 // NewEngine constructs a ready-to-use MetricPipeline engine.
