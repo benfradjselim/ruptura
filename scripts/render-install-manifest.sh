@@ -40,7 +40,7 @@ image_tag="v${version_const}"
     --set ui.enabled=true \
     --set autoGenerateApiKey=true \
     --set image.tag="$image_tag" \
-    --set ui.image.tag="$image_tag"
+    --set ui.image.tag="ui-$image_tag"
 } > "$out"
 
 echo "Wrote $out (image tag: $image_tag)"
