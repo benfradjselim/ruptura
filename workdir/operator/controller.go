@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultImage       = "docker.io/selimbf/ruptura:v8.5.0"
+	defaultImage       = "docker.io/selimbf/ruptura:v8.5.1"
 	defaultStorageSize = "10Gi"
 	defaultEdition     = "community"
 	appLabel           = "app.kubernetes.io/name"

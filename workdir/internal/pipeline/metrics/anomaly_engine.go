@@ -243,6 +243,10 @@ const (
 	// traffic stay visible for minutes. On the lab, half of the remaining rate
 	// anomalies were such bursts between 2 and 3 times the usual value.
 	minRateRatio = 3.0
+	// minRateChange is the smallest rate change, in bytes per second, worth
+	// reporting. Below it, traffic is mostly probes and scrapes, and on the lab
+	// a fifth of rate anomalies moved by less than 100 B/s.
+	minRateChange = 1000.0
 	// minCoreRatio is the relative change CPU, in cores or as a share of its
 	// limit, must show to be unusual.
 	minCoreRatio = 2.0
@@ -289,14 +293,14 @@ func changeRatio(value, expected float64) float64 {
 
 // negligibleDeviation reports whether value is too close to expected to alert.
 // Rates and CPU, in cores or as a share of its limit, need a large relative
-// change, and CPU also an absolute one. Other values within the 0 to 1 range use
+// change and an absolute one. Other values within the 0 to 1 range use
 // the bounded floor, and the rest a fraction of the expected value. A seasonal expected value may dip slightly
 // below 0, so checks use magnitudes.
 func negligibleDeviation(metric string, value, expected float64) bool {
 	dev := math.Abs(value - expected)
 	switch metricScales[metric] {
 	case scaleRate:
-		return changeRatio(value, expected) < minRateRatio
+		return changeRatio(value, expected) < minRateRatio || dev < minRateChange
 	case scaleCores:
 		return changeRatio(value, expected) < minCoreRatio || dev < minCoreChange
 	case scaleCPULimitShare:
