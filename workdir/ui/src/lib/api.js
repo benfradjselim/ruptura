@@ -117,6 +117,8 @@ export const api = {
 
   // ── Fleet ──────────────────────────────────────────────────────────────────
   fleet: () => req('GET', '/fleet'),
+  failures: () => req('GET', '/failures'),
+  inputs: () => req('GET', '/inputs'),
 
   // ── History ────────────────────────────────────────────────────────────────
   history: (workload, from, to) => {

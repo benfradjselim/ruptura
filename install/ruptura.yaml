@@ -302,7 +302,7 @@ spec:
   template:
     metadata:
       annotations:
-        deploy/ui-image: "v8.4.0"
+        deploy/ui-image: "ui-v8.4.0"
       labels:
         app.kubernetes.io/name: ruptura
         app.kubernetes.io/instance: ruptura
@@ -316,7 +316,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ruptura-ui
-          image: "ghcr.io/benfradjselim/ruptura-ui:v8.4.0"
+          image: "ghcr.io/benfradjselim/ruptura-ui:ui-v8.4.0"
           imagePullPolicy: Always
           ports:
             - name: http
