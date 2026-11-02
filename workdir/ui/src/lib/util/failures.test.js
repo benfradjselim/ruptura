@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatEta, sortFailures, missingRoles, recentAnomalies } from './failures.js'
+import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal } from './failures.js'
 
 describe('formatEta', () => {
   it.each([
@@ -48,5 +48,19 @@ describe('recentAnomalies', () => {
       { host: 'c', timestamp: at(1), acknowledged: true },
     ], now)
     expect(got.map(a => a.host)).toEqual(['a'])
+  })
+})
+
+describe('measuredSignal', () => {
+  it('turns an unavailable signal into no value', () => {
+    expect(measuredSignal({ unavailable_signals: ['mood'] }, 'mood', 0)).toBeNull()
+  })
+
+  it('keeps a measured zero', () => {
+    expect(measuredSignal({ unavailable_signals: ['mood'] }, 'stress', 0)).toBe(0)
+  })
+
+  it('accepts a workload without the list', () => {
+    expect(measuredSignal({}, 'stress', 0.4)).toBe(0.4)
   })
 })
