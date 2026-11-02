@@ -27,8 +27,8 @@ func TestAnomalyEngine_CumulativeCounters(t *testing.T) {
 	})
 	t.Run("sustained rate jump alerts", func(t *testing.T) {
 		e := NewAnomalyEngine()
-		total, ts, _ := feed(e, 0, 1500, 400, start)
-		if _, _, alerts := feed(e, total, 15000, int(counterRateWindow/(15*time.Second)), ts); alerts == 0 {
+		total, ts, _ := feed(e, 0, 15000, 400, start)
+		if _, _, alerts := feed(e, total, 150000, int(counterRateWindow/(15*time.Second)), ts); alerts == 0 {
 			t.Error("a sustained 10x rate jump must alert")
 		}
 	})
