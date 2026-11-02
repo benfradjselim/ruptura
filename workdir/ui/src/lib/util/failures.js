@@ -22,3 +22,7 @@ const RECENT_MS = 15 * 60 * 1000
 export function recentAnomalies(anomalies, now) {
   return anomalies.filter(a => !a.acknowledged && now - Date.parse(a.timestamp) <= RECENT_MS)
 }
+
+export function measuredSignal(workload, key, value) {
+  return (workload.unavailable_signals || []).includes(key) ? null : value
+}

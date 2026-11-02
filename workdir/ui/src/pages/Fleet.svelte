@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
+  import { measuredSignal } from '../lib/util/failures.js'
   import { displayLabel, displayValue, displayUnit, signalClass, incidentProbabilityBand } from '../lib/displayLabels.js'
 
   let fleet = null
@@ -133,9 +134,8 @@
   }
 
   function getSignal(w, key) {
-    if (w.signals) return w.signals[key]
-    if (w.kpis) return w.kpis[key]
-    return w[key]
+    const value = w.signals ? w.signals[key] : w.kpis ? w.kpis[key] : w[key]
+    return measuredSignal(w, key, value)
   }
 
   function infraGroups(w) {
@@ -313,7 +313,7 @@
               {#if activeTab[key] === 'signals'}
                 <div class="signals-detail">
                   {#each Object.entries(w.signals || w.kpis || { stress: w.stress, fatigue: w.fatigue, contagion: w.contagion, health_score: w.health_score }).filter(([,v]) => v != null) as [k, v]}
-                    {#if typeof v === 'number'}
+                    {#if typeof v === 'number' && measuredSignal(w, k, v) !== null}
                       <div class="signal-row">
                         <span class="signal-name">{displayLabel(k)}</span>
                         <div class="signal-bar-track wide">
