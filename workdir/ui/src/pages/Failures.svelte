@@ -8,13 +8,20 @@
   const TICKS = ['Now', '+10 min', '+20 min', '+30 min']
   const LANES = 3
 
-  let failures = [], missing = [], loading = true, error = '', timer
+  let failures = [], missing = [], record = null, protection = null, loading = true, error = '', timer
 
   async function load() {
     try {
-      const [found, inputs] = await Promise.all([api.failures(), api.inputs()])
+      const [found, inputs, track, coverage] = await Promise.all([
+        api.failures(),
+        api.inputs().catch(() => []),
+        api.trackRecord().catch(() => null),
+        api.coverage().catch(() => null),
+      ])
       failures = sortFailures(found || [])
       missing = missingRoles(inputs || [])
+      record = track
+      protection = coverage
       error = ''
     } catch (e) {
       error = e.message
@@ -82,6 +89,9 @@
             </div>
             <div class="why">
               <h3>{label(failure.failureMode)}</h3>
+              {#each failure.evidence || [] as fact}
+                <p class="fact">{fact}</p>
+              {/each}
               <p>{failure.recommendedAction}</p>
             </div>
           </li>
@@ -90,9 +100,36 @@
     {/if}
   {/if}
 
-  {#if missing.length > 0}
-    <p class="blind"><strong>Blind spots</strong> {missing.join(' · ')}</p>
-  {/if}
+  <div class="proof">
+    <div>
+      <h2>Track record <span>last 24 hours</span></h2>
+      {#if record && record.failures > 0}
+        <dl>
+          <div><dt>Failures seen</dt><dd>{record.failures}</dd></div>
+          <div><dt>Warned 5 min ahead</dt><dd>{record.warned}</dd></div>
+          <div><dt>Median warning</dt><dd>{formatEta(record.medianLeadSeconds)}</dd></div>
+        </dl>
+      {:else}
+        <p class="quiet">No failure recorded yet.</p>
+      {/if}
+    </div>
+
+    <div>
+      <h2>Blind spots</h2>
+      {#if protection && protection.watched > 0}
+        <dl>
+          <div><dt>Pods watched</dt><dd>{protection.watched}</dd></div>
+          <div class:warn={protection.protected < protection.watched}><dt>No memory limit</dt><dd>{protection.watched - protection.protected}</dd></div>
+        </dl>
+        {#if protection.protected < protection.watched}
+          <p class="quiet">Without a limit, Ruptura cannot forecast memory exhaustion on these pods.</p>
+        {/if}
+      {/if}
+      {#if missing.length > 0}
+        <p class="quiet">Data not found: {missing.join(' · ')}</p>
+      {/if}
+    </div>
+  </div>
 </section>
 
 <style>
@@ -139,12 +176,19 @@
   h3 { font-size: 13px; line-height: 20px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); font-weight: 600; }
   .why p { color: var(--text-2); }
 
-  .blind { margin-top: 26px; font: 400 12px var(--font-mono); color: var(--text-3); }
-  .blind strong { color: var(--text-2); margin-right: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
-  .quiet { margin-top: 40px; color: var(--text-3); }
+  .fact { color: var(--text); font-family: var(--font-mono); font-size: 13px; }
+  .proof { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--border-2); }
+  .proof h2 { font-size: 16px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .proof h2 span { font: 400 12px var(--font-mono); color: var(--text-3); text-transform: none; letter-spacing: 0; margin-left: 8px; }
+  .proof dl { display: flex; gap: 36px; margin-top: 14px; flex-wrap: wrap; }
+  .proof dt { font: 500 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+  .proof dd { font: 500 26px/32px var(--font-mono); font-variant-numeric: tabular-nums; }
+  .proof .warn dd { color: var(--amber); }
+  .quiet { margin-top: 12px; color: var(--text-3); }
   .fault-note { margin-top: 40px; color: var(--red); }
 
   @media (max-width: 760px) {
+    .proof { grid-template-columns: 1fr; }
     h1 { font-size: 28px; line-height: 34px; }
     .ruptures li { grid-template-columns: 1fr; gap: 8px; }
   }

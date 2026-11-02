@@ -119,6 +119,8 @@ export const api = {
   fleet: () => req('GET', '/fleet'),
   failures: () => req('GET', '/failures'),
   inputs: () => req('GET', '/inputs'),
+  trackRecord: () => req('GET', '/track-record'),
+  coverage: () => req('GET', '/coverage'),
 
   // ── History ────────────────────────────────────────────────────────────────
   history: (workload, from, to) => {

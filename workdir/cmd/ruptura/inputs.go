@@ -127,6 +127,13 @@ func (c *inputCollector) observeWorkloads(tracker *failuremodes.Tracker, inf *di
 	}
 }
 
+// Protection reports pods with and without a memory limit.
+func (c *inputCollector) Protection() normalize.Protection {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return normalize.ProtectionOf(c.frames["pod"], "memory.usage", "memory.limit")
+}
+
 // inputProfile returns the configured profile, standard by default.
 func inputProfile() string {
 	if profile := os.Getenv(inputProfileEnv); profile != "" {

@@ -1,8 +1,11 @@
 package api
 
 import (
+	"fmt"
+	"math"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 )
@@ -16,15 +19,45 @@ const (
 
 // FailureResult is the structured conclusion of the engine for one target.
 type FailureResult struct {
-	Level             string  `json:"level"`
-	Target            string  `json:"target"`
-	Pod               string  `json:"pod,omitempty"`
-	FailureMode       string  `json:"failureMode"`
-	Kind              string  `json:"kind"`
-	State             string  `json:"state"`
-	ETASeconds        int     `json:"etaSeconds,omitempty"`
-	Confidence        float64 `json:"confidence,omitempty"`
-	RecommendedAction string  `json:"recommendedAction"`
+	Level             string   `json:"level"`
+	Target            string   `json:"target"`
+	Pod               string   `json:"pod,omitempty"`
+	FailureMode       string   `json:"failureMode"`
+	Kind              string   `json:"kind"`
+	State             string   `json:"state"`
+	ETASeconds        int      `json:"etaSeconds,omitempty"`
+	Confidence        float64  `json:"confidence,omitempty"`
+	RecommendedAction string   `json:"recommendedAction"`
+	Evidence          []string `json:"evidence,omitempty"`
+}
+
+// TrackRecorder reports how early failures were announced.
+type TrackRecorder interface {
+	NoteForecast(workload string, at time.Time)
+	TrackRecord(from, to time.Time) failuremodes.TrackRecord
+}
+
+const trackRecordWindow = 24 * time.Hour
+
+// failureEvidence states the measurement behind a result, in plain words.
+func failureEvidence(est failuremodes.Estimate) []string {
+	switch est.Mode {
+	case failuremodes.ModeSaturation:
+		return []string{fmt.Sprintf("Memory at %d%% of its limit", int(math.Round(est.Usage*100)))}
+	case failuremodes.ModeCPUThrottling:
+		return []string{fmt.Sprintf("CPU throttled %d%% of the time", int(math.Round(est.Usage*100)))}
+	case failuremodes.ModeStartupStuck:
+		return []string{"Kubernetes reports " + est.Reason}
+	case failuremodes.ModeReplicasUnavailable:
+		return []string{fmt.Sprintf("%d replicas unavailable for over 5 minutes", int(est.Usage))}
+	case failuremodes.ModeRecurrentFailure:
+		return []string{fmt.Sprintf("%d failures, about every %d min", est.Failures, int(math.Round(est.Interval.Minutes())))}
+	case failuremodes.ModeRolloutStuck:
+		return []string{"Rollout passed its progress deadline"}
+	case failuremodes.ModeOOMKilled:
+		return []string{"Last exit was OOMKilled"}
+	}
+	return nil
 }
 
 // failureResult builds the result for a workload. It returns nil when no failure
@@ -36,6 +69,7 @@ func failureResult(workload, state string, est *failuremodes.Estimate, crashLoop
 		result.FailureMode = failureModeCrashLoop
 		result.Kind = failureKindDetected
 		result.RecommendedAction = "Read the logs of the previous container and fix the startup failure"
+		result.Evidence = []string{"Repeated restarts in the last 30 minutes"}
 	case est == nil:
 		return nil
 	default:
@@ -43,8 +77,9 @@ func failureResult(workload, state string, est *failuremodes.Estimate, crashLoop
 		result.Pod = est.Pod
 		result.Confidence = est.Confidence
 		result.RecommendedAction = estimateAction(*est)
+		result.Evidence = failureEvidence(*est)
 		result.Kind = failureKindDetected
-		if est.Mode == failuremodes.ModeSaturation {
+		if est.Mode == failuremodes.ModeSaturation || est.Mode == failuremodes.ModeRecurrentFailure {
 			result.Kind = failureKindPredicted
 			result.ETASeconds = int(est.ETF.Seconds())
 		}
@@ -132,4 +167,22 @@ func (h *Handlers) Failures() []*FailureResult {
 
 func (h *Handlers) handleFailures(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, h.Failures())
+}
+
+type trackRecordResponse struct {
+	WindowHours       int `json:"windowHours"`
+	Failures          int `json:"failures"`
+	Warned            int `json:"warned"`
+	MedianLeadSeconds int `json:"medianLeadSeconds"`
+}
+
+func (h *Handlers) handleTrackRecord(w http.ResponseWriter, _ *http.Request) {
+	response := trackRecordResponse{WindowHours: int(trackRecordWindow.Hours())}
+	if recorder, ok := h.failureModes.(TrackRecorder); ok {
+		now := time.Now()
+		record := recorder.TrackRecord(now.Add(-trackRecordWindow), now)
+		response.Failures, response.Warned = record.Failures, record.Warned
+		response.MedianLeadSeconds = int(record.MedianLead.Seconds())
+	}
+	writeJSON(w, http.StatusOK, response)
 }

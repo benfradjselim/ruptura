@@ -204,6 +204,7 @@ func (h *Handlers) buildFleet() fleetResponse {
 			state, risk = applyEstimate(state, risk, est, h.warningHorizon())
 			etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
 			estimate = &est
+			h.noteForecast(name, est)
 		}
 		resp.TotalHosts++
 		// Explicit cases only — a bare "default: critical" here previously
@@ -274,6 +275,7 @@ func (h *Handlers) buildFleet() fleetResponse {
 				state, risk = applyEstimate(state, risk, est, h.warningHorizon())
 				etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
 				estimate = &est
+				h.noteForecast(name, est)
 			}
 			switch state {
 			case "critical":

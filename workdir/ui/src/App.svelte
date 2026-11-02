@@ -25,9 +25,9 @@
   const PRIMARY_NAV = [
     { id: 'failures', label: 'Rupture Horizon' },
     { id: 'fleet', label: 'Fleet' },
-    { id: 'dashboard', label: 'Overview' },
     { id: 'infra', label: 'Infra' },
-    { id: 'alerts', label: 'Alerts' },
+    { id: 'alerts', label: 'Anomalies' },
+    { id: 'dashboard', label: 'Engine' },
   ]
   const PRIMARY_IDS = PRIMARY_NAV.map(item => item.id)
 
@@ -71,36 +71,11 @@
 
   const navGroups = [
     {
-      label: 'Observe',
-      items: [
-        { id: 'dashboard',  label: 'Overview'   },
-        { id: 'fleet',      label: 'Fleet'      },
-        { id: 'infra',      label: 'Infra'      },
-        { id: 'dashboards', label: 'Boards'     },
-      ],
-    },
-    {
-      label: 'Explore',
-      items: [
-        { id: 'logs',   label: 'Logs'   },
-        { id: 'traces', label: 'Traces' },
-      ],
-    },
-    {
-      label: 'Respond',
-      items: [
-        { id: 'alerts',      label: 'Alerts'      },
-        { id: 'alert-rules', label: 'Alert Rules' },
-        { id: 'slos',        label: 'SLOs'        },
-      ],
-    },
-    {
       label: 'Configure',
       items: [
-        { id: 'datasources',   label: 'Data Sources' },
-        { id: 'notifications', label: 'Channels'     },
-        { id: 'orgs',          label: 'Orgs'         },
-        { id: 'settings',      label: 'Settings'     },
+        { id: 'alert-rules', label: 'Alert rules' },
+        { id: 'notifications', label: 'Channels' },
+        { id: 'settings', label: 'Settings' },
       ],
     },
   ]
@@ -153,10 +128,6 @@
                   {/each}
                 </div>
               {/each}
-              <div class="menu-group">
-                <span class="menu-label">Actions</span>
-                <button class="menu-item" on:click={applySecurityTemplate}>Security board</button>
-              </div>
             </div>
           {/if}
         </div>
@@ -235,8 +206,8 @@
 
   .more { position: relative; height: 100%; }
   .menu {
-    position: absolute; top: 100%; left: 0; min-width: 420px;
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+    position: absolute; top: 100%; left: 0; min-width: 200px;
+    display: grid; grid-template-columns: 1fr; gap: 18px;
     padding: 18px; background: var(--surface); border: 1px solid var(--border-2);
     clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
   }

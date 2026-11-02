@@ -44,6 +44,8 @@ func (h *Handlers) NewRouter() http.Handler {
 
 	api.HandleFunc("/failures", h.handleFailures).Methods("GET")
 	api.HandleFunc("/inputs", h.handleInputs).Methods("GET")
+	api.HandleFunc("/track-record", h.handleTrackRecord).Methods("GET")
+	api.HandleFunc("/coverage", h.handleCoverage).Methods("GET")
 	api.HandleFunc("/forecast", h.handleForecast).Methods("POST")
 	api.HandleFunc("/forecast/{metric}/{host:.+}", h.handleForecast).Methods("GET")
 

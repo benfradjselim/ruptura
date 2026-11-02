@@ -159,3 +159,35 @@ func TestFailures_WorkloadWithoutTelemetry(t *testing.T) {
 		t.Errorf("critical hosts = %d, want 1", fleet.CriticalHosts)
 	}
 }
+
+func TestFailureEvidence(t *testing.T) {
+	cases := []struct {
+		name string
+		est  failuremodes.Estimate
+		want string
+	}{
+		{"saturation", failuremodes.Estimate{Mode: failuremodes.ModeSaturation, Usage: 0.91}, "Memory at 91% of its limit"},
+		{"throttling", failuremodes.Estimate{Mode: failuremodes.ModeCPUThrottling, Usage: 0.4}, "CPU throttled 40% of the time"},
+		{"startup", failuremodes.Estimate{Mode: failuremodes.ModeStartupStuck, Reason: "FailedMount"}, "Kubernetes reports FailedMount"},
+		{"replicas", failuremodes.Estimate{Mode: failuremodes.ModeReplicasUnavailable, Usage: 2}, "2 replicas unavailable for over 5 minutes"},
+		{"rhythm", failuremodes.Estimate{Mode: failuremodes.ModeRecurrentFailure, Interval: 31 * time.Minute, Failures: 7}, "7 failures, about every 31 min"},
+		{"rollout", failuremodes.Estimate{Mode: failuremodes.ModeRolloutStuck}, "Rollout passed its progress deadline"},
+		{"oom", failuremodes.Estimate{Mode: failuremodes.ModeOOMKilled}, "Last exit was OOMKilled"},
+	}
+	for _, c := range cases {
+		got := failureEvidence(c.est)
+		if len(got) != 1 || got[0] != c.want {
+			t.Errorf("%s: evidence = %v, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestEstimateAction_RecurrentFailure(t *testing.T) {
+	est := failuremodes.Estimate{Mode: failuremodes.ModeRecurrentFailure, Failures: 7, Interval: 31 * time.Minute}
+	if got := estimateAction(est); got != "Find what restarts this workload before the next failure" {
+		t.Errorf("action = %q", got)
+	}
+	if got := estimateHeadline("w", est); got != "w fails about every 31 minutes." {
+		t.Errorf("headline = %q", got)
+	}
+}

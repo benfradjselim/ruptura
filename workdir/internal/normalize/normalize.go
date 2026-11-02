@@ -54,3 +54,30 @@ func CoverageOf(roles []string, collected map[string]map[string]float64) []Cover
 	}
 	return out
 }
+
+// Protection says how many targets have a limit to predict against.
+type Protection struct {
+	Watched     int      `json:"watched"`
+	Protected   int      `json:"protected"`
+	Unprotected []string `json:"unprotected"`
+}
+
+// maxListedTargets keeps the report readable on large clusters.
+const maxListedTargets = 20
+
+// ProtectionOf reports targets that have a usage reading but no limit.
+func ProtectionOf(frames []Frame, usageRole, limitRole string) Protection {
+	report := Protection{Unprotected: []string{}}
+	for _, frame := range frames {
+		if _, ok := frame.Values[usageRole]; !ok {
+			continue
+		}
+		report.Watched++
+		if _, ok := frame.Values[limitRole]; ok {
+			report.Protected++
+		} else if len(report.Unprotected) < maxListedTargets {
+			report.Unprotected = append(report.Unprotected, frame.Target)
+		}
+	}
+	return report
+}
