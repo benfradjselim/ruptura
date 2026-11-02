@@ -147,3 +147,22 @@ func TestFailures_RoundTrip(t *testing.T) {
 		t.Errorf("failures = %v", got)
 	}
 }
+
+func TestOutcomes_RoundTrip(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	at := time.Date(2026, 11, 1, 1, 0, 0, 0, time.UTC)
+	if err := s.PutOutcome(at, 20*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.ListOutcomes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || !got[0].At.Equal(at) || got[0].Lead != 20*time.Minute {
+		t.Errorf("outcomes = %+v", got)
+	}
+}

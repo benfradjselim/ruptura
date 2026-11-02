@@ -476,6 +476,31 @@ func (s *Store) ListFailures() (map[string][]time.Time, error) {
 	return out, err
 }
 
+// Outcome is a failure and how early it was warned.
+type Outcome struct {
+	At   time.Time
+	Lead time.Duration
+}
+
+// PutOutcome stores one failure outcome under fo:{ts}, with the failure retention.
+func (s *Store) PutOutcome(at time.Time, lead time.Duration) error {
+	return s.set(tsKey("fo:", at), Outcome{At: at, Lead: lead}, failureTTL)
+}
+
+// ListOutcomes returns the stored outcomes, oldest first.
+func (s *Store) ListOutcomes() ([]Outcome, error) {
+	var out []Outcome
+	err := s.listByPrefix("fo:", func(_, val []byte) error {
+		var outcome Outcome
+		if err := json.Unmarshal(val, &outcome); err != nil {
+			return err
+		}
+		out = append(out, outcome)
+		return nil
+	})
+	return out, err
+}
+
 // --- Infra signal history (v8.0 Infrastructure & Cluster Intelligence Layer) ---
 // Key schema (docs/v8.0.0/RUPTURA-PLATFORM-EXTENSION.md §6.4, additive-only,
 // never change existing prefixes):

@@ -39,10 +39,31 @@ func (t *Tracker) recordOutcome(workload string, at time.Time) {
 		outcome.lead = at.Sub(warned)
 		delete(t.forecasts, workload)
 	}
+	t.appendOutcome(outcome)
+	if t.outcomeRecorder != nil {
+		t.outcomeRecorder(outcome.at, outcome.lead)
+	}
+}
+
+func (t *Tracker) appendOutcome(outcome failureOutcome) {
 	t.outcomes = append(t.outcomes, outcome)
 	if len(t.outcomes) > maxTrackRecord {
 		t.outcomes = t.outcomes[len(t.outcomes)-maxTrackRecord:]
 	}
+}
+
+// SetOutcomeRecorder sets a callback that receives each failure and its warning.
+func (t *Tracker) SetOutcomeRecorder(recorder func(at time.Time, lead time.Duration)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.outcomeRecorder = recorder
+}
+
+// RestoreOutcome loads one outcome saved by an earlier run.
+func (t *Tracker) RestoreOutcome(at time.Time, lead time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.appendOutcome(failureOutcome{at: at, lead: lead})
 }
 
 // TrackRecord reports failures between from and to, and how many were warned at
