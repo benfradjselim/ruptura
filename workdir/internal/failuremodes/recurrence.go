@@ -70,9 +70,11 @@ func nextFailure(times []time.Time, now time.Time) (time.Duration, float64, bool
 
 // recurrenceEstimate reads the failure times of a workload.
 func (t *Tracker) recurrenceEstimate(workload string, now time.Time) (Estimate, bool) {
-	remaining, confidence, ok := nextFailure(t.failures[workload], now)
+	times := t.failures[workload]
+	remaining, confidence, ok := nextFailure(times, now)
 	if !ok {
 		return Estimate{}, false
 	}
-	return Estimate{Mode: ModeRecurrentFailure, ETF: remaining, Confidence: confidence}, true
+	interval := times[len(times)-1].Sub(times[0]) / time.Duration(len(times)-1)
+	return Estimate{Mode: ModeRecurrentFailure, ETF: remaining, Confidence: confidence, Interval: interval, Failures: len(times)}, true
 }

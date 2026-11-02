@@ -31,6 +31,9 @@ type Estimate struct {
 	Usage      float64
 	// Reason is the Kubernetes event reason behind a detected failure.
 	Reason string
+	// Interval and Failures describe the rhythm of a recurrent failure.
+	Interval time.Duration
+	Failures int
 }
 
 type point struct {

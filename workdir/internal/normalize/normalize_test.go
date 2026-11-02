@@ -39,3 +39,15 @@ func TestCoverageOf(t *testing.T) {
 		t.Errorf("coverage = %+v, want %+v", got, want)
 	}
 }
+
+func TestProtectionOf(t *testing.T) {
+	frames := []Frame{
+		{Target: "n/a", Values: map[string]float64{"use": 1, "lim": 2}},
+		{Target: "n/b", Values: map[string]float64{"use": 1}},
+		{Target: "n/c", Values: map[string]float64{"lim": 2}},
+	}
+	got := ProtectionOf(frames, "use", "lim")
+	if got.Watched != 2 || got.Protected != 1 || !reflect.DeepEqual(got.Unprotected, []string{"n/b"}) {
+		t.Errorf("report = %+v", got)
+	}
+}

@@ -34,17 +34,19 @@ type podState struct {
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
 // concurrent use.
 type Tracker struct {
-	mu       sync.RWMutex
-	pods     map[string]*podState
-	replicas map[string]replicaState
-	rollouts map[string]time.Time
-	failures map[string][]time.Time
-	recorder func(workload string, at time.Time)
+	mu        sync.RWMutex
+	pods      map[string]*podState
+	replicas  map[string]replicaState
+	rollouts  map[string]time.Time
+	failures  map[string][]time.Time
+	forecasts map[string]time.Time
+	outcomes  []failureOutcome
+	recorder  func(workload string, at time.Time)
 }
 
 // NewTracker returns an empty tracker.
 func NewTracker() *Tracker {
-	return &Tracker{pods: make(map[string]*podState), replicas: make(map[string]replicaState), rollouts: make(map[string]time.Time), failures: make(map[string][]time.Time)}
+	return &Tracker{pods: make(map[string]*podState), replicas: make(map[string]replicaState), rollouts: make(map[string]time.Time), failures: make(map[string][]time.Time), forecasts: make(map[string]time.Time)}
 }
 
 func (s *podState) recordRestarts(at time.Time, restarts int) bool {
@@ -66,6 +68,7 @@ func (t *Tracker) recordFailure(workload string, at time.Time) {
 		history = history[len(history)-maxRestartHistory:]
 	}
 	t.failures[workload] = history
+	t.recordOutcome(workload, at)
 	if t.recorder != nil {
 		t.recorder(workload, at)
 	}

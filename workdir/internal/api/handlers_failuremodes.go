@@ -47,6 +47,16 @@ func (h *Handlers) SetLevelScope(scope string) { h.levelScope = scope }
 // SetFailureModes wires the failure-mode estimates into the API.
 func (h *Handlers) SetFailureModes(f FailureEstimates) { h.failureModes = f }
 
+// noteForecast records a warning that names a future failure.
+func (h *Handlers) noteForecast(workload string, est failuremodes.Estimate) {
+	if est.ETF <= 0 || est.ETF > h.warningHorizon() {
+		return
+	}
+	if recorder, ok := h.failureModes.(TrackRecorder); ok {
+		recorder.NoteForecast(workload, time.Now())
+	}
+}
+
 func (h *Handlers) workloadEstimate(workload string) (failuremodes.Estimate, bool) {
 	if h.failureModes == nil {
 		return failuremodes.Estimate{}, false
@@ -116,6 +126,9 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate, horizo
 }
 
 func estimateHeadline(name string, est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeRecurrentFailure {
+		return fmt.Sprintf("%s fails about every %d minutes.", name, int(math.Round(est.Interval.Minutes())))
+	}
 	if est.Mode == failuremodes.ModeRolloutStuck {
 		return fmt.Sprintf("%s rollout has stopped progressing.", name)
 	}
@@ -135,6 +148,9 @@ func estimateHeadline(name string, est failuremodes.Estimate) string {
 }
 
 func estimateAction(est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeRecurrentFailure {
+		return "Find what restarts this workload before the next failure"
+	}
 	if est.Mode == failuremodes.ModeRolloutStuck {
 		return "Inspect the new revision or roll back"
 	}
