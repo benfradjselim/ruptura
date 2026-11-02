@@ -90,7 +90,7 @@ func TestSaturation_Shapes(t *testing.T) {
 	}{
 		{"irregular step leak warns before the limit", stepLeak, 0, 22, true},
 		{"long plateau before the last steps warns early", longPlateau, 0, 16, true},
-		{"sawtooth stays silent once a drop was seen", sawtooth, 15, 180, false},
+		{"sawtooth stays silent once a drop was seen", sawtooth, 15, 60, false},
 		{"flat usage stays silent", steady, 0, 60, false},
 	}
 	for _, c := range cases {

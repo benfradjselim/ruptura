@@ -21,7 +21,7 @@ import (
 )
 
 // operatorVersion is the single source of truth for the operator version.
-const operatorVersion = "0.10.0"
+const operatorVersion = "1.1.0"
 
 var logger = log.New(os.Stdout, "", 0)
 
