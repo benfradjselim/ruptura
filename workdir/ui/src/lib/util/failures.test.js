@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatEta, sortFailures, missingRoles } from './failures.js'
+import { formatEta, sortFailures, missingRoles, recentAnomalies } from './failures.js'
 
 describe('formatEta', () => {
   it.each([
@@ -34,5 +34,19 @@ describe('sortFailures', () => {
 describe('missingRoles', () => {
   it('lists roles with no data', () => {
     expect(missingRoles([{ role: 'a', available: true }, { role: 'b', available: false }])).toEqual(['b'])
+  })
+})
+
+describe('recentAnomalies', () => {
+  const now = Date.parse('2026-11-02T02:00:00Z')
+  const at = (minutes) => new Date(now - minutes * 60000).toISOString()
+
+  it('keeps unacknowledged anomalies of the last 15 minutes', () => {
+    const got = recentAnomalies([
+      { host: 'a', timestamp: at(5) },
+      { host: 'b', timestamp: at(30) },
+      { host: 'c', timestamp: at(1), acknowledged: true },
+    ], now)
+    expect(got.map(a => a.host)).toEqual(['a'])
   })
 })

@@ -16,3 +16,9 @@ export function sortFailures(failures) {
 export function missingRoles(inputs) {
   return inputs.filter(input => !input.available).map(input => input.role)
 }
+
+const RECENT_MS = 15 * 60 * 1000
+
+export function recentAnomalies(anomalies, now) {
+  return anomalies.filter(a => !a.acknowledged && now - Date.parse(a.timestamp) <= RECENT_MS)
+}

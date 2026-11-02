@@ -1,4 +1,5 @@
 <script>
+  import { recentAnomalies } from '../lib/util/failures.js'
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
 
@@ -76,7 +77,7 @@
     return 'ok'
   }
 
-  $: activeAlerts     = alerts.filter(a => !a.acknowledged)
+  $: activeAlerts     = recentAnomalies(alerts, Date.now())
   $: namespaceCount   = new Set(infraGroups.map(g => g.namespace).filter(Boolean)).size
   $: agitatedGroups   = infraGroups.filter(g => g.agitated).length
   $: notableHosts     = (fleet?.hosts || []).filter(h => h.state === 'critical' || h.state === 'degraded').slice(0, 6)
@@ -134,7 +135,7 @@
         <span class="dot {health?.rupture_detection === 'active' ? 'ok' : 'warn'}"></span>
         {health?.rupture_detection || '—'}
       </p>
-      <p class="stat-sub">5-model ensemble</p>
+      <p class="stat-sub">Known failures and anomalies</p>
     </div>
 
     <!-- Tracker count -->
@@ -269,13 +270,13 @@
   <!-- ── Section 5: Active alerts ──────────────────────────────────────────── -->
   <div class="band section-band">
     <div class="section-label" style="grid-column:1/13">
-      <span class="kicker">Active alerts</span>
+      <span class="kicker">Anomalies, last 15 minutes</span>
       <span class="badge {activeAlerts.length > 0 ? 'err' : 'dim'}" style="margin-left:8px">{activeAlerts.length}</span>
     </div>
 
     {#if activeAlerts.length === 0}
       <div style="grid-column:1/13">
-        <p class="muted">No active alerts.</p>
+        <p class="muted">No anomaly in the last 15 minutes.</p>
       </div>
     {:else}
       <div class="alert-list" style="grid-column:1/13">
