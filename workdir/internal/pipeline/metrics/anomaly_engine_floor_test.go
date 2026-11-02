@@ -38,10 +38,10 @@ func TestAnomalyEngine_IgnoresNegligibleDeviations(t *testing.T) {
 }
 
 func TestNegligibleDeviation_NegativeExpectedStaysBounded(t *testing.T) {
-	if !negligibleDeviation(0.001134, -0.015593) {
+	if !negligibleDeviation("custom", 0.001134, -0.015593) {
 		t.Error("a 0.017 change on a 0 to 1 metric must be negligible")
 	}
-	if negligibleDeviation(2.97, 2.30) {
+	if negligibleDeviation("custom", 2.97, 2.30) {
 		t.Error("a 29 percent change on an unbounded metric must alert")
 	}
 }
