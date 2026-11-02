@@ -239,11 +239,19 @@ func dropNegligible(events []models.AnomalyEvent) []models.AnomalyEvent {
 
 const (
 	// minRateRatio is the change a rate must show, up or down, to be unusual.
-	// On the lab, half of the anomalies on low traffic rates were below it.
-	minRateRatio = 2.0
+	// Rates are averaged over counterRateWindow, so periodic bursts of operator
+	// traffic stay visible for minutes. On the lab, half of the remaining rate
+	// anomalies were such bursts between 2 and 3 times the usual value.
+	minRateRatio = 3.0
+	// minCoreRatio is the relative change CPU, in cores or as a share of its
+	// limit, must show to be unusual.
+	minCoreRatio = 2.0
 	// minCoreChange is the smallest CPU change, in cores, worth reporting. It
 	// matches the 100m granularity of CPU requests.
 	minCoreChange = 0.1
+	// minLimitShareChange is the smallest change of CPU usage as a share of its
+	// limit worth reporting. A restart at a few percent of the limit is not.
+	minLimitShareChange = 0.1
 )
 
 // metricScale says how a metric is compared with its usual value.
@@ -253,17 +261,20 @@ const (
 	scaleDefault metricScale = iota
 	scaleRate
 	scaleCores
+	scaleCPULimitShare
 )
 
 var metricScales = map[string]metricScale{
-	"k8s.pod.network.io":            scaleRate,
-	"k8s.node.network.io":           scaleRate,
-	"k8s.pod.cpu.time":              scaleCores,
-	"k8s.node.cpu.time":             scaleCores,
-	"container.cpu.time":            scaleCores,
-	"k8s.container.cpu.time":        scaleCores,
-	"k8s.pod.cpu.utilization":       scaleCores,
-	"k8s.container.cpu.utilization": scaleCores,
+	"k8s.pod.network.io":                  scaleRate,
+	"k8s.node.network.io":                 scaleRate,
+	"k8s.pod.cpu.time":                    scaleCores,
+	"k8s.node.cpu.time":                   scaleCores,
+	"container.cpu.time":                  scaleCores,
+	"k8s.container.cpu.time":              scaleCores,
+	"k8s.pod.cpu.utilization":             scaleCores,
+	"k8s.container.cpu.utilization":       scaleCores,
+	"k8s.pod.cpu_limit_utilization":       scaleCPULimitShare,
+	"k8s.container.cpu_limit_utilization": scaleCPULimitShare,
 }
 
 // changeRatio returns how many times value differs from expected, in either
@@ -277,9 +288,9 @@ func changeRatio(value, expected float64) float64 {
 }
 
 // negligibleDeviation reports whether value is too close to expected to alert.
-// Rates and CPU cores need a large relative change, and cores also an absolute
-// one. Other values within the 0 to 1 range use the bounded floor, and the rest a
-// fraction of the expected value. A seasonal expected value may dip slightly
+// Rates and CPU, in cores or as a share of its limit, need a large relative
+// change, and CPU also an absolute one. Other values within the 0 to 1 range use
+// the bounded floor, and the rest a fraction of the expected value. A seasonal expected value may dip slightly
 // below 0, so checks use magnitudes.
 func negligibleDeviation(metric string, value, expected float64) bool {
 	dev := math.Abs(value - expected)
@@ -287,7 +298,9 @@ func negligibleDeviation(metric string, value, expected float64) bool {
 	case scaleRate:
 		return changeRatio(value, expected) < minRateRatio
 	case scaleCores:
-		return changeRatio(value, expected) < minRateRatio || dev < minCoreChange
+		return changeRatio(value, expected) < minCoreRatio || dev < minCoreChange
+	case scaleCPULimitShare:
+		return changeRatio(value, expected) < minCoreRatio || dev < minLimitShareChange
 	}
 	if math.Abs(value) <= 1 && math.Abs(expected) <= 1 {
 		return dev < madBoundedFraction
