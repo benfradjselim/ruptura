@@ -69,7 +69,7 @@ OTLP metrics/logs/traces ─┼─► Ingest receivers (port 31470 / 4317)
 | `internal/analyzer` | 10-signal KPI computation, calibration, adaptive baselines |
 | `internal/fusion` | FusedR compositor (metricR + logR + traceR) |
 | `internal/pipeline` (ensemble) | 5-model anomaly ensemble, MAE weight rebalancing |
-| `internal/predictor` | HealthScore forecast (+15m, +30m) |
+| `internal/pipeline/metrics` | HealthScore forecast (+15m, +30m) |
 | `internal/actions` | Action execution, K8s actuator, safety gates |
 | `internal/api` | REST API v2 handlers (44 endpoints) |
 | `internal/correlator` | Burst detector, topology graph builder |
