@@ -218,7 +218,7 @@
           <button class="card-header" on:click={() => expand(w)}>
             <div class="card-identity">
               <span class="state-dot {sc}"></span>
-              <span class="workload-name">{workloadLabel(w)}</span>
+              <span class="workload-name" title={workloadLabel(w)}>{parseHost(w).name || workloadLabel(w)}</span>
               {#if w.state}
                 <span class="state-badge {sc}">{w.state}</span>
               {/if}
@@ -403,7 +403,7 @@
 
 /* Loading / error */
 .fleet-loading, .fleet-error { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 4rem; color: var(--text-secondary, var(--text-2)); }
-.spinner { width: 24px; height: 24px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+.spinner { width: 24px; height: 24px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 0; animation: spin 0.8s linear infinite; }
 .spinner.sm { width: 16px; height: 16px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -413,27 +413,28 @@
 .empty-state h2 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.75rem; }
 .empty-state p { color: var(--text-secondary, var(--text-2)); margin: 0 0 0.5rem; line-height: 1.6; }
 .empty-hint { font-size: 0.875rem; }
-.empty-hint code { background: var(--surface, #1e2535); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.8em; }
+.empty-hint code { background: var(--surface, #1e2535); padding: 0.15em 0.4em; border-radius: 0; font-size: 0.8em; }
 .empty-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap; }
-.empty-actions a, .empty-actions button { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; text-decoration: none; }
+.empty-actions a, .empty-actions button { padding: 0.5rem 1rem; border-radius: 0; font-size: 0.875rem; cursor: pointer; text-decoration: none; }
 .empty-actions a { background: var(--accent-cyan, #06b6d4); color: #000; font-weight: 600; }
 .empty-actions button { background: var(--surface, #1e2535); color: var(--text-primary, #f1f5f9); border: 1px solid var(--border, rgba(255,255,255,0.06)); }
 
 /* Grid */
-.workload-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1rem; }
+.workload-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1rem; }
+.workload-card { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%); }
 
 /* Card */
-.workload-card { background: var(--surface, #141824); border: 1px solid var(--border, rgba(255,255,255,0.06)); border-radius: 8px; overflow: hidden; transition: border-color 0.15s; }
+.workload-card { background: var(--surface, #141824); border: 1px solid var(--border, rgba(255,255,255,0.06)); border-radius: 0; overflow: hidden; transition: border-color 0.15s; }
 .workload-card.healthy { border-left: 3px solid var(--green); }
 .workload-card.degraded { border-left: 3px solid var(--amber); }
 .workload-card.at-risk { border-left: 3px solid #f97316; }
 .workload-card.critical { border-left: 3px solid var(--red); }
-.workload-card.calibrating { border-left: 3px solid #6366f1; }
+.workload-card.calibrating { border-left: 3px solid var(--border-3); }
 .workload-card.expanded { grid-column: 1 / -1; }
 
 .card-header { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0.875rem 1rem; background: none; border: none; cursor: pointer; text-align: left; color: inherit; gap: 0.5rem; }
 .card-identity { display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1; }
-.state-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.state-dot { width: 8px; height: 8px; border-radius: 0; flex-shrink: 0; }
 .state-dot.healthy { background: var(--green); }
 .state-dot.degraded { background: var(--amber); }
 .state-dot.at-risk { background: #f97316; }
@@ -442,7 +443,7 @@
 @keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 @keyframes pulse-indigo { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 .workload-name { font-weight: 600; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.state-badge { font-size: 0.7rem; padding: 0.15em 0.5em; border-radius: 999px; font-weight: 500; }
+.state-badge { font-size: 0.7rem; padding: 0.15em 0.5em; border-radius: 0; font-weight: 500; }
 .state-badge.healthy { background: rgba(34,197,94,0.15); color: var(--green); }
 .state-badge.degraded { background: rgba(245,158,11,0.15); color: var(--amber); }
 .state-badge.at-risk { background: rgba(249,115,22,0.15); color: #f97316; }
@@ -458,8 +459,8 @@
 .score-value.at-risk { color: #f97316; }
 .score-value.critical { color: var(--red); }
 .calibrating-pill { font-size: 0.75rem; color: #818cf8; gap: 0.25rem; }
-.calib-bar-track { width: 60px; height: 4px; background: rgba(99,102,241,0.2); border-radius: 2px; overflow: hidden; }
-.calib-bar-fill { height: 100%; background: #818cf8; border-radius: 2px; transition: width 0.5s ease; }
+.calib-bar-track { width: 60px; height: 4px; background: rgba(99,102,241,0.2); border-radius: 0; overflow: hidden; }
+.calib-bar-fill { height: 100%; background: #818cf8; border-radius: 0; transition: width 0.5s ease; }
 .calib-pct { font-size: 0.65rem; color: #818cf8; font-variant-numeric: tabular-nums; }
 .expand-icon { color: var(--text-secondary, var(--text-2)); font-size: 0.7rem; }
 
@@ -467,9 +468,9 @@
 .signal-bars { display: flex; flex-direction: column; gap: 0.3rem; padding: 0 1rem 0.75rem; }
 .signal-bar-item { display: grid; grid-template-columns: 90px 1fr 42px; align-items: center; gap: 0.5rem; }
 .signal-bar-label { font-size: 0.7rem; color: var(--text-secondary, var(--text-2)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.signal-bar-track { height: 4px; background: var(--surface-high, #1e2535); border-radius: 2px; overflow: hidden; }
+.signal-bar-track { height: 4px; background: var(--surface-high, #1e2535); border-radius: 0; overflow: hidden; }
 .signal-bar-track.wide { height: 6px; }
-.signal-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+.signal-bar-fill { height: 100%; border-radius: 0; transition: width 0.4s ease; }
 .signal-bar-fill.healthy { background: var(--green); }
 .signal-bar-fill.degraded { background: var(--amber); }
 .signal-bar-fill.at-risk { background: #f97316; }
@@ -481,12 +482,12 @@
 .card-detail { border-top: 1px solid var(--border, rgba(255,255,255,0.06)); padding: 1rem; }
 
 /* FBL-A2-1: forecast-as-hero — the one sentence an SRE reads first */
-.summary-hero { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; background: var(--bg-2, rgba(255,255,255,0.03)); border-left: 3px solid var(--accent-cyan, #06b6d4); }
+.summary-hero { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 0; background: var(--bg-2, rgba(255,255,255,0.03)); border-left: 3px solid var(--accent-cyan, #06b6d4); }
 .summary-hero.warming { border-left-color: var(--amber); }
 .summary-headline { margin: 0; font-size: 0.95rem; font-weight: 600; line-height: 1.4; }
 .summary-action { margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--text-secondary, var(--text-2)); }
 .tab-bar { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
-.tab-btn { padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--border, rgba(255,255,255,0.06)); background: none; color: var(--text-secondary, var(--text-2)); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+.tab-btn { padding: 0.35rem 0.75rem; border-radius: 0; border: 1px solid var(--border, rgba(255,255,255,0.06)); background: none; color: var(--text-secondary, var(--text-2)); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
 .tab-btn.active { background: var(--accent-cyan, #06b6d4); color: #000; border-color: transparent; font-weight: 600; }
 
 .signals-detail { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -531,10 +532,10 @@
 }
 .infra-chip {
   display: flex; align-items: center; gap: 4px;
-  padding: 2px 7px; border-radius: 3px; border: 1px solid;
+  padding: 2px 7px; border-radius: 0; border: 1px solid;
   background: var(--surface-2);
 }
-.infra-dot     { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.infra-dot     { width: 5px; height: 5px; border-radius: 0; flex-shrink: 0; }
 .infra-chip-name { font-size: 9px; color: var(--text-2); }
 .infra-chip-val  { font-family: var(--font-mono); font-size: 9px; font-variant-numeric: tabular-nums; }
 </style>

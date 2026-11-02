@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal } from './failures.js'
+import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal, horizonPlacement } from './failures.js'
 
 describe('formatEta', () => {
   it.each([
@@ -14,14 +14,14 @@ describe('formatEta', () => {
 })
 
 describe('sortFailures', () => {
-  it('puts critical first, then the nearest failure', () => {
+  it('puts critical first, then what is happening now, then the nearest failure', () => {
     const got = sortFailures([
       { target: 'a', state: 'degraded', etaSeconds: 60 },
       { target: 'b', state: 'critical', etaSeconds: 900 },
       { target: 'c', state: 'critical', etaSeconds: 300 },
       { target: 'd', state: 'critical' },
     ])
-    expect(got.map(f => f.target)).toEqual(['c', 'b', 'd', 'a'])
+    expect(got.map(f => f.target)).toEqual(['d', 'c', 'b', 'a'])
   })
 
   it('does not change its input', () => {
@@ -62,5 +62,16 @@ describe('measuredSignal', () => {
 
   it('accepts a workload without the list', () => {
     expect(measuredSignal({}, 'stress', 0.4)).toBe(0.4)
+  })
+})
+
+describe('horizonPlacement', () => {
+  it('places detected failures at now and forecasts on the axis', () => {
+    expect(horizonPlacement({}, 1800)).toEqual({ position: 0, beyond: false })
+    expect(horizonPlacement({ etaSeconds: 900 }, 1800)).toEqual({ position: 50, beyond: false })
+  })
+
+  it('holds a later failure at the edge', () => {
+    expect(horizonPlacement({ etaSeconds: 3600 }, 1800)).toEqual({ position: 100, beyond: true })
   })
 })

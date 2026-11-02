@@ -1,0 +1,107 @@
+/*
+ * Ruptura identity: Fault Line.
+ * Cyan is what holds. Rose is rupture and appears only for real failures.
+ * Corners are cut at 45 degrees, like the break in the mark. No radius, no glow.
+ */
+@import '@fontsource/chakra-petch/400.css';
+@import '@fontsource/chakra-petch/600.css';
+@import '@fontsource/chakra-petch/700.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+:root, [data-theme="dark"] {
+  --bg: #04080F;
+  --surface: #0A111C;
+  --surface-2: #101A28;
+  --surface-3: #182636;
+  --border: #16222F;
+  --border-2: #223344;
+  --border-3: #2F4557;
+  --text: #E9F1F7;
+  --text-2: #8DA2B3;
+  --text-3: #54697A;
+  --accent: #00D4FF;
+  --accent-dim: rgba(0, 212, 255, 0.09);
+  --red: #FF2D6F;
+  --red-dim: rgba(255, 45, 111, 0.11);
+  --amber: #FFB020;
+  --amber-dim: rgba(255, 176, 32, 0.1);
+  --green: #3EE6A8;
+  --green-dim: rgba(62, 230, 168, 0.09);
+  --violet: #00D4FF;
+  --violet-dim: rgba(0, 212, 255, 0.09);
+  --font-ui: "Chakra Petch", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --cut: 10px;
+  --seam: repeating-linear-gradient(115deg, transparent 0 46px, rgba(0, 212, 255, 0.022) 46px 47px);
+}
+
+[data-theme="light"] {
+  --bg: #EEF3F6;
+  --surface: #FFFFFF;
+  --surface-2: #E4ECF1;
+  --surface-3: #D7E2E9;
+  --border: #D3DEE5;
+  --border-2: #BCCBD5;
+  --border-3: #9FB3C0;
+  --text: #06121D;
+  --text-2: #3F5566;
+  --text-3: #71879A;
+  --accent: #0079A8;
+  --accent-dim: rgba(0, 121, 168, 0.1);
+  --red: #D60F52;
+  --red-dim: rgba(214, 15, 82, 0.1);
+  --amber: #A86700;
+  --amber-dim: rgba(168, 103, 0, 0.1);
+  --green: #06805A;
+  --green-dim: rgba(6, 128, 90, 0.1);
+  --violet: #0079A8;
+  --violet-dim: rgba(0, 121, 168, 0.1);
+  --seam: repeating-linear-gradient(115deg, transparent 0 46px, rgba(0, 121, 168, 0.04) 46px 47px);
+}
+
+html, body { overflow: auto; }
+
+body {
+  background: var(--seam), var(--bg) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+h1, h2, h3, .page-title { font-family: var(--font-ui); font-weight: 700; letter-spacing: 0; }
+.page-title { font-size: 26px; line-height: 32px; text-transform: uppercase; }
+
+.kicker, .stat-label, th, .nav-group-label {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.stat-value, .num, .fri, .pct, .score, .metric-val { font-family: var(--font-mono) !important; font-variant-numeric: tabular-nums; }
+
+.page-wrap { padding-top: 28px !important; }
+
+.stat-card, .card, .panel, .widget, .empty, .error-state {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+}
+
+.btn, button.btn, input, select, textarea {
+  border-radius: 0 !important;
+  font-family: var(--font-ui);
+}
+
+.btn, button.btn {
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.grid-toggle { display: none !important; }

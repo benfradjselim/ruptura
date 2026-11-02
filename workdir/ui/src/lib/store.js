@@ -3,7 +3,7 @@ import { getToken, setToken } from './api.js'
 
 export const token = writable(getToken())
 export const user = writable(null)
-export const currentPage = writable('dashboard')
+export const currentPage = writable('failures')
 export const alerts = writable([])
 export const kpis = writable({})
 export const wsConnected = writable(false)

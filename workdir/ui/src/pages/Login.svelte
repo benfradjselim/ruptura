@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js'
+  import Mark from '../lib/components/Mark.svelte'
   import { token, user } from '../lib/store.js'
 
   let username = '', password = '', error = '', loading = false, isSetup = false
@@ -33,28 +34,16 @@
   }
 </script>
 
-<!-- Müller-Brockmann: full-bleed, single column centred, large numeral as hero -->
 <div class="login-spread">
   <!-- Left col: brand + large numeral FRI concept -->
   <div class="login-left">
-    <div class="brand-mark">
-      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-        <path d="M18 3L33 30H3L18 3Z" stroke="currentColor" stroke-width="2" fill="none"/>
-        <path d="M18 12L26 26H10L18 12Z" fill="currentColor" opacity="0.4"/>
-      </svg>
-      <span>Ruptura</span>
-    </div>
-    <div class="hero-numeral" aria-hidden="true">0.0</div>
-    <p class="hero-label">Fused Rupture Index</p>
-    <p class="hero-sub">
-      Predictive observability for Kubernetes.<br>
-      Know what will fail, when, and why.
-    </p>
-    <ul class="feature-list">
-      <li><span class="dot healthy"></span>Named failures with evidence</li>
-      <li><span class="dot accent"></span>Learns each workload</li>
-      <li><span class="dot violet"></span>One custom resource</li>
-    </ul>
+    <Mark size={84} />
+    <h2 class="wordmark">RUPTURA</h2>
+    <p class="promise">Know what will fail, when, and why.</p>
+    <svg class="fault" viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 96 L238 96 L262 62 L246 46 L302 46 L322 26 L600 26" />
+      <circle cx="262" cy="62" r="5" /><circle cx="246" cy="46" r="5" />
+    </svg>
   </div>
 
   <!-- Right col: login form -->
@@ -95,193 +84,39 @@
           {loading ? 'Verifying…' : isSetup ? 'Create account' : 'Sign in'}
         </button>
       </form>
-      <p class="version-note">Community edition · v7</p>
+      <p class="version-note">Community edition</p>
     </div>
   </div>
 </div>
 
 <style>
-  /* ── Layout: full-bleed split grid ── */
-  .login-spread {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    min-height: 100vh;
-    background: var(--bg, #0F172A);
-  }
-
-  /* ── Left: brand panel ── */
-  .login-left {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 64px 48px;
-    background: var(--surface, #1E293B);
-    border-right: 1px solid var(--border, rgba(148,163,184,0.10));
-  }
-
-  .brand-mark {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent, #38BDF8);
-    margin-bottom: 64px;
-  }
-  .brand-mark svg { color: var(--accent, #38BDF8); }
-
-  /* Swiss big numeral — the signature move */
-  .hero-numeral {
-    font-family: "DM Mono", "Fira Code", monospace;
-    font-size: clamp(72px, 10vw, 120px);
-    font-weight: 500;
-    line-height: 1;
-    color: var(--text, #E2E8F0);
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    margin-bottom: 8px;
-    /* Optical ink alignment: nudge left by side-bearing */
-    margin-left: -4px;
-  }
-
-  .hero-label {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--accent, #38BDF8);
-    margin-bottom: 24px;
-  }
-
-  .hero-sub {
-    font-size: 14px;
-    line-height: 24px;
-    color: var(--text-2, #94A3B8);
-    margin-bottom: 40px;
-    max-width: 320px;
-  }
-
-  .feature-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .feature-list li {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-    color: var(--text-2, #94A3B8);
-  }
-  .dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .dot.healthy { background: var(--green, #22C55E); }
-  .dot.accent  { background: var(--accent, #38BDF8); }
-  .dot.violet  { background: var(--violet, #8B5CF6); }
-
-  /* ── Right: form panel ── */
-  .login-right {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 48px 32px;
-    background: var(--bg, #0F172A);
-  }
-
-  .form-card {
-    width: 100%;
-    max-width: 360px;
-  }
-
-  h1 {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--text, #E2E8F0);
-    margin-bottom: 8px;
-    letter-spacing: -0.01em;
-  }
-
-  .setup-hint {
-    font-size: 12px;
-    color: var(--amber, #F59E0B);
-    background: var(--amber-dim, rgba(245,158,11,0.10));
-    border: 1px solid rgba(245,158,11,0.20);
-    border-radius: 4px;
-    padding: 8px 12px;
-    margin-bottom: 24px;
-    line-height: 1.5;
-  }
-
-  .field {
-    margin-bottom: 16px;
-  }
-  label {
-    display: block;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-3, #3F4D5C);
-    margin-bottom: 6px;
-  }
-  input {
-    display: block;
-    width: 100%;
-    background: var(--surface, #1E293B);
-    border: 1px solid var(--border-2, rgba(148,163,184,0.18));
-    border-radius: 4px;
-    color: var(--text, #E2E8F0);
-    padding: 10px 14px;
-    font-size: 14px;
-    font-family: inherit;
-    transition: border-color 0.12s;
-  }
-  input:focus { outline: none; border-color: var(--accent, #38BDF8); }
-  input::placeholder { color: var(--text-3, #3F4D5C); }
-
-  .error {
-    font-size: 12px;
-    color: var(--red, #EF4444);
-    background: var(--red-dim, rgba(239,68,68,0.10));
-    border: 1px solid rgba(239,68,68,0.20);
-    border-radius: 4px;
-    padding: 8px 12px;
-    margin-bottom: 16px;
-    line-height: 1.5;
-  }
-
+  .login-spread { display: grid; grid-template-columns: 1.3fr 1fr; min-height: 100vh; }
+  .login-left { position: relative; display: flex; flex-direction: column; justify-content: center; padding: 64px; overflow: hidden; }
+  .wordmark { margin-top: 28px; font-size: 54px; line-height: 60px; letter-spacing: 0.2em; font-weight: 700; color: var(--text); }
+  .promise { margin-top: 12px; font-size: 20px; line-height: 28px; color: var(--text-2); }
+  .fault { position: absolute; left: 0; right: 0; bottom: 56px; width: 100%; height: 120px; }
+  .fault path { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .fault circle { fill: var(--red); }
+  .login-right { display: flex; align-items: center; justify-content: center; padding: 48px; background: var(--surface); border-left: 1px solid var(--border-2); }
+  .form-card { width: 100%; max-width: 340px; }
+  h1 { font-size: 22px; line-height: 28px; text-transform: uppercase; margin-bottom: 24px; }
+  .setup-hint { color: var(--text-2); margin-bottom: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  label { font: 500 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+  input { padding: 10px 12px; background: var(--bg); border: 1px solid var(--border-2); color: var(--text); font-size: 15px; }
+  input:focus { outline: none; border-color: var(--accent); }
+  .error { color: var(--red); margin-bottom: 12px; }
   .submit-btn {
-    width: 100%;
-    padding: 11px;
-    background: var(--accent, #38BDF8);
-    color: #000;
-    border: none;
-    border-radius: 4px;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.12s, opacity 0.12s;
-    margin-top: 8px;
-    letter-spacing: 0.01em;
+    width: 100%; padding: 12px; border: 0; background: var(--accent); color: #04080F;
+    font: 700 14px var(--font-ui); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
   }
-  .submit-btn:hover:not(:disabled) { background: #67CFFA; }
-  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  .version-note {
-    margin-top: 24px;
-    font-size: 11px;
-    color: var(--text-3, #3F4D5C);
-    text-align: center;
-  }
-
-  /* ── Responsive ── */
-  @media (max-width: 640px) {
+  .submit-btn:disabled { opacity: 0.6; cursor: wait; }
+  .version-note { margin-top: 20px; font: 400 12px var(--font-mono); color: var(--text-3); }
+  @media (max-width: 800px) {
     .login-spread { grid-template-columns: 1fr; }
-    .login-left { display: none; }
-    .login-right { padding: 32px 24px; min-height: 100vh; }
+    .login-left { padding: 32px; min-height: 280px; }
+    .wordmark { font-size: 34px; line-height: 40px; }
   }
 </style>
+
