@@ -64,7 +64,7 @@ var getWorkloadsCmd = &cobra.Command{
 			}
 			row := []string{
 				ref,
-				healthColor(s.HealthScore.Value),
+				kpiHealth(s.HealthScore),
 				stateIcon(state) + " " + state,
 				fusedRColor(s.FusedRuptureIndex),
 				calibBar(s.CalibrationProgress),
@@ -131,7 +131,7 @@ var getRupturesCmd = &cobra.Command{
 				state = "critical"
 			}
 			t.add(ref, fusedRColor(s.FusedRuptureIndex), stateIcon(state)+" "+state,
-				healthColor(s.HealthScore.Value), blast, match)
+				kpiHealth(s.HealthScore), blast, match)
 		}
 		t.print()
 		return nil

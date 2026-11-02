@@ -50,7 +50,11 @@ var describeWorkloadCmd = &cobra.Command{
 
 		// status row
 		fmt.Printf("  %-20s %s %s\n", dim("state"), stateIcon(state), bold(state))
-		fmt.Printf("  %-20s %s / 100\n", dim("health score"), healthColor(snap.HealthScore.Value))
+		healthLine := kpiHealth(snap.HealthScore)
+		if !snap.HealthScore.Unavailable {
+			healthLine += " / 100"
+		}
+		fmt.Printf("  %-20s %s\n", dim("health score"), healthLine)
 		fmt.Printf("  %-20s %s\n", dim("fused rupture idx"), fusedRColor(snap.FusedRuptureIndex))
 		fmt.Printf("  %-20s %s  %s\n", dim("calibration"),
 			calibBar(snap.CalibrationProgress),
@@ -64,7 +68,7 @@ var describeWorkloadCmd = &cobra.Command{
 			fmt.Printf("  %s\n", bold("Forecast"))
 			fmt.Printf("  %-20s %s  →  %s (15m)  →  %s (30m)\n",
 				dim("health trajectory"),
-				healthColor(snap.HealthScore.Value),
+				kpiHealth(snap.HealthScore),
 				healthColor(f.In15Min),
 				healthColor(f.In30Min),
 			)

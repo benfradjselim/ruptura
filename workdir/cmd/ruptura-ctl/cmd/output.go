@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // ANSI color codes
@@ -51,6 +53,15 @@ func healthColor(score float64) string {
 	default:
 		return red(fmt.Sprintf("%.0f", score))
 	}
+}
+
+// kpiHealth renders a health score, or a dimmed n/a when its inputs are not
+// measured, so an unmeasured workload never looks like a failing one.
+func kpiHealth(k models.KPI) string {
+	if k.Unavailable {
+		return dim("n/a")
+	}
+	return healthColor(k.Value)
 }
 
 func fusedRColor(r float64) string {

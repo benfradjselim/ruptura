@@ -132,7 +132,7 @@ var statusCmd = &cobra.Command{
 
 			t.add(
 				ref,
-				healthColor(s.HealthScore.Value),
+				kpiHealth(s.HealthScore),
 				stateIcon(state)+" "+state,
 				fusedRColor(s.FusedRuptureIndex),
 				calibBar(s.CalibrationProgress),
