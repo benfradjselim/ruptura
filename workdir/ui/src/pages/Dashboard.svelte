@@ -1,5 +1,5 @@
 <script>
-  import { recentAnomalies } from '../lib/util/failures.js'
+  import { recentAnomalies, measuredSignal } from '../lib/util/failures.js'
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
 
@@ -248,7 +248,7 @@
         <div class="host-row">
           <span class="dot {hostStateClass(h.state)}"></span>
           <span class="host-name">{h.host}</span>
-          <span class="host-hs mono">{h.health_score.toFixed(0)}</span>
+          <span class="host-hs mono">{measuredSignal(h, 'health_score', h.health_score)?.toFixed(0) ?? '—'}</span>
           <span class="host-fri mono text-2">{h.fused_rupture_index?.toFixed(2) ?? '—'}</span>
           {#if h.calibration_progress < 100}
             <span class="badge dim" style="font-size:9px;padding:1px 5px">cal {h.calibration_progress}%</span>
