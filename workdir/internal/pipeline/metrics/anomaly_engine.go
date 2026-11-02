@@ -230,19 +230,65 @@ func dropUnconfirmedSeasonal(events []models.AnomalyEvent) []models.AnomalyEvent
 func dropNegligible(events []models.AnomalyEvent) []models.AnomalyEvent {
 	kept := events[:0]
 	for _, ev := range events {
-		if !negligibleDeviation(ev.Value, ev.Expected) {
+		if !negligibleDeviation(ev.Metric, ev.Value, ev.Expected) {
 			kept = append(kept, ev)
 		}
 	}
 	return kept
 }
 
+const (
+	// minRateRatio is the change a rate must show, up or down, to be unusual.
+	// On the lab, half of the anomalies on low traffic rates were below it.
+	minRateRatio = 2.0
+	// minCoreChange is the smallest CPU change, in cores, worth reporting. It
+	// matches the 100m granularity of CPU requests.
+	minCoreChange = 0.1
+)
+
+// metricScale says how a metric is compared with its usual value.
+type metricScale int
+
+const (
+	scaleDefault metricScale = iota
+	scaleRate
+	scaleCores
+)
+
+var metricScales = map[string]metricScale{
+	"k8s.pod.network.io":            scaleRate,
+	"k8s.node.network.io":           scaleRate,
+	"k8s.pod.cpu.time":              scaleCores,
+	"k8s.node.cpu.time":             scaleCores,
+	"container.cpu.time":            scaleCores,
+	"k8s.container.cpu.time":        scaleCores,
+	"k8s.pod.cpu.utilization":       scaleCores,
+	"k8s.container.cpu.utilization": scaleCores,
+}
+
+// changeRatio returns how many times value differs from expected, in either
+// direction. A zero on one side counts as a large change.
+func changeRatio(value, expected float64) float64 {
+	low, high := math.Min(math.Abs(value), math.Abs(expected)), math.Max(math.Abs(value), math.Abs(expected))
+	if low == 0 {
+		return math.Inf(1)
+	}
+	return high / low
+}
+
 // negligibleDeviation reports whether value is too close to expected to alert.
-// Values within the 0 to 1 unit range use the bounded floor. A seasonal
-// expected value may dip slightly below 0, so the check uses magnitudes. Other
-// values use a fraction of the expected value.
-func negligibleDeviation(value, expected float64) bool {
+// Rates and CPU cores need a large relative change, and cores also an absolute
+// one. Other values within the 0 to 1 range use the bounded floor, and the rest a
+// fraction of the expected value. A seasonal expected value may dip slightly
+// below 0, so checks use magnitudes.
+func negligibleDeviation(metric string, value, expected float64) bool {
 	dev := math.Abs(value - expected)
+	switch metricScales[metric] {
+	case scaleRate:
+		return changeRatio(value, expected) < minRateRatio
+	case scaleCores:
+		return changeRatio(value, expected) < minRateRatio || dev < minCoreChange
+	}
 	if math.Abs(value) <= 1 && math.Abs(expected) <= 1 {
 		return dev < madBoundedFraction
 	}
