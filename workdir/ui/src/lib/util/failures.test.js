@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal, horizonPlacement, pastPlacement, relatedEvents, cardSummary } from './failures.js'
+import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal, horizonPlacement, pastPlacement, relatedEvents, cardSummary, horizonClusters } from './failures.js'
 
 describe('formatEta', () => {
   it.each([
@@ -112,5 +112,36 @@ describe('cardSummary', () => {
 
   it('says when nothing is known', () => {
     expect(cardSummary({ state: 'healthy' })).toEqual({ title: 'No known failure', when: '', facts: [] })
+  })
+})
+
+describe('horizonClusters', () => {
+  const H = 1800
+  const f = (target, etaSeconds, state = 'warning') => ({ target, etaSeconds, state })
+
+  it('groups failures at the same time under one marker', () => {
+    const clusters = horizonClusters([f('a', 0), f('b', 0, 'critical'), f('c', 0)], H)
+    expect(clusters).toHaveLength(1)
+    expect(clusters[0].failures.map(x => x.target)).toEqual(['a', 'b', 'c'])
+    expect(clusters[0].state).toBe('critical')
+    expect(clusters[0].position).toBe(50)
+  })
+
+  it('keeps distant failures apart and alternates their lanes', () => {
+    const clusters = horizonClusters([f('a', 0), f('b', 900), f('c', 1000)], H)
+    expect(clusters.map(c => c.failures.length)).toEqual([1, 2])
+    expect(clusters.map(c => c.lane)).toEqual([0, 1])
+  })
+
+  it('anchors labels near the right edge to the left', () => {
+    const clusters = horizonClusters([f('a', 0), f('b', 1740), f('c', 2000)], H)
+    expect(clusters[1].alignRight).toBe(true)
+    expect(clusters[1].beyond).toBe(true)
+  })
+
+  it('opens a label to the left when the next one is close', () => {
+    expect(horizonClusters([f('a', 0), f('b', 1740)], H)[0].alignRight).toBe(true)
+    expect(horizonClusters([f('a', 0)], H)[0].alignRight).toBe(false)
+    expect(horizonClusters([f('a', 0), f('b', 900), f('c', 1800)], H).map(c => c.alignRight)).toEqual([true, false, true])
   })
 })

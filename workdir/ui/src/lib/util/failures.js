@@ -32,6 +32,43 @@ export function horizonPlacement(failure, horizonSeconds) {
   return { position: 50 + Math.min(50, (seconds / horizonSeconds) * 50), beyond: seconds > horizonSeconds }
 }
 
+// Failures closer than CLUSTER_GAP percent of the axis share one marker, so
+// their labels never overlap. A label opens to the left past RIGHT_EDGE, or
+// when another label follows within LABEL_SPAN and none precedes within it.
+const CLUSTER_GAP = 12
+const RIGHT_EDGE = 75
+const LABEL_SPAN = 50
+const LANES = 2
+
+export function horizonClusters(failures, horizonSeconds) {
+  const placed = failures
+    .map(failure => ({ failure, ...horizonPlacement(failure, horizonSeconds) }))
+    .sort((a, b) => a.position - b.position)
+  const clusters = []
+  for (const item of placed) {
+    const last = clusters[clusters.length - 1]
+    if (last && item.position - last.position < CLUSTER_GAP) {
+      last.failures.push(item.failure)
+      last.beyond = last.beyond || item.beyond
+      continue
+    }
+    clusters.push({ position: item.position, beyond: item.beyond, failures: [item.failure] })
+  }
+  return clusters.map((cluster, i) => ({
+    ...cluster,
+    lane: i % LANES,
+    alignRight: cluster.position > RIGHT_EDGE || opensLeft(clusters, i),
+    state: cluster.failures.some(f => f.state === 'critical') ? 'critical' : 'warning',
+  }))
+}
+
+function opensLeft(clusters, i) {
+  const next = clusters[i + 1], prev = clusters[i - 1]
+  const crowdedRight = next && next.position - clusters[i].position < LABEL_SPAN
+  const freeLeft = !prev || clusters[i].position - prev.position >= LABEL_SPAN
+  return Boolean(crowdedRight && freeLeft)
+}
+
 export function pastPlacement(minutesAgo, windowMinutes) {
   return Math.max(0, 50 - (minutesAgo / windowMinutes) * 50)
 }
