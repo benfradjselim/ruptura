@@ -47,13 +47,13 @@
     <div class="hero-numeral" aria-hidden="true">0.0</div>
     <p class="hero-label">Fused Rupture Index</p>
     <p class="hero-sub">
-      Predictive AIOps for Kubernetes.<br>
-      Detects divergence hours before failure.
+      Predictive observability for Kubernetes.<br>
+      Know what will fail, when, and why.
     </p>
     <ul class="feature-list">
-      <li><span class="dot healthy"></span>5-model adaptive ensemble</li>
-      <li><span class="dot accent"></span>10 composite KPI signals</li>
-      <li><span class="dot violet"></span>HealthScore forecast +30min</li>
+      <li><span class="dot healthy"></span>Named failures with evidence</li>
+      <li><span class="dot accent"></span>Learns each workload</li>
+      <li><span class="dot violet"></span>One custom resource</li>
     </ul>
   </div>
 
