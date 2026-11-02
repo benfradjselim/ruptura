@@ -3,6 +3,7 @@
   import { api } from '../lib/api.js'
   import InfraGroupHeatmap from '../lib/components/InfraGroupHeatmap.svelte'
   import PropagationFlow   from '../lib/components/PropagationFlow.svelte'
+  import { pressuredNamespaces } from '../lib/util/anomalies.js'
 
   let groups      = []
   let propagation = {}
@@ -17,7 +18,7 @@
         api.propagation(),
       ])
       groups      = grpRes.groups      || []
-      propagation = propRes            || {}
+      propagation = pressuredNamespaces(propRes || {})
       error       = null
     } catch (e) {
       error = e.message
@@ -36,7 +37,7 @@
 <div class="infra-page">
   <div class="page-header">
     <h1>Infrastructure</h1>
-    <span class="subtitle">Infra group health and CGPM propagation pressure</span>
+    <span class="subtitle">Shared infrastructure that can hurt your workloads: network, control plane, nodes, storage.</span>
   </div>
 
   {#if loading}
@@ -48,15 +49,19 @@
     </div>
   {:else}
     <section class="panel">
-      <h2 class="panel-title">Group Health</h2>
-      <p class="panel-desc">One cell per active infra group. Color encodes worst-case signal across all namespaces.</p>
+      <h2 class="panel-title">Infrastructure health</h2>
+      <p class="panel-desc">One cell per part of the shared infrastructure, scored from its worst signal.</p>
       <InfraGroupHeatmap {groups} />
     </section>
 
     <section class="panel">
-      <h2 class="panel-title">Propagation Pressure</h2>
-      <p class="panel-desc">CGPM: which infra groups are pushing pressure into each namespace's workloads.</p>
-      <PropagationFlow {propagation} />
+      <h2 class="panel-title">Pressure on your namespaces</h2>
+      <p class="panel-desc">Namespaces where shared infrastructure is pushing pressure into workloads.</p>
+      {#if Object.keys(propagation.namespaces || {}).length === 0}
+        <p class="panel-desc">No namespace is under infrastructure pressure right now.</p>
+      {:else}
+        <PropagationFlow {propagation} />
+      {/if}
     </section>
   {/if}
 </div>
