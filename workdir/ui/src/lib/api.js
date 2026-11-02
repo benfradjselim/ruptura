@@ -121,6 +121,7 @@ export const api = {
   inputs: () => req('GET', '/inputs'),
   trackRecord: () => req('GET', '/track-record'),
   coverage: () => req('GET', '/coverage'),
+  eventHistory: () => req('GET', '/event-history'),
 
   // ── History ────────────────────────────────────────────────────────────────
   history: (workload, from, to) => {

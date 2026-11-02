@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/discovery"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 )
 
@@ -37,7 +39,61 @@ type TrackRecorder interface {
 	TrackRecord(from, to time.Time) failuremodes.TrackRecord
 }
 
-const trackRecordWindow = 24 * time.Hour
+const (
+	trackRecordWindow = 24 * time.Hour
+	// timelineWindow is the past side of the horizon.
+	timelineWindow = 30 * time.Minute
+	// changeWindow is how long a change stays relevant to a failure.
+	changeWindow = 2 * time.Hour
+)
+
+// TimelineEvent is a past event on the horizon.
+type TimelineEvent struct {
+	Target     string `json:"target"`
+	Type       string `json:"type"`
+	Detail     string `json:"detail,omitempty"`
+	MinutesAgo int    `json:"minutesAgo"`
+}
+
+// timelineEvents merges failures and changes, oldest first.
+func timelineEvents(failures map[string][]time.Time, changes []discovery.Change, now time.Time) []TimelineEvent {
+	events := []TimelineEvent{}
+	for target, times := range failures {
+		for _, at := range times {
+			events = append(events, TimelineEvent{Target: target, Type: "failure", MinutesAgo: int(now.Sub(at).Minutes())})
+		}
+	}
+	for _, change := range changes {
+		events = append(events, TimelineEvent{Target: change.Workload, Type: "change", Detail: change.Image, MinutesAgo: int(now.Sub(change.At).Minutes())})
+	}
+	sort.SliceStable(events, func(i, j int) bool { return events[i].MinutesAgo > events[j].MinutesAgo })
+	return events
+}
+
+// changeEvidence names the latest change of a workload.
+func changeEvidence(target string, changes []discovery.Change, now time.Time) string {
+	for i := len(changes) - 1; i >= 0; i-- {
+		if changes[i].Workload == target {
+			return fmt.Sprintf("Changed %d min ago: %s", int(now.Sub(changes[i].At).Minutes()), changes[i].Image)
+		}
+	}
+	return ""
+}
+
+// FailureHistory reports recent failures per workload.
+type FailureHistory interface {
+	RecentFailures(since time.Time) map[string][]time.Time
+}
+
+func (h *Handlers) handleEventHistory(w http.ResponseWriter, _ *http.Request) {
+	now := time.Now()
+	since := now.Add(-timelineWindow)
+	var failures map[string][]time.Time
+	if history, ok := h.failureModes.(FailureHistory); ok {
+		failures = history.RecentFailures(since)
+	}
+	writeJSON(w, http.StatusOK, timelineEvents(failures, h.discovery.RecentChanges(since), now))
+}
 
 // failureEvidence states the measurement behind a result, in plain words.
 func failureEvidence(est failuremodes.Estimate) []string {
@@ -158,8 +214,14 @@ func (h *Handlers) Failures() []*FailureResult {
 	}
 	selected := selectFailures(results, h.levelSelector, h.workloadLabels)
 	scoped := make([]*FailureResult, 0, len(selected))
+	now := time.Now()
+	changes := h.discovery.RecentChanges(now.Add(-changeWindow))
 	for _, result := range selected {
-		copied := scopeResult(*result, h.levelScope)
+		copied := *result
+		if evidence := changeEvidence(result.Target, changes, now); evidence != "" {
+			copied.Evidence = append(append([]string{}, result.Evidence...), evidence)
+		}
+		copied = scopeResult(copied, h.levelScope)
 		scoped = append(scoped, &copied)
 	}
 	return scoped
