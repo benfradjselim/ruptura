@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
-  import { measuredSignal } from '../lib/util/failures.js'
+  import { measuredSignal, cardSummary } from '../lib/util/failures.js'
   import { displayLabel, displayValue, displayUnit, signalClass, incidentProbabilityBand } from '../lib/displayLabels.js'
 
   let fleet = null
@@ -212,6 +212,7 @@
         {@const risk = riskScore(w)}
         {@const sc = stateClass(w.state)}
         {@const expanded = expandedWorkload === key}
+        {@const summary = cardSummary(w)}
 
         <div class="workload-card {sc}" class:expanded>
           <!-- Card header -->
@@ -224,47 +225,22 @@
               {/if}
             </div>
             <div class="card-scores">
-              {#if pct != null}
+              {#if summary.when}
                 <div class="score-block">
-                  <span class="score-label">Reliability</span>
-                  <!-- ITEM-010: null guard on health_score -->
-                  <span class="score-value {signalClass('health_score', w.health_score ?? w.kpis?.health_score)}">{pct}%</span>
-                </div>
-              {:else}
-                <div class="score-block calibrating-pill">
-                  <span class="score-label">Calibrating</span>
-                  {#if (w.calibration_progress ?? 0) > 0}
-                    <div class="calib-bar-track" title="Calibration {w.calibration_progress}%">
-                      <div class="calib-bar-fill" style="width: {w.calibration_progress}%"></div>
-                    </div>
-                    <span class="calib-pct">{w.calibration_progress}%</span>
-                  {/if}
-                </div>
-              {/if}
-              {#if risk != null}
-                <div class="score-block" title={incidentProbabilityBand(w.fused_rupture_index ?? w.fused_r)}>
-                  <span class="score-label">Risk</span>
-                  <span class="score-value {signalClass('fused_r', w.fused_rupture_index ?? w.fused_r)}">{risk}</span>
+                  <span class="score-label">{summary.title}</span>
+                  <span class="score-value when {sc}">{summary.when}</span>
                 </div>
               {/if}
               <span class="expand-icon">{expanded ? '▲' : '▼'}</span>
             </div>
           </button>
 
-          <!-- Signal mini-bars (always visible) -->
-          <div class="signal-bars">
-            {#each SIGNAL_KEYS as sk}
-              {@const raw = getSignal(w, sk)}
-              {#if raw != null}
-                <div class="signal-bar-item" title="{displayLabel(sk)}: {displayValue(sk, raw)}{displayUnit(sk)}">
-                  <span class="signal-bar-label">{displayLabel(sk)}</span>
-                  <div class="signal-bar-track">
-                    <div class="signal-bar-fill {signalClass(sk, raw)}" style="width: {Math.min(raw * 100, 100)}%"></div>
-                  </div>
-                  <span class="signal-bar-val">{displayValue(sk, raw)}{displayUnit(sk)}</span>
-                </div>
-              {/if}
-            {/each}
+          <div class="facts">
+            {#if summary.facts.length}
+              {#each summary.facts as fact}<p>{fact}</p>{/each}
+            {:else if !summary.when}
+              <p class="muted-fact">{w.state === 'calibrating' ? 'Learning this workload' : 'No known failure'}</p>
+            {/if}
           </div>
 
           <!-- Infra context bar — matched on namespace only (v8.1) -->
@@ -300,93 +276,6 @@
                 </div>
               {/if}
 
-              <div class="tab-bar">
-                {#each ['signals', 'history', 'forecast'] as t}
-                  <button
-                    class="tab-btn"
-                    class:active={activeTab[key] === t}
-                    on:click={() => loadTab(w, t)}
-                  >{t.charAt(0).toUpperCase() + t.slice(1)}</button>
-                {/each}
-              </div>
-
-              {#if activeTab[key] === 'signals'}
-                <div class="signals-detail">
-                  {#each Object.entries(w.signals || w.kpis || { stress: w.stress, fatigue: w.fatigue, contagion: w.contagion, health_score: w.health_score }).filter(([,v]) => v != null) as [k, v]}
-                    {#if typeof v === 'number' && measuredSignal(w, k, v) !== null}
-                      <div class="signal-row">
-                        <span class="signal-name">{displayLabel(k)}</span>
-                        <div class="signal-bar-track wide">
-                          <div class="signal-bar-fill {signalClass(k, v)}" style="width: {Math.min(v * 100, 100)}%"></div>
-                        </div>
-                        <span class="signal-val {signalClass(k, v)}">{displayValue(k, v)}{displayUnit(k)}</span>
-                      </div>
-                    {:else if v != null && typeof v === 'object' && v.value != null}
-                      <div class="signal-row">
-                        <span class="signal-name">{displayLabel(k)}</span>
-                        <div class="signal-bar-track wide">
-                          <div class="signal-bar-fill {signalClass(k, v.value)}" style="width: {Math.min(v.value * 100, 100)}%"></div>
-                        </div>
-                        <span class="signal-val {signalClass(k, v.value)}">{displayValue(k, v.value)}{displayUnit(k)}</span>
-                      </div>
-                    {/if}
-                  {/each}
-                </div>
-
-              {:else if activeTab[key] === 'history'}
-                {#if loadingDetail[key]}
-                  <div class="detail-loading"><div class="spinner sm"></div> Loading history…</div>
-                {:else if !historyData[key]?.length}
-                  <!-- ITEM-017: History empty state -->
-                  <div class="detail-empty">
-                    <p>No history yet — snapshots accumulate over time.</p>
-                    <p class="hint">Check back after a few hours of telemetry.</p>
-                  </div>
-                {:else}
-                  <div class="history-list">
-                    {#each historyData[key].slice(0, 20) as snap}
-                      <div class="history-row">
-                        <span class="history-time">{new Date(snap.timestamp || snap.ts).toLocaleTimeString()}</span>
-                        <span class="history-score {signalClass('health_score', snap.health_score)}">
-                          {snap.health_score != null ? (snap.health_score * 100).toFixed(0) + '%' : '—'}
-                        </span>
-                        <span class="history-fri {signalClass('fused_r', snap.fused_rupture_index ?? snap.fused_r)}">
-                          R={((snap.fused_rupture_index ?? snap.fused_r ?? 0) * 10).toFixed(1)}
-                        </span>
-                      </div>
-                    {/each}
-                  </div>
-                {/if}
-
-              {:else if activeTab[key] === 'forecast'}
-                {#if loadingDetail[key]}
-                  <div class="detail-loading"><div class="spinner sm"></div> Loading forecast…</div>
-                {:else if forecastData[key]?.note}
-                  <!-- ITEM-017: Forecast calibrating empty state -->
-                  <div class="detail-calibrating">
-                    <div class="spinner sm"></div>
-                    <p>{forecastData[key].note}</p>
-                    <p class="hint">Forecasts become available after baseline calibration (~60 min).</p>
-                  </div>
-                {:else if forecastData[key]?.error}
-                  <div class="detail-empty"><p>Forecast not available for this workload yet.</p></div>
-                {:else if forecastData[key]?.points?.length}
-                  <div class="forecast-list">
-                    {#each forecastData[key].points as pt}
-                      <div class="forecast-row">
-                        <span class="forecast-offset">+{pt.offset_minutes}m</span>
-                        <div class="signal-bar-track wide">
-                          <div class="signal-bar-fill {signalClass('health_score', pt.mean)}"
-                               style="width: {Math.min((pt.mean ?? 0) * 100, 100)}%"></div>
-                        </div>
-                        <span class="forecast-val">{pt.mean != null ? (pt.mean * 100).toFixed(0) + '%' : '—'}</span>
-                      </div>
-                    {/each}
-                  </div>
-                {:else}
-                  <div class="detail-empty"><p>No forecast data available.</p></div>
-                {/if}
-              {/if}
             </div>
           {/if}
         </div>
@@ -421,6 +310,9 @@
 
 /* Grid */
 .workload-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1rem; }
+.facts { padding: 0 1rem 0.9rem; font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+.facts .muted-fact { color: var(--text-3); }
+.score-value.when { font-family: var(--font-mono); text-transform: none; }
 .workload-card { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%); }
 
 /* Card */

@@ -39,3 +39,13 @@ export function pastPlacement(minutesAgo, windowMinutes) {
 export function relatedEvents(events, target) {
   return events.filter(event => event.target === target).sort((a, b) => a.minutesAgo - b.minutesAgo)
 }
+
+export function cardSummary(workload) {
+  const failure = workload.failure
+  if (!failure) return { title: 'No known failure', when: '', facts: [] }
+  return {
+    title: failure.failureMode.replace(/_/g, ' '),
+    when: failure.kind === 'predicted' && failure.etaSeconds ? `in ${formatEta(failure.etaSeconds)}` : 'now',
+    facts: failure.evidence || [],
+  }
+}

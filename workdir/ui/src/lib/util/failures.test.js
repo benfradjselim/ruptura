@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal, horizonPlacement, pastPlacement, relatedEvents } from './failures.js'
+import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal, horizonPlacement, pastPlacement, relatedEvents, cardSummary } from './failures.js'
 
 describe('formatEta', () => {
   it.each([
@@ -96,5 +96,21 @@ describe('relatedEvents', () => {
       { target: 'a', minutesAgo: 3 },
     ]
     expect(relatedEvents(events, 'a').map(e => e.minutesAgo)).toEqual([3, 20])
+  })
+})
+
+describe('cardSummary', () => {
+  it('names a forecast failure with its time left', () => {
+    expect(cardSummary({ failure: { failureMode: 'saturation', kind: 'predicted', etaSeconds: 720, evidence: ['Memory at 91% of its limit'] } }))
+      .toEqual({ title: 'saturation', when: 'in 12 min', facts: ['Memory at 91% of its limit'] })
+  })
+
+  it('names a detected failure as happening now', () => {
+    expect(cardSummary({ failure: { failureMode: 'crash_loop', kind: 'detected' } }))
+      .toEqual({ title: 'crash loop', when: 'now', facts: [] })
+  })
+
+  it('says when nothing is known', () => {
+    expect(cardSummary({ state: 'healthy' })).toEqual({ title: 'No known failure', when: '', facts: [] })
   })
 })
