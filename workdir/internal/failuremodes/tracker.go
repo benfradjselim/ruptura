@@ -34,14 +34,15 @@ type podState struct {
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
 // concurrent use.
 type Tracker struct {
-	mu        sync.RWMutex
-	pods      map[string]*podState
-	replicas  map[string]replicaState
-	rollouts  map[string]time.Time
-	failures  map[string][]time.Time
-	forecasts map[string]time.Time
-	outcomes  []failureOutcome
-	recorder  func(workload string, at time.Time)
+	mu              sync.RWMutex
+	pods            map[string]*podState
+	replicas        map[string]replicaState
+	rollouts        map[string]time.Time
+	failures        map[string][]time.Time
+	forecasts       map[string]time.Time
+	outcomes        []failureOutcome
+	recorder        func(workload string, at time.Time)
+	outcomeRecorder func(at time.Time, lead time.Duration)
 }
 
 // NewTracker returns an empty tracker.
