@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0
-vars=$(grep -oE '^RUPTURA_[A-Z_]+' docs/REFERENCE.md | sort -u)
+vars=$(grep -oE 'RUPTURA_[A-Z_]+' docs/REFERENCE.md | sort -u)
 for v in $vars; do
   if ! grep -rq "$v" workdir --include="*.go"; then
     echo "::error::$v is documented in docs/REFERENCE.md but never read in workdir/*.go"
