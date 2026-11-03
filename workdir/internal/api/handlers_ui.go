@@ -203,7 +203,7 @@ func (h *Handlers) buildFleet() fleetResponse {
 		if est, ok := h.workloadEstimate(name); ok {
 			state, risk = applyEstimate(state, risk, est, h.warningHorizon())
 			etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
-			estimate = &est
+			estimate = reportedEstimate(est, h.warningHorizon())
 			h.noteForecast(name, est)
 		}
 		resp.TotalHosts++
@@ -274,7 +274,7 @@ func (h *Handlers) buildFleet() fleetResponse {
 			if est, ok := h.workloadEstimate(name); ok {
 				state, risk = applyEstimate(state, risk, est, h.warningHorizon())
 				etfSeconds, failureMode = int(est.ETF.Seconds()), string(est.Mode)
-				estimate = &est
+				estimate = reportedEstimate(est, h.warningHorizon())
 				h.noteForecast(name, est)
 			}
 			switch state {

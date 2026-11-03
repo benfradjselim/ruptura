@@ -224,3 +224,22 @@ func TestChangeEvidence(t *testing.T) {
 		t.Errorf("evidence = %q", got)
 	}
 }
+
+func TestReportedEstimate_DropsDistantSaturation(t *testing.T) {
+	cases := []struct {
+		name    string
+		est     failuremodes.Estimate
+		horizon time.Duration
+		want    bool
+	}{
+		{"saturation inside the risk horizon", failuremodes.Estimate{Mode: failuremodes.ModeSaturation, ETF: 40 * time.Minute}, 30 * time.Minute, true},
+		{"saturation ten days away", failuremodes.Estimate{Mode: failuremodes.ModeSaturation, ETF: 240 * time.Hour}, 30 * time.Minute, false},
+		{"saturation inside a long configured horizon", failuremodes.Estimate{Mode: failuremodes.ModeSaturation, ETF: 90 * time.Minute}, 2 * time.Hour, true},
+		{"a detected condition has no time to failure", failuremodes.Estimate{Mode: failuremodes.ModeCPUThrottling}, 30 * time.Minute, true},
+	}
+	for _, c := range cases {
+		if got := reportedEstimate(c.est, c.horizon) != nil; got != c.want {
+			t.Errorf("%s: reported = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
