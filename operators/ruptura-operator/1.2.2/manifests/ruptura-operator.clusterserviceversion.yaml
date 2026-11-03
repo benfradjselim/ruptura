@@ -191,57 +191,57 @@ spec:
             app.kubernetes.io/name: ruptura
             app.kubernetes.io/component: operator
           spec:
-              replicas: 1
-              selector:
-                matchLabels:
+            replicas: 1
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: ruptura
+                app.kubernetes.io/component: operator
+            template:
+              metadata:
+                labels:
                   app.kubernetes.io/name: ruptura
                   app.kubernetes.io/component: operator
-              template:
-                metadata:
-                  labels:
-                    app.kubernetes.io/name: ruptura
-                    app.kubernetes.io/component: operator
-                    app.kubernetes.io/version: "1.2.2"
-                  annotations:
-                    prometheus.io/scrape: "true"
-                    prometheus.io/port: "9090"
-                    prometheus.io/path: "/metrics"
-                spec:
-                  serviceAccountName: ruptura-operator
-                  securityContext:
-                    runAsNonRoot: true
-                  containers:
-                    - name: ruptura-operator
-                      image: ghcr.io/benfradjselim/ruptura-operator:v1.2.2
-                      imagePullPolicy: IfNotPresent
-                      args: ["--interval=30s", "--metrics-addr=:9090"]
-                      ports:
-                        - name: metrics
-                          containerPort: 9090
-                          protocol: TCP
-                      livenessProbe:
-                        httpGet:
-                          path: /healthz
-                          port: 9090
-                        initialDelaySeconds: 5
-                        periodSeconds: 15
-                      readinessProbe:
-                        httpGet:
-                          path: /healthz
-                          port: 9090
-                        initialDelaySeconds: 3
-                        periodSeconds: 10
-                      securityContext:
-                        allowPrivilegeEscalation: false
-                        readOnlyRootFilesystem: true
-                        runAsNonRoot: true
-                      resources:
-                        requests:
-                          cpu: "50m"
-                          memory: "32Mi"
-                        limits:
-                          cpu: "200m"
-                          memory: "128Mi"
+                  app.kubernetes.io/version: "1.2.2"
+                annotations:
+                  prometheus.io/scrape: "true"
+                  prometheus.io/port: "9090"
+                  prometheus.io/path: "/metrics"
+              spec:
+                serviceAccountName: ruptura-operator
+                securityContext:
+                  runAsNonRoot: true
+                containers:
+                  - name: ruptura-operator
+                    image: ghcr.io/benfradjselim/ruptura-operator:v1.2.2
+                    imagePullPolicy: IfNotPresent
+                    args: ["--interval=30s", "--metrics-addr=:9090"]
+                    ports:
+                      - name: metrics
+                        containerPort: 9090
+                        protocol: TCP
+                    livenessProbe:
+                      httpGet:
+                        path: /healthz
+                        port: 9090
+                      initialDelaySeconds: 5
+                      periodSeconds: 15
+                    readinessProbe:
+                      httpGet:
+                        path: /healthz
+                        port: 9090
+                      initialDelaySeconds: 3
+                      periodSeconds: 10
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: true
+                      runAsNonRoot: true
+                    resources:
+                      requests:
+                        cpu: "50m"
+                        memory: "32Mi"
+                      limits:
+                        cpu: "200m"
+                        memory: "128Mi"
   installModes:
     - {type: OwnNamespace, supported: false}
     - {type: SingleNamespace, supported: false}
