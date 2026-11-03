@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"math"
 	"os"
 	"strings"
 	"sync"
@@ -19,6 +20,8 @@ const (
 	inputProfileEnv   = "RUPTURA_INPUT_PROFILE"
 
 	replicasUnavailableRole = "replicas.unavailable"
+	replicasDesiredRole     = "replicas.desired"
+	replicasAvailableRole   = "replicas.available"
 	rolloutStalledRole      = "rollout.stalled"
 	containerOOMRole        = "container.oom"
 )
@@ -86,12 +89,30 @@ func replicaGaps(frames []normalize.Frame) []replicaGap {
 			continue
 		}
 		for role, kind := range replicaRoles {
-			if missing, ok := frame.Values[role]; ok {
+			missing, ok := frame.Values[role]
+			if role == replicasUnavailableRole {
+				missing, ok = deploymentMissing(frame.Values)
+			}
+			if ok {
 				gaps = append(gaps, replicaGap{parts[0] + "/" + kind + "/" + parts[1], int(missing)})
 			}
 		}
 	}
 	return gaps
+}
+
+// deploymentMissing counts desired replicas that are not available. Kubernetes
+// counts unavailable replicas over all pods, so the surge pod of a stuck rollout
+// reads as missing while every desired replica serves.
+// Without both counts it falls back to the unavailable reading.
+func deploymentMissing(values map[string]float64) (float64, bool) {
+	desired, okDesired := values[replicasDesiredRole]
+	available, okAvailable := values[replicasAvailableRole]
+	if !okDesired || !okAvailable {
+		unavailable, ok := values[replicasUnavailableRole]
+		return unavailable, ok
+	}
+	return math.Max(0, desired-available), true
 }
 
 // observeReplicas feeds workload frames to the tracker.

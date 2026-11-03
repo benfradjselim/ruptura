@@ -356,6 +356,25 @@ func TestPublishedRuptureIndex(t *testing.T) {
 	}
 }
 
+func TestReplicaGaps_StuckRolloutSurgeIsNotMissing(t *testing.T) {
+	cases := []struct {
+		name   string
+		values map[string]float64
+		want   int
+	}{
+		{"surge pod of a stuck rollout", map[string]float64{replicasDesiredRole: 2, replicasAvailableRole: 2, replicasUnavailableRole: 1}, 0},
+		{"one of two replicas down", map[string]float64{replicasDesiredRole: 2, replicasAvailableRole: 1, replicasUnavailableRole: 1}, 1},
+		{"more available than desired while scaling down", map[string]float64{replicasDesiredRole: 1, replicasAvailableRole: 2}, 0},
+		{"no desired count falls back to unavailable", map[string]float64{replicasUnavailableRole: 1}, 1},
+	}
+	for _, c := range cases {
+		got := replicaGaps([]normalize.Frame{{Target: "n/web", Values: c.values}})
+		if len(got) != 1 || got[0].missing != c.want {
+			t.Errorf("%s: gaps = %+v, want %d missing", c.name, got, c.want)
+		}
+	}
+}
+
 func TestReplicaGaps(t *testing.T) {
 	frames := []normalize.Frame{
 		{Target: "n/web", Values: map[string]float64{replicasUnavailableRole: 2}},
