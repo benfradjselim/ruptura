@@ -44,53 +44,67 @@ apiVersion: ruptura.io/v1alpha1
 kind: RupturaInstance
 metadata:
   name: shop
+  namespace: ruptura-demo
 spec:
   level:
-    scope: namespace
+    scope: workload
     selector:
       matchLabels: {team: shop}
-  input:
-    profile: standard
-  analysis:
-    sensitivity: balanced
-    horizon: 30m
   alerting:
     channels:
-      - name: ops
-        alertmanager: {url: http://alertmanager:9093}
+      - name: cluster
+        alertmanager:
+          url: https://alertmanager-main.openshift-monitoring.svc:9094
+          serviceAccountToken: true
 ```
 
-Ruptura validates it, deploys what it needs, and reports status on the resource.
+The operator validates it, deploys the engine, and reports status on the resource. On OpenShift it also grants the engine access to cluster metrics and to the cluster Alertmanager, so failures follow the same routes, silences and receivers as platform alerts.
 
-```yaml
-level: workload
-target: shop/orders
-failureMode: memory_saturation
-kind: predicted
-state: critical
-etaSeconds: 720
-recommendedAction: Review the memory limit
+Each failure is one structured result, from `GET /api/v2/failures`:
+
+```json
+{
+  "level": "workload",
+  "target": "demo-shop/Deployment/step-leak",
+  "failureMode": "saturation",
+  "kind": "predicted",
+  "state": "degraded",
+  "etaSeconds": 626,
+  "recommendedAction": "Review the memory limit or restart the pod before it is killed",
+  "evidence": ["Memory at 75% of its limit"]
+}
 ```
 
-> This configuration is under active development. See the [roadmap](#roadmap).
+Failures covered today: memory saturation, OOM kill, crash loop, pod stuck at startup, unavailable replicas, stuck rollout, CPU throttling, and failures recurring on a regular rhythm.
 
 ## Getting started
 
+### OpenShift, with the operator
+
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/benfradjselim/ruptura/main/install/ruptura.yaml
-kubectl -n ruptura-system get pods
+oc apply -f https://raw.githubusercontent.com/benfradjselim/ruptura/main/install/operator.yaml
+oc -n ruptura-system rollout status deploy/ruptura-operator
 ```
 
-Or with Helm:
+Then create a `RupturaInstance` like the one above and watch it reach `Running`:
+
+```bash
+oc get rupturainstance -A
+```
+
+### Kubernetes, with Helm
 
 ```bash
 helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --namespace ruptura-system --create-namespace \
   --set apiKey=$(openssl rand -hex 32) \
-  --set ui.enabled=true
+  --set ui.enabled=true \
+  --set thanos.url=http://prometheus.monitoring.svc:9090
 ```
 
-Try it locally, no cluster needed:
+Failure modes read Prometheus, so set `thanos.url` to your Prometheus or Thanos query endpoint. On Kubernetes the operator cannot set it yet.
+
+### Locally, no cluster needed
 
 ```bash
 docker compose up --build
@@ -116,7 +130,7 @@ Then open <http://localhost:8081> and sign in with password `ruptura-local-dev`.
 
 | Status | Scope |
 |---|---|
-| **Now** | Pod and workload failures, memory saturation, crash loops, CPU throttling, Kubernetes Events, `RupturaInstance` configuration |
+| **Now** | Pod and workload failures, Kubernetes Events, `RupturaInstance` configuration, Alertmanager, including the OpenShift cluster Alertmanager |
 | **Next** | Node level, noisy neighbours, failure propagation, logs |
 | **Later** | Namespace and cluster levels, traces, eBPF, OpenShift Console plugin |
 
