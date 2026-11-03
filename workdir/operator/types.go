@@ -75,6 +75,9 @@ type AnalysisConfig struct {
 // AlertmanagerChannel sends results to an Alertmanager.
 type AlertmanagerChannel struct {
 	URL string `json:"url"`
+	// ServiceAccountToken sends the instance service account token, as needed by
+	// the OpenShift cluster Alertmanager. Never set it for a third party target.
+	ServiceAccountToken bool `json:"serviceAccountToken,omitempty"`
 }
 
 // AlertChannel is one named destination for results.
@@ -214,8 +217,21 @@ type HTTPGetAction struct {
 }
 
 type Volume struct {
-	Name                  string           `json:"name"`
-	PersistentVolumeClaim *PVCVolumeSource `json:"persistentVolumeClaim,omitempty"`
+	Name                  string                 `json:"name"`
+	PersistentVolumeClaim *PVCVolumeSource       `json:"persistentVolumeClaim,omitempty"`
+	ConfigMap             *ConfigMapVolumeSource `json:"configMap,omitempty"`
+}
+
+// ConfigMapVolumeSource mounts selected keys of a ConfigMap.
+type ConfigMapVolumeSource struct {
+	Name  string      `json:"name"`
+	Items []KeyToPath `json:"items,omitempty"`
+}
+
+// KeyToPath maps a ConfigMap key to a file name.
+type KeyToPath struct {
+	Key  string `json:"key"`
+	Path string `json:"path"`
 }
 
 type PVCVolumeSource struct {
@@ -225,6 +241,7 @@ type PVCVolumeSource struct {
 type VolumeMount struct {
 	Name      string `json:"name"`
 	MountPath string `json:"mountPath"`
+	ReadOnly  bool   `json:"readOnly,omitempty"`
 }
 
 // Service shapes
