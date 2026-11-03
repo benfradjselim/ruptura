@@ -34,7 +34,14 @@ An invalid instance deploys nothing: its status reports phase `Failed` with ever
 
 Deleting the instance removes everything the operator created, cluster bindings included.
 
-On Kubernetes the operator installs the same way, but it cannot yet point the engine at a Prometheus, and failure modes need one. Use Helm there until then.
+On Kubernetes the operator installs the same way. Failure modes read Prometheus, so declare its query endpoint:
+
+```yaml
+spec:
+  input:
+    prometheus:
+      url: http://prometheus.monitoring.svc:9090
+```
 
 ## Kubernetes, with Helm
 

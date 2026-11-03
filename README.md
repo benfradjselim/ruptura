@@ -79,20 +79,20 @@ Failures covered today: memory saturation, OOM kill, crash loop, pod stuck at st
 
 ## Getting started
 
-### OpenShift, with the operator
+### OpenShift and Kubernetes, with the operator
 
 ```bash
 oc apply -f https://raw.githubusercontent.com/benfradjselim/ruptura/main/install/operator.yaml
 oc -n ruptura-system rollout status deploy/ruptura-operator
 ```
 
-Then create a `RupturaInstance` like the one above and watch it reach `Running`:
+On Kubernetes, also set `spec.input.prometheus.url` to your Prometheus query endpoint. Then create the `RupturaInstance` and watch it reach `Running`:
 
 ```bash
 oc get rupturainstance -A
 ```
 
-### Kubernetes, with Helm
+### Engine only, with Helm
 
 ```bash
 helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
@@ -102,7 +102,7 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --set thanos.url=http://prometheus.monitoring.svc:9090
 ```
 
-Failure modes read Prometheus, so set `thanos.url` to your Prometheus or Thanos query endpoint. On Kubernetes the operator cannot set it yet.
+Failure modes read Prometheus, so set `thanos.url` to your Prometheus or Thanos query endpoint.
 
 ### Locally, no cluster needed
 

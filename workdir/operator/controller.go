@@ -242,11 +242,11 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 	})
 	mounts := []VolumeMount{{Name: "data", MountPath: "/var/lib/ruptura/data"}}
 	volumes := []Volume{{Name: "data", PersistentVolumeClaim: &PVCVolumeSource{ClaimName: name + "-data"}}}
+	if url := prometheusURL(spec, isOCP); url != "" {
+		env = append(env, EnvVar{Name: "RUPTURA_THANOS_URL", Value: url})
+	}
 	if isOCP {
-		env = append(env,
-			EnvVar{Name: "RUPTURA_THANOS_URL", Value: thanosURL},
-			EnvVar{Name: "RUPTURA_ALERTMANAGER_CA_FILE", Value: serviceCAMountPath + "/" + serviceCAKey},
-		)
+		env = append(env, EnvVar{Name: "RUPTURA_ALERTMANAGER_CA_FILE", Value: serviceCAMountPath + "/" + serviceCAKey})
 		mounts = append(mounts, VolumeMount{Name: "service-ca", MountPath: serviceCAMountPath, ReadOnly: true})
 		volumes = append(volumes, Volume{Name: "service-ca", ConfigMap: &ConfigMapVolumeSource{
 			Name:  serviceCAConfigMapName(name),
@@ -458,6 +458,18 @@ func alertmanagerURLs(channels []AlertChannel, withToken bool) string {
 		}
 	}
 	return strings.Join(urls, ",")
+}
+
+// prometheusURL returns the declared query endpoint, or the cluster Thanos
+// querier on OpenShift. Without one the engine runs without failure modes.
+func prometheusURL(spec RupturaInstanceSpec, isOCP bool) string {
+	if spec.Input.Prometheus != nil && spec.Input.Prometheus.URL != "" {
+		return spec.Input.Prometheus.URL
+	}
+	if isOCP {
+		return thanosURL
+	}
+	return ""
 }
 
 // usesServiceAccountToken reports whether any channel sends the token.

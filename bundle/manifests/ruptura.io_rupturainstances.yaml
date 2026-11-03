@@ -111,6 +111,14 @@ spec:
                       type: string
                       enum: [minimal, standard, full, deep]
                       default: standard
+                    prometheus:
+                      type: object
+                      description: "Prometheus compatible query endpoint that failure modes read. Default on OpenShift: the cluster Thanos querier."
+                      required: [url]
+                      properties:
+                        url:
+                          type: string
+                          pattern: '^https?://.+'
                 analysis:
                   type: object
                   properties:

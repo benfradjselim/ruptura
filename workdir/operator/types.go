@@ -64,6 +64,14 @@ type LevelConfig struct {
 // InputConfig selects the input profile.
 type InputConfig struct {
 	Profile string `json:"profile,omitempty"`
+	// Prometheus is the query endpoint failure modes read. On OpenShift it
+	// defaults to the cluster Thanos querier.
+	Prometheus *PrometheusSource `json:"prometheus,omitempty"`
+}
+
+// PrometheusSource is a Prometheus compatible query endpoint.
+type PrometheusSource struct {
+	URL string `json:"url"`
 }
 
 // AnalysisConfig tunes predictions.
