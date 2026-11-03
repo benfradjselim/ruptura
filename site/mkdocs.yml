@@ -1,5 +1,5 @@
 site_name: Ruptura
-site_description: "Predictive failure detection engine for cloud-native infrastructure"
+site_description: "Named failures for Kubernetes and OpenShift workloads"
 site_url: https://benfradjselim.github.io/ruptura/
 repo_url: https://github.com/benfradjselim/ruptura
 copyright: "© 2026 Selim Benfradj — Apache 2.0"
@@ -26,43 +26,12 @@ plugins:
 
 nav:
   - Home: index.md
-  - Getting Started:
-    - index.md
-    - Installation: getting-started/installation.md
-    - Ingest Guide: getting-started/ingest.md
-    - Quickstart: getting-started/quickstart.md
-    - Dashboard Tour: getting-started/dashboard-tour.md
-    - Configuration: getting-started/configuration.md
-  - Concepts:
-    - index.md
-    - Rupture Index: concepts/rupture-index.md
-    - Composite Signals: concepts/composite-signals.md
-    - Surge Profiles: concepts/surge-profiles.md
-    - Action Engine: concepts/action-engine.md
-  - Architecture:
-    - index.md
-    - Pipelines: architecture/pipelines.md
-    - Fusion Engine: architecture/fusion-engine.md
-    - Dashboard Architecture: architecture/dashboard.md
-    - Operator: architecture/operator.md
-  - CLI:
-    - Reference: cli/rupturactl.md
-  - API:
-    - index.md
-    - Reference: api/reference.md
-  - SDKs:
-    - index.md
-    - Go SDK: sdks/go-sdk.md
-    - Python SDK: sdks/python-sdk.md
-  - Operations:
-    - index.md
-    - Deployment: operations/deploy.md
-    - Self Monitoring: operations/self-monitoring.md
-    - Troubleshooting: operations/troubleshooting.md
+  - Installation: install.md
+  - RupturaInstance: rupturainstance.md
+  - Failure modes: failures.md
+  - Alerting: alerting.md
+  - API: reference/api.md
   - Community:
-    - index.md
-    - Contributing: community/contributing.md
     - Roadmap: community/roadmap.md
-  - About:
-    - index.md
+    - Contributing: community/contributing.md
     - License: about/license.md

@@ -45,7 +45,7 @@ spec:
               properties:
                 image:
                   type: string
-                  description: "Ruptura container image. Default: ghcr.io/benfradjselim/ruptura:v6.6.3"
+                  description: "Ruptura engine image. Default: the engine version matching this operator."
                 replicas:
                   type: integer
                   minimum: 1
@@ -63,7 +63,7 @@ spec:
                   type: string
                   enum: [community, autopilot]
                   default: community
-                  description: "Feature tier. 'autopilot' enables T1 auto-execution."
+                  description: "Feature tier. Keep community."
                 ingestRPS:
                   type: integer
                   minimum: 1

@@ -67,7 +67,7 @@ Open a GitHub Discussion under the *Ideas* category. Include:
 - Proposed solution
 - Alternatives considered
 
-Large features (new ingest protocol, new composite signal, new action provider) benefit from a short design doc before implementation.
+Large features (new input source, new failure mode, new output) benefit from a short design doc before implementation.
 
 ## Code style
 
