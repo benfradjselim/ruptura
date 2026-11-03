@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultImage       = "docker.io/selimbf/ruptura:v8.5.2"
+	defaultImage       = "docker.io/selimbf/ruptura:v8.6.0"
 	defaultStorageSize = "10Gi"
 	defaultEdition     = "community"
 	appLabel           = "app.kubernetes.io/name"
@@ -23,6 +23,14 @@ const (
 	thanosURL = "https://thanos-querier.openshift-monitoring.svc:9091"
 	// monitoringViewRole is the ClusterRole granting read access to cluster metrics.
 	monitoringViewRole = "cluster-monitoring-view"
+	// clusterMonitoringNamespace holds the OpenShift cluster Alertmanager.
+	clusterMonitoringNamespace = "openshift-monitoring"
+	// alertmanagerEditRole allows posting alerts to the cluster Alertmanager.
+	alertmanagerEditRole = "monitoring-alertmanager-edit"
+	// serviceCAInjectAnnotation asks OpenShift to write its service CA into a ConfigMap.
+	serviceCAInjectAnnotation = "service.beta.openshift.io/inject-cabundle"
+	serviceCAKey              = "service-ca.crt"
+	serviceCAMountPath        = "/etc/ruptura/service-ca"
 	// readerRole grants instances read access to workloads and events.
 	readerRole = "ruptura-instance-reader"
 	// instanceServiceAccount is the ServiceAccount used by instance pods.
@@ -66,6 +74,12 @@ func cleanup(c *k8sClient, inst RupturaInstance, isOCP bool) error {
 		}
 		if err := c.delete(clusterRoleBindingPath(ns, name)); err != nil {
 			return fmt.Errorf("delete ClusterRoleBinding: %w", err)
+		}
+		if err := c.delete(alertmanagerBindingPath(ns, name)); err != nil {
+			return fmt.Errorf("delete Alertmanager RoleBinding: %w", err)
+		}
+		if err := c.delete(serviceCAConfigMapPath(ns, name)); err != nil {
+			return fmt.Errorf("delete service CA ConfigMap: %w", err)
 		}
 	}
 	if err := c.delete(readerBindingPath(ns, name)); err != nil {
@@ -159,6 +173,9 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 		if err := reconcileMonitoringBinding(c, ns, name, labels); err != nil {
 			return fmt.Errorf("ClusterRoleBinding: %w", err)
 		}
+		if err := reconcileAlertmanagerAccess(c, ns, name, inst.Spec, labels); err != nil {
+			return fmt.Errorf("Alertmanager access: %w", err)
+		}
 	}
 	if err := reconcileDeployment(c, ns, name, image, edition, apiKeyRef, replicas, isOCP, inst.Spec, labels); err != nil {
 		return fmt.Errorf("Deployment: %w", err)
@@ -223,8 +240,18 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 			},
 		},
 	})
+	mounts := []VolumeMount{{Name: "data", MountPath: "/var/lib/ruptura/data"}}
+	volumes := []Volume{{Name: "data", PersistentVolumeClaim: &PVCVolumeSource{ClaimName: name + "-data"}}}
 	if isOCP {
-		env = append(env, EnvVar{Name: "RUPTURA_THANOS_URL", Value: thanosURL})
+		env = append(env,
+			EnvVar{Name: "RUPTURA_THANOS_URL", Value: thanosURL},
+			EnvVar{Name: "RUPTURA_ALERTMANAGER_CA_FILE", Value: serviceCAMountPath + "/" + serviceCAKey},
+		)
+		mounts = append(mounts, VolumeMount{Name: "service-ca", MountPath: serviceCAMountPath, ReadOnly: true})
+		volumes = append(volumes, Volume{Name: "service-ca", ConfigMap: &ConfigMapVolumeSource{
+			Name:  serviceCAConfigMapName(name),
+			Items: []KeyToPath{{Key: serviceCAKey, Path: serviceCAKey}},
+		}})
 	}
 	env = append(env, configEnv(spec)...)
 	if spec.IngestRPS > 0 {
@@ -290,11 +317,9 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 								{Name: "http", ContainerPort: 8080, Protocol: "TCP"},
 								{Name: "otlp", ContainerPort: 4317, Protocol: "TCP"},
 							},
-							Env: env,
-							VolumeMounts: []VolumeMount{
-								{Name: "data", MountPath: "/var/lib/ruptura/data"},
-							},
-							Resources: resources,
+							Env:          env,
+							VolumeMounts: mounts,
+							Resources:    resources,
 							SecurityContext: &ContainerSecurityContext{
 								AllowPrivilegeEscalation: false,
 								RunAsNonRoot:             trueVal,
@@ -315,9 +340,7 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 							},
 						},
 					},
-					Volumes: []Volume{
-						{Name: "data", PersistentVolumeClaim: &PVCVolumeSource{ClaimName: name + "-data"}},
-					},
+					Volumes: volumes,
 				},
 			},
 		},
@@ -425,14 +448,21 @@ func selectorString(labels map[string]string) string {
 	return strings.Join(pairs, ",")
 }
 
-func alertmanagerURLs(channels []AlertChannel) string {
+// alertmanagerURLs lists the Alertmanager targets that do or do not receive
+// the service account token.
+func alertmanagerURLs(channels []AlertChannel, withToken bool) string {
 	urls := make([]string, 0, len(channels))
 	for _, channel := range channels {
-		if channel.Alertmanager != nil {
+		if channel.Alertmanager != nil && channel.Alertmanager.ServiceAccountToken == withToken {
 			urls = append(urls, channel.Alertmanager.URL)
 		}
 	}
 	return strings.Join(urls, ",")
+}
+
+// usesServiceAccountToken reports whether any channel sends the token.
+func usesServiceAccountToken(spec RupturaInstanceSpec) bool {
+	return alertmanagerURLs(spec.Alerting.Channels, true) != ""
 }
 
 // configEnv passes the declared configuration to the engine.
@@ -444,7 +474,8 @@ func configEnv(spec RupturaInstanceSpec) []EnvVar {
 		{Name: "RUPTURA_SENSITIVITY", Value: spec.Analysis.Sensitivity},
 		{Name: "RUPTURA_HORIZON", Value: spec.Analysis.Horizon},
 		{Name: "LOG_LEVEL", Value: spec.Logging.Level},
-		{Name: "RUPTURA_ALERTMANAGER_URLS", Value: alertmanagerURLs(spec.Alerting.Channels)},
+		{Name: "RUPTURA_ALERTMANAGER_URLS", Value: alertmanagerURLs(spec.Alerting.Channels, false)},
+		{Name: "RUPTURA_ALERTMANAGER_TOKEN_URLS", Value: alertmanagerURLs(spec.Alerting.Channels, true)},
 	}
 	env := make([]EnvVar, 0, len(values))
 	for _, value := range values {
@@ -536,4 +567,60 @@ func reconcileBinding(c *k8sClient, path, bindingName, role, ns string, labels m
 		}},
 	}
 	return c.apply(path, crb)
+}
+
+func serviceCAConfigMapName(name string) string { return name + "-service-ca" }
+
+func serviceCAConfigMapPath(ns, name string) string {
+	return fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", ns, serviceCAConfigMapName(name))
+}
+
+func alertmanagerBindingName(ns, name string) string {
+	return fmt.Sprintf("ruptura-%s-%s-alertmanager", ns, name)
+}
+
+func alertmanagerBindingPath(ns, name string) string {
+	return fmt.Sprintf("/apis/rbac.authorization.k8s.io/v1/namespaces/%s/rolebindings/%s", clusterMonitoringNamespace, alertmanagerBindingName(ns, name))
+}
+
+// reconcileAlertmanagerAccess lets the engine reach the OpenShift cluster
+// Alertmanager: a ConfigMap that OpenShift fills with the service CA, and, when
+// a channel sends the token, a binding to the role that allows posting alerts.
+func reconcileAlertmanagerAccess(c *k8sClient, ns, name string, spec RupturaInstanceSpec, labels map[string]string) error {
+	configMap := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":        serviceCAConfigMapName(name),
+			"namespace":   ns,
+			"labels":      labels,
+			"annotations": map[string]string{serviceCAInjectAnnotation: "true"},
+		},
+	}
+	if err := c.apply(serviceCAConfigMapPath(ns, name), configMap); err != nil {
+		return fmt.Errorf("service CA ConfigMap: %w", err)
+	}
+	if !usesServiceAccountToken(spec) {
+		return c.delete(alertmanagerBindingPath(ns, name))
+	}
+	binding := map[string]interface{}{
+		"apiVersion": "rbac.authorization.k8s.io/v1",
+		"kind":       "RoleBinding",
+		"metadata": map[string]interface{}{
+			"name":      alertmanagerBindingName(ns, name),
+			"namespace": clusterMonitoringNamespace,
+			"labels":    labels,
+		},
+		"roleRef": map[string]interface{}{
+			"apiGroup": "rbac.authorization.k8s.io",
+			"kind":     "Role",
+			"name":     alertmanagerEditRole,
+		},
+		"subjects": []interface{}{map[string]interface{}{
+			"kind":      "ServiceAccount",
+			"name":      instanceServiceAccount,
+			"namespace": ns,
+		}},
+	}
+	return c.apply(alertmanagerBindingPath(ns, name), binding)
 }

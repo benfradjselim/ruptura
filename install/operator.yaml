@@ -35,6 +35,17 @@ rules:
     resources: ["clusterroles"]
     resourceNames: ["cluster-monitoring-view", "ruptura-instance-reader"]
     verbs: ["bind"]
+  # Let instances post to the OpenShift cluster Alertmanager
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles"]
+    resourceNames: ["monitoring-alertmanager-edit"]
+    verbs: ["bind"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "update", "patch", "delete"]
   - apiGroups: ["ruptura.io"]
     resources: ["rupturainstances", "rupturainstances/status"]
     verbs: ["get", "list", "watch", "update", "patch"]
@@ -139,7 +150,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: ruptura-operator
-          image: ghcr.io/benfradjselim/ruptura-operator:v1.2.2
+          image: ghcr.io/benfradjselim/ruptura-operator:v1.3.0
           imagePullPolicy: IfNotPresent
           args: ["--interval=30s", "--metrics-addr=:9090"]
           ports:

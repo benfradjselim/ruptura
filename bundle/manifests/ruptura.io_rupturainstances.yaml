@@ -136,6 +136,9 @@ spec:
                             required: [url]
                             properties:
                               url: {type: string}
+                              serviceAccountToken:
+                                type: boolean
+                                description: Send the instance service account token, as the OpenShift cluster Alertmanager requires. Never set it for a third party target.
                 logging:
                   type: object
                   properties:
