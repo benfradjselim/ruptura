@@ -34,7 +34,7 @@ An invalid instance deploys nothing: its status reports phase `Failed` with ever
 
 Deleting the instance removes everything the operator created, cluster bindings included.
 
-On Kubernetes the operator installs the same way. Failure modes read Prometheus, so declare its query endpoint:
+On Kubernetes the operator installs the same way. Every failure mode except `crash_loop` reads Prometheus, so declare its query endpoint:
 
 ```yaml
 spec:

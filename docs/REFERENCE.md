@@ -4,7 +4,7 @@ The operator sets these from a `RupturaInstance`. Set them yourself only when yo
 
 | Variable | Effect |
 |---|---|
-| `RUPTURA_THANOS_URL` | Prometheus or Thanos query endpoint. Failure modes are off without it. |
+| `RUPTURA_THANOS_URL` | Prometheus or Thanos query endpoint. Without it only `crash_loop` is reported. |
 | `RUPTURA_API_KEY` | API key required on `/api/v2` requests, except probes. |
 | `RUPTURA_LEVEL_SCOPE` | `pod`, `workload` or `namespace`: how results are reported. |
 | `RUPTURA_LEVEL_SELECTOR` | `key=value,key=value`: only matching workloads are reported and alerted. |

@@ -35,7 +35,7 @@ spec:
 | `level.scope` | `pod`, `workload`, `namespace` | `workload` | How results are reported. Other values in the schema are planned and refused for now. |
 | `level.selector.matchLabels` | labels | none | Only workloads with these labels are reported and alerted. |
 | `input.profile` | `minimal`, `standard` | `standard` | How much telemetry is collected. `full` and `deep` are planned. |
-| `input.prometheus.url` | `http` or `https` URL | OpenShift: the cluster Thanos querier. Kubernetes: none | Prometheus compatible query endpoint that failure modes read. Required on Kubernetes. |
+| `input.prometheus.url` | `http` or `https` URL | OpenShift: the cluster Thanos querier. Kubernetes: none | Prometheus compatible query endpoint. Without it only `crash_loop` is reported. |
 | `analysis.sensitivity` | `conservative`, `balanced`, `aggressive` | `balanced` | How early forecasts warn. |
 | `analysis.horizon` | duration | `30m` | How far ahead forecasts look. |
 | `alerting.channels` | list | none | Where results are sent, see [Alerting](alerting.md). |

@@ -102,7 +102,7 @@ helm install ruptura oci://ghcr.io/benfradjselim/charts/ruptura \
   --set thanos.url=http://prometheus.monitoring.svc:9090
 ```
 
-Failure modes read Prometheus, so set `thanos.url` to your Prometheus or Thanos query endpoint.
+Every failure mode except `crash_loop` reads Prometheus, so set `thanos.url` to your Prometheus or Thanos query endpoint.
 
 ### Locally, no cluster needed
 
