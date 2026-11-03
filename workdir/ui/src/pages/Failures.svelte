@@ -1,13 +1,13 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
-  import { formatEta, sortFailures, missingRoles, horizonPlacement, pastPlacement, relatedEvents } from '../lib/util/failures.js'
+  import { formatEta, sortFailures, missingRoles, horizonClusters, pastPlacement, relatedEvents } from '../lib/util/failures.js'
 
   const REFRESH_MS = 15000
   const HORIZON_SECONDS = 30 * 60
   const PAST_MINUTES = 30
   const TICKS = ['-30 min', '-15 min', 'Now', '+15 min', '+30 min']
-  const LANES = 3
+  const MAX_TAG_NAMES = 6
 
   let failures = [], missing = [], record = null, protection = null, history = [], selected = null, loading = true, error = '', timer
 
@@ -72,12 +72,18 @@
       {#each history as event}
         <span class="past {event.type}" style="left:{pastPlacement(event.minutesAgo, PAST_MINUTES)}%" title="{name(event.target)}: {event.type} {event.minutesAgo} min ago {event.detail || ''}"></span>
       {/each}
-      {#each failures as failure, i (failure.target + failure.failureMode)}
-        {@const place = horizonPlacement(failure, HORIZON_SECONDS)}
-        <div class="node {failure.state}" style="left:{place.position}%; --lane:{i % LANES}" title="{name(failure.target)}: {label(failure.failureMode)}">
+      {#each horizonClusters(failures, HORIZON_SECONDS) as cluster}
+        <div class="node {cluster.state}" class:right={cluster.alignRight} style="left:{cluster.position}%; --lane:{cluster.lane}"
+             title={cluster.failures.map(f => `${name(f.target)}: ${label(f.failureMode)}`).join('\n')}>
           <span class="stem"></span>
           <span class="dot"></span>
-          <span class="tag">{name(failure.target)}{place.beyond ? ' →' : ''}</span>
+          <span class="tag">
+            {#each cluster.failures.slice(0, MAX_TAG_NAMES) as failure}
+              <span class:crit={failure.state === 'critical'}>{name(failure.target)}</span>
+            {/each}
+            {#if cluster.failures.length > MAX_TAG_NAMES}<span class="more">+{cluster.failures.length - MAX_TAG_NAMES} more</span>{/if}
+            {#if cluster.beyond}<span class="more">beyond 30 min →</span>{/if}
+          </span>
         </div>
       {/each}
     </div>
@@ -194,8 +200,12 @@
   .node.critical .dot { background: var(--red); }
   .tag {
     position: absolute; left: 6px; bottom: calc(30px + var(--lane) * 40px);
-    font: 600 14px var(--font-ui); white-space: nowrap; color: var(--text);
+    display: flex; flex-direction: column;
+    font: 600 14px/17px var(--font-ui); white-space: nowrap; color: var(--text);
   }
+  .tag .crit { color: var(--red); }
+  .tag .more { font: 400 11px/16px var(--font-mono); color: var(--text-3); }
+  .node.right .tag { left: auto; right: 6px; align-items: flex-end; }
 
   .ruptures { list-style: none; margin-top: 30px; display: grid; gap: 10px; }
   .ruptures li {

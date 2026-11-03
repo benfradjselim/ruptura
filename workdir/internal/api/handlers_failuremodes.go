@@ -125,6 +125,16 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate, horizo
 	return state, risk
 }
 
+// reportedEstimate returns the estimate to list as a failure, or nil when it is a
+// saturation forecast beyond the cut applyEstimate uses, so a failure days away
+// is never listed or sent to Alertmanager.
+func reportedEstimate(est failuremodes.Estimate, horizon time.Duration) *failuremodes.Estimate {
+	if est.Mode == failuremodes.ModeSaturation && est.ETF > riskHorizon && est.ETF > horizon {
+		return nil
+	}
+	return &est
+}
+
 func estimateHeadline(name string, est failuremodes.Estimate) string {
 	if est.Mode == failuremodes.ModeRecurrentFailure {
 		return fmt.Sprintf("%s fails about every %d minutes.", name, int(math.Round(est.Interval.Minutes())))

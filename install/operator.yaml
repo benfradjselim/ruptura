@@ -139,7 +139,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: ruptura-operator
-          image: ghcr.io/benfradjselim/ruptura-operator:v1.2.1
+          image: ghcr.io/benfradjselim/ruptura-operator:v1.2.2
           imagePullPolicy: IfNotPresent
           args: ["--interval=30s", "--metrics-addr=:9090"]
           ports:
