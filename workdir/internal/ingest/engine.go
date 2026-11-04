@@ -2,6 +2,8 @@ package ingest
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -76,6 +78,7 @@ type Engine struct {
 	tracesCount  int64
 
 	httpServer  *http.Server
+	httpTLS     *tls.Config
 	udpConn     *net.UDPConn
 	grpcServer  *grpc.Server
 	grpcSamples chan *GRPCMetricPoint
@@ -165,17 +168,51 @@ func rateLimitMiddleware(rl *rateLimiter, next http.Handler) http.Handler {
 	})
 }
 
+// SetTLS makes StartHTTP serve OTLP over TLS with the given configuration.
+func (e *Engine) SetTLS(config *tls.Config) {
+	e.httpTLS = config
+}
+
 func (e *Engine) StartHTTP(addr string) error {
 	mux := http.NewServeMux()
 	RegisterHandlers(mux, e)
 	rl := newRateLimiter()
-	e.httpServer = &http.Server{Addr: addr, Handler: rateLimitMiddleware(rl, mux)}
+	e.httpServer = &http.Server{Addr: addr, Handler: rateLimitMiddleware(rl, mux), TLSConfig: e.httpTLS}
 	go func() {
-		if err := e.httpServer.ListenAndServe(); err != http.ErrServerClosed {
+		var err error
+		if e.httpTLS != nil {
+			err = e.httpServer.ListenAndServeTLS("", "")
+		} else {
+			err = e.httpServer.ListenAndServe()
+		}
+		if err != http.ErrServerClosed {
 			logger.Default.Error("HTTP ingest failed", "error", err)
 		}
 	}()
 	return nil
+}
+
+// ServerTLS loads a server certificate and, when clientCAFile is set, requires
+// client certificates signed by it.
+func ServerTLS(certFile, keyFile, clientCAFile string) (*tls.Config, error) {
+	pair, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("ingest: load server certificate: %w", err)
+	}
+	config := &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12}
+	if clientCAFile != "" {
+		pem, err := os.ReadFile(clientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("ingest: read client CA: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("ingest: no valid certificates in client CA")
+		}
+		config.ClientCAs = pool
+		config.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+	return config, nil
 }
 
 func (e *Engine) StartDogStatsD(addr string) error {

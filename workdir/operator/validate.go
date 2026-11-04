@@ -72,6 +72,7 @@ func validateSpec(spec RupturaInstanceSpec) error {
 			problems = append(problems, fmt.Sprintf("input.prometheus.url: %q is not an http or https URL", prometheus.URL))
 		}
 	}
+	problems = append(problems, checkInputs(spec.Input)...)
 	problems = append(problems, checkChannels(spec.Alerting.Channels)...)
 	if len(problems) == 0 {
 		return nil

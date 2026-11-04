@@ -127,6 +127,167 @@ spec:
                         url:
                           type: string
                           pattern: '^https?://.+'
+                        tls:
+                          type: object
+                          properties:
+                            ca:
+                              type: object
+                              description: "Extra CA that signs the Prometheus server certificate."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                                configMapKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            cert:
+                              type: object
+                              description: "Client certificate for mutual TLS, with key."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                                configMapKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            key:
+                              type: object
+                              description: "Client private key, from a Secret."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            serverName: {type: string}
+                        authorization:
+                          type: object
+                          description: "Exactly one method. Without this block no credential is sent."
+                          minProperties: 1
+                          maxProperties: 1
+                          properties:
+                            bearerToken:
+                              type: object
+                              description: "Bearer token, from a Secret."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            basicAuth:
+                              type: object
+                              required: [username, password]
+                              properties:
+                                username:
+                                  type: object
+                                  description: "Username."
+                                  minProperties: 1
+                                  maxProperties: 1
+                                  properties:
+                                    secretKeyRef:
+                                      type: object
+                                      required: [name, key]
+                                      properties:
+                                        name: {type: string, minLength: 1}
+                                        key: {type: string, minLength: 1}
+                                    configMapKeyRef:
+                                      type: object
+                                      required: [name, key]
+                                      properties:
+                                        name: {type: string, minLength: 1}
+                                        key: {type: string, minLength: 1}
+                                password:
+                                  type: object
+                                  description: "Password, from a Secret."
+                                  minProperties: 1
+                                  maxProperties: 1
+                                  properties:
+                                    secretKeyRef:
+                                      type: object
+                                      required: [name, key]
+                                      properties:
+                                        name: {type: string, minLength: 1}
+                                        key: {type: string, minLength: 1}
+                            serviceAccountToken: {type: boolean, enum: [true]}
+                    otlp:
+                      type: object
+                      description: "OTLP receiver on port 4317, OTLP over HTTP."
+                      properties:
+                        tls:
+                          type: object
+                          required: [cert, key]
+                          properties:
+                            cert:
+                              type: object
+                              description: "Server certificate."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                                configMapKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            key:
+                              type: object
+                              description: "Server private key, from a Secret."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            clientCA:
+                              type: object
+                              description: "When set, clients must present a certificate signed by this CA."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                                configMapKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
                 analysis:
                   type: object
                   properties:

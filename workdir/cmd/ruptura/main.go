@@ -320,6 +320,13 @@ func runWithContext(ctx context.Context, cfg Config) error {
 
 	// Start OTLP ingest listener
 	otlpAddr := fmt.Sprintf(":%d", cfg.OTLPPort)
+	if certFile := os.Getenv("RUPTURA_OTLP_TLS_CERT_FILE"); certFile != "" {
+		tlsConfig, err := ingest.ServerTLS(certFile, os.Getenv("RUPTURA_OTLP_TLS_KEY_FILE"), os.Getenv("RUPTURA_OTLP_TLS_CLIENT_CA_FILE"))
+		if err != nil {
+			return fmt.Errorf("OTLP TLS: %w", err)
+		}
+		ingestEngine.SetTLS(tlsConfig)
+	}
 	if err := ingestEngine.StartHTTP(otlpAddr); err != nil {
 		return fmt.Errorf("start OTLP ingest failed: %w", err)
 	}

@@ -38,14 +38,18 @@ type Reading struct {
 
 // Thanos queries a Prometheus-compatible HTTP API.
 type Thanos struct {
-	baseURL string
-	token   string
-	client  *http.Client
+	baseURL   string
+	authorize func(*http.Request) error
+	client    *http.Client
 }
 
 // NewThanos builds a Thanos source from a base URL, bearer token and client.
 // The client timeout is capped at 15 seconds.
 func NewThanos(baseURL, token string, client *http.Client) *Thanos {
+	return newThanos(baseURL, staticBearer(token), client)
+}
+
+func newThanos(baseURL string, authorize func(*http.Request) error, client *http.Client) *Thanos {
 	if client == nil {
 		client = &http.Client{}
 	}
@@ -53,41 +57,167 @@ func NewThanos(baseURL, token string, client *http.Client) *Thanos {
 	if c.Timeout == 0 || c.Timeout > requestTimeout {
 		c.Timeout = requestTimeout
 	}
-	return &Thanos{baseURL: strings.TrimRight(baseURL, "/"), token: token, client: &c}
+	return &Thanos{baseURL: strings.TrimRight(baseURL, "/"), authorize: authorize, client: &c}
+}
+
+func staticBearer(token string) func(*http.Request) error {
+	return func(req *http.Request) error {
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		return nil
+	}
+}
+
+// Authentication modes for a Prometheus endpoint.
+const (
+	AuthServiceAccount = "serviceAccount"
+	AuthBearer         = "bearer"
+	AuthBasic          = "basic"
+	AuthNone           = "none"
+)
+
+// PrometheusConfig describes how to reach a Prometheus compatible endpoint.
+// Credential files are read at each request, so rotated values are used.
+type PrometheusConfig struct {
+	URL          string
+	CAFile       string
+	CertFile     string
+	KeyFile      string
+	ServerName   string
+	Auth         string
+	TokenFile    string
+	UsernameFile string
+	PasswordFile string
+	// ServiceAccountDir holds the pod token and cluster CAs; empty means the
+	// standard in-cluster path.
+	ServiceAccountDir string
 }
 
 // NewInClusterThanos builds a source using the pod service account token and
 // trusting ca.crt plus service-ca.crt (when present).
 func NewInClusterThanos(baseURL string) (*Thanos, error) {
-	return newInClusterThanos(baseURL, saDir)
+	return NewPrometheus(PrometheusConfig{URL: baseURL, Auth: AuthServiceAccount})
 }
 
 func newInClusterThanos(baseURL, dir string) (*Thanos, error) {
-	tok, err := os.ReadFile(filepath.Join(dir, "token"))
-	if err != nil {
-		return nil, fmt.Errorf("sources: read token: %w", err)
+	return NewPrometheus(PrometheusConfig{URL: baseURL, Auth: AuthServiceAccount, ServiceAccountDir: dir})
+}
+
+// NewPrometheus builds a source from an explicit configuration. Certificates
+// are trusted from the system, the cluster CAs when present, and CAFile.
+func NewPrometheus(cfg PrometheusConfig) (*Thanos, error) {
+	dir := cfg.ServiceAccountDir
+	if dir == "" {
+		dir = saDir
 	}
-	pool := x509.NewCertPool()
+	tlsConfig, err := clientTLS(cfg, dir)
+	if err != nil {
+		return nil, err
+	}
+	authorize, err := authorizer(cfg, dir)
+	if err != nil {
+		return nil, err
+	}
+	client := &http.Client{
+		Timeout:   requestTimeout,
+		Transport: &http.Transport{TLSClientConfig: tlsConfig},
+	}
+	return newThanos(cfg.URL, authorize, client), nil
+}
+
+func clientTLS(cfg PrometheusConfig, dir string) (*tls.Config, error) {
+	pool, err := x509.SystemCertPool()
+	if err != nil || pool == nil {
+		pool = x509.NewCertPool()
+	}
 	for _, f := range []struct {
-		name     string
+		path     string
 		optional bool
-	}{{"ca.crt", false}, {"service-ca.crt", true}} {
-		pem, err := os.ReadFile(filepath.Join(dir, f.name))
+	}{
+		{filepath.Join(dir, "ca.crt"), cfg.Auth != AuthServiceAccount},
+		{filepath.Join(dir, "service-ca.crt"), true},
+		{cfg.CAFile, false},
+	} {
+		if f.path == "" {
+			continue
+		}
+		pem, err := os.ReadFile(f.path)
 		if err != nil {
 			if f.optional && errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			return nil, fmt.Errorf("sources: read %s: %w", f.name, err)
+			return nil, fmt.Errorf("sources: read %s: %w", filepath.Base(f.path), err)
 		}
 		if !pool.AppendCertsFromPEM(pem) {
-			return nil, fmt.Errorf("sources: no valid certificates in %s", f.name)
+			return nil, fmt.Errorf("sources: no valid certificates in %s", filepath.Base(f.path))
 		}
 	}
-	client := &http.Client{
-		Timeout:   requestTimeout,
-		Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}},
+	config := &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12, ServerName: cfg.ServerName}
+	if cfg.CertFile != "" || cfg.KeyFile != "" {
+		if cfg.CertFile == "" || cfg.KeyFile == "" {
+			return nil, fmt.Errorf("sources: a client certificate needs both a certificate and a key")
+		}
+		pair, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("sources: load client certificate: %w", err)
+		}
+		config.Certificates = []tls.Certificate{pair}
 	}
-	return NewThanos(baseURL, strings.TrimSpace(string(tok)), client), nil
+	return config, nil
+}
+
+func readSecretFile(path string) (string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("sources: read %s: %w", filepath.Base(path), err)
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
+func authorizer(cfg PrometheusConfig, dir string) (func(*http.Request) error, error) {
+	bearerFile := func(path string) func(*http.Request) error {
+		return func(req *http.Request) error {
+			token, err := readSecretFile(path)
+			if err != nil {
+				return err
+			}
+			req.Header.Set("Authorization", "Bearer "+token)
+			return nil
+		}
+	}
+	switch cfg.Auth {
+	case "", AuthServiceAccount:
+		path := filepath.Join(dir, "token")
+		if _, err := readSecretFile(path); err != nil {
+			return nil, err
+		}
+		return bearerFile(path), nil
+	case AuthBearer:
+		if cfg.TokenFile == "" {
+			return nil, fmt.Errorf("sources: bearer authentication needs a token file")
+		}
+		return bearerFile(cfg.TokenFile), nil
+	case AuthBasic:
+		if cfg.UsernameFile == "" || cfg.PasswordFile == "" {
+			return nil, fmt.Errorf("sources: basic authentication needs a username and a password file")
+		}
+		return func(req *http.Request) error {
+			user, err := readSecretFile(cfg.UsernameFile)
+			if err != nil {
+				return err
+			}
+			password, err := readSecretFile(cfg.PasswordFile)
+			if err != nil {
+				return err
+			}
+			req.SetBasicAuth(user, password)
+			return nil
+		}, nil
+	case AuthNone:
+		return func(*http.Request) error { return nil }, nil
+	}
+	return nil, fmt.Errorf("sources: unknown authentication %q", cfg.Auth)
 }
 
 type promResponse struct {
@@ -129,8 +259,8 @@ func (t *Thanos) queryBy(ctx context.Context, q, targetLabel string) (map[string
 	if err != nil {
 		return nil, nil, fmt.Errorf("sources: build request: %w", err)
 	}
-	if t.token != "" {
-		req.Header.Set("Authorization", "Bearer "+t.token)
+	if err := t.authorize(req); err != nil {
+		return nil, nil, err
 	}
 	resp, err := t.client.Do(req)
 	if err != nil {

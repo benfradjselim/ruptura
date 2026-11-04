@@ -67,11 +67,15 @@ type InputConfig struct {
 	// Prometheus is the query endpoint failure modes read. On OpenShift it
 	// defaults to the cluster Thanos querier.
 	Prometheus *PrometheusSource `json:"prometheus,omitempty"`
+	// OTLP configures the OTLP receiver.
+	OTLP *OTLPInput `json:"otlp,omitempty"`
 }
 
 // PrometheusSource is a Prometheus compatible query endpoint.
 type PrometheusSource struct {
-	URL string `json:"url"`
+	URL           string         `json:"url"`
+	TLS           *ClientTLS     `json:"tls,omitempty"`
+	Authorization *Authorization `json:"authorization,omitempty"`
 }
 
 // AnalysisConfig tunes predictions.
@@ -228,6 +232,7 @@ type Volume struct {
 	Name                  string                 `json:"name"`
 	PersistentVolumeClaim *PVCVolumeSource       `json:"persistentVolumeClaim,omitempty"`
 	ConfigMap             *ConfigMapVolumeSource `json:"configMap,omitempty"`
+	Projected             *ProjectedVolumeSource `json:"projected,omitempty"`
 }
 
 // ConfigMapVolumeSource mounts selected keys of a ConfigMap.

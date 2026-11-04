@@ -130,6 +130,15 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	ns := inst.Metadata.Namespace
 	name := inst.Metadata.Name
 
+	inputs, err := resolveInputs(c, ns, inst.Spec.Input)
+	if err != nil {
+		log.Printf("RupturaInstance %s/%s: inputs not usable: %v", ns, name, err)
+		if deploymentExists(c, ns, name) {
+			return writeDegradedStatus(c, inst, err)
+		}
+		return writeInvalidStatus(c, inst, err)
+	}
+
 	image := inst.Spec.Image
 	if image == "" {
 		image = defaultImage
@@ -177,7 +186,7 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 			return fmt.Errorf("Alertmanager access: %w", err)
 		}
 	}
-	if err := reconcileDeployment(c, ns, name, image, edition, apiKeyRef, replicas, isOCP, inst.Spec, labels); err != nil {
+	if err := reconcileDeployment(c, ns, name, image, edition, apiKeyRef, replicas, isOCP, inst.Spec, inputs, labels); err != nil {
 		return fmt.Errorf("Deployment: %w", err)
 	}
 	if err := reconcileService(c, ns, name, labels); err != nil {
@@ -226,7 +235,7 @@ func reconcilePVC(c *k8sClient, ns, name, size string, labels map[string]string)
 	return c.apply(path, pvc)
 }
 
-func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef string, replicas int32, isOCP bool, spec RupturaInstanceSpec, labels map[string]string) error {
+func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef string, replicas int32, isOCP bool, spec RupturaInstanceSpec, inputs resolvedInputs, labels map[string]string) error {
 	env := []EnvVar{
 		{Name: "RUPTURA_EDITION", Value: edition},
 	}
@@ -254,11 +263,19 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 		}})
 	}
 	env = append(env, configEnv(spec)...)
+	env = append(env, inputs.env...)
 	if spec.IngestRPS > 0 {
 		env = append(env, EnvVar{
 			Name:  "RUPTURA_INGEST_RPS",
 			Value: fmt.Sprintf("%d", spec.IngestRPS),
 		})
+	}
+
+	mounts = append(mounts, inputs.mounts...)
+	volumes = append(volumes, inputs.volumes...)
+	var podAnnotations map[string]string
+	if inputs.hash != "" {
+		podAnnotations = map[string]string{inputsHashAnnotation: inputs.hash}
 	}
 
 	resources := spec.Resources
@@ -301,6 +318,7 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 						appLabel:      "ruptura",
 						instanceLabel: name,
 					},
+					Annotations: podAnnotations,
 				},
 				Spec: PodSpec{
 					ServiceAccountName: instanceServiceAccount,
@@ -422,6 +440,28 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 	}
 
 	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s", ns, name)
+	return c.patchStatus(path, status)
+}
+
+func deploymentExists(c *k8sClient, ns, name string) bool {
+	var dep map[string]interface{}
+	return c.get(fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s", ns, name), &dep) == nil
+}
+
+// writeDegradedStatus reports a change that cannot be applied while the
+// running engine is left untouched.
+func writeDegradedStatus(c *k8sClient, inst RupturaInstance, problem error) error {
+	var dep DeploymentWithStatus
+	_ = c.get(fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s", inst.Metadata.Namespace, inst.Metadata.Name), &dep)
+	status := RupturaInstanceStatus{
+		Phase:              "Degraded",
+		Message:            "change not applied, the running engine is kept: " + problem.Error(),
+		ReadyReplicas:      dep.Status.ReadyReplicas,
+		AvailableReplicas:  dep.Status.AvailableReplicas,
+		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
+		ObservedGeneration: inst.Metadata.Generation,
+	}
+	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s", inst.Metadata.Namespace, inst.Metadata.Name)
 	return c.patchStatus(path, status)
 }
 

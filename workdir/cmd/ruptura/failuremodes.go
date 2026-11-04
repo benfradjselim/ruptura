@@ -31,7 +31,7 @@ func startFailureModes(ctx context.Context, url string, inf *discovery.Informer,
 		logger.Default.Warn("failure modes disabled: catalog", "err", err)
 		return nil
 	}
-	source, err := sources.NewInClusterThanos(url)
+	source, err := sources.NewPrometheus(prometheusConfig(url))
 	if err != nil {
 		logger.Default.Warn("failure modes disabled: thanos client", "err", err)
 		return nil
