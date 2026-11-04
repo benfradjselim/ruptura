@@ -169,6 +169,19 @@ func (c *MetadataCache) ResolvePodOwner(ns, podName string) (kind, name string, 
 	return "", "", false
 }
 
+// PodReplicaSet returns the ReplicaSet that owns a pod, which names the
+// release of a Deployment, or ok=false for other owners or unknown pods.
+func (c *MetadataCache) PodReplicaSet(ns, podName string) (string, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for i := range c.pods {
+		if c.pods[i].namespace == ns && c.pods[i].info.Name == podName {
+			return c.pods[i].ownerName, c.pods[i].ownerKind == "ReplicaSet"
+		}
+	}
+	return "", false
+}
+
 func (c *MetadataCache) upsertPod(p cachedPod) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

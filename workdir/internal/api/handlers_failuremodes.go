@@ -112,7 +112,13 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate, horizo
 		}
 		return state, math.Max(risk, conditionRisk)
 	}
-	if est.ETF > riskHorizon && est.ETF > horizon {
+	if est.Mode == failuremodes.ModeReleaseRegression && est.ETF > criticalETF {
+		if state != "critical" {
+			state = "degraded"
+		}
+		return state, math.Max(risk, conditionRisk)
+	}
+	if est.ETF > riskHorizon && est.ETF > horizon && est.Mode != failuremodes.ModeReleaseRegression {
 		return state, risk
 	}
 	risk = math.Max(risk, maxRisk*(1-est.ETF.Seconds()/riskHorizon.Seconds()))
@@ -136,6 +142,9 @@ func reportedEstimate(est failuremodes.Estimate, horizon time.Duration) *failure
 }
 
 func estimateHeadline(name string, est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeReleaseRegression {
+		return fmt.Sprintf("%s release %s is projected to reach its memory limit in %d minutes.", name, est.Version, int(math.Round(est.ETF.Minutes())))
+	}
 	if est.Mode == failuremodes.ModeRecurrentFailure {
 		return fmt.Sprintf("%s fails about every %d minutes.", name, int(math.Round(est.Interval.Minutes())))
 	}
@@ -158,6 +167,9 @@ func estimateHeadline(name string, est failuremodes.Estimate) string {
 }
 
 func estimateAction(est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeReleaseRegression {
+		return "Roll back to " + est.PreviousVersion + " or fix the memory growth of " + est.Version
+	}
 	if est.Mode == failuremodes.ModeRecurrentFailure {
 		return "Find what restarts this workload before the next failure"
 	}

@@ -117,6 +117,12 @@ func failureEvidence(est failuremodes.Estimate) []string {
 		return []string{fmt.Sprintf("%d failures, about every %d min", est.Failures, int(math.Round(est.Interval.Minutes())))}
 	case failuremodes.ModeRolloutStuck:
 		return []string{"Rollout passed its progress deadline"}
+	case failuremodes.ModeReleaseRegression:
+		mib := func(bps float64) float64 { return math.Round(bps*60/1024/1024*10) / 10 }
+		return []string{
+			fmt.Sprintf("Release %s grows %.1f MiB per minute, release %s grew %.1f", est.Version, mib(est.Rate), est.PreviousVersion, mib(est.PreviousRate)),
+			fmt.Sprintf("Memory at %d%% of its limit", int(math.Round(est.Usage*100))),
+		}
 	case failuremodes.ModeOOMKilled:
 		return []string{"Last exit was OOMKilled"}
 	}

@@ -34,6 +34,12 @@ type Estimate struct {
 	// Interval and Failures describe the rhythm of a recurrent failure.
 	Interval time.Duration
 	Failures int
+	// Version and PreviousVersion name the releases a regression compares,
+	// and Rate and PreviousRate their memory growth in bytes per second.
+	Version         string
+	PreviousVersion string
+	Rate            float64
+	PreviousRate    float64
 }
 
 type point struct {
