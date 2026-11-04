@@ -104,12 +104,24 @@ func cleanup(c *k8sClient, inst RupturaInstance, isOCP bool) error {
 	if err := c.delete(fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/ruptura-instance", ns)); err != nil {
 		return fmt.Errorf("delete ServiceAccount: %w", err)
 	}
+	if err := c.delete(leasePath(ns, name)); err != nil {
+		return fmt.Errorf("delete Lease: %w", err)
+	}
 	return c.patchFinalizers(inst, removeFinalizer(inst))
 }
 
 // reconcile drives a single RupturaInstance toward its desired state.
 // It is idempotent: server-side apply handles create-or-update for all resources.
 func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bool) error {
+	holder, err := claim(c, inst, time.Now())
+	if err != nil {
+		return fmt.Errorf("Lease: %w", err)
+	}
+	if holder != "" {
+		noteSkipped(inst, holder)
+		return nil
+	}
+
 	// Handle deletion: run cleanup then remove our finalizer.
 	if inst.Metadata.DeletionTimestamp != nil {
 		if hasFinalizer(inst) {
@@ -326,8 +338,9 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 					SecurityContext:    podSC,
 					Containers: []Container{
 						{
-							Name:  "ruptura",
-							Image: image,
+							Name:                     "ruptura",
+							Image:                    image,
+							TerminationMessagePolicy: "FallbackToLogsOnError",
 							Args: []string{
 								"--port=8080",
 								"--storage=/var/lib/ruptura/data",
@@ -429,13 +442,15 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 	depPath := fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s", ns, name)
 	_ = c.get(depPath, &dep)
 
-	phase := "Running"
+	phase, message := "Running", ""
 	if dep.Status.ReadyReplicas == 0 {
-		phase = "Pending"
+		phase, message = "Pending", notReadyReason(c, ns, name)
 	}
 
 	status := RupturaInstanceStatus{
 		Phase:              phase,
+		Message:            message,
+		Operator:           c.ns,
 		ReadyReplicas:      dep.Status.ReadyReplicas,
 		AvailableReplicas:  dep.Status.AvailableReplicas,
 		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
@@ -458,6 +473,7 @@ func writeDegradedStatus(c *k8sClient, inst RupturaInstance, problem error) erro
 	_ = c.get(fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s", inst.Metadata.Namespace, inst.Metadata.Name), &dep)
 	status := RupturaInstanceStatus{
 		Phase:              "Degraded",
+		Operator:           c.ns,
 		Message:            "change not applied, the running engine is kept: " + problem.Error(),
 		ReadyReplicas:      dep.Status.ReadyReplicas,
 		AvailableReplicas:  dep.Status.AvailableReplicas,
@@ -472,6 +488,7 @@ func writeDegradedStatus(c *k8sClient, inst RupturaInstance, problem error) erro
 func writeInvalidStatus(c *k8sClient, inst RupturaInstance, problem error) error {
 	status := RupturaInstanceStatus{
 		Phase:              "Failed",
+		Operator:           c.ns,
 		Message:            problem.Error(),
 		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
 		ObservedGeneration: inst.Metadata.Generation,

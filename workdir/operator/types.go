@@ -110,10 +110,12 @@ type LoggingConfig struct {
 
 // RupturaInstanceStatus is the observed state written back by the operator.
 type RupturaInstanceStatus struct {
-	Phase              string `json:"phase"`
-	ReadyReplicas      int32  `json:"readyReplicas"`
-	AvailableReplicas  int32  `json:"availableReplicas"`
-	Message            string `json:"message,omitempty"`
+	Phase             string `json:"phase"`
+	ReadyReplicas     int32  `json:"readyReplicas"`
+	AvailableReplicas int32  `json:"availableReplicas"`
+	Message           string `json:"message"`
+	// Operator is the namespace of the operator that manages this instance.
+	Operator           string `json:"operator,omitempty"`
 	LastReconcileTime  string `json:"lastReconcileTime,omitempty"`
 	ObservedGeneration int64  `json:"observedGeneration,omitempty"`
 }
@@ -185,6 +187,9 @@ type Container struct {
 	ReadinessProbe  *Probe                    `json:"readinessProbe,omitempty"`
 	Resources       ResourceRequirements      `json:"resources,omitempty"`
 	SecurityContext *ContainerSecurityContext `json:"securityContext,omitempty"`
+	// TerminationMessagePolicy FallbackToLogsOnError keeps the last log lines of
+	// a crash in the pod status, where the operator reads them.
+	TerminationMessagePolicy string `json:"terminationMessagePolicy,omitempty"`
 }
 
 type ContainerSecurityContext struct {

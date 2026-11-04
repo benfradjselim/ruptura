@@ -18,7 +18,10 @@ const (
 	fieldManager  = "ruptura-operator"
 )
 
-var errNotFound = fmt.Errorf("not found")
+var (
+	errNotFound = fmt.Errorf("not found")
+	errConflict = fmt.Errorf("conflict")
+)
 
 // k8sClient is a minimal Kubernetes API client using the in-cluster service account.
 // It has no external dependencies — all communication is plain HTTPS with JSON.
@@ -202,3 +205,32 @@ func (c *k8sClient) patchFinalizers(inst RupturaInstance, finalizers []string) e
 }
 
 func isNotFound(err error) bool { return err == errNotFound }
+
+// send writes an object with POST or PUT. A 409 is errConflict, so a caller can
+// tell a lost race from a failure.
+func (c *k8sClient) send(method, path string, obj interface{}) error {
+	body, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	req, _ := http.NewRequest(method, c.host+path, bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	switch {
+	case resp.StatusCode == http.StatusConflict:
+		return errConflict
+	case resp.StatusCode == http.StatusNotFound:
+		return errNotFound
+	case resp.StatusCode >= 400:
+		return fmt.Errorf("%s %s → %d", method, path, resp.StatusCode)
+	}
+	return nil
+}

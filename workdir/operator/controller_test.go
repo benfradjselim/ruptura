@@ -184,10 +184,10 @@ func TestReconcile_DeletionWithoutFinalizer_IsNoop(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}
 	c := fakeServer(t, map[string]http.HandlerFunc{
-		"/apis/apps/v1/namespaces/ruptura-system/deployments/ri":                    trackDelete,
-		"/api/v1/namespaces/ruptura-system/services/ri":                             trackDelete,
-		"/api/v1/namespaces/ruptura-system/persistentvolumeclaims/ri-data":          trackDelete,
-		"/apis/route.openshift.io/v1/namespaces/ruptura-system/routes/ri":           trackDelete,
+		"/apis/apps/v1/namespaces/ruptura-system/deployments/ri":           trackDelete,
+		"/api/v1/namespaces/ruptura-system/services/ri":                    trackDelete,
+		"/api/v1/namespaces/ruptura-system/persistentvolumeclaims/ri-data": trackDelete,
+		"/apis/route.openshift.io/v1/namespaces/ruptura-system/routes/ri":  trackDelete,
 	})
 
 	if err := reconcile(context.Background(), c, inst, false); err != nil {

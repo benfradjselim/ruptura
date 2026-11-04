@@ -32,6 +32,9 @@ spec:
         - name: Phase
           type: string
           jsonPath: .status.phase
+        - name: Message
+          type: string
+          jsonPath: .status.message
         - name: Age
           type: date
           jsonPath: .metadata.creationTimestamp
@@ -327,6 +330,9 @@ spec:
                   type: integer
                 message:
                   type: string
+                operator:
+                  type: string
+                  description: "Namespace of the operator that manages this instance."
                 lastReconcileTime:
                   type: string
                   format: date-time
