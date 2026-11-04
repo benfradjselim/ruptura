@@ -83,6 +83,14 @@ func (inf *Informer) ResolvePodOwner(ns, podName string) (kind, name string, ok 
 	return inf.cache.ResolvePodOwner(ns, podName)
 }
 
+// PodReplicaSet returns the ReplicaSet that owns a pod, or ok=false.
+func (inf *Informer) PodReplicaSet(ns, podName string) (string, bool) {
+	if inf == nil || inf.cache == nil {
+		return "", false
+	}
+	return inf.cache.PodReplicaSet(ns, podName)
+}
+
 // Run starts goroutines for workload + pod watching and blocks until ctx is cancelled.
 // onAdd is called for every ADDED/MODIFIED workload event; onDelete for DELETED.
 // onFirstSync (may be nil) is called exactly once, after the initial LIST phase

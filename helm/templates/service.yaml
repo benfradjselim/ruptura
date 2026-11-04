@@ -35,10 +35,19 @@ spec:
   selector:
     {{- include "ruptura.engineSelectorLabels" . | nindent 4 }}
   ports:
-    - name: otlp-http
+    - name: otlp-grpc
       port: 4317
-      targetPort: otlp
+      targetPort: otlp-grpc
       protocol: TCP
+      appProtocol: grpc
+      {{- if and (eq .Values.otlpService.type "NodePort") .Values.otlpGrpcNodePort }}
+      nodePort: {{ .Values.otlpGrpcNodePort }}
+      {{- end }}
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+      protocol: TCP
+      appProtocol: http
       {{- if and (eq .Values.otlpService.type "NodePort") .Values.otlpNodePort }}
       nodePort: {{ .Values.otlpNodePort }}
       {{- end }}

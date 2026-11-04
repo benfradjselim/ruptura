@@ -31,7 +31,7 @@ func startFailureModes(ctx context.Context, url string, inf *discovery.Informer,
 		logger.Default.Warn("failure modes disabled: catalog", "err", err)
 		return nil
 	}
-	source, err := sources.NewInClusterThanos(url)
+	source, err := sources.NewPrometheus(prometheusConfig(url))
 	if err != nil {
 		logger.Default.Warn("failure modes disabled: thanos client", "err", err)
 		return nil
@@ -72,6 +72,9 @@ func pollFailureModes(ctx context.Context, source *sources.Thanos, catalog sourc
 			if signal.Mode == "condition" {
 				tracker.ObserveCondition(workload, pod, now, reading.Usage)
 				continue
+			}
+			if version, ok := inf.PodReplicaSet(reading.Namespace, reading.Pod); ok {
+				tracker.ObserveVersion(pod, version)
 			}
 			if reading.RestartsOnly {
 				tracker.ObserveRestarts(workload, pod, now, reading.Restarts)

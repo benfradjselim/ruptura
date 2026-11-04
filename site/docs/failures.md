@@ -5,6 +5,8 @@ Each result names one failure mode. A **predicted** failure has not happened yet
 | Failure mode | Kind | Raised when |
 |---|---|---|
 | `saturation` | predicted | Memory of a container is on course to reach its limit within the horizon. Needs a memory limit and at least 10 minutes of samples. |
+| `release_regression` | predicted | A new version of a Deployment grows toward its memory limit at least 3 times faster than the version it replaced, for 5 minutes past a 6 minute warm-up. Reported up to 2 hours ahead, with both rates and a roll back as action. |
+| `replica_divergence` | predicted | One of at least 3 replicas of a version grows at least 3 times faster than the others, for 5 minutes. Reported up to 2 hours ahead and names the pod. Silent when all replicas grow together. |
 | `recurrent_failure` | predicted | A workload failed at least 6 times at regular intervals; the next failure is expected one interval after the last. |
 | `oom_killed` | detected | The last exit of a container was `OOMKilled`, in the last 30 minutes. |
 | `crash_loop` | detected | At least 3 restarts in the last 30 minutes. |

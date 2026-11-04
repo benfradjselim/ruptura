@@ -6,13 +6,17 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strings"
 	"time"
 )
 
 const (
-	defaultImage       = "docker.io/selimbf/ruptura:v8.6.0"
+	defaultImage = "docker.io/selimbf/ruptura:v8.7.0"
+	// relatedImageEnv is set by OLM from the CSV, so a disconnected mirror can
+	// rewrite the engine image by digest.
+	relatedImageEnv    = "RELATED_IMAGE_RUPTURA"
 	defaultStorageSize = "10Gi"
 	defaultEdition     = "community"
 	appLabel           = "app.kubernetes.io/name"
@@ -100,12 +104,24 @@ func cleanup(c *k8sClient, inst RupturaInstance, isOCP bool) error {
 	if err := c.delete(fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/ruptura-instance", ns)); err != nil {
 		return fmt.Errorf("delete ServiceAccount: %w", err)
 	}
+	if err := c.delete(leasePath(ns, name)); err != nil {
+		return fmt.Errorf("delete Lease: %w", err)
+	}
 	return c.patchFinalizers(inst, removeFinalizer(inst))
 }
 
 // reconcile drives a single RupturaInstance toward its desired state.
 // It is idempotent: server-side apply handles create-or-update for all resources.
 func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bool) error {
+	holder, err := claim(c, inst, time.Now())
+	if err != nil {
+		return fmt.Errorf("Lease: %w", err)
+	}
+	if holder != "" {
+		noteSkipped(inst, holder)
+		return nil
+	}
+
 	// Handle deletion: run cleanup then remove our finalizer.
 	if inst.Metadata.DeletionTimestamp != nil {
 		if hasFinalizer(inst) {
@@ -130,10 +146,16 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	ns := inst.Metadata.Namespace
 	name := inst.Metadata.Name
 
-	image := inst.Spec.Image
-	if image == "" {
-		image = defaultImage
+	inputs, err := resolveInputs(c, ns, inst.Spec.Input)
+	if err != nil {
+		log.Printf("RupturaInstance %s/%s: inputs not usable: %v", ns, name, err)
+		if deploymentExists(c, ns, name) {
+			return writeDegradedStatus(c, inst, err)
+		}
+		return writeInvalidStatus(c, inst, err)
 	}
+
+	image := engineImage(inst.Spec.Image)
 	storageSize := inst.Spec.StorageSize
 	if storageSize == "" {
 		storageSize = defaultStorageSize
@@ -177,7 +199,7 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 			return fmt.Errorf("Alertmanager access: %w", err)
 		}
 	}
-	if err := reconcileDeployment(c, ns, name, image, edition, apiKeyRef, replicas, isOCP, inst.Spec, labels); err != nil {
+	if err := reconcileDeployment(c, ns, name, image, edition, apiKeyRef, replicas, isOCP, inst.Spec, inputs, labels); err != nil {
 		return fmt.Errorf("Deployment: %w", err)
 	}
 	if err := reconcileService(c, ns, name, labels); err != nil {
@@ -226,7 +248,7 @@ func reconcilePVC(c *k8sClient, ns, name, size string, labels map[string]string)
 	return c.apply(path, pvc)
 }
 
-func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef string, replicas int32, isOCP bool, spec RupturaInstanceSpec, labels map[string]string) error {
+func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef string, replicas int32, isOCP bool, spec RupturaInstanceSpec, inputs resolvedInputs, labels map[string]string) error {
 	env := []EnvVar{
 		{Name: "RUPTURA_EDITION", Value: edition},
 	}
@@ -242,11 +264,11 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 	})
 	mounts := []VolumeMount{{Name: "data", MountPath: "/var/lib/ruptura/data"}}
 	volumes := []Volume{{Name: "data", PersistentVolumeClaim: &PVCVolumeSource{ClaimName: name + "-data"}}}
+	if url := prometheusURL(spec, isOCP); url != "" {
+		env = append(env, EnvVar{Name: "RUPTURA_THANOS_URL", Value: url})
+	}
 	if isOCP {
-		env = append(env,
-			EnvVar{Name: "RUPTURA_THANOS_URL", Value: thanosURL},
-			EnvVar{Name: "RUPTURA_ALERTMANAGER_CA_FILE", Value: serviceCAMountPath + "/" + serviceCAKey},
-		)
+		env = append(env, EnvVar{Name: "RUPTURA_ALERTMANAGER_CA_FILE", Value: serviceCAMountPath + "/" + serviceCAKey})
 		mounts = append(mounts, VolumeMount{Name: "service-ca", MountPath: serviceCAMountPath, ReadOnly: true})
 		volumes = append(volumes, Volume{Name: "service-ca", ConfigMap: &ConfigMapVolumeSource{
 			Name:  serviceCAConfigMapName(name),
@@ -254,11 +276,19 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 		}})
 	}
 	env = append(env, configEnv(spec)...)
+	env = append(env, inputs.env...)
 	if spec.IngestRPS > 0 {
 		env = append(env, EnvVar{
 			Name:  "RUPTURA_INGEST_RPS",
 			Value: fmt.Sprintf("%d", spec.IngestRPS),
 		})
+	}
+
+	mounts = append(mounts, inputs.mounts...)
+	volumes = append(volumes, inputs.volumes...)
+	var podAnnotations map[string]string
+	if inputs.hash != "" {
+		podAnnotations = map[string]string{inputsHashAnnotation: inputs.hash}
 	}
 
 	resources := spec.Resources
@@ -301,21 +331,24 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 						appLabel:      "ruptura",
 						instanceLabel: name,
 					},
+					Annotations: podAnnotations,
 				},
 				Spec: PodSpec{
 					ServiceAccountName: instanceServiceAccount,
 					SecurityContext:    podSC,
 					Containers: []Container{
 						{
-							Name:  "ruptura",
-							Image: image,
+							Name:                     "ruptura",
+							Image:                    image,
+							TerminationMessagePolicy: "FallbackToLogsOnError",
 							Args: []string{
 								"--port=8080",
 								"--storage=/var/lib/ruptura/data",
 							},
 							Ports: []ContainerPort{
 								{Name: "http", ContainerPort: 8080, Protocol: "TCP"},
-								{Name: "otlp", ContainerPort: 4317, Protocol: "TCP"},
+								{Name: "otlp-grpc", ContainerPort: 4317, Protocol: "TCP"},
+								{Name: "otlp-http", ContainerPort: 4318, Protocol: "TCP"},
 							},
 							Env:          env,
 							VolumeMounts: mounts,
@@ -363,7 +396,8 @@ func reconcileService(c *k8sClient, ns, name string, labels map[string]string) e
 			Selector: map[string]string{instanceLabel: name},
 			Ports: []ServicePort{
 				{Name: "http", Port: 8080, TargetPort: 8080, Protocol: "TCP"},
-				{Name: "otlp", Port: 4317, TargetPort: 4317, Protocol: "TCP"},
+				{Name: "otlp-grpc", Port: 4317, TargetPort: 4317, Protocol: "TCP"},
+				{Name: "otlp-http", Port: 4318, TargetPort: 4318, Protocol: "TCP"},
 			},
 		},
 	}
@@ -408,13 +442,15 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 	depPath := fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s", ns, name)
 	_ = c.get(depPath, &dep)
 
-	phase := "Running"
+	phase, message := "Running", ""
 	if dep.Status.ReadyReplicas == 0 {
-		phase = "Pending"
+		phase, message = "Pending", notReadyReason(c, ns, name)
 	}
 
 	status := RupturaInstanceStatus{
 		Phase:              phase,
+		Message:            message,
+		Operator:           c.ns,
 		ReadyReplicas:      dep.Status.ReadyReplicas,
 		AvailableReplicas:  dep.Status.AvailableReplicas,
 		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
@@ -425,10 +461,34 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 	return c.patchStatus(path, status)
 }
 
+func deploymentExists(c *k8sClient, ns, name string) bool {
+	var dep map[string]interface{}
+	return c.get(fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s", ns, name), &dep) == nil
+}
+
+// writeDegradedStatus reports a change that cannot be applied while the
+// running engine is left untouched.
+func writeDegradedStatus(c *k8sClient, inst RupturaInstance, problem error) error {
+	var dep DeploymentWithStatus
+	_ = c.get(fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s", inst.Metadata.Namespace, inst.Metadata.Name), &dep)
+	status := RupturaInstanceStatus{
+		Phase:              "Degraded",
+		Operator:           c.ns,
+		Message:            "change not applied, the running engine is kept: " + problem.Error(),
+		ReadyReplicas:      dep.Status.ReadyReplicas,
+		AvailableReplicas:  dep.Status.AvailableReplicas,
+		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
+		ObservedGeneration: inst.Metadata.Generation,
+	}
+	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s", inst.Metadata.Namespace, inst.Metadata.Name)
+	return c.patchStatus(path, status)
+}
+
 // writeInvalidStatus reports a spec that was refused. Nothing is deployed.
 func writeInvalidStatus(c *k8sClient, inst RupturaInstance, problem error) error {
 	status := RupturaInstanceStatus{
 		Phase:              "Failed",
+		Operator:           c.ns,
 		Message:            problem.Error(),
 		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
 		ObservedGeneration: inst.Metadata.Generation,
@@ -458,6 +518,18 @@ func alertmanagerURLs(channels []AlertChannel, withToken bool) string {
 		}
 	}
 	return strings.Join(urls, ",")
+}
+
+// prometheusURL returns the declared query endpoint, or the cluster Thanos
+// querier on OpenShift. Without one the engine runs without failure modes.
+func prometheusURL(spec RupturaInstanceSpec, isOCP bool) string {
+	if spec.Input.Prometheus != nil && spec.Input.Prometheus.URL != "" {
+		return spec.Input.Prometheus.URL
+	}
+	if isOCP {
+		return thanosURL
+	}
+	return ""
 }
 
 // usesServiceAccountToken reports whether any channel sends the token.
@@ -623,4 +695,16 @@ func reconcileAlertmanagerAccess(c *k8sClient, ns, name string, spec RupturaInst
 		}},
 	}
 	return c.apply(alertmanagerBindingPath(ns, name), binding)
+}
+
+// engineImage picks the engine image: the instance spec, then the image OLM
+// passes to the operator, then the built-in default.
+func engineImage(spec string) string {
+	if spec != "" {
+		return spec
+	}
+	if related := os.Getenv(relatedImageEnv); related != "" {
+		return related
+	}
+	return defaultImage
 }

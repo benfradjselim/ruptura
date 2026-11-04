@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -66,6 +67,12 @@ func validateSpec(spec RupturaInstanceSpec) error {
 			problems = append(problems, fmt.Sprintf("analysis.horizon: invalid duration %q", horizon))
 		}
 	}
+	if prometheus := spec.Input.Prometheus; prometheus != nil {
+		if parsed, err := url.Parse(prometheus.URL); err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+			problems = append(problems, fmt.Sprintf("input.prometheus.url: %q is not an http or https URL", prometheus.URL))
+		}
+	}
+	problems = append(problems, checkInputs(spec.Input)...)
 	problems = append(problems, checkChannels(spec.Alerting.Channels)...)
 	if len(problems) == 0 {
 		return nil

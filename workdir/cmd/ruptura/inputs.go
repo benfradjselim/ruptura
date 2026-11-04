@@ -173,7 +173,7 @@ func startInputs(ctx context.Context, url string, tracker *failuremodes.Tracker,
 		logger.Default.Warn("inputs disabled: catalog", "err", err)
 		return nil
 	}
-	source, err := sources.NewInClusterThanos(url)
+	source, err := sources.NewPrometheus(prometheusConfig(url))
 	if err != nil {
 		logger.Default.Warn("inputs disabled: thanos client", "err", err)
 		return nil

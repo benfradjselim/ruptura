@@ -64,6 +64,18 @@ type LevelConfig struct {
 // InputConfig selects the input profile.
 type InputConfig struct {
 	Profile string `json:"profile,omitempty"`
+	// Prometheus is the query endpoint failure modes read. On OpenShift it
+	// defaults to the cluster Thanos querier.
+	Prometheus *PrometheusSource `json:"prometheus,omitempty"`
+	// OTLP configures the OTLP receiver.
+	OTLP *OTLPInput `json:"otlp,omitempty"`
+}
+
+// PrometheusSource is a Prometheus compatible query endpoint.
+type PrometheusSource struct {
+	URL           string         `json:"url"`
+	TLS           *ClientTLS     `json:"tls,omitempty"`
+	Authorization *Authorization `json:"authorization,omitempty"`
 }
 
 // AnalysisConfig tunes predictions.
@@ -98,10 +110,12 @@ type LoggingConfig struct {
 
 // RupturaInstanceStatus is the observed state written back by the operator.
 type RupturaInstanceStatus struct {
-	Phase              string `json:"phase"`
-	ReadyReplicas      int32  `json:"readyReplicas"`
-	AvailableReplicas  int32  `json:"availableReplicas"`
-	Message            string `json:"message,omitempty"`
+	Phase             string `json:"phase"`
+	ReadyReplicas     int32  `json:"readyReplicas"`
+	AvailableReplicas int32  `json:"availableReplicas"`
+	Message           string `json:"message"`
+	// Operator is the namespace of the operator that manages this instance.
+	Operator           string `json:"operator,omitempty"`
 	LastReconcileTime  string `json:"lastReconcileTime,omitempty"`
 	ObservedGeneration int64  `json:"observedGeneration,omitempty"`
 }
@@ -173,6 +187,9 @@ type Container struct {
 	ReadinessProbe  *Probe                    `json:"readinessProbe,omitempty"`
 	Resources       ResourceRequirements      `json:"resources,omitempty"`
 	SecurityContext *ContainerSecurityContext `json:"securityContext,omitempty"`
+	// TerminationMessagePolicy FallbackToLogsOnError keeps the last log lines of
+	// a crash in the pod status, where the operator reads them.
+	TerminationMessagePolicy string `json:"terminationMessagePolicy,omitempty"`
 }
 
 type ContainerSecurityContext struct {
@@ -220,6 +237,7 @@ type Volume struct {
 	Name                  string                 `json:"name"`
 	PersistentVolumeClaim *PVCVolumeSource       `json:"persistentVolumeClaim,omitempty"`
 	ConfigMap             *ConfigMapVolumeSource `json:"configMap,omitempty"`
+	Projected             *ProjectedVolumeSource `json:"projected,omitempty"`
 }
 
 // ConfigMapVolumeSource mounts selected keys of a ConfigMap.

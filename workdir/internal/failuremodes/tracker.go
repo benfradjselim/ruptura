@@ -43,11 +43,14 @@ type Tracker struct {
 	outcomes        []failureOutcome
 	recorder        func(workload string, at time.Time)
 	outcomeRecorder func(at time.Time, lead time.Duration)
+	versions        map[string]string
+	releases        map[string]*releaseState
 }
 
 // NewTracker returns an empty tracker.
 func NewTracker() *Tracker {
-	return &Tracker{pods: make(map[string]*podState), replicas: make(map[string]replicaState), rollouts: make(map[string]time.Time), failures: make(map[string][]time.Time), forecasts: make(map[string]time.Time)}
+	return &Tracker{pods: make(map[string]*podState), replicas: make(map[string]replicaState), rollouts: make(map[string]time.Time), failures: make(map[string][]time.Time), forecasts: make(map[string]time.Time),
+		versions: make(map[string]string), releases: make(map[string]*releaseState)}
 }
 
 func (s *podState) recordRestarts(at time.Time, restarts int) bool {
@@ -115,6 +118,22 @@ func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity fl
 	state.estimate, state.valid = state.detector.Observe(at, usage, capacity, restarts)
 	state.estimate.Pod = pod
 	state.seen = at
+	if version := t.versions[pod]; version != "" {
+		release, ok := t.releases[workload]
+		if !ok {
+			release = newReleaseState()
+			t.releases[workload] = release
+		}
+		release.observe(pod, version, at, usage, capacity)
+	}
+}
+
+// ObserveVersion records the release a pod runs, such as its ReplicaSet. It is
+// read by the next memory observation of the pod.
+func (t *Tracker) ObserveVersion(pod, version string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.versions[pod] = version
 }
 
 func (t *Tracker) podLocked(workload, pod string) *podState {
@@ -144,8 +163,8 @@ func (t *Tracker) ObserveCondition(workload, pod string, at time.Time, ratio flo
 // modes. An imminent failure outranks a condition already in progress, which
 // outranks a slower projection.
 func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	var worst Estimate
 	found := false
 	consider := func(est Estimate) {
@@ -153,11 +172,23 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 			worst, found = est, true
 		}
 	}
+	regression, regressing := Estimate{}, false
+	divergent, diverging := Estimate{}, false
+	if release, ok := t.releases[workload]; ok {
+		regression, regressing = release.estimate(now)
+		divergent, diverging = release.divergence(now)
+	}
+	if regressing {
+		consider(regression)
+	} else if diverging {
+		consider(divergent)
+	}
 	for pod, state := range t.pods {
 		if state.workload != workload {
 			continue
 		}
-		if state.valid && now.Sub(state.seen) <= estimateMaxAge {
+		explained := (regressing && t.versions[pod] == regression.Version) || (!regressing && diverging && pod == divergent.Pod)
+		if state.valid && now.Sub(state.seen) <= estimateMaxAge && !(explained && state.estimate.Mode == ModeSaturation) {
 			consider(state.estimate)
 		}
 		if state.condValid && now.Sub(state.condSeen) <= estimateMaxAge {
@@ -208,6 +239,13 @@ func (t *Tracker) Prune(cutoff time.Time) {
 	for pod, state := range t.pods {
 		if state.seen.Before(cutoff) && state.condSeen.Before(cutoff) && state.eventSeen.Before(cutoff) {
 			delete(t.pods, pod)
+			delete(t.versions, pod)
+		}
+	}
+	for workload, release := range t.releases {
+		release.prune(cutoff)
+		if len(release.pods) == 0 && len(release.profiles) == 0 {
+			delete(t.releases, workload)
 		}
 	}
 }

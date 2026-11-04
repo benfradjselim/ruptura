@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Ruptura workload simulator — injects 5 synthetic workloads with distinct
-failure modes via the /api/v2/write endpoint (Prometheus remote-write JSON).
+failure modes via the /api/v2/write endpoint (the JSON write format of the simulator).
 
 Usage:
     python3 scripts/simulate.py [--host HOST] [--port PORT] [--interval SEC]
@@ -14,7 +14,7 @@ Examples:
     python3 scripts/simulate.py --host <YOUR_NODE_IP> --port 31470
 
     # Direct OTLP port (no NodePort)
-    python3 scripts/simulate.py --host localhost --port 4317
+    python3 scripts/simulate.py --host localhost --port 4318
 
 Workloads:
   gateway          — stable, healthy, normal traffic

@@ -130,7 +130,7 @@ func (r *OTLPReceiver) lookupSpanService(spanID string) string {
 	return ""
 }
 
-// TraceHandler handles POST /otlp/v1/traces
+// TraceHandler handles POST /v1/traces
 // Note: persistence is handled exclusively by r.spans (SpanSink) to avoid double-writes.
 func (r *OTLPReceiver) TraceHandler(w http.ResponseWriter, req *http.Request) {
 	decoded, err := DecodeTracesRequest(req)
@@ -193,7 +193,7 @@ func (r *OTLPReceiver) TraceHandler(w http.ResponseWriter, req *http.Request) {
 	logger.Default.Info("otlp traces ingested", "count", count)
 }
 
-// MetricsHandler handles POST /otlp/v1/metrics
+// MetricsHandler handles POST /v1/metrics
 // Note: persistence is handled exclusively by r.metrics (MetricSink) to avoid double-writes.
 func (r *OTLPReceiver) MetricsHandler(w http.ResponseWriter, req *http.Request) {
 	decoded, err := DecodeMetricsRequest(req)
@@ -235,7 +235,7 @@ func (r *OTLPReceiver) MetricsHandler(w http.ResponseWriter, req *http.Request) 
 	logger.Default.Info("otlp metrics ingested", "count", count)
 }
 
-// LogsHandler handles POST /otlp/v1/logs
+// LogsHandler handles POST /v1/logs
 // Note: persistence is handled exclusively by r.logs (LogSink) to avoid double-writes.
 func (r *OTLPReceiver) LogsHandler(w http.ResponseWriter, req *http.Request) {
 	decoded, err := DecodeLogsRequest(req)

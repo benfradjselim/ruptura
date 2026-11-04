@@ -42,7 +42,7 @@ COPY --from=builder /ruptura /ruptura
 # REST API + Prometheus remote_write
 EXPOSE 8080
 # OTLP ingest (metrics, logs, traces)
-EXPOSE 4317
+EXPOSE 4317 4318
 # gRPC ingest
 EXPOSE 9090
 
@@ -54,4 +54,4 @@ USER 65532:65532
 # Liveness:  GET /api/v2/health → 200
 # Readiness: GET /api/v2/ready  → 200
 ENTRYPOINT ["/ruptura"]
-CMD ["--port=8080", "--otlp-port=4317", "--storage=/var/lib/ruptura/data"]
+CMD ["--port=8080", "--otlp-grpc-port=4317", "--otlp-http-port=4318", "--storage=/var/lib/ruptura/data"]

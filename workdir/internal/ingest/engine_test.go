@@ -108,7 +108,7 @@ func TestOTLPMetrics_gauge(t *testing.T) {
 	e := New(mp, nil, nil, nil, nil)
 	
 	body := `{"resourceMetrics":[{"resource":{"attributes":[{"key":"host.name","value":{"stringValue":"h1"}}]},"scopeMetrics":[{"metrics":[{"name":"cpu","gauge":{"dataPoints":[{"asDouble":1.0,"timeUnixNano":"1000000000"}]}}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/metrics", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	
 	e.handleOTLPMetrics(w, req)
@@ -140,7 +140,7 @@ func TestOTLPMetrics_PodResolvesToOwningDeployment(t *testing.T) {
 		{"key":"k8s.namespace.name","value":{"stringValue":"prod"}},
 		{"key":"k8s.pod.name","value":{"stringValue":"web-stable-58cdf6849d-n5l2d"}}
 	]},"scopeMetrics":[{"metrics":[{"name":"cpu","gauge":{"dataPoints":[{"asDouble":0.5,"timeUnixNano":"1000000000"}]}}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/metrics", strings.NewReader(body))
 	w := httptest.NewRecorder()
 
 	e.handleOTLPMetrics(w, req)
@@ -168,7 +168,7 @@ func TestOTLPMetrics_PodOwnerUnresolved_FallsBackToPodAsHost(t *testing.T) {
 		{"key":"k8s.namespace.name","value":{"stringValue":"prod"}},
 		{"key":"k8s.pod.name","value":{"stringValue":"web-stable-58cdf6849d-n5l2d"}}
 	]},"scopeMetrics":[{"metrics":[{"name":"cpu","gauge":{"dataPoints":[{"asDouble":0.5,"timeUnixNano":"1000000000"}]}}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/metrics", strings.NewReader(body))
 	w := httptest.NewRecorder()
 
 	e.handleOTLPMetrics(w, req)
@@ -192,7 +192,7 @@ func TestOTLPMetrics_NodeScopedTelemetry_NeverRegisteredAsWorkload(t *testing.T)
 	body := `{"resourceMetrics":[{"resource":{"attributes":[
 		{"key":"k8s.node.name","value":{"stringValue":"k3s-lab-ruptura-3a97-node-pool-1"}}
 	]},"scopeMetrics":[{"metrics":[{"name":"node_cpu_percent","gauge":{"dataPoints":[{"asDouble":0.3,"timeUnixNano":"1000000000"}]}}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/metrics", strings.NewReader(body))
 	w := httptest.NewRecorder()
 
 	e.handleOTLPMetrics(w, req)
@@ -216,7 +216,7 @@ func TestOTLPMetrics_BareHostTelemetry_StillRegistersAsHost(t *testing.T) {
 	e := New(mp, nil, nil, nil, nil)
 
 	body := `{"resourceMetrics":[{"resource":{"attributes":[{"key":"host.name","value":{"stringValue":"h1"}}]},"scopeMetrics":[{"metrics":[{"name":"cpu","gauge":{"dataPoints":[{"asDouble":1.0,"timeUnixNano":"1000000000"}]}}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/metrics", strings.NewReader(body))
 	w := httptest.NewRecorder()
 
 	e.handleOTLPMetrics(w, req)
@@ -234,7 +234,7 @@ func TestOTLPMetrics_sum(t *testing.T) {
 	e := New(mp, nil, nil, nil, nil)
 	
 	body := `{"resourceMetrics":[{"resource":{"attributes":[{"key":"host.name","value":{"stringValue":"h1"}}]},"scopeMetrics":[{"metrics":[{"name":"mem","sum":{"dataPoints":[{"asInt":10,"timeUnixNano":"1000000000"}]}}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/metrics", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/metrics", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	
 	e.handleOTLPMetrics(w, req)
@@ -252,7 +252,7 @@ func TestOTLPLogs(t *testing.T) {
 	e := New(nil, logs, nil, nil, nil)
 
 	body := `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"svc1"}}]},"scopeLogs":[{"logRecords":[{"body":{"stringValue":"err"},"timeUnixNano":"1000000000"}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/logs", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/logs", strings.NewReader(body))
 	w := httptest.NewRecorder()
 
 	e.handleOTLPLogs(w, req)
@@ -270,7 +270,7 @@ func TestOTLPLogs_LogPipeline(t *testing.T) {
 
 	// Two log records for the same service — both sinks should receive both lines.
 	body := `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"svc1"}}]},"scopeLogs":[{"logRecords":[{"body":{"stringValue":"error: disk full"},"timeUnixNano":"1000000000"},{"body":{"stringValue":"warn: high memory"},"timeUnixNano":"2000000000"}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/logs", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/logs", strings.NewReader(body))
 	w := httptest.NewRecorder()
 
 	e.handleOTLPLogs(w, req)
@@ -298,7 +298,7 @@ func TestOTLPLogs_LogPipeline_WorkloadKey(t *testing.T) {
 
 	// Resource has k8s.deployment.name and k8s.namespace.name → workload key used
 	body := `{"resourceLogs":[{"resource":{"attributes":[{"key":"k8s.namespace.name","value":{"stringValue":"prod"}},{"key":"k8s.deployment.name","value":{"stringValue":"frontend"}},{"key":"service.name","value":{"stringValue":"frontend-svc"}}]},"scopeLogs":[{"logRecords":[{"body":{"stringValue":"started"},"timeUnixNano":"1000000000"}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/logs", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/logs", strings.NewReader(body))
 	e.handleOTLPLogs(w(req), req)
 
 	if len(calls) != 1 {
@@ -325,7 +325,7 @@ func TestOTLPTraces_ok(t *testing.T) {
 	e := New(nil, nil, spans, nil, nil)
 	
 	body := `{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"t1","spanId":"s1","name":"span1","status":{"code":1}}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/traces", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/traces", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	
 	e.handleOTLPTraces(w, req)
@@ -340,7 +340,7 @@ func TestOTLPTraces_error(t *testing.T) {
 	e := New(nil, nil, spans, nil, nil)
 	
 	body := `{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"t1","spanId":"s1","name":"span1","status":{"code":2}}]}]}]}`
-	req := httptest.NewRequest("POST", "/otlp/v1/traces", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/traces", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	
 	e.handleOTLPTraces(w, req)

@@ -72,7 +72,8 @@ thanos:
 
 ports:
   api: 8080    # REST API + Prometheus metrics
-  otlp: 4317   # OTLP ingest (metrics/logs/traces)
+  otlpGrpc: 4317   # OTLP gRPC ingest (metrics, logs, traces)
+  otlpHttp: 4318   # OTLP HTTP ingest and Prometheus remote write
 
 service:
   type: ClusterIP
@@ -82,8 +83,10 @@ otlpService:
   type: NodePort
   annotations: {}
 
-# -- NodePort for the OTLP ingest port (4317). Set to "" for auto-assignment.
+# -- NodePort for OTLP HTTP and remote write (4318). Set to "" for auto-assignment.
 otlpNodePort: 31470
+# -- NodePort for OTLP gRPC (4317). Empty for auto-assignment.
+otlpGrpcNodePort: ""
 
 ingress:
   enabled: false

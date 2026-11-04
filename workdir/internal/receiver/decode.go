@@ -231,3 +231,18 @@ func convertTraces(pb *tracepb.TracesData) *models.OTLPTraceRequest {
 	}
 	return req
 }
+
+// MetricsFromProto converts an OTLP gRPC metrics export to the ingest model.
+func MetricsFromProto(rm []*metricspb.ResourceMetrics) *models.OTLPMetricsRequest {
+	return convertMetrics(&metricspb.MetricsData{ResourceMetrics: rm})
+}
+
+// LogsFromProto converts an OTLP gRPC logs export to the ingest model.
+func LogsFromProto(rl []*logspb.ResourceLogs) *models.OTLPLogsRequest {
+	return convertLogs(&logspb.LogsData{ResourceLogs: rl})
+}
+
+// TracesFromProto converts an OTLP gRPC traces export to the ingest model.
+func TracesFromProto(rs []*tracepb.ResourceSpans) *models.OTLPTraceRequest {
+	return convertTraces(&tracepb.TracesData{ResourceSpans: rs})
+}

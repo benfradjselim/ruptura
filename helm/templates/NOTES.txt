@@ -10,8 +10,9 @@ REST API (HealthScore, rupture index, forecasts):
   curl http://localhost:8080/api/v2/ruptures
 
 OTLP Ingest (send metrics/logs/traces from your workloads):
-  kubectl port-forward svc/{{ include "ruptura.fullname" . }}-otlp 4317:4317 -n {{ .Release.Namespace }}
-  # Configure your OTLP exporter endpoint: http://localhost:4317
+  kubectl port-forward svc/{{ include "ruptura.fullname" . }}-otlp 4317:4317 4318:4318 -n {{ .Release.Namespace }}
+  # OTLP gRPC exporter: localhost:4317. OTLP HTTP exporter: http://localhost:4318.
+  # Prometheus remote write: http://localhost:4318/api/v1/write
 
 Prometheus metrics (scrape target):
   http://{{ include "ruptura.fullname" . }}.{{ .Release.Namespace }}:80/api/v2/metrics

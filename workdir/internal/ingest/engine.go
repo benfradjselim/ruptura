@@ -2,6 +2,8 @@ package ingest
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -54,7 +56,7 @@ type Ingestor interface {
 type Engine struct {
 	pipeline    metrics.MetricPipeline
 	logs        LogSink
-	logPipeline LogSink     // log metrics pipeline — emits log_error_rate / log_burst_index into metric pipeline
+	logPipeline LogSink // log metrics pipeline — emits log_error_rate / log_burst_index into metric pipeline
 	logStore    LogStoreSink
 	spans       SpanSink
 	sentiment   SentimentSink
@@ -76,8 +78,10 @@ type Engine struct {
 	tracesCount  int64
 
 	httpServer  *http.Server
+	httpTLS     *tls.Config
 	udpConn     *net.UDPConn
 	grpcServer  *grpc.Server
+	otlpGRPC    *grpc.Server
 	grpcSamples chan *GRPCMetricPoint
 }
 
@@ -165,17 +169,51 @@ func rateLimitMiddleware(rl *rateLimiter, next http.Handler) http.Handler {
 	})
 }
 
+// SetTLS makes StartHTTP serve OTLP over TLS with the given configuration.
+func (e *Engine) SetTLS(config *tls.Config) {
+	e.httpTLS = config
+}
+
 func (e *Engine) StartHTTP(addr string) error {
 	mux := http.NewServeMux()
 	RegisterHandlers(mux, e)
 	rl := newRateLimiter()
-	e.httpServer = &http.Server{Addr: addr, Handler: rateLimitMiddleware(rl, mux)}
+	e.httpServer = &http.Server{Addr: addr, Handler: rateLimitMiddleware(rl, mux), TLSConfig: e.httpTLS}
 	go func() {
-		if err := e.httpServer.ListenAndServe(); err != http.ErrServerClosed {
+		var err error
+		if e.httpTLS != nil {
+			err = e.httpServer.ListenAndServeTLS("", "")
+		} else {
+			err = e.httpServer.ListenAndServe()
+		}
+		if err != http.ErrServerClosed {
 			logger.Default.Error("HTTP ingest failed", "error", err)
 		}
 	}()
 	return nil
+}
+
+// ServerTLS loads a server certificate and, when clientCAFile is set, requires
+// client certificates signed by it.
+func ServerTLS(certFile, keyFile, clientCAFile string) (*tls.Config, error) {
+	pair, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("ingest: load server certificate: %w", err)
+	}
+	config := &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12}
+	if clientCAFile != "" {
+		pem, err := os.ReadFile(clientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("ingest: read client CA: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("ingest: no valid certificates in client CA")
+		}
+		config.ClientCAs = pool
+		config.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+	return config, nil
 }
 
 func (e *Engine) StartDogStatsD(addr string) error {
@@ -217,14 +255,33 @@ func (e *Engine) Stop(ctx context.Context) error {
 	if e.grpcServer != nil {
 		e.grpcServer.GracefulStop()
 	}
+	if e.otlpGRPC != nil {
+		e.otlpGRPC.GracefulStop()
+	}
 	return nil
 }
 
+// RegisterHandlers serves OTLP over HTTP at the standard paths, Prometheus
+// remote write, and the JSON write format of the Ruptura simulator.
 func RegisterHandlers(mux *http.ServeMux, e *Engine) {
+	mux.HandleFunc("/v1/metrics", e.handleOTLPMetrics)
+	mux.HandleFunc("/v1/logs", e.handleOTLPLogs)
+	mux.HandleFunc("/v1/traces", e.handleOTLPTraces)
+	mux.HandleFunc("/api/v1/write", e.handlePrometheusRemoteWrite)
 	mux.HandleFunc("/api/v2/write", e.handleRemoteWrite)
-	mux.HandleFunc("/otlp/v1/metrics", e.handleOTLPMetrics)
-	mux.HandleFunc("/otlp/v1/logs", e.handleOTLPLogs)
-	mux.HandleFunc("/otlp/v1/traces", e.handleOTLPTraces)
+}
+
+// writeExportResponse answers an OTLP export with an empty response message,
+// in the encoding of the request, as the OTLP specification requires.
+func writeExportResponse(w http.ResponseWriter, r *http.Request) {
+	if strings.Contains(r.Header.Get("Content-Type"), "application/x-protobuf") {
+		w.Header().Set("Content-Type", "application/x-protobuf")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("{}"))
 }
 
 // extractWorkloadRef extracts a WorkloadRef from an OTLPResource by inspecting
@@ -359,34 +416,15 @@ func (e *Engine) handleRemoteWrite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, ts := range req.Timeseries {
-		var name string
-		host := "unknown"
-		workload := models.WorkloadRef{}
-		for _, lbl := range ts.Labels {
-			switch lbl.Name {
-			case "__name__":
-				name = lbl.Value
-			case "host", "instance":
-				host = lbl.Value
-			case "namespace":
-				workload.Namespace = lbl.Value
-			case "deployment":
-				workload.Name = lbl.Value
-				workload.Kind = "Deployment"
-			}
+		labels := make([]promLabel, 0, len(ts.Labels))
+		for _, l := range ts.Labels {
+			labels = append(labels, promLabel{Name: l.Name, Value: l.Value})
 		}
-		if name == "" {
-			continue
+		samples := make([]promSample, 0, len(ts.Samples))
+		for _, smp := range ts.Samples {
+			samples = append(samples, promSample{Value: smp.Value, Timestamp: smp.Timestamp})
 		}
-		if workload.IsEmpty() {
-			workload = models.WorkloadRefFromHost(host)
-		}
-
-		if e.checkCardinality(host, name) {
-			for _, s := range ts.Samples {
-				e.pipeline.Ingest(host, name, s.Value, time.UnixMilli(s.Timestamp))
-			}
-		}
+		e.ingestSeries(labels, samples)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -398,7 +436,12 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	req := *decoded
+	e.ingestMetrics(*decoded)
+	writeExportResponse(w, r)
+}
+
+// ingestMetrics processes one OTLP metrics request, from HTTP or gRPC.
+func (e *Engine) ingestMetrics(req models.OTLPMetricsRequest) {
 	for _, rm := range req.ResourceMetrics {
 		ref, skip := e.resolveFleetWorkloadRef(rm.Resource)
 		if skip {
@@ -450,7 +493,6 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
@@ -459,7 +501,12 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	req := *decoded
+	e.ingestLogs(*decoded)
+	writeExportResponse(w, r)
+}
+
+// ingestLogs processes one OTLP logs request, from HTTP or gRPC.
+func (e *Engine) ingestLogs(req models.OTLPLogsRequest) {
 	for _, rl := range req.ResourceLogs {
 		ref := extractWorkloadRef(rl.Resource)
 		service := rl.Resource.GetAttr("service.name")
@@ -495,13 +542,13 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 
 				if e.logStore != nil {
 					entry := map[string]interface{}{
-						"service":    service,
-						"body":       body,
-						"severity":   lr.SeverityText,
-						"timestamp":  ts.UnixNano(),
-						"workload":   ref.Key(),
-						"namespace":  ref.Namespace,
-						"kind":       ref.Kind,
+						"service":       service,
+						"body":          body,
+						"severity":      lr.SeverityText,
+						"timestamp":     ts.UnixNano(),
+						"workload":      ref.Key(),
+						"namespace":     ref.Namespace,
+						"kind":          ref.Kind,
 						"workload_name": ref.Name,
 					}
 					_ = e.logStore.SaveLog(service, entry, ts)
@@ -523,7 +570,6 @@ func (e *Engine) handleOTLPLogs(w http.ResponseWriter, r *http.Request) {
 			e.sentiment.UpdateSentiment(service, pos, neg)
 		}
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (e *Engine) handleOTLPTraces(w http.ResponseWriter, r *http.Request) {
@@ -532,7 +578,12 @@ func (e *Engine) handleOTLPTraces(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	req := *decoded
+	e.ingestTraces(*decoded)
+	writeExportResponse(w, r)
+}
+
+// ingestTraces processes one OTLP traces request, from HTTP or gRPC.
+func (e *Engine) ingestTraces(req models.OTLPTraceRequest) {
 	now := time.Now()
 	for _, rs := range req.ResourceSpans {
 		ref := extractWorkloadRef(rs.Resource)
@@ -569,7 +620,6 @@ func (e *Engine) handleOTLPTraces(w http.ResponseWriter, r *http.Request) {
 			e.traceR.SetTraceR(ref.Key(), traceR, now)
 		}
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (e *Engine) parseDogStatsDLine(line string) {
@@ -577,7 +627,7 @@ func (e *Engine) parseDogStatsDLine(line string) {
 	if len(parts) < 2 {
 		return
 	}
-	
+
 	head := strings.Split(parts[0], ":")
 	if len(head) < 2 {
 		return
@@ -585,7 +635,7 @@ func (e *Engine) parseDogStatsDLine(line string) {
 	name := head[0]
 	value := 0.0
 	fmt.Sscanf(head[1], "%f", &value)
-	
+
 	host := "unknown"
 	for _, p := range parts {
 		if strings.HasPrefix(p, "#") {
@@ -598,7 +648,7 @@ func (e *Engine) parseDogStatsDLine(line string) {
 			}
 		}
 	}
-	
+
 	if e.checkCardinality(host, name) {
 		e.pipeline.Ingest(host, name, value, time.Now())
 	}
@@ -619,13 +669,13 @@ func (e *Engine) checkCardinality(host, name string) bool {
 	if _, ok := e.activeSeries.Load(key); ok {
 		return true
 	}
-	
+
 	count := atomic.LoadInt32(&e.seriesCount)
 	if count >= 50000 {
 		logger.Default.Warn("Cardinality limit reached, rejecting series", "key", key)
 		return false
 	}
-	
+
 	e.activeSeries.Store(key, true)
 	atomic.AddInt32(&e.seriesCount, 1)
 	return true

@@ -34,7 +34,24 @@ An invalid instance deploys nothing: its status reports phase `Failed` with ever
 
 Deleting the instance removes everything the operator created, cluster bindings included.
 
-On Kubernetes the operator installs the same way, but it cannot yet point the engine at a Prometheus, and failure modes need one. Use Helm there until then.
+While the engine is not ready, `status.message` gives the cause Kubernetes reports: a failing container with its last log line, a pod the scheduler cannot place, an unbound volume claim, or a pod refused at creation. `oc get rupturainstance` shows it in the Message column.
+
+One operator manages an instance at a time. It holds a Lease named `<instance>-operator` in the namespace of the instance, and `status.operator` names its namespace. A second operator on the same cluster leaves the instance alone, and takes it over only after the holder stops renewing for two minutes. Operators older than 1.4.0 do not use the Lease: remove them before installing 1.4.0.
+
+### Upgrading to 1.4.0
+
+- OTLP over HTTP moved from port 4317, paths `/otlp/v1/*`, to the standard port 4318, paths `/v1/metrics`, `/v1/logs`, `/v1/traces`. Port 4317 now serves OTLP gRPC. Point `otlphttp` exporters at `:4318`, and `otlp` exporters at `:4317`.
+- Prometheus remote write is received at `:4318/api/v1/write`.
+- The engine pod restarts once after the upgrade.
+
+On Kubernetes the operator installs the same way. Every failure mode except `crash_loop` reads Prometheus, so declare its query endpoint:
+
+```yaml
+spec:
+  input:
+    prometheus:
+      url: http://prometheus.monitoring.svc:9090
+```
 
 ## Kubernetes, with Helm
 

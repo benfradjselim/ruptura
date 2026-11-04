@@ -40,6 +40,9 @@ spec:
         - name: Phase
           type: string
           jsonPath: .status.phase
+        - name: Message
+          type: string
+          jsonPath: .status.message
         - name: Age
           type: date
           jsonPath: .metadata.creationTimestamp
@@ -119,6 +122,175 @@ spec:
                       type: string
                       enum: [minimal, standard, full, deep]
                       default: standard
+                    prometheus:
+                      type: object
+                      description: "Prometheus compatible query endpoint that failure modes read. Default on OpenShift: the cluster Thanos querier."
+                      required: [url]
+                      properties:
+                        url:
+                          type: string
+                          pattern: '^https?://.+'
+                        tls:
+                          type: object
+                          properties:
+                            ca:
+                              type: object
+                              description: "Extra CA that signs the Prometheus server certificate."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                                configMapKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            cert:
+                              type: object
+                              description: "Client certificate for mutual TLS, with key."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                                configMapKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            key:
+                              type: object
+                              description: "Client private key, from a Secret."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            serverName: {type: string}
+                        authorization:
+                          type: object
+                          description: "Exactly one method. Without this block no credential is sent."
+                          minProperties: 1
+                          maxProperties: 1
+                          properties:
+                            bearerToken:
+                              type: object
+                              description: "Bearer token, from a Secret."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            basicAuth:
+                              type: object
+                              required: [username, password]
+                              properties:
+                                username:
+                                  type: object
+                                  description: "Username."
+                                  minProperties: 1
+                                  maxProperties: 1
+                                  properties:
+                                    secretKeyRef:
+                                      type: object
+                                      required: [name, key]
+                                      properties:
+                                        name: {type: string, minLength: 1}
+                                        key: {type: string, minLength: 1}
+                                    configMapKeyRef:
+                                      type: object
+                                      required: [name, key]
+                                      properties:
+                                        name: {type: string, minLength: 1}
+                                        key: {type: string, minLength: 1}
+                                password:
+                                  type: object
+                                  description: "Password, from a Secret."
+                                  minProperties: 1
+                                  maxProperties: 1
+                                  properties:
+                                    secretKeyRef:
+                                      type: object
+                                      required: [name, key]
+                                      properties:
+                                        name: {type: string, minLength: 1}
+                                        key: {type: string, minLength: 1}
+                            serviceAccountToken: {type: boolean, enum: [true]}
+                    otlp:
+                      type: object
+                      description: "OTLP receiver: gRPC on 4317, HTTP and Prometheus remote write on 4318."
+                      properties:
+                        tls:
+                          type: object
+                          required: [cert, key]
+                          properties:
+                            cert:
+                              type: object
+                              description: "Server certificate."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                                configMapKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            key:
+                              type: object
+                              description: "Server private key, from a Secret."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                            clientCA:
+                              type: object
+                              description: "When set, clients must present a certificate signed by this CA."
+                              minProperties: 1
+                              maxProperties: 1
+                              properties:
+                                secretKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
+                                configMapKeyRef:
+                                  type: object
+                                  required: [name, key]
+                                  properties:
+                                    name: {type: string, minLength: 1}
+                                    key: {type: string, minLength: 1}
                 analysis:
                   type: object
                   properties:
@@ -166,6 +338,9 @@ spec:
                   type: integer
                 message:
                   type: string
+                operator:
+                  type: string
+                  description: "Namespace of the operator that manages this instance."
                 lastReconcileTime:
                   type: string
                   format: date-time
@@ -219,6 +394,12 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "create", "update", "delete"]
   - apiGroups: ["ruptura.io"]
     resources: ["rupturainstances", "rupturainstances/status"]
     verbs: ["get", "list", "watch", "update", "patch"]
@@ -298,7 +479,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/component: operator
-    app.kubernetes.io/version: "0.8.9"
+    app.kubernetes.io/version: "1.4.0"
 spec:
   replicas: 1
   selector:
@@ -310,7 +491,7 @@ spec:
       labels:
         app.kubernetes.io/name: ruptura
         app.kubernetes.io/component: operator
-        app.kubernetes.io/version: "0.8.9"
+        app.kubernetes.io/version: "1.4.0"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
@@ -323,7 +504,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: ruptura-operator
-          image: ghcr.io/benfradjselim/ruptura-operator:v1.3.0
+          image: ghcr.io/benfradjselim/ruptura-operator:v1.4.0
           imagePullPolicy: IfNotPresent
           args: ["--interval=30s", "--metrics-addr=:9090"]
           ports:
