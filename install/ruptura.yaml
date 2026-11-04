@@ -19,10 +19,10 @@ metadata:
   name: ruptura
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -39,10 +39,10 @@ metadata:
   name: ruptura-init-apikey
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
 ---
 # Source: ruptura/templates/serviceaccount.yaml
@@ -52,10 +52,10 @@ metadata:
   name: ruptura
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -66,10 +66,10 @@ metadata:
   name: ruptura-ui-nginx
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: ui
 data:
@@ -109,10 +109,10 @@ metadata:
   name: ruptura-data
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   accessModes:
@@ -127,10 +127,10 @@ kind: ClusterRole
 metadata:
   name: ruptura
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
 rules:
   - apiGroups: ["apps"]
@@ -153,10 +153,10 @@ kind: ClusterRoleBinding
 metadata:
   name: ruptura
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -174,10 +174,10 @@ metadata:
   name: ruptura-init-apikey
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
 rules:
   # Scoped to this namespace only, and only enough to check for and create the
@@ -194,10 +194,10 @@ metadata:
   name: ruptura-init-apikey
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -215,10 +215,10 @@ metadata:
   name: ruptura-ui
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: ui
 spec:
@@ -240,10 +240,10 @@ metadata:
   name: ruptura
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: engine
 spec:
@@ -265,10 +265,10 @@ metadata:
   name: ruptura-otlp
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: engine
 spec:
@@ -297,10 +297,10 @@ metadata:
   name: ruptura-ui
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: ui
 spec:
@@ -313,7 +313,7 @@ spec:
   template:
     metadata:
       annotations:
-        deploy/ui-image: "ui-v8.6.0"
+        deploy/ui-image: "ui-v8.7.0"
       labels:
         app.kubernetes.io/name: ruptura
         app.kubernetes.io/instance: ruptura
@@ -327,7 +327,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ruptura-ui
-          image: "ghcr.io/benfradjselim/ruptura-ui:ui-v8.6.0"
+          image: "ghcr.io/benfradjselim/ruptura-ui:ui-v8.7.0"
           imagePullPolicy: Always
           ports:
             - name: http
@@ -384,10 +384,10 @@ metadata:
   name: ruptura
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: engine
 spec:
@@ -417,7 +417,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: ruptura
-          image: docker.io/selimbf/ruptura:v8.6.0
+          image: docker.io/selimbf/ruptura:v8.7.0
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
@@ -498,10 +498,10 @@ metadata:
   name: ruptura-init-apikey
   namespace: ruptura-system
   labels:
-    helm.sh/chart: ruptura-1.3.0
+    helm.sh/chart: ruptura-1.4.0
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/instance: ruptura
-    app.kubernetes.io/version: "8.6.0"
+    app.kubernetes.io/version: "8.7.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   backoffLimit: 3
