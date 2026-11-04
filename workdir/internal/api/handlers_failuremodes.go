@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
@@ -112,13 +113,13 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate, horizo
 		}
 		return state, math.Max(risk, conditionRisk)
 	}
-	if est.Mode == failuremodes.ModeReleaseRegression && est.ETF > criticalETF {
+	if (est.Mode == failuremodes.ModeReleaseRegression || est.Mode == failuremodes.ModeReplicaDivergence) && est.ETF > criticalETF {
 		if state != "critical" {
 			state = "degraded"
 		}
 		return state, math.Max(risk, conditionRisk)
 	}
-	if est.ETF > riskHorizon && est.ETF > horizon && est.Mode != failuremodes.ModeReleaseRegression {
+	if est.ETF > riskHorizon && est.ETF > horizon && est.Mode != failuremodes.ModeReleaseRegression && est.Mode != failuremodes.ModeReplicaDivergence {
 		return state, risk
 	}
 	risk = math.Max(risk, maxRisk*(1-est.ETF.Seconds()/riskHorizon.Seconds()))
@@ -142,6 +143,9 @@ func reportedEstimate(est failuremodes.Estimate, horizon time.Duration) *failure
 }
 
 func estimateHeadline(name string, est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeReplicaDivergence {
+		return fmt.Sprintf("%s pod %s is projected to reach its memory limit in %d minutes, unlike its replicas.", name, podName(est.Pod), int(math.Round(est.ETF.Minutes())))
+	}
 	if est.Mode == failuremodes.ModeReleaseRegression {
 		return fmt.Sprintf("%s release %s is projected to reach its memory limit in %d minutes.", name, est.Version, int(math.Round(est.ETF.Minutes())))
 	}
@@ -167,6 +171,9 @@ func estimateHeadline(name string, est failuremodes.Estimate) string {
 }
 
 func estimateAction(est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeReplicaDivergence {
+		return "Restart or delete pod " + podName(est.Pod) + ", the only replica growing, and check its node and its state"
+	}
 	if est.Mode == failuremodes.ModeReleaseRegression {
 		return "Roll back to " + est.PreviousVersion + " or fix the memory growth of " + est.Version
 	}
@@ -189,4 +196,12 @@ func estimateAction(est failuremodes.Estimate) string {
 		return "Raise the CPU limit or reduce the workload's CPU demand"
 	}
 	return "Review the memory limit or restart the pod before it is killed"
+}
+
+// podName drops the namespace of a namespace/pod key.
+func podName(pod string) string {
+	if i := strings.LastIndex(pod, "/"); i >= 0 {
+		return pod[i+1:]
+	}
+	return pod
 }

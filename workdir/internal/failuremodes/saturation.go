@@ -40,6 +40,8 @@ type Estimate struct {
 	PreviousVersion string
 	Rate            float64
 	PreviousRate    float64
+	// Siblings counts the other replicas a diverging pod is compared with.
+	Siblings int
 }
 
 type point struct {

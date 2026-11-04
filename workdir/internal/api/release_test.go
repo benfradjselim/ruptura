@@ -40,3 +40,17 @@ func TestReleaseRegressionReporting(t *testing.T) {
 		t.Errorf("headline = %q", headline)
 	}
 }
+
+func TestReplicaDivergenceReporting(t *testing.T) {
+	est := failuremodes.Estimate{Mode: failuremodes.ModeReplicaDivergence, Pod: "shop/app-7d9-x2k", ETF: 60 * time.Minute, Usage: 0.5,
+		Rate: 3 * 1024 * 1024 / 60.0, PreviousRate: 0, Siblings: 2}
+	if got, _ := applyEstimate("healthy", 0, est, 30*time.Minute); got != "degraded" {
+		t.Errorf("state = %s, want degraded", got)
+	}
+	if evidence := failureEvidence(est); len(evidence) == 0 || evidence[0] != "Pod grows 3.0 MiB per minute, its 2 replicas 0.0" {
+		t.Errorf("evidence = %v", evidence)
+	}
+	if action := estimateAction(est); !strings.Contains(action, "app-7d9-x2k") {
+		t.Errorf("action = %q", action)
+	}
+}

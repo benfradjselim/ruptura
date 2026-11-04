@@ -173,17 +173,21 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 		}
 	}
 	regression, regressing := Estimate{}, false
+	divergent, diverging := Estimate{}, false
 	if release, ok := t.releases[workload]; ok {
 		regression, regressing = release.estimate(now)
+		divergent, diverging = release.divergence(now)
 	}
 	if regressing {
 		consider(regression)
+	} else if diverging {
+		consider(divergent)
 	}
 	for pod, state := range t.pods {
 		if state.workload != workload {
 			continue
 		}
-		explained := regressing && t.versions[pod] == regression.Version
+		explained := (regressing && t.versions[pod] == regression.Version) || (!regressing && diverging && pod == divergent.Pod)
 		if state.valid && now.Sub(state.seen) <= estimateMaxAge && !(explained && state.estimate.Mode == ModeSaturation) {
 			consider(state.estimate)
 		}

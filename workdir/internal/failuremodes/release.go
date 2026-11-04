@@ -36,6 +36,8 @@ type releasePod struct {
 	samples  []point
 	capacity float64
 	since    time.Time
+	// divergentSince is when the pod started to outgrow its siblings.
+	divergentSince time.Time
 }
 
 type versionProfile struct {
