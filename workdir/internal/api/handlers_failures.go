@@ -154,7 +154,8 @@ func failureResult(workload, state string, est *failuremodes.Estimate, crashLoop
 		result.RecommendedAction = estimateAction(*est)
 		result.Evidence = failureEvidence(*est)
 		result.Kind = failureKindDetected
-		if est.Mode == failuremodes.ModeSaturation || est.Mode == failuremodes.ModeRecurrentFailure {
+		switch est.Mode {
+		case failuremodes.ModeSaturation, failuremodes.ModeRecurrentFailure, failuremodes.ModeReleaseRegression, failuremodes.ModeReplicaDivergence:
 			result.Kind = failureKindPredicted
 			result.ETASeconds = int(est.ETF.Seconds())
 		}

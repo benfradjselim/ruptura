@@ -13,6 +13,8 @@ import (
 func TestFailureResult(t *testing.T) {
 	saturation := failuremodes.Estimate{Mode: failuremodes.ModeSaturation, Pod: "n/p", ETF: 12 * time.Minute, Confidence: 0.8, Usage: 900}
 	throttled := failuremodes.Estimate{Mode: failuremodes.ModeCPUThrottling, Pod: "n/p", Confidence: 1, Usage: 0.4}
+	regression := failuremodes.Estimate{Mode: failuremodes.ModeReleaseRegression, Pod: "n/p", ETF: 50 * time.Minute, Confidence: 1, Version: "w-2", PreviousVersion: "w-1"}
+	divergent := failuremodes.Estimate{Mode: failuremodes.ModeReplicaDivergence, Pod: "n/p", ETF: 40 * time.Minute, Confidence: 1}
 	cases := []struct {
 		name      string
 		est       *failuremodes.Estimate
@@ -23,6 +25,8 @@ func TestFailureResult(t *testing.T) {
 	}{
 		{"no finding", nil, false, "", "", 0},
 		{"saturation is predicted", &saturation, false, "saturation", failureKindPredicted, 720},
+		{"release regression is predicted", &regression, false, "release_regression", failureKindPredicted, 3000},
+		{"replica divergence is predicted", &divergent, false, "replica_divergence", failureKindPredicted, 2400},
 		{"throttling is detected", &throttled, false, "cpu_throttling", failureKindDetected, 0},
 		{"crash loop is detected", nil, true, failureModeCrashLoop, failureKindDetected, 0},
 		{"crash loop outranks a forecast", &saturation, true, failureModeCrashLoop, failureKindDetected, 0},
