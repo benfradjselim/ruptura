@@ -225,6 +225,9 @@ spec:
                     image: ghcr.io/benfradjselim/ruptura-operator:v1.2.2
                     imagePullPolicy: IfNotPresent
                     args: ["--interval=30s", "--metrics-addr=:9090"]
+                    env:
+                      - name: RELATED_IMAGE_RUPTURA
+                        value: docker.io/selimbf/ruptura:v8.5.2
                     ports:
                       - name: metrics
                         containerPort: 9090

@@ -6,13 +6,17 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strings"
 	"time"
 )
 
 const (
-	defaultImage       = "docker.io/selimbf/ruptura:v8.6.0"
+	defaultImage = "docker.io/selimbf/ruptura:v8.6.0"
+	// relatedImageEnv is set by OLM from the CSV, so a disconnected mirror can
+	// rewrite the engine image by digest.
+	relatedImageEnv    = "RELATED_IMAGE_RUPTURA"
 	defaultStorageSize = "10Gi"
 	defaultEdition     = "community"
 	appLabel           = "app.kubernetes.io/name"
@@ -139,10 +143,7 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 		return writeInvalidStatus(c, inst, err)
 	}
 
-	image := inst.Spec.Image
-	if image == "" {
-		image = defaultImage
-	}
+	image := engineImage(inst.Spec.Image)
 	storageSize := inst.Spec.StorageSize
 	if storageSize == "" {
 		storageSize = defaultStorageSize
@@ -677,4 +678,16 @@ func reconcileAlertmanagerAccess(c *k8sClient, ns, name string, spec RupturaInst
 		}},
 	}
 	return c.apply(alertmanagerBindingPath(ns, name), binding)
+}
+
+// engineImage picks the engine image: the instance spec, then the image OLM
+// passes to the operator, then the built-in default.
+func engineImage(spec string) string {
+	if spec != "" {
+		return spec
+	}
+	if related := os.Getenv(relatedImageEnv); related != "" {
+		return related
+	}
+	return defaultImage
 }
