@@ -51,7 +51,8 @@ const version = "8.6.0"
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
 	Port        int
-	OTLPPort    int
+	OTLPGRPCPort int
+	OTLPHTTPPort int
 	StoragePath string
 	APIKey      string
 	Edition     string // "community" (default) or "autopilot"
@@ -63,7 +64,8 @@ func parseFlags(args []string) (Config, error) {
 	fs := flag.NewFlagSet("ruptura", flag.ContinueOnError)
 	cfg := Config{}
 	fs.IntVar(&cfg.Port, "port", 8080, "HTTP port")
-	fs.IntVar(&cfg.OTLPPort, "otlp-port", 4317, "OTLP ingest HTTP port")
+	fs.IntVar(&cfg.OTLPGRPCPort, "otlp-grpc-port", 4317, "OTLP gRPC ingest port")
+	fs.IntVar(&cfg.OTLPHTTPPort, "otlp-http-port", 4318, "OTLP HTTP and Prometheus remote write ingest port")
 	fs.StringVar(&cfg.StoragePath, "storage", "/var/lib/ruptura/data", "storage directory")
 	fs.StringVar(&cfg.APIKey, "api-key", "", "API bearer token")
 	fs.BoolVar(&cfg.ShowVersion, "version", false, "print version and exit")
@@ -319,7 +321,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	go fusionEngine.StartLogWatcher(ctx, burstDet.Events())
 
 	// Start OTLP ingest listener
-	otlpAddr := fmt.Sprintf(":%d", cfg.OTLPPort)
+	otlpAddr := fmt.Sprintf(":%d", cfg.OTLPHTTPPort)
 	if certFile := os.Getenv("RUPTURA_OTLP_TLS_CERT_FILE"); certFile != "" {
 		tlsConfig, err := ingest.ServerTLS(certFile, os.Getenv("RUPTURA_OTLP_TLS_KEY_FILE"), os.Getenv("RUPTURA_OTLP_TLS_CLIENT_CA_FILE"))
 		if err != nil {
@@ -329,6 +331,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	if err := ingestEngine.StartHTTP(otlpAddr); err != nil {
 		return fmt.Errorf("start OTLP ingest failed: %w", err)
+	}
+	if err := ingestEngine.StartOTLPGRPC(fmt.Sprintf(":%d", cfg.OTLPGRPCPort)); err != nil {
+		return fmt.Errorf("OTLP gRPC: %w", err)
 	}
 	defer ingestEngine.Stop(context.Background()) //nolint:errcheck
 
@@ -542,7 +547,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
-	logger.Default.Info("listening", "addr", srv.Addr, "otlp", otlpAddr)
+	logger.Default.Info("listening", "addr", srv.Addr, "otlp_grpc", cfg.OTLPGRPCPort, "otlp_http", cfg.OTLPHTTPPort)
 
 	select {
 	case <-ctx.Done():

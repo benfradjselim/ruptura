@@ -333,7 +333,8 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 							},
 							Ports: []ContainerPort{
 								{Name: "http", ContainerPort: 8080, Protocol: "TCP"},
-								{Name: "otlp", ContainerPort: 4317, Protocol: "TCP"},
+								{Name: "otlp-grpc", ContainerPort: 4317, Protocol: "TCP"},
+								{Name: "otlp-http", ContainerPort: 4318, Protocol: "TCP"},
 							},
 							Env:          env,
 							VolumeMounts: mounts,
@@ -381,7 +382,8 @@ func reconcileService(c *k8sClient, ns, name string, labels map[string]string) e
 			Selector: map[string]string{instanceLabel: name},
 			Ports: []ServicePort{
 				{Name: "http", Port: 8080, TargetPort: 8080, Protocol: "TCP"},
-				{Name: "otlp", Port: 4317, TargetPort: 4317, Protocol: "TCP"},
+				{Name: "otlp-grpc", Port: 4317, TargetPort: 4317, Protocol: "TCP"},
+				{Name: "otlp-http", Port: 4318, TargetPort: 4318, Protocol: "TCP"},
 			},
 		},
 	}

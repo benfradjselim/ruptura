@@ -25,6 +25,7 @@ services:
     ports:
       - "8080:8080"
       - "4317:4317"
+      - "4318:4318"
     environment:
       RUPTURA_DEMO_MODE: "true"
       RUPTURA_API_KEY: ${RUPTURA_API_KEY:-ruptura-local-dev}

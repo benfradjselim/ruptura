@@ -278,10 +278,16 @@ spec:
     app.kubernetes.io/instance: ruptura
     app.kubernetes.io/component: engine
   ports:
-    - name: otlp-http
+    - name: otlp-grpc
       port: 4317
-      targetPort: otlp
+      targetPort: otlp-grpc
       protocol: TCP
+      appProtocol: grpc
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+      protocol: TCP
+      appProtocol: http
       nodePort: 31470
 ---
 # Source: ruptura/templates/deployment-ui.yaml
@@ -421,15 +427,19 @@ spec:
             readOnlyRootFilesystem: true
           args:
             - --port=8080
-            - --otlp-port=4317
+            - --otlp-grpc-port=4317
+            - --otlp-http-port=4318
             - --storage=/var/lib/ruptura/data
             - --api-key=$(RUPTURA_API_KEY)
           ports:
             - name: api
               containerPort: 8080
               protocol: TCP
-            - name: otlp
+            - name: otlp-grpc
               containerPort: 4317
+              protocol: TCP
+            - name: otlp-http
+              containerPort: 4318
               protocol: TCP
           env:
             - name: RUPTURA_API_KEY

@@ -1626,7 +1626,7 @@ paths:
 
   # ── OTLP ─────────────────────────────────────────────────────────────────────
 
-  /otlp/v1/traces:
+  /v1/traces:
     post:
       tags: [otlp]
       summary: OTLP HTTP — receive trace data
@@ -1635,7 +1635,7 @@ paths:
         "200":
           description: Accepted
 
-  /otlp/v1/metrics:
+  /v1/metrics:
     post:
       tags: [otlp]
       summary: OTLP HTTP — receive metric data
@@ -1644,7 +1644,7 @@ paths:
         "200":
           description: Accepted
 
-  /otlp/v1/logs:
+  /v1/logs:
     post:
       tags: [otlp]
       summary: OTLP HTTP — receive log data

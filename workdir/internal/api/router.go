@@ -86,7 +86,7 @@ func (h *Handlers) NewRouter() http.Handler {
 
 	api.HandleFunc("/v1/{signal:metrics|logs|traces}", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMisdirectedRequest, map[string]string{
-			"error": "OTLP ingestion runs on a separate port. Send to :4318/otlp/v1/{metrics,logs,traces}",
+			"error": "OTLP ingestion runs on a separate port. Send OTLP gRPC to :4317, or OTLP HTTP to :4318/v1/{metrics,logs,traces}",
 			"docs":  "https://benfradjselim.github.io/ruptura/",
 		})
 	}).Methods("POST")

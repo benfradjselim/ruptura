@@ -24,6 +24,6 @@ The operator sets these from a `RupturaInstance`. Set them yourself only when yo
 | `RUPTURA_EDITION` | Keep `community`. |
 | `LOG_LEVEL` | `debug`, `info`, `warn` or `error`. |
 
-Flags: `--port` for the HTTP API (default 8080), `--storage` for the data directory. OTLP is received on port 4317.
+Flags: `--port` for the HTTP API (default 8080), `--otlp-grpc-port` for OTLP gRPC (default 4317), `--otlp-http-port` for OTLP HTTP at `/v1/metrics`, `/v1/logs`, `/v1/traces` and Prometheus remote write at `/api/v1/write` (default 4318), `--storage` for the data directory.
 
 See the [docs site](https://benfradjselim.github.io/ruptura/) for the `RupturaInstance` reference, failure modes and API.

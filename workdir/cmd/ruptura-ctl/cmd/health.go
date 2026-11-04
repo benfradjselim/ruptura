@@ -73,11 +73,11 @@ var healthCmd = &cobra.Command{
 		fmt.Printf("    %-18s %s\n", dim("received"), fmtNum(ingest["metrics"]))
 
 		fmt.Println()
-		fmt.Printf("  %s\n", dim("logs (OTLP :4317)"))
+		fmt.Printf("  %s\n", dim("logs (OTLP :4317 gRPC, :4318 HTTP)"))
 		fmt.Printf("    %-18s %s\n", dim("received"), fmtNum(ingest["otlp"]))
 
 		fmt.Println()
-		fmt.Printf("  %s\n", dim("traces (OTLP :4317)"))
+		fmt.Printf("  %s\n", dim("traces (OTLP :4317 gRPC, :4318 HTTP)"))
 		fmt.Printf("    %-18s %s\n", dim("received"), fmtNum(ingest["grpc"]))
 
 		totalAll := ingest["metrics"] + ingest["otlp"] + ingest["grpc"]

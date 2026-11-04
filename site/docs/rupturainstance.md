@@ -84,7 +84,15 @@ spec:
         clientCA: {configMapKeyRef: {name: otel-ca, key: ca.crt}}
 ```
 
-The receiver speaks OTLP over HTTP on port 4317. Point an `otlphttp` exporter at `https://<instance>.<namespace>.svc:4317/otlp`. With `clientCA`, clients must present a certificate signed by it.
+The engine receives data the standard way, so an OpenTelemetry Collector or a Prometheus needs no special setting:
+
+| Protocol | Port | Collector or Prometheus setting |
+|---|---|---|
+| OTLP gRPC | 4317 | `otlp` exporter, `endpoint: <instance>.<namespace>.svc:4317` |
+| OTLP HTTP, protobuf or JSON, gzip | 4318 | `otlphttp` exporter, `endpoint: https://<instance>.<namespace>.svc:4318` |
+| Prometheus remote write 1.0 | 4318 | `remote_write: url: https://<instance>.<namespace>.svc:4318/api/v1/write` |
+
+TLS applies to both ports. With `clientCA`, clients must present a certificate signed by it. Over the ingest rate (`RUPTURA_INGEST_RPS`), gRPC answers `RESOURCE_EXHAUSTED` and HTTP answers 429 with `Retry-After`, which exporters retry.
 
 ## Secrets and ConfigMaps
 

@@ -234,7 +234,7 @@ spec:
                             serviceAccountToken: {type: boolean, enum: [true]}
                     otlp:
                       type: object
-                      description: "OTLP receiver on port 4317, OTLP over HTTP."
+                      description: "OTLP receiver: gRPC on 4317, HTTP and Prometheus remote write on 4318."
                       properties:
                         tls:
                           type: object

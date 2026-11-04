@@ -42,7 +42,8 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           args:
             - --port={{ .Values.ports.api }}
-            - --otlp-port={{ .Values.ports.otlp }}
+            - --otlp-grpc-port={{ .Values.ports.otlpGrpc }}
+            - --otlp-http-port={{ .Values.ports.otlpHttp }}
             - --storage=/var/lib/ruptura/data
             {{- if or .Values.apiKey .Values.autoGenerateApiKey }}
             - --api-key=$(RUPTURA_API_KEY)
@@ -51,8 +52,11 @@ spec:
             - name: api
               containerPort: {{ .Values.ports.api }}
               protocol: TCP
-            - name: otlp
-              containerPort: {{ .Values.ports.otlp }}
+            - name: otlp-grpc
+              containerPort: {{ .Values.ports.otlpGrpc }}
+              protocol: TCP
+            - name: otlp-http
+              containerPort: {{ .Values.ports.otlpHttp }}
               protocol: TCP
           env:
             {{- if or .Values.apiKey .Values.autoGenerateApiKey }}
