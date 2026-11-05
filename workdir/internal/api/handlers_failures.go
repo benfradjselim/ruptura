@@ -23,6 +23,7 @@ const (
 type FailureResult struct {
 	Level             string   `json:"level"`
 	Target            string   `json:"target"`
+	Workload          string   `json:"workload"`
 	Pod               string   `json:"pod,omitempty"`
 	FailureMode       string   `json:"failureMode"`
 	Kind              string   `json:"kind"`
@@ -138,7 +139,7 @@ func failureEvidence(est failuremodes.Estimate) []string {
 // failureResult builds the result for a workload. It returns nil when no failure
 // is known, so an anomaly is never presented as a diagnosed failure.
 func failureResult(workload, state string, est *failuremodes.Estimate, crashLoop bool) *FailureResult {
-	result := FailureResult{Level: failureLevelWorkload, Target: workload, State: state}
+	result := FailureResult{Level: failureLevelWorkload, Target: workload, Workload: workload, State: state}
 	switch {
 	case crashLoop:
 		result.FailureMode = failureModeCrashLoop

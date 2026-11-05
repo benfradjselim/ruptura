@@ -118,6 +118,7 @@ export const api = {
   // ── Fleet ──────────────────────────────────────────────────────────────────
   fleet: () => req('GET', '/fleet'),
   failures: () => req('GET', '/failures'),
+  failureSeries: (workload) => req('GET', `/failures/series?workload=${encodeURIComponent(workload)}`),
   inputs: () => req('GET', '/inputs'),
   trackRecord: () => req('GET', '/track-record'),
   coverage: () => req('GET', '/coverage'),
