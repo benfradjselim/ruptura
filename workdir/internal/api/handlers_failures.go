@@ -29,6 +29,8 @@ type FailureResult struct {
 	Kind              string   `json:"kind"`
 	State             string   `json:"state"`
 	ETASeconds        int      `json:"etaSeconds,omitempty"`
+	ETAEarlySeconds   int      `json:"etaEarlySeconds,omitempty"`
+	ETALateSeconds    int      `json:"etaLateSeconds,omitempty"`
 	Confidence        float64  `json:"confidence,omitempty"`
 	RecommendedAction string   `json:"recommendedAction"`
 	Evidence          []string `json:"evidence,omitempty"`
@@ -159,6 +161,8 @@ func failureResult(workload, state string, est *failuremodes.Estimate, crashLoop
 		case failuremodes.ModeSaturation, failuremodes.ModeRecurrentFailure, failuremodes.ModeReleaseRegression, failuremodes.ModeReplicaDivergence:
 			result.Kind = failureKindPredicted
 			result.ETASeconds = int(est.ETF.Seconds())
+			result.ETAEarlySeconds = int(est.ETFEarly.Seconds())
+			result.ETALateSeconds = int(est.ETFLate.Seconds())
 		}
 	}
 	return &result

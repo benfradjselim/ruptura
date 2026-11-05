@@ -56,5 +56,8 @@ func TestReplicaDivergence(t *testing.T) {
 		if est.Pod != "ns/app-a-2" || at > 15 || est.Siblings != 2 || est.ETF <= 0 || est.ETF > releaseHorizon {
 			t.Errorf("%s: estimate %+v at %.1f min", tc.name, est, at)
 		}
+		if est.ETFEarly <= 0 || est.ETFEarly > est.ETF || est.ETFLate < est.ETF {
+			t.Errorf("%s: band %v to %v does not surround %v", tc.name, est.ETFEarly, est.ETFLate, est.ETF)
+		}
 	}
 }

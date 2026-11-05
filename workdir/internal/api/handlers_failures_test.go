@@ -11,7 +11,7 @@ import (
 )
 
 func TestFailureResult(t *testing.T) {
-	saturation := failuremodes.Estimate{Mode: failuremodes.ModeSaturation, Pod: "n/p", ETF: 12 * time.Minute, Confidence: 0.8, Usage: 900}
+	saturation := failuremodes.Estimate{Mode: failuremodes.ModeSaturation, Pod: "n/p", ETF: 12 * time.Minute, ETFEarly: 9 * time.Minute, ETFLate: 16 * time.Minute, Confidence: 0.8, Usage: 900}
 	throttled := failuremodes.Estimate{Mode: failuremodes.ModeCPUThrottling, Pod: "n/p", Confidence: 1, Usage: 0.4}
 	regression := failuremodes.Estimate{Mode: failuremodes.ModeReleaseRegression, Pod: "n/p", ETF: 50 * time.Minute, Confidence: 1, Version: "w-2", PreviousVersion: "w-1"}
 	divergent := failuremodes.Estimate{Mode: failuremodes.ModeReplicaDivergence, Pod: "n/p", ETF: 40 * time.Minute, Confidence: 1}
@@ -44,6 +44,9 @@ func TestFailureResult(t *testing.T) {
 		}
 		if got.FailureMode != c.wantMode || got.Kind != c.wantKind || got.ETASeconds != c.wantETA {
 			t.Errorf("%s: got %+v", c.name, got)
+		}
+		if c.est == &saturation && !c.crashLoop && (got.ETAEarlySeconds != 540 || got.ETALateSeconds != 960) {
+			t.Errorf("%s: band %d to %d", c.name, got.ETAEarlySeconds, got.ETALateSeconds)
 		}
 		if got.Level != "workload" || got.Target != "n/Deployment/w" || got.Workload != "n/Deployment/w" || got.State != "critical" || got.RecommendedAction == "" {
 			t.Errorf("%s: incomplete result %+v", c.name, got)

@@ -71,4 +71,23 @@ describe('forecastGeometry', () => {
     expect(g.limitY).toBeLessThan(200)
     expect(g.yTicks.at(-1).label).toBe('100%')
   })
+
+  it('spans the band between the earliest and latest failure', () => {
+    const g = geometry([{ pod: 'p', points: ramp(0.5, 0.8) }], { failureMode: 'saturation', pod: 'p', etaSeconds: 1200, etaEarlySeconds: 900, etaLateSeconds: 1500 })
+    const xs = g.band.split(' ').map(pt => Number(pt.split(',')[0]))
+    expect(Math.min(...xs)).toBeCloseTo(g.nowX, 0)
+    expect(Math.max(...xs)).toBeGreaterThan(g.eta.x)
+    expect(g.range.from).not.toBe(g.range.to)
+  })
+
+  it('keeps an unknown latest failure open to the right edge', () => {
+    const g = geometry([{ pod: 'p', points: ramp(0.5, 0.8) }], { failureMode: 'saturation', pod: 'p', etaSeconds: 1200, etaEarlySeconds: 900 })
+    expect(g.band).toContain('400.0')
+    expect(g.range.to).toBeNull()
+  })
+
+  it('draws no band without a measured spread', () => {
+    const g = geometry([{ pod: 'p', points: ramp(0.5, 0.8) }], { failureMode: 'saturation', pod: 'p', etaSeconds: 1200 })
+    expect(g.band).toBeNull()
+  })
 })

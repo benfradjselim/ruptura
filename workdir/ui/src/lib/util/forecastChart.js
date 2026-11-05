@@ -47,6 +47,8 @@ function relative(ms) {
  */
 export function forecastGeometry({ pods, failure, failureTimes = [], now, width, height, pad = { left: 44, right: 14, top: 12, bottom: 22 } }) {
   const etaMs = (failure.etaSeconds || 0) * 1000
+  const earlyMs = (failure.etaEarlySeconds || 0) * 1000
+  const lateMs = (failure.etaLateSeconds || 0) * 1000
   const t0 = now - PAST_MS
   const t1 = now + futureSpan(etaMs)
   const visible = pods.map(p => ({ ...p, points: p.points.filter(pt => pt.t >= t0 && pt.t <= now) }))
@@ -65,19 +67,22 @@ export function forecastGeometry({ pods, failure, failureTimes = [], now, width,
     .sort((a, b) => Number(a.highlight) - Number(b.highlight))
 
   const failAt = etaMs > 0 ? now + etaMs : null
-  let projection = null
+  let projection = null, band = null
   const lead = visible.find(p => p.points.length > 0 && (p.pod === failure.pod || (single && !failure.pod)))
   if (failAt && TREND_MODES.includes(failure.failureMode) && lead) {
     const last = lead.points[lead.points.length - 1]
     const endT = Math.min(failAt, t1)
     const endU = failAt === last.t ? LIMIT : last.usage + ((LIMIT - last.usage) * (endT - last.t)) / (failAt - last.t)
     projection = { x1: x(last.t), y1: y(last.usage), x2: x(endT), y2: y(endU) }
+    if (earlyMs > 0) band = bandPolygon(last, now + earlyMs, lateMs > 0 ? now + lateMs : null, t1, x, y)
   }
 
   return {
     width, height, pad,
     lines,
     projection,
+    band,
+    range: band && earlyMs > 0 ? { from: clock(now + earlyMs), to: lateMs > 0 ? clock(now + lateMs) : null } : null,
     limitY: y(LIMIT),
     nowX: x(now),
     eta: failAt && failAt <= t1 ? { x: x(failAt), label: clock(failAt) } : null,
@@ -86,4 +91,24 @@ export function forecastGeometry({ pods, failure, failureTimes = [], now, width,
     xTicks: [t0, now, t1].map(t => ({ x: x(t), label: relative(t - now) })),
     empty: lines.length === 0,
   }
+}
+
+// Point of a straight trend from last that reaches the limit at failAt, at t.
+function onTrend(last, failAt, t) {
+  return failAt === last.t ? LIMIT : last.usage + ((LIMIT - last.usage) * (t - last.t)) / (failAt - last.t)
+}
+
+// Area between the fastest and slowest trends the readings agree on, capped by
+// the limit and the right edge. An unknown latest failure stays flat.
+function bandPolygon(last, earlyAt, lateAt, t1, x, y) {
+  const end = t => Math.min(t, t1)
+  const pts = [[last.t, last.usage], [end(earlyAt), onTrend(last, earlyAt, end(earlyAt))]]
+  if (lateAt === null) {
+    if (earlyAt < t1) pts.push([t1, LIMIT])
+    pts.push([t1, last.usage])
+  } else {
+    if (earlyAt < t1) pts.push([end(lateAt), LIMIT])
+    pts.push([end(lateAt), onTrend(last, lateAt, end(lateAt))])
+  }
+  return pts.map(([t, u]) => `${x(t).toFixed(1)},${y(u).toFixed(1)}`).join(' ')
 }

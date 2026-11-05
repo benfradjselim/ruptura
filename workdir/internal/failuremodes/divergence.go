@@ -38,9 +38,10 @@ func (s *releaseState) divergence(now time.Time) (Estimate, bool) {
 			continue
 		}
 		rates := map[string]float64{}
+		bands := map[string][2]float64{}
 		for _, name := range names {
-			if r, ok := rate(s.pods[name].samples, now.Add(-divergenceWindow)); ok {
-				rates[name] = r
+			if r, low, high, ok := rateBand(s.pods[name].samples, now.Add(-divergenceWindow)); ok {
+				rates[name], bands[name] = r, [2]float64{low, high}
 			}
 		}
 		for _, name := range names {
@@ -73,7 +74,8 @@ func (s *releaseState) divergence(now time.Time) (Estimate, bool) {
 			if now.Sub(p.divergentSince) < divergenceSustain || etf > releaseHorizon {
 				continue
 			}
-			est := Estimate{Mode: ModeReplicaDivergence, Pod: name, ETF: etf, Confidence: 1, Usage: last / p.capacity,
+			early, late := failureBand(p.capacity-last, bands[name][0], bands[name][1])
+			est := Estimate{Mode: ModeReplicaDivergence, Pod: name, ETF: etf, ETFEarly: early, ETFLate: late, Confidence: 1, Usage: last / p.capacity,
 				Version: version, Rate: r, PreviousRate: others[len(others)/2], Siblings: len(others)}
 			if !found || est.ETF < best.ETF {
 				best, found = est, true

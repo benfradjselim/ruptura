@@ -34,6 +34,7 @@
       {#each g.lines as line (line.pod)}
         <path class="series" class:hot={line.highlight} d={line.d}><title>{short(line.pod)}</title></path>
       {/each}
+      {#if g.band}<polygon class="band" points={g.band} />{/if}
       {#if g.projection}
         <line class="projection" x1={g.projection.x1} y1={g.projection.y1} x2={g.projection.x2} y2={g.projection.y2} />
       {/if}
@@ -46,11 +47,15 @@
         <text class="label" x={tick.x} y={height - 6} text-anchor={i === 0 ? 'start' : i === g.xTicks.length - 1 ? 'end' : 'middle'}>{tick.label}</text>
       {/each}
     </svg>
+    {#if !compact && g.range}
+      <p class="range">Failure expected between <strong>{g.range.from}</strong> and <strong>{g.range.to || 'later'}</strong>, most likely <strong>{g.eta ? g.eta.label : ''}</strong></p>
+    {/if}
     {#if !compact}
       <figcaption>
         <span class="key hot"></span>{failure.pod ? short(failure.pod) : 'workload'}
         {#if siblings > 0}<span class="key"></span>{siblings} other replica{siblings > 1 ? 's' : ''}{/if}
         {#if g.projection}<span class="key dash"></span>trend Ruptura reads{/if}
+        {#if g.band}<span class="key area"></span>range of trends{/if}
         {#if g.failures.length}<span class="key fail"></span>past failure{/if}
       </figcaption>
     {/if}
@@ -71,6 +76,10 @@
   .past-failure { stroke: var(--red); stroke-width: 2; opacity: 0.45; }
   .series { fill: none; stroke: var(--text-3); stroke-width: 1.5; opacity: 0.7; stroke-linejoin: round; }
   .series.hot { stroke: var(--amber); stroke-width: 2.5; opacity: 1; }
+  .band { fill: var(--amber); opacity: 0.16; }
+  .range { margin-top: 8px; font: 400 12px var(--font-mono); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .range strong { color: var(--text); font-weight: 600; }
+  .key.area { height: 10px; border-top: 0; background: var(--amber); opacity: 0.3; }
   .projection { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 5; }
   .eta { stroke: var(--red); stroke-width: 1; opacity: 0.5; }
   .eta-dot { fill: var(--red); }
