@@ -74,7 +74,7 @@ jobs:
 
       - name: "Feed a sustained simulated rupture (payment-api: high error rate + contagion)"
         run: |
-          kubectl -n ruptura-system port-forward svc/ruptura-otlp 31470:4317 &
+          kubectl -n ruptura-system port-forward svc/ruptura-otlp 31470:4318 &
           sleep 3
           # Run long enough for the pipeline's z-score/MAD/seasonal detectors
           # to establish a baseline and then register payment-api's error

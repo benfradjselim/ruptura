@@ -96,7 +96,7 @@ jobs:
       #    of "<node-ip>:31470" on a real cluster). ─────────────────────────
       - name: Send synthetic workloads (README command, port-forwarded)
         run: |
-          kubectl -n ruptura-system port-forward svc/ruptura-otlp 31470:4317 &
+          kubectl -n ruptura-system port-forward svc/ruptura-otlp 31470:4318 &
           sleep 3
           # simulate.py runs an infinite tick loop by design; `timeout` bounds it
           # to a few ticks for CI. Exit code 124 (timeout fired) is the expected,
