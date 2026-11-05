@@ -2,14 +2,29 @@
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
   import { formatEta, sortFailures, missingRoles, horizonClusters, pastPlacement, relatedEvents } from '../lib/util/failures.js'
+  import { hasForecastChart } from '../lib/util/forecastChart.js'
+  import ForecastChart from '../lib/components/ForecastChart.svelte'
 
   const REFRESH_MS = 15000
   const HORIZON_SECONDS = 30 * 60
   const PAST_MINUTES = 30
   const TICKS = ['-30 min', '-15 min', 'Now', '+15 min', '+30 min']
   const MAX_TAG_NAMES = 6
+  const MAX_CHARTS = 8
+  const MINUTE_MS = 60 * 1000
 
   let failures = [], missing = [], record = null, protection = null, history = [], selected = null, loading = true, error = '', timer
+  let series = {}, readAt = Date.now()
+
+  async function loadSeries(found) {
+    const workloads = [...new Set(found.filter(hasForecastChart).map(f => f.workload).filter(Boolean))].slice(0, MAX_CHARTS)
+    const entries = await Promise.all(workloads.map(w => api.failureSeries(w).then(r => [w, r.pods || []]).catch(() => [w, null])))
+    return Object.fromEntries(entries.filter(([, pods]) => pods))
+  }
+
+  const failureTimes = workload => history
+    .filter(e => e.type === 'failure' && e.target === workload)
+    .map(e => readAt - e.minutesAgo * MINUTE_MS)
 
   async function load() {
     try {
@@ -21,6 +36,8 @@
         api.eventHistory().catch(() => []),
       ])
       failures = sortFailures(found || [])
+      series = await loadSeries(failures)
+      readAt = Date.now()
       missing = missingRoles(inputs || [])
       record = track
       protection = coverage
@@ -108,6 +125,11 @@
               {/each}
               <p>{failure.recommendedAction}</p>
             </div>
+            {#if series[failure.workload]}
+              <div class="chart">
+                <ForecastChart compact height={96} pods={series[failure.workload]} {failure} failureTimes={failureTimes(failure.workload)} now={readAt} />
+              </div>
+            {/if}
           </li>
         {/each}
       </ol>
@@ -115,12 +137,16 @@
   {/if}
 
   {#if selected}
-    {@const events = relatedEvents(history, selected.target)}
+    {@const events = relatedEvents(history, selected.workload || selected.target)}
     <aside class="drawer" aria-label="Failure details">
       <button class="close" on:click={() => (selected = null)}>Close</button>
       <p class="eyebrow">{label(selected.failureMode)} · {selected.kind}</p>
       <h2>{name(selected.target)}</h2>
       <p class="scope">{scope(selected.target)}</p>
+      {#if series[selected.workload]}
+        <h3>Memory and forecast</h3>
+        <ForecastChart height={240} pods={series[selected.workload]} failure={selected} failureTimes={failureTimes(selected.workload)} now={readAt} />
+      {/if}
       <h3>Why Ruptura says this</h3>
       {#each selected.evidence || [] as fact}<p class="fact">{fact}</p>{/each}
       {#if selected.pod}<p class="scope">Pod {selected.pod.split('/').pop()}</p>{/if}
@@ -216,6 +242,7 @@
     clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
   }
   .ruptures li.critical { border-left-color: var(--red); }
+  .ruptures .chart { grid-column: 1 / -1; margin-top: -4px; }
   .time strong { display: block; font: 500 24px/30px var(--font-mono); font-variant-numeric: tabular-nums; }
   .critical .time strong { color: var(--red); }
   .time span { font: 400 12px var(--font-mono); color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; }
@@ -228,7 +255,7 @@
   .open:hover { background: var(--accent-dim); }
   .open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .drawer {
-    position: fixed; top: 60px; right: 0; bottom: 0; width: 420px; z-index: 30; overflow-y: auto;
+    position: fixed; top: 60px; right: 0; bottom: 0; width: 540px; z-index: 30; overflow-y: auto;
     padding: 28px; background: var(--surface); border-left: 2px solid var(--accent);
   }
   .drawer h2 { font-size: 26px; line-height: 32px; margin-top: 4px; }

@@ -45,7 +45,7 @@ func TestFailureResult(t *testing.T) {
 		if got.FailureMode != c.wantMode || got.Kind != c.wantKind || got.ETASeconds != c.wantETA {
 			t.Errorf("%s: got %+v", c.name, got)
 		}
-		if got.Level != "workload" || got.Target != "n/Deployment/w" || got.State != "critical" || got.RecommendedAction == "" {
+		if got.Level != "workload" || got.Target != "n/Deployment/w" || got.Workload != "n/Deployment/w" || got.State != "critical" || got.RecommendedAction == "" {
 			t.Errorf("%s: incomplete result %+v", c.name, got)
 		}
 	}

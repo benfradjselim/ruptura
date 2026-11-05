@@ -43,6 +43,7 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/kpi/{name}/{namespace}/{workload}", h.handleKPIByWorkload).Methods("GET")
 
 	api.HandleFunc("/failures", h.handleFailures).Methods("GET")
+	api.HandleFunc("/failures/series", h.handleFailureSeries).Methods("GET")
 	api.HandleFunc("/inputs", h.handleInputs).Methods("GET")
 	api.HandleFunc("/track-record", h.handleTrackRecord).Methods("GET")
 	api.HandleFunc("/coverage", h.handleCoverage).Methods("GET")
