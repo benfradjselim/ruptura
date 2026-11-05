@@ -24,9 +24,13 @@ const (
 
 // Estimate is a time-to-failure prediction.
 type Estimate struct {
-	Mode       Mode
-	Pod        string
-	ETF        time.Duration
+	Mode Mode
+	Pod  string
+	ETF  time.Duration
+	// ETFEarly and ETFLate bound ETF with the quartiles of the growth rates
+	// the readings show. Zero means unknown.
+	ETFEarly   time.Duration
+	ETFLate    time.Duration
 	Confidence float64
 	Usage      float64
 	// Reason is the Kubernetes event reason behind a detected failure.
@@ -84,7 +88,8 @@ func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, resta
 	if len(s.points) < saturationMinSamples || at.Sub(s.points[0].at) < saturationMinSpan {
 		return Estimate{}, false
 	}
-	slope, agree := theilSen(s.points)
+	slopes := pairSlopes(s.points)
+	slope, agree := theilSen(slopes)
 	if slope <= 0 || agree < saturationMinAgreeing {
 		return Estimate{}, false
 	}
@@ -96,7 +101,9 @@ func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, resta
 		remaining = 0
 	}
 	etf := time.Duration(remaining / slope * float64(time.Second))
-	return Estimate{Mode: ModeSaturation, ETF: etf, Confidence: agree, Usage: usage}, true
+	low, high := slopeBand(slopes)
+	early, late := failureBand(remaining, low, high)
+	return Estimate{Mode: ModeSaturation, ETF: etf, ETFEarly: early, ETFLate: late, Confidence: agree, Usage: usage}, true
 }
 
 // minHalfRise is the share of the expected rise each half of the window must show.
@@ -138,23 +145,13 @@ func average(points []point) float64 {
 	return sum / float64(len(points))
 }
 
-// theilSen returns the median pairwise slope in usage per second and the
-// fraction of changing pairs that rise. Flat pairs are ignored, because a leak
-// that grows in steps has long plateaus.
-func theilSen(points []point) (float64, float64) {
-	var slopes []float64
-	for i := 0; i < len(points); i++ {
-		for j := i + 1; j < len(points); j++ {
-			dt := points[j].at.Sub(points[i].at).Seconds()
-			if dt > 0 {
-				slopes = append(slopes, (points[j].usage-points[i].usage)/dt)
-			}
-		}
-	}
+// theilSen returns the median of sorted pairwise slopes, in usage per second,
+// and the fraction of changing pairs that rise. Flat pairs are ignored, because
+// a leak that grows in steps has long plateaus.
+func theilSen(slopes []float64) (float64, float64) {
 	if len(slopes) == 0 {
 		return 0, 0
 	}
-	sort.Float64s(slopes)
 	median := slopes[len(slopes)/2]
 	if len(slopes)%2 == 0 {
 		median = (slopes[len(slopes)/2-1] + slopes[len(slopes)/2]) / 2

@@ -56,6 +56,12 @@ func newReleaseState() *releaseState {
 
 // rate is the Theil-Sen slope, in bytes per second, of the samples after from.
 func rate(samples []point, from time.Time) (float64, bool) {
+	r, _, _, ok := rateBand(samples, from)
+	return r, ok
+}
+
+// rateBand is rate with the first and third quartiles of the pairwise slopes.
+func rateBand(samples []point, from time.Time) (median, low, high float64, ok bool) {
 	var pts []point
 	for _, p := range samples {
 		if !p.at.Before(from) {
@@ -63,21 +69,14 @@ func rate(samples []point, from time.Time) (float64, bool) {
 		}
 	}
 	if len(pts) < 5 {
-		return 0, false
+		return 0, 0, 0, false
 	}
-	var slopes []float64
-	for i := range pts {
-		for j := i + 1; j < len(pts); j++ {
-			if dt := pts[j].at.Sub(pts[i].at).Seconds(); dt > 0 {
-				slopes = append(slopes, (pts[j].usage-pts[i].usage)/dt)
-			}
-		}
-	}
+	slopes := pairSlopes(pts)
 	if len(slopes) == 0 {
-		return 0, false
+		return 0, 0, 0, false
 	}
-	sort.Float64s(slopes)
-	return slopes[len(slopes)/2], true
+	low, high = slopeBand(slopes)
+	return slopes[len(slopes)/2], low, high, true
 }
 
 func (s *releaseState) observe(pod, version string, at time.Time, usage, capacity float64) {
@@ -144,7 +143,7 @@ func (s *releaseState) estimate(now time.Time) (Estimate, bool) {
 		if p.version != newest || now.Sub(p.first) < releaseMinAge || p.capacity <= 0 || len(p.samples) == 0 {
 			continue
 		}
-		r, ok := rate(p.samples, now.Add(-releaseWindow))
+		r, low, high, ok := rateBand(p.samples, now.Add(-releaseWindow))
 		last := p.samples[len(p.samples)-1].usage
 		regressing := ok && r > releaseFactor*reference && last < p.capacity
 		if !regressing {
@@ -158,7 +157,8 @@ func (s *releaseState) estimate(now time.Time) (Estimate, bool) {
 		if now.Sub(p.since) < releaseSustain || etf > releaseHorizon {
 			continue
 		}
-		est := Estimate{Mode: ModeReleaseRegression, Pod: name, ETF: etf, Confidence: 1, Usage: last / p.capacity,
+		early, late := failureBand(p.capacity-last, low, high)
+		est := Estimate{Mode: ModeReleaseRegression, Pod: name, ETF: etf, ETFEarly: early, ETFLate: late, Confidence: 1, Usage: last / p.capacity,
 			Version: newest, PreviousVersion: previous, Rate: r, PreviousRate: s.profiles[previous].rate}
 		if !found || est.ETF < best.ETF {
 			best, found = est, true
