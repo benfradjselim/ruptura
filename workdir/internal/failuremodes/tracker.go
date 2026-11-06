@@ -28,6 +28,7 @@ type podState struct {
 
 	eventSeen   time.Time
 	eventReason string
+	backOffSeen time.Time
 	lastOOM     bool
 }
 
@@ -208,6 +209,9 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 		consider(est)
 	}
 	if est, ok := t.recurrenceEstimate(workload, now); ok {
+		if t.lastExitOOM(workload) {
+			est.Reason = OOMReason
+		}
 		consider(est)
 	}
 	return worst, found
@@ -237,7 +241,7 @@ func (t *Tracker) Prune(cutoff time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for pod, state := range t.pods {
-		if state.seen.Before(cutoff) && state.condSeen.Before(cutoff) && state.eventSeen.Before(cutoff) {
+		if state.seen.Before(cutoff) && state.condSeen.Before(cutoff) && state.eventSeen.Before(cutoff) && state.backOffSeen.Before(cutoff) {
 			delete(t.pods, pod)
 			delete(t.versions, pod)
 		}

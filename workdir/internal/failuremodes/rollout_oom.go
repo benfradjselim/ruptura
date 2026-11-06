@@ -53,3 +53,17 @@ func (s *podState) oomEstimate(pod string, now time.Time) (Estimate, bool) {
 	}
 	return Estimate{Mode: ModeOOMKilled, Pod: pod, Confidence: 1}, true
 }
+
+// OOMReason marks a recurrent failure whose last exits were OOM kills.
+const OOMReason = "OOMKilled"
+
+// lastExitOOM reports whether a pod of workload last exited on an OOM kill. The
+// caller holds the lock.
+func (t *Tracker) lastExitOOM(workload string) bool {
+	for _, state := range t.pods {
+		if state.workload == workload && state.lastOOM {
+			return true
+		}
+	}
+	return false
+}

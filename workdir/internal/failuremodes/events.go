@@ -41,9 +41,28 @@ func startupFailure(reason, message string) (string, bool) {
 	return "", false
 }
 
+// crashBackOffMaxAge is how long a crash back-off event keeps a workload in a
+// crash loop. Kubernetes repeats it at each back-off, up to every 5 minutes.
+const crashBackOffMaxAge = 10 * time.Minute
+
+// crashBackOff reports the event Kubernetes sends when it delays restarting a
+// container that keeps failing, the CrashLoopBackOff state.
+func crashBackOff(reason, message string) bool {
+	return reason == "BackOff" && strings.Contains(message, "restarting failed container")
+}
+
 // ObserveEvent records a Kubernetes warning event for a pod of workload.
-// Reasons that do not block a start are ignored.
+// Reasons that neither block a start nor signal a crash back-off are ignored.
 func (t *Tracker) ObserveEvent(workload, pod, reason, message string, at time.Time) {
+	if crashBackOff(reason, message) {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		state := t.podLocked(workload, pod)
+		if at.After(state.backOffSeen) {
+			state.backOffSeen = at
+		}
+		return
+	}
 	cause, ok := startupFailure(reason, message)
 	if !ok {
 		return
@@ -55,4 +74,16 @@ func (t *Tracker) ObserveEvent(workload, pod, reason, message string, at time.Ti
 		state.eventSeen = at
 		state.eventReason = cause
 	}
+}
+
+// CrashBackOff reports whether a pod of workload is in a crash back-off now.
+func (t *Tracker) CrashBackOff(workload string, now time.Time) bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	for _, state := range t.pods {
+		if state.workload == workload && !state.backOffSeen.IsZero() && now.Sub(state.backOffSeen) <= crashBackOffMaxAge {
+			return true
+		}
+	}
+	return false
 }
