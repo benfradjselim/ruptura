@@ -33,7 +33,8 @@ type Estimate struct {
 	ETFLate    time.Duration
 	Confidence float64
 	Usage      float64
-	// Reason is the Kubernetes event reason behind a detected failure.
+	// Reason is the Kubernetes event reason behind a detected failure, or
+	// OOMReason on a recurrent failure explained by OOM kills.
 	Reason string
 	// Interval and Failures describe the rhythm of a recurrent failure.
 	Interval time.Duration

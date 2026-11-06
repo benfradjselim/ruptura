@@ -72,10 +72,20 @@ func (h *Handlers) stateRestarts(workload string, lifetime int) int {
 	if h.failureModes == nil {
 		return lifetime
 	}
-	if h.failureModes.RecentRestarts(workload, time.Now(), restartWindow) >= recentCrashLoopRestarts {
+	now := time.Now()
+	if h.failureModes.RecentRestarts(workload, now, restartWindow) >= recentCrashLoopRestarts {
+		return crashLoopRestartThreshold
+	}
+	if source, ok := h.failureModes.(CrashBackOffSource); ok && source.CrashBackOff(workload, now) {
 		return crashLoopRestartThreshold
 	}
 	return 0
+}
+
+// CrashBackOffSource reports workloads Kubernetes holds in CrashLoopBackOff,
+// which it signals before restarts pile up.
+type CrashBackOffSource interface {
+	CrashBackOff(workload string, now time.Time) bool
 }
 
 // baseRisk returns the risk before failure modes apply. A tracked workload
@@ -176,6 +186,9 @@ func estimateAction(est failuremodes.Estimate) string {
 	}
 	if est.Mode == failuremodes.ModeReleaseRegression {
 		return "Roll back to " + est.PreviousVersion + " or fix the memory growth of " + est.Version
+	}
+	if est.Mode == failuremodes.ModeRecurrentFailure && est.Reason == failuremodes.OOMReason {
+		return "Raise the memory limit or find the memory spike before the next OOM kill"
 	}
 	if est.Mode == failuremodes.ModeRecurrentFailure {
 		return "Find what restarts this workload before the next failure"

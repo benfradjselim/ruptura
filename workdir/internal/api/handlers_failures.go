@@ -119,7 +119,11 @@ func failureEvidence(est failuremodes.Estimate) []string {
 	case failuremodes.ModeReplicasUnavailable:
 		return []string{fmt.Sprintf("%s unavailable for over 5 minutes", replicaCount(int(est.Usage)))}
 	case failuremodes.ModeRecurrentFailure:
-		return []string{fmt.Sprintf("%d failures, about every %d min", est.Failures, int(math.Round(est.Interval.Minutes())))}
+		rhythm := fmt.Sprintf("%d failures, about every %d min", est.Failures, int(math.Round(est.Interval.Minutes())))
+		if est.Reason == failuremodes.OOMReason {
+			return []string{rhythm, "Last exit was OOMKilled"}
+		}
+		return []string{rhythm}
 	case failuremodes.ModeRolloutStuck:
 		return []string{"Rollout passed its progress deadline"}
 	case failuremodes.ModeReplicaDivergence:
@@ -145,7 +149,7 @@ func failureEvidence(est failuremodes.Estimate) []string {
 func failureResult(workload, state string, est *failuremodes.Estimate, crashLoop bool) *FailureResult {
 	result := FailureResult{Level: failureLevelWorkload, Target: workload, Workload: workload, State: state}
 	switch {
-	case crashLoop:
+	case crashLoop && !oomExplained(est):
 		result.FailureMode = failureModeCrashLoop
 		result.Kind = failureKindDetected
 		result.RecommendedAction = "Read the logs of the previous container and fix the startup failure"
@@ -280,4 +284,13 @@ func (h *Handlers) handleTrackRecord(w http.ResponseWriter, _ *http.Request) {
 		response.MedianLeadSeconds = int(record.MedianLead.Seconds())
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+// oomExplained reports a crash loop caused by OOM kills. Its forecast of the next
+// kill, or the OOM diagnosis, says more than a generic crash loop.
+func oomExplained(est *failuremodes.Estimate) bool {
+	if est == nil {
+		return false
+	}
+	return est.Mode == failuremodes.ModeOOMKilled || (est.Mode == failuremodes.ModeRecurrentFailure && est.Reason == failuremodes.OOMReason)
 }
