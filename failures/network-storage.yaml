@@ -1,0 +1,143 @@
+- id: service-without-endpoints
+  title: Service with no ready endpoint
+  level: network
+  symptom: A Service selects no ready pod
+  impact: Every caller of the Service fails
+  detect:
+    inputs: [kube_endpoint_address, Service selector]
+    rule: Zero ready addresses for a Service that has callers
+  predict:
+    possible: partial
+    precursor: The failures of the pods behind it
+  propagates_to: [callers of the Service]
+  action: Fix the selector or the pods behind it
+  sources: [Kubernetes Endpoints]
+  ruptura: {status: not-covered}
+
+- id: dependency-call-failures
+  title: Calls to a dependency fail
+  level: network
+  symptom: Connection refused, timeouts or resets toward one Service
+  impact: The caller errors or queues
+  detect:
+    inputs: [traces, service mesh request metrics, kernel TCP events]
+    rule: Error or reset rate toward one destination
+  predict:
+    possible: partial
+    precursor: The failure of the dependency, when it is predicted
+  propagates_to: [callers of the caller]
+  action: Fix the dependency, add a timeout and a fallback
+  sources: [OpenTelemetry span status, Istio request metrics]
+  ruptura: {status: planned}
+
+- id: dns-resolution-failures
+  title: DNS resolution fails
+  level: network
+  symptom: Lookups time out or return SERVFAIL
+  impact: Calls between services fail across namespaces
+  detect:
+    inputs: [coredns_dns_responses_total, kernel DNS events]
+    rule: SERVFAIL or timeout rate high
+  predict:
+    possible: partial
+    precursor: CoreDNS saturated or its upstream failing
+  propagates_to: [every workload that resolves names]
+  action: Check CoreDNS pods, their limits and upstream resolvers
+  sources: [CoreDNS CoreDNSErrorsHigh]
+  ruptura: {status: planned}
+
+- id: tcp-retransmits
+  title: Network retransmits rise
+  level: network
+  symptom: TCP retransmits and receive errors grow on a node or path
+  impact: Latency and timeouts for everything crossing that path
+  detect:
+    inputs: [node_netstat_Tcp_RetransSegs, node_network_receive_errs_total]
+    rule: Retransmit or error rate above its baseline
+  predict:
+    possible: partial
+    precursor: Errors growing on an interface
+  propagates_to: [pods of the node]
+  action: Check the interface, the MTU and the network fabric
+  sources: [node-exporter NodeNetworkReceiveErrs, node-exporter NodeNetworkTransmitErrs]
+  ruptura: {status: planned}
+
+- id: network-policy-blocks-traffic
+  title: NetworkPolicy blocks a needed call
+  level: network
+  symptom: A new or changed policy drops traffic between two workloads
+  impact: The caller times out
+  detect:
+    inputs: [NetworkPolicy changes, flow logs]
+    rule: Drops between workloads that called each other before
+  predict:
+    possible: no
+    precursor: None, a policy change is the cause
+  propagates_to: [callers of the blocked workload]
+  action: Allow the call in the policy or revert the change
+  sources: [Kubernetes NetworkPolicy]
+  ruptura: {status: not-covered}
+
+- id: route-without-backend
+  title: Route or Ingress has no healthy backend
+  level: network
+  symptom: External traffic gets 503 from the router
+  impact: Users see the outage
+  detect:
+    inputs: [Route or Ingress backend Service, kube_endpoint_address]
+    rule: Backend Service without ready endpoint
+  predict:
+    possible: partial
+    precursor: The failures of the pods behind the Service
+  propagates_to: [users]
+  action: Fix the backend pods or the Route target
+  sources: [OpenShift Route, Kubernetes Ingress]
+  ruptura: {status: not-covered}
+
+- id: pvc-pending
+  title: PersistentVolumeClaim stays Pending
+  level: storage
+  symptom: No volume binds, the storage class cannot provision
+  impact: Pods that need the claim never start
+  detect:
+    inputs: [kube_persistentvolumeclaim_status_phase]
+    rule: Phase Pending for a sustained time
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [pods using the claim]
+  action: Check the storage class, its provisioner and capacity
+  sources: [Kubernetes PersistentVolumeClaim phase]
+  ruptura: {status: not-covered}
+
+- id: persistent-volume-filling
+  title: Persistent volume filling up
+  level: storage
+  symptom: Free space on a volume falls
+  impact: The database or queue on it stops writing
+  detect:
+    inputs: [kubelet_volume_stats_available_bytes, kubelet_volume_stats_capacity_bytes]
+    rule: Free space below a threshold
+  predict:
+    possible: yes
+    precursor: Steady fall of free space, hours or days ahead
+  propagates_to: [pods using the volume, their callers]
+  action: Grow the volume or clean old data
+  sources: [kubernetes-mixin KubePersistentVolumeFillingUp]
+  ruptura: {status: planned}
+
+- id: persistent-volume-errors
+  title: Persistent volume in error
+  level: storage
+  symptom: Volume phase Failed or Pending
+  impact: Data not reachable for its pods
+  detect:
+    inputs: [kube_persistentvolume_status_phase]
+    rule: Phase Failed or Pending
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [pods using the volume]
+  action: Check the storage backend and the volume events
+  sources: [kubernetes-mixin KubePersistentVolumeErrors]
+  ruptura: {status: not-covered}

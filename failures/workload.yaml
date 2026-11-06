@@ -1,0 +1,143 @@
+- id: replicas-unavailable
+  title: Workload missing replicas
+  level: workload
+  symptom: Fewer available replicas than desired for a sustained time
+  impact: Less capacity, no redundancy left
+  detect:
+    inputs: [kube_deployment_spec_replicas, kube_deployment_status_replicas_available]
+    rule: Desired minus available above zero for 5 minutes
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [callers of the workload]
+  action: Check why the missing pods are not ready
+  sources: [kubernetes-mixin KubeDeploymentReplicasMismatch]
+  ruptura: {status: implemented, mode: replicas_unavailable}
+
+- id: statefulset-replicas-unavailable
+  title: StatefulSet missing replicas
+  level: workload
+  symptom: Fewer ready StatefulSet replicas than desired
+  impact: Quorum or shards at risk
+  detect:
+    inputs: [kube_statefulset_replicas, kube_statefulset_status_replicas_ready]
+    rule: Desired minus ready above zero for a sustained time
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [callers of the workload]
+  action: Check the missing ordinal, its volume and its node
+  sources: [kubernetes-mixin KubeStatefulSetReplicasMismatch]
+  ruptura: {status: implemented, mode: replicas_unavailable}
+
+- id: daemonset-pods-missing
+  title: DaemonSet missing on some nodes
+  level: workload
+  symptom: Fewer DaemonSet pods available than nodes that should run it
+  impact: Nodes without logging, networking or monitoring agents
+  detect:
+    inputs: [kube_daemonset_status_desired_number_scheduled, kube_daemonset_status_number_available]
+    rule: Desired minus available above zero for a sustained time
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [pods of the affected nodes]
+  action: Check taints, resources and pod errors on the missing nodes
+  sources: [kubernetes-mixin KubeDaemonSetRolloutStuck]
+  ruptura: {status: implemented, mode: replicas_unavailable}
+
+- id: rollout-stuck
+  title: Rollout passes its progress deadline
+  level: workload
+  symptom: New pods never become ready, Kubernetes sets Progressing to False
+  impact: The new version is not served, the old one stays at reduced headroom
+  detect:
+    inputs: [kube_deployment_status_condition Progressing]
+    rule: Progressing False with reason ProgressDeadlineExceeded
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [callers of the workload]
+  action: Inspect the new revision or roll back
+  sources: [kubernetes-mixin KubeDeploymentRolloutStuck]
+  ruptura: {status: tested, mode: rollout_stuck}
+
+- id: release-memory-regression
+  title: New release leaks memory the previous one did not
+  level: workload
+  symptom: After a rollout, the new version grows much faster than the previous one did
+  impact: OOM kills hours after a deploy that looked healthy
+  detect:
+    inputs: [container_memory_working_set_bytes, ReplicaSet of each pod]
+    rule: Growth rate of the new version several times the previous one's
+  predict:
+    possible: yes
+    precursor: The rate gap between versions, minutes after the rollout
+  propagates_to: [callers of the workload]
+  action: Roll back to the previous version or fix the new one
+  sources: [Kubernetes ReplicaSet revision]
+  ruptura: {status: implemented, mode: release_regression}
+
+- id: hpa-maxed-out
+  title: Autoscaler at its maximum
+  level: workload
+  symptom: The HorizontalPodAutoscaler wants more replicas than its maximum
+  impact: Load beyond capacity, latency and errors rise
+  detect:
+    inputs: [kube_horizontalpodautoscaler_status_current_replicas, kube_horizontalpodautoscaler_spec_max_replicas]
+    rule: Current replicas at maximum for a sustained time
+  predict:
+    possible: yes
+    precursor: Replica count climbing toward the maximum with daily load
+  propagates_to: [callers of the workload]
+  action: Raise the maximum, add capacity, or reduce load per request
+  sources: [kubernetes-mixin KubeHpaMaxedOut]
+  ruptura: {status: not-covered}
+
+- id: job-failed
+  title: Job fails
+  level: workload
+  symptom: The Job reaches its backoff limit
+  impact: Batch work not done, data not produced
+  detect:
+    inputs: [kube_job_failed, kube_job_status_failed]
+    rule: Job condition Failed
+  predict:
+    possible: partial
+    precursor: Duration or memory growing run after run
+  propagates_to: [consumers of the job's output]
+  action: Read the failed pod logs and fix the cause
+  sources: [kubernetes-mixin KubeJobFailed]
+  ruptura: {status: not-covered}
+
+- id: cronjob-not-running
+  title: CronJob misses its schedule
+  level: workload
+  symptom: No successful run in the expected interval, runs overlap or are suspended
+  impact: Scheduled work silently stops
+  detect:
+    inputs: [kube_cronjob_status_last_schedule_time, kube_cronjob_next_schedule_time]
+    rule: Last successful run older than the schedule allows
+  predict:
+    possible: yes
+    precursor: Run duration growing toward the schedule interval
+  propagates_to: [consumers of the job's output]
+  action: Check suspension, concurrency policy and the last runs
+  sources: [Kubernetes CronJob status]
+  ruptura: {status: not-covered}
+
+- id: pdb-blocks-drain
+  title: PodDisruptionBudget blocks node maintenance
+  level: workload
+  symptom: No disruption allowed, node drains hang
+  impact: Upgrades and maintenance stall
+  detect:
+    inputs: [kube_poddisruptionbudget_status_pod_disruptions_allowed]
+    rule: Zero disruptions allowed while a drain waits
+  predict:
+    possible: yes
+    precursor: Replicas equal to minAvailable
+  propagates_to: [cluster upgrade]
+  action: Add replicas or relax the budget
+  sources: [Kubernetes PodDisruptionBudget]
+  ruptura: {status: not-covered}
