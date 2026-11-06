@@ -1,0 +1,191 @@
+- id: memory-leak-to-oom
+  title: Memory leak ends in an OOM kill
+  level: container
+  symptom: Container memory grows steadily until the kernel kills it at its limit
+  impact: The container restarts and its in-flight requests fail
+  detect:
+    inputs: [container_memory_working_set_bytes, kube_pod_container_resource_limits, kube_pod_container_status_last_terminated_reason]
+    rule: Last termination reason is OOMKilled
+  predict:
+    possible: yes
+    precursor: Sustained growth of memory toward the limit
+  propagates_to: [callers of the workload]
+  action: Raise the memory limit or fix the leak
+  sources: [kubernetes-mixin KubePodCrashLooping, Kubernetes termination reason OOMKilled]
+  ruptura: {status: tested, mode: saturation}
+
+- id: accelerating-memory-growth
+  title: Memory growth accelerates toward the limit
+  level: container
+  symptom: Memory grows faster and faster, a straight trend underestimates it
+  impact: OOM kill earlier than a linear forecast says
+  detect:
+    inputs: [container_memory_working_set_bytes, kube_pod_container_resource_limits]
+    rule: Last termination reason is OOMKilled
+  predict:
+    possible: yes
+    precursor: Rising growth rate over a short window
+  propagates_to: [callers of the workload]
+  action: Raise the memory limit or find what accumulates
+  sources: [Kubernetes termination reason OOMKilled]
+  ruptura: {status: tested, mode: saturation}
+
+- id: sudden-memory-spike
+  title: Sudden memory jump past the limit
+  level: container
+  symptom: Memory jumps from a normal level past the limit with no trend before
+  impact: OOM kill with no warning from a trend rule
+  detect:
+    inputs: [kube_pod_container_status_last_terminated_reason]
+    rule: Last termination reason is OOMKilled
+  predict:
+    possible: partial
+    precursor: Only a regular rhythm of past kills; the jump itself gives no warning
+  propagates_to: [callers of the workload]
+  action: Raise the memory limit or find the request that spikes memory
+  sources: [Kubernetes termination reason OOMKilled]
+  ruptura: {status: implemented, mode: oom_killed}
+
+- id: oom-crash-loop
+  title: Container killed by OOM again and again
+  level: container
+  symptom: Repeated OOM kills, Kubernetes holds the container in CrashLoopBackOff
+  impact: The workload is down most of the time
+  detect:
+    inputs: [kube_pod_container_status_restarts_total, kube_pod_container_status_last_terminated_reason]
+    rule: CrashLoopBackOff with OOMKilled as last termination reason
+  predict:
+    possible: yes
+    precursor: Regular interval between kills
+  propagates_to: [callers of the workload]
+  action: Raise the memory limit or find the memory spike before the next kill
+  sources: [kubernetes-mixin KubePodCrashLooping]
+  ruptura: {status: implemented, mode: recurrent_failure}
+
+- id: crash-loop
+  title: Container crashes at start, again and again
+  level: container
+  symptom: The container exits shortly after start, Kubernetes backs off its restarts
+  impact: The workload never serves
+  detect:
+    inputs: [Kubernetes event BackOff, kube_pod_container_status_waiting_reason, kube_pod_container_status_restarts_total]
+    rule: Event BackOff "restarting failed container", or repeated restarts
+  predict:
+    possible: no
+    precursor: None before the first crash; a new release or configuration change is the usual cause
+  propagates_to: [callers of the workload]
+  action: Read the logs of the previous container and fix the startup failure
+  sources: [kubernetes-mixin KubePodCrashLooping, Kubernetes waiting reason CrashLoopBackOff]
+  ruptura: {status: tested, mode: crash_loop}
+
+- id: recurrent-failure
+  title: Failures that come back at a regular interval
+  level: container
+  symptom: The same workload fails every N minutes or hours
+  impact: Predictable outages, often from a batch, a leak or a scheduled job
+  detect:
+    inputs: [kube_pod_container_status_restarts_total]
+    rule: Restart times with a stable interval
+  predict:
+    possible: yes
+    precursor: The interval of past failures
+  propagates_to: [callers of the workload]
+  action: Find what restarts the workload before the next failure
+  sources: [kubernetes-mixin KubePodCrashLooping]
+  ruptura: {status: tested, mode: recurrent_failure}
+
+- id: cpu-throttling
+  title: Container throttled by its CPU limit
+  level: container
+  symptom: The container hits its CPU quota and waits for most periods
+  impact: Latency rises, probes time out, requests queue
+  detect:
+    inputs: [container_cpu_cfs_throttled_periods_total, container_cpu_cfs_periods_total]
+    rule: Share of throttled periods stays high
+  predict:
+    possible: partial
+    precursor: CPU usage rising toward the limit
+  propagates_to: [callers of the workload]
+  action: Raise the CPU limit or reduce the workload's CPU demand
+  sources: [kubernetes-mixin CPUThrottlingHigh]
+  ruptura: {status: implemented, mode: cpu_throttling}
+
+- id: liveness-probe-restarts
+  title: Liveness probe kills a slow container
+  level: container
+  symptom: The kubelet restarts a container whose liveness probe fails, often under load
+  impact: Restarts under load make the load worse
+  detect:
+    inputs: [Kubernetes event Unhealthy, kube_pod_container_status_restarts_total]
+    rule: Unhealthy events for liveness followed by restarts
+  predict:
+    possible: partial
+    precursor: Probe latency rising with load or CPU throttling
+  propagates_to: [callers of the workload]
+  action: Relax the probe timeout or fix the slowness it measures
+  sources: [Kubernetes event reason Unhealthy]
+  ruptura: {status: not-covered}
+
+- id: readiness-probe-failing
+  title: Pod running but never ready
+  level: container
+  symptom: The readiness probe keeps failing, the pod gets no traffic
+  impact: Fewer serving replicas, rollout cannot progress
+  detect:
+    inputs: [kube_pod_status_ready, Kubernetes event Unhealthy]
+    rule: Pod running and not ready for a sustained time
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [workload replicas, rollout]
+  action: Check what the probe tests, often a dependency or a slow start
+  sources: [kubernetes-mixin KubePodNotReady]
+  ruptura: {status: not-covered}
+
+- id: config-error-at-start
+  title: Container cannot start because of its configuration
+  level: container
+  symptom: Waiting reason CreateContainerConfigError, a ConfigMap, Secret or key is missing
+  impact: The pod never starts
+  detect:
+    inputs: [kube_pod_container_status_waiting_reason]
+    rule: Waiting reason CreateContainerConfigError
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [callers of the workload]
+  action: Create the missing ConfigMap or Secret, or fix the reference
+  sources: [kubernetes-mixin KubeContainerWaiting, Kubernetes waiting reason CreateContainerConfigError]
+  ruptura: {status: not-covered}
+
+- id: init-container-failing
+  title: Init container keeps failing
+  level: container
+  symptom: The pod stays in Init, its init container crashes or waits on a dependency
+  impact: The pod never starts
+  detect:
+    inputs: [kube_pod_init_container_status_restarts_total, kube_pod_init_container_status_waiting_reason]
+    rule: Init container restarts or waits for a sustained time
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [callers of the workload]
+  action: Read the init container logs, often a dependency that is not reachable
+  sources: [Kubernetes pod phase Pending with init containers]
+  ruptura: {status: not-covered}
+
+- id: pid-exhaustion
+  title: Container runs out of process IDs
+  level: container
+  symptom: fork fails, the process cannot start threads or children
+  impact: Requests fail, the container may hang
+  detect:
+    inputs: [container_processes, node pid limits]
+    rule: Process count near the PID limit
+  predict:
+    possible: yes
+    precursor: Thread or process count growing steadily
+  propagates_to: [callers of the workload, other pods of the node]
+  action: Fix the thread leak or raise the PID limit
+  sources: [Kubernetes node condition PIDPressure]
+  ruptura: {status: planned}

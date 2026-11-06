@@ -1,0 +1,159 @@
+- id: image-pull-failure
+  title: Image cannot be pulled
+  level: pod
+  symptom: ErrImagePull then ImagePullBackOff, the tag does not exist, the registry refuses, or the secret is wrong
+  impact: The pod never starts
+  detect:
+    inputs: [Kubernetes events Failed and BackOff, kube_pod_container_status_waiting_reason]
+    rule: Event message ErrImagePull or ImagePullBackOff
+  predict:
+    possible: no
+    precursor: None, a new image reference is the cause
+  propagates_to: [callers of the workload, rollout]
+  action: Fix the image reference or the pull secret
+  sources: [kubernetes-mixin KubeContainerWaiting, Kubernetes waiting reason ImagePullBackOff]
+  ruptura: {status: tested, mode: startup_stuck}
+
+- id: invalid-image-name
+  title: Image name is not valid
+  level: pod
+  symptom: Event InvalidImageName
+  impact: The pod never starts
+  detect:
+    inputs: [Kubernetes event InvalidImageName]
+    rule: Event reason InvalidImageName
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [callers of the workload]
+  action: Fix the image reference
+  sources: [Kubernetes event reason InvalidImageName]
+  ruptura: {status: implemented, mode: startup_stuck}
+
+- id: volume-mount-failure
+  title: Volume cannot be mounted
+  level: pod
+  symptom: Event FailedMount, a ConfigMap, Secret or volume is missing or not ready
+  impact: The pod stays in ContainerCreating
+  detect:
+    inputs: [Kubernetes event FailedMount]
+    rule: Event reason FailedMount
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [callers of the workload]
+  action: Create the missing object or fix the volume
+  sources: [Kubernetes event reason FailedMount]
+  ruptura: {status: tested, mode: startup_stuck}
+
+- id: volume-attach-failure
+  title: Volume cannot be attached to the node
+  level: pod
+  symptom: Event FailedAttachVolume, often a volume still attached elsewhere
+  impact: The pod stays in ContainerCreating
+  detect:
+    inputs: [Kubernetes event FailedAttachVolume]
+    rule: Event reason FailedAttachVolume
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [callers of the workload]
+  action: Detach the volume from the old node or fix the storage driver
+  sources: [Kubernetes event reason FailedAttachVolume]
+  ruptura: {status: implemented, mode: startup_stuck}
+
+- id: unschedulable-pod
+  title: Pod cannot be scheduled
+  level: pod
+  symptom: Event FailedScheduling, no node fits its requests, affinity, taints or volumes
+  impact: The pod stays Pending
+  detect:
+    inputs: [Kubernetes event FailedScheduling, kube_pod_status_unschedulable]
+    rule: Event reason FailedScheduling
+  predict:
+    possible: partial
+    precursor: Requests growing toward node allocatable
+  propagates_to: [callers of the workload, rollout]
+  action: Free capacity, add nodes, or fix the constraints
+  sources: [kubernetes-mixin KubePodNotReady, Kubernetes event reason FailedScheduling]
+  ruptura: {status: implemented, mode: startup_stuck}
+
+- id: sandbox-creation-failure
+  title: Pod sandbox cannot be created
+  level: pod
+  symptom: Event FailedCreatePodSandBox, network or runtime setup fails
+  impact: The pod stays in ContainerCreating
+  detect:
+    inputs: [Kubernetes event FailedCreatePodSandBox]
+    rule: Event reason FailedCreatePodSandBox
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [every pod scheduled on the node]
+  action: Check the network plugin and container runtime on the node
+  sources: [Kubernetes event reason FailedCreatePodSandBox]
+  ruptura: {status: implemented, mode: startup_stuck}
+
+- id: replica-divergence
+  title: One replica grows while its siblings stay flat
+  level: pod
+  symptom: Replicas of one version behave alike except one, whose memory climbs
+  impact: That pod will be OOM killed, often from a bad node, a stuck connection or a skewed shard
+  detect:
+    inputs: [container_memory_working_set_bytes, kube_pod_container_resource_limits, ReplicaSet of each pod]
+    rule: One pod's growth rate several times its siblings'
+  predict:
+    possible: yes
+    precursor: The gap between the pod and its siblings
+  propagates_to: [requests routed to that pod]
+  action: Restart or delete the pod and check its node and state
+  sources: [Kubernetes ReplicaSet]
+  ruptura: {status: tested, mode: replica_divergence}
+
+- id: eviction-node-memory-pressure
+  title: Pod evicted under node memory pressure
+  level: pod
+  symptom: The kubelet evicts pods when the node runs low on memory, first those above their requests
+  impact: Pods without a limit die without any OOM at their own level
+  detect:
+    inputs: [Kubernetes event Evicted, kube_node_status_condition MemoryPressure, node_memory_MemAvailable_bytes]
+    rule: Event reason Evicted or node condition MemoryPressure
+  predict:
+    possible: yes
+    precursor: Node available memory falling while pods grow beyond their requests
+  propagates_to: [every pod of the node above its request]
+  action: Set requests and limits, or add memory to the node pool
+  sources: [Kubernetes node condition MemoryPressure, Kubernetes event reason Evicted]
+  ruptura: {status: planned}
+
+- id: ephemeral-storage-eviction
+  title: Pod evicted for using too much local disk
+  level: pod
+  symptom: Logs or scratch files fill the ephemeral storage, the kubelet evicts the pod
+  impact: The pod restarts elsewhere and may fill that node too
+  detect:
+    inputs: [Kubernetes event Evicted, container_fs_usage_bytes]
+    rule: Eviction message names ephemeral-storage
+  predict:
+    possible: yes
+    precursor: Local disk use growing toward its limit
+  propagates_to: [other pods of the node]
+  action: Rotate logs, clean scratch space, or set an ephemeral storage limit
+  sources: [Kubernetes event reason Evicted]
+  ruptura: {status: not-covered}
+
+- id: pod-stuck-terminating
+  title: Pod stuck in Terminating
+  level: pod
+  symptom: The pod keeps its deletion timestamp, a finalizer or an unreachable node holds it
+  impact: StatefulSet replacements and volume reattachment wait
+  detect:
+    inputs: [kube_pod_deletion_timestamp]
+    rule: Deletion timestamp older than the grace period
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [StatefulSet ordering, volumes]
+  action: Check finalizers and the node, force delete only when the node is gone
+  sources: [Kubernetes pod deletion grace period]
+  ruptura: {status: not-covered}

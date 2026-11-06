@@ -1,0 +1,239 @@
+- id: resource-quota-exhausted
+  title: Namespace quota exhausted
+  level: namespace
+  symptom: New pods or objects are refused, the quota is used up
+  impact: Scaling and rollouts fail in that namespace
+  detect:
+    inputs: [kube_resourcequota used and hard]
+    rule: Used equal to hard
+  predict:
+    possible: yes
+    precursor: Usage growing toward the quota
+  propagates_to: [every workload of the namespace]
+  action: Raise the quota or reduce requests
+  sources: [kubernetes-mixin KubeQuotaExceeded, kubernetes-mixin KubeQuotaFullyUsed]
+  ruptura: {status: planned}
+
+- id: admission-refused
+  title: Pods refused at creation
+  level: namespace
+  symptom: Event FailedCreate, a quota, LimitRange, policy or webhook refuses the pod
+  impact: The workload cannot create pods
+  detect:
+    inputs: [Kubernetes event FailedCreate]
+    rule: Event reason FailedCreate
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [callers of the workload]
+  action: Read the refusal message and fix the quota, limit or policy
+  sources: [Kubernetes event reason FailedCreate]
+  ruptura: {status: implemented, mode: startup_stuck}
+
+- id: webhook-failing
+  title: Admission webhook down or slow
+  level: control-plane
+  symptom: Requests that hit a failing webhook are refused or time out
+  impact: Deploys, scaling and sometimes every write in the cluster fail
+  detect:
+    inputs: [apiserver_admission_webhook_rejection_count, apiserver_admission_webhook_admission_duration_seconds]
+    rule: Rejections or latency above baseline
+  predict:
+    possible: partial
+    precursor: The webhook's own pods failing
+  propagates_to: [every write through the webhook]
+  action: Fix the webhook service or set its failure policy
+  sources: [Kubernetes admission webhooks]
+  ruptura: {status: not-covered}
+
+- id: apiserver-errors-latency
+  title: API server errors or slow requests
+  level: control-plane
+  symptom: 5xx responses and request latency rise
+  impact: Controllers, operators and deploys slow down or fail
+  detect:
+    inputs: [apiserver_request_total, apiserver_request_duration_seconds]
+    rule: Error budget burn
+  predict:
+    possible: partial
+    precursor: etcd latency or request volume rising
+  propagates_to: [every controller and operator]
+  action: Find the noisy client or the slow etcd
+  sources: [kubernetes-mixin KubeAPIErrorBudgetBurn]
+  ruptura: {status: not-covered}
+
+- id: etcd-database-quota
+  title: etcd database reaches its quota
+  level: control-plane
+  symptom: The etcd database grows toward its space quota
+  impact: The cluster becomes read-only
+  detect:
+    inputs: [etcd_mvcc_db_total_size_in_bytes, etcd_server_quota_backend_bytes]
+    rule: Size near the quota
+  predict:
+    possible: yes
+    precursor: Steady growth of the database, days ahead
+  propagates_to: [the whole cluster]
+  action: Compact and defragment, find what stores too many objects
+  sources: [etcd-mixin etcdDatabaseQuotaLowSpace]
+  ruptura: {status: planned}
+
+- id: etcd-slow-disk
+  title: etcd disk too slow
+  level: control-plane
+  symptom: WAL fsync and commit durations rise
+  impact: Leader elections, slow API, then an unavailable cluster
+  detect:
+    inputs: [etcd_disk_wal_fsync_duration_seconds, etcd_disk_backend_commit_duration_seconds]
+    rule: 99th percentile above its threshold
+  predict:
+    possible: partial
+    precursor: Latency trending up with load
+  propagates_to: [the whole cluster]
+  action: Move etcd to faster disks or reduce load
+  sources: [etcd-mixin etcdHighFsyncDurations, etcd-mixin etcdHighCommitDurations]
+  ruptura: {status: not-covered}
+
+- id: etcd-member-down
+  title: etcd member down
+  level: control-plane
+  symptom: A member stops answering, quorum shrinks
+  impact: One more loss and the cluster stops
+  detect:
+    inputs: [etcd_server_has_leader, up]
+    rule: Member unreachable
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [the whole cluster]
+  action: Restore the member before any other maintenance
+  sources: [etcd-mixin etcdMembersDown, etcd-mixin etcdInsufficientMembers]
+  ruptura: {status: not-covered}
+
+- id: certificate-expiry
+  title: TLS certificate expires
+  level: cluster
+  symptom: A serving or client certificate reaches its notAfter date
+  impact: Calls fail on TLS, often across the whole cluster for a control plane certificate
+  detect:
+    inputs: [certificate notAfter in Secrets, apiserver_client_certificate_expiration_seconds]
+    rule: Expiry inside a warning window
+  predict:
+    possible: yes
+    precursor: The expiry date itself, weeks ahead
+  propagates_to: [every client of the certificate]
+  action: Renew the certificate and check its automation
+  sources: [kubernetes-mixin KubeClientCertificateExpiration, kubernetes-mixin KubeletClientCertificateExpiration]
+  ruptura: {status: planned}
+
+- id: cluster-operator-degraded
+  title: OpenShift cluster operator degraded
+  level: cluster
+  symptom: A ClusterOperator reports Degraded or not Available
+  impact: The platform function it owns fails, from ingress to monitoring
+  detect:
+    inputs: [ClusterOperator conditions]
+    rule: Degraded True or Available False
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [workloads using that platform function]
+  action: Read the operator's condition message and its pods
+  sources: [OpenShift ClusterOperatorDegraded, OpenShift ClusterOperatorDown]
+  ruptura: {status: not-covered}
+
+- id: machine-config-pool-degraded
+  title: Machine config pool degraded
+  level: cluster
+  symptom: A MachineConfigPool cannot roll its configuration to its nodes
+  impact: Upgrades stall, nodes stay cordoned
+  detect:
+    inputs: [MachineConfigPool conditions]
+    rule: Degraded True
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [nodes of the pool]
+  action: Check the machine config daemon on the stuck node
+  sources: [OpenShift MachineConfigPool]
+  ruptura: {status: not-covered}
+
+- id: operator-install-failed
+  title: OLM operator install fails
+  level: cluster
+  symptom: The ClusterServiceVersion reaches phase Failed
+  impact: The operator and what it manages are missing
+  detect:
+    inputs: [ClusterServiceVersion status]
+    rule: Phase Failed
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [workloads managed by the operator]
+  action: Read the CSV condition and the install plan
+  sources: [Operator Lifecycle Manager ClusterServiceVersion]
+  ruptura: {status: not-covered}
+
+- id: monitoring-target-down
+  title: Metrics target down
+  level: cluster
+  symptom: Prometheus cannot scrape a target
+  impact: Every alert and forecast built on that target goes blind
+  detect:
+    inputs: [up]
+    rule: up equals 0 for a sustained time
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [alerts and forecasts on that target]
+  action: Fix the target or its ServiceMonitor
+  sources: [kube-prometheus TargetDown]
+  ruptura: {status: not-covered}
+
+- id: dependency-failure-cascade
+  title: A failing dependency takes its callers down
+  level: application
+  symptom: One workload fails and the services that call it start to fail
+  impact: An application outage from one component
+  detect:
+    inputs: [call graph, failures of each workload]
+    rule: Callers of a failing workload
+  predict:
+    possible: partial
+    precursor: A predicted failure of the dependency, carried along the call graph
+  propagates_to: [the application]
+  action: Fix the dependency first, add timeouts and fallbacks in callers
+  sources: [OpenTelemetry service graph]
+  ruptura: {status: implemented}
+
+- id: error-budget-burn
+  title: Application error budget burns
+  level: application
+  symptom: Error rate or latency above its objective
+  impact: Users see failures
+  detect:
+    inputs: [application request metrics, traces]
+    rule: Burn rate above threshold
+  predict:
+    possible: partial
+    precursor: Burn rate rising before the budget is gone
+  propagates_to: [users]
+  action: Find the component that fails or slows
+  sources: [Google SRE multiwindow burn rate alerts]
+  ruptura: {status: planned}
+
+- id: log-exception-burst
+  title: Burst of errors in logs
+  level: application
+  symptom: OutOfMemoryError, panic, connection refused or timeout lines multiply
+  impact: Often the first sign before a crash or an outage
+  detect:
+    inputs: [container logs]
+    rule: Keyword rate above its baseline
+  predict:
+    possible: partial
+    precursor: The burst itself, minutes before the failure, to be proven
+  propagates_to: [callers of the workload]
+  action: Read the lines and fix the cause before the crash
+  sources: [Kubernetes container logs]
+  ruptura: {status: planned}

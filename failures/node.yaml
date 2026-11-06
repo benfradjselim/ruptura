@@ -1,0 +1,175 @@
+- id: node-not-ready
+  title: Node not ready
+  level: node
+  symptom: The kubelet stops reporting or reports NotReady
+  impact: Pods of the node are evicted after the toleration period
+  detect:
+    inputs: [kube_node_status_condition Ready]
+    rule: Ready not True for a sustained time
+  predict:
+    possible: partial
+    precursor: Memory, disk or PID pressure on the node
+  propagates_to: [every pod of the node]
+  action: Check the kubelet, the runtime and the node's resources
+  sources: [kubernetes-mixin KubeNodeNotReady, kubernetes-mixin KubeNodeUnreachable]
+  ruptura: {status: not-covered}
+
+- id: node-readiness-flapping
+  title: Node flaps between Ready and NotReady
+  level: node
+  symptom: Ready changes several times in a short window
+  impact: Pods rescheduled again and again
+  detect:
+    inputs: [kube_node_status_condition Ready]
+    rule: Several Ready changes in 15 minutes
+  predict:
+    possible: no
+    precursor: None
+  propagates_to: [every pod of the node]
+  action: Check the network and the kubelet of the node
+  sources: [kubernetes-mixin KubeNodeReadinessFlapping]
+  ruptura: {status: not-covered}
+
+- id: node-memory-pressure
+  title: Node under memory pressure
+  level: node
+  symptom: Node condition MemoryPressure, the kubelet starts evicting
+  impact: Pods evicted, first those above their requests
+  detect:
+    inputs: [kube_node_status_condition MemoryPressure, node_memory_MemAvailable_bytes]
+    rule: MemoryPressure True
+  predict:
+    possible: yes
+    precursor: Available memory falling toward the eviction threshold
+  propagates_to: [pods of the node above their requests]
+  action: Set requests and limits, or add memory
+  sources: [Kubernetes node condition MemoryPressure]
+  ruptura: {status: planned}
+
+- id: node-disk-pressure
+  title: Node under disk pressure
+  level: node
+  symptom: Node condition DiskPressure, image and container garbage collection runs
+  impact: Pods evicted, new pods cannot start
+  detect:
+    inputs: [kube_node_status_condition DiskPressure, node_filesystem_avail_bytes]
+    rule: DiskPressure True
+  predict:
+    possible: yes
+    precursor: Node filesystem filling
+  propagates_to: [every pod of the node]
+  action: Clean images and logs, or grow the disk
+  sources: [Kubernetes node condition DiskPressure]
+  ruptura: {status: not-covered}
+
+- id: node-pid-pressure
+  title: Node under PID pressure
+  level: node
+  symptom: Node condition PIDPressure
+  impact: New processes and pods cannot start
+  detect:
+    inputs: [kube_node_status_condition PIDPressure]
+    rule: PIDPressure True
+  predict:
+    possible: yes
+    precursor: Process count growing on the node
+  propagates_to: [every pod of the node]
+  action: Find the pod that leaks processes and set PID limits
+  sources: [Kubernetes node condition PIDPressure]
+  ruptura: {status: not-covered}
+
+- id: node-filesystem-filling
+  title: Node filesystem filling up
+  level: node
+  symptom: Free space on a node filesystem falls
+  impact: DiskPressure, evictions, then a node that cannot run pods
+  detect:
+    inputs: [node_filesystem_avail_bytes, node_filesystem_size_bytes]
+    rule: Free space below a threshold
+  predict:
+    possible: yes
+    precursor: Steady fall of free space, hours or days ahead
+  propagates_to: [every pod of the node]
+  action: Find what writes, clean it, or grow the filesystem
+  sources: [node-exporter NodeFilesystemSpaceFillingUp, node-exporter NodeFilesystemAlmostOutOfSpace]
+  ruptura: {status: planned}
+
+- id: inode-exhaustion
+  title: Node runs out of inodes
+  level: node
+  symptom: Free inodes fall to zero while space remains
+  impact: Files cannot be created, containers fail to start
+  detect:
+    inputs: [node_filesystem_files_free]
+    rule: Free inodes below a threshold
+  predict:
+    possible: yes
+    precursor: Steady fall of free inodes
+  propagates_to: [every pod of the node]
+  action: Remove the many small files, often logs or caches
+  sources: [node-exporter NodeFilesystemFilesFillingUp, node-exporter NodeFilesystemAlmostOutOfFiles]
+  ruptura: {status: not-covered}
+
+- id: too-many-pods
+  title: Kubelet at its pod limit
+  level: node
+  symptom: The node runs as many pods as its maxPods
+  impact: No new pod fits on the node
+  detect:
+    inputs: [kubelet_running_pods, kube_node_status_capacity pods]
+    rule: Running pods near capacity
+  predict:
+    possible: yes
+    precursor: Pod count growing toward maxPods
+  propagates_to: [scheduling of new pods]
+  action: Add nodes or raise maxPods
+  sources: [kubernetes-mixin KubeletTooManyPods]
+  ruptura: {status: not-covered}
+
+- id: clock-not-synchronised
+  title: Node clock drifts
+  level: node
+  symptom: NTP not synchronised, time offset grows
+  impact: TLS, tokens and distributed locks fail in strange ways
+  detect:
+    inputs: [node_timex_offset_seconds, node_timex_sync_status]
+    rule: Offset above a threshold or sync lost
+  predict:
+    possible: partial
+    precursor: Offset growing after sync loss
+  propagates_to: [every pod of the node, etcd]
+  action: Fix time synchronisation on the node
+  sources: [node-exporter NodeClockNotSynchronising, node-exporter NodeClockSkewDetected]
+  ruptura: {status: not-covered}
+
+- id: conntrack-table-full
+  title: Connection tracking table full
+  level: node
+  symptom: New connections dropped, kernel log reports a full conntrack table
+  impact: Random connection failures for every pod of the node
+  detect:
+    inputs: [node_nf_conntrack_entries, node_nf_conntrack_entries_limit]
+    rule: Entries near the limit
+  predict:
+    possible: yes
+    precursor: Entries climbing with connection churn
+  propagates_to: [every pod of the node]
+  action: Raise the conntrack limit or reduce connection churn
+  sources: [node-exporter NodeHighNumberConntrackEntriesUsed]
+  ruptura: {status: planned}
+
+- id: node-capacity-exhausted
+  title: Requests outgrow node allocatable
+  level: node
+  symptom: The sum of requests approaches what nodes can allocate
+  impact: New pods unschedulable, autoscaling and rollouts stall
+  detect:
+    inputs: [kube_pod_container_resource_requests, kube_node_status_allocatable]
+    rule: Requests over allocatable minus one node
+  predict:
+    possible: yes
+    precursor: Requests growing week after week
+  propagates_to: [scheduling of new pods]
+  action: Add nodes or right-size requests
+  sources: [kubernetes-mixin KubeCPUOvercommit, kubernetes-mixin KubeMemoryOvercommit]
+  ruptura: {status: planned}
