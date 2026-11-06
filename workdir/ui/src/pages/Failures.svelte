@@ -4,6 +4,7 @@
   import { formatEta, sortFailures, missingRoles, horizonClusters, pastPlacement, relatedEvents } from '../lib/util/failures.js'
   import { hasForecastChart } from '../lib/util/forecastChart.js'
   import ForecastChart from '../lib/components/ForecastChart.svelte'
+  import { warmup, confidenceLabel, etaRange, blindSpotsByNamespace, readableInputs } from '../lib/util/horizonStatus.js'
 
   const REFRESH_MS = 15000
   const HORIZON_SECONDS = 30 * 60
@@ -14,7 +15,7 @@
   const MINUTE_MS = 60 * 1000
 
   let failures = [], missing = [], record = null, protection = null, history = [], selected = null, loading = true, error = '', timer
-  let series = {}, readAt = Date.now()
+  let series = {}, readAt = Date.now(), warm = null, sources = []
 
   async function loadSeries(found) {
     const workloads = [...new Set(found.filter(hasForecastChart).map(f => f.workload).filter(Boolean))].slice(0, MAX_CHARTS)
@@ -28,17 +29,20 @@
 
   async function load() {
     try {
-      const [found, inputs, track, coverage, past] = await Promise.all([
+      const [found, inputs, track, coverage, past, health] = await Promise.all([
         api.failures(),
         api.inputs().catch(() => []),
         api.trackRecord().catch(() => null),
         api.coverage().catch(() => null),
         api.eventHistory().catch(() => []),
+        api.health().catch(() => null),
       ])
       failures = sortFailures(found || [])
       series = await loadSeries(failures)
       readAt = Date.now()
       missing = missingRoles(inputs || [])
+      sources = readableInputs(inputs || [])
+      warm = warmup(health?.uptime_seconds, readAt)
       record = track
       protection = coverage
       history = past || []
@@ -57,6 +61,7 @@
   $: predicted = failures.filter(f => f.kind === 'predicted').length
   $: detected = failures.length - predicted
   $: critical = failures.filter(f => f.state === 'critical').length
+  $: blindSpots = blindSpotsByNamespace(protection?.unprotected)
 
   onMount(() => { load(); timer = setInterval(load, REFRESH_MS) })
   onDestroy(() => clearInterval(timer))
@@ -66,7 +71,7 @@
   <header class="heading">
     <div>
       <p class="eyebrow">Rupture horizon</p>
-      <h1>{failures.length === 0 ? 'No rupture ahead' : `${failures.length} rupture${failures.length > 1 ? 's' : ''} in sight`}</h1>
+      <h1>{failures.length > 0 ? `${failures.length} rupture${failures.length > 1 ? 's' : ''} in sight` : warm ? 'Warming up' : 'No rupture ahead'}</h1>
     </div>
     <dl class="tally">
       <div class:hot={critical > 0}><dt>Critical</dt><dd>{critical}</dd></div>
@@ -74,6 +79,14 @@
       <div><dt>Detected</dt><dd>{detected}</dd></div>
     </dl>
   </header>
+
+  {#if warm}
+    <p class="warmup" role="status">
+      Engine started {warm.startedMinutes} min ago.
+      {warm.detecting ? 'Detected failures are back.' : 'Detected failures return within 5 minutes.'}
+      Forecasts need 30 minutes of readings and return about <strong>{warm.forecastsAt}</strong>. Until then, no forecast does not mean no risk.
+    </p>
+  {/if}
 
   {#if loading}
     <p class="quiet">Reading the cluster</p>
@@ -113,6 +126,8 @@
             <div class="time">
               <strong>{failure.etaSeconds ? formatEta(failure.etaSeconds) : 'Now'}</strong>
               <span>{failure.kind}</span>
+              {#if etaRange(failure)}<em>{etaRange(failure)}</em>{/if}
+              {#if confidenceLabel(failure)}<em>{confidenceLabel(failure)}</em>{/if}
             </div>
             <div class="what">
               <h2>{name(failure.target)}</h2>
@@ -143,6 +158,11 @@
       <p class="eyebrow">{label(selected.failureMode)} · {selected.kind}</p>
       <h2>{name(selected.target)}</h2>
       <p class="scope">{scope(selected.target)}</p>
+      {#if selected.etaSeconds}
+        <p class="when">
+          Failure in <strong>{formatEta(selected.etaSeconds)}</strong>{#if etaRange(selected)}, range {etaRange(selected)}{/if}{#if confidenceLabel(selected)} · {confidenceLabel(selected)}{/if}
+        </p>
+      {/if}
       {#if series[selected.workload]}
         <h3>Memory and forecast</h3>
         <ForecastChart height={240} pods={series[selected.workload]} failure={selected} failureTimes={failureTimes(selected.workload)} now={readAt} />
@@ -189,9 +209,37 @@
         {#if protection.protected < protection.watched}
           <p class="quiet">Without a limit, Ruptura cannot forecast memory exhaustion on these pods.</p>
         {/if}
+        {#if blindSpots.length > 0}
+          <details class="blind">
+            <summary>Pods without a memory limit, by namespace</summary>
+            <ul>
+              {#each blindSpots as group}
+                <li>
+                  <details>
+                    <summary><span>{group.pods.length}</span> {group.namespace}</summary>
+                    <p>{group.pods.join(' · ')}</p>
+                  </details>
+                </li>
+              {/each}
+            </ul>
+          </details>
+        {/if}
       {/if}
       {#if missing.length > 0}
         <p class="quiet">Data not found: {missing.join(' · ')}</p>
+      {/if}
+    </div>
+
+    <div>
+      <h2>What Ruptura reads <span>targets per input</span></h2>
+      {#if sources.length > 0}
+        <ul class="sources">
+          {#each sources as source}
+            <li class:off={!source.available}><span>{source.label}</span><strong>{source.available ? source.targets : 'none'}</strong></li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="quiet">No input reported yet.</p>
       {/if}
     </div>
   </div>
@@ -267,7 +315,7 @@
   .events span { color: var(--text-3); margin-right: 8px; }
   .events .failure { color: var(--red); }
   .fact { color: var(--text); font-family: var(--font-mono); font-size: 13px; }
-  .proof { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--border-2); }
+  .proof { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 36px; margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--border-2); }
   .proof h2 { font-size: 16px; text-transform: uppercase; letter-spacing: 0.06em; }
   .proof h2 span { font: 400 12px var(--font-mono); color: var(--text-3); text-transform: none; letter-spacing: 0; margin-left: 8px; }
   .proof dl { display: flex; gap: 36px; margin-top: 14px; flex-wrap: wrap; }
@@ -275,8 +323,26 @@
   .proof dd { font: 500 26px/32px var(--font-mono); font-variant-numeric: tabular-nums; }
   .proof .warn dd { color: var(--amber); }
   .quiet { margin-top: 12px; color: var(--text-3); }
+  .warmup { margin-top: 20px; padding: 12px 16px; border-left: 3px solid var(--amber); background: var(--amber-dim); color: var(--text); }
+  .warmup strong { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .time em { display: block; font: 400 11px var(--font-mono); font-style: normal; color: var(--text-2); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .drawer .when { margin-top: 10px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .drawer .when strong { color: var(--text); font-family: var(--font-mono); }
+  .blind { margin-top: 12px; font-size: 13px; }
+  .blind summary { cursor: pointer; color: var(--accent); }
+  .blind ul { list-style: none; margin-top: 8px; max-height: 260px; overflow-y: auto; }
+  .blind li summary { color: var(--text-2); font-family: var(--font-mono); padding: 3px 0; }
+  .blind li summary span { display: inline-block; min-width: 28px; color: var(--amber); font-variant-numeric: tabular-nums; }
+  .blind li p { color: var(--text-3); font: 400 12px var(--font-mono); padding: 4px 0 8px 28px; word-break: break-all; }
+  .sources { list-style: none; margin-top: 14px; font: 400 13px var(--font-mono); }
+  .sources li { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .sources strong { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .sources .off { color: var(--amber); }
   .fault-note { margin-top: 40px; color: var(--red); }
 
+  @media (max-width: 1100px) {
+    .proof { grid-template-columns: 1fr 1fr; }
+  }
   @media (max-width: 760px) {
     .drawer { width: 100%; }
     .proof { grid-template-columns: 1fr; }
