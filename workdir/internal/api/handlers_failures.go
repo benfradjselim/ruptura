@@ -34,6 +34,8 @@ type FailureResult struct {
 	Confidence        float64  `json:"confidence,omitempty"`
 	RecommendedAction string   `json:"recommendedAction"`
 	Evidence          []string `json:"evidence,omitempty"`
+	// Affects lists the workloads that call this one, directly or not.
+	Affects []string `json:"affects,omitempty"`
 }
 
 // TrackRecorder reports how early failures were announced.
@@ -245,6 +247,12 @@ func (h *Handlers) Failures() []*FailureResult {
 		copied := *result
 		if evidence := changeEvidence(result.Target, changes, now); evidence != "" {
 			copied.Evidence = append(append([]string{}, result.Evidence...), evidence)
+		}
+		if h.callGraph != nil {
+			if callers := h.callGraph.Graph().Callers(result.Workload); len(callers) > 0 {
+				copied.Affects = callers
+				copied.Evidence = append(append([]string{}, copied.Evidence...), ImpactText(callers))
+			}
 		}
 		copied = scopeResult(copied, h.levelScope)
 		scoped = append(scoped, &copied)

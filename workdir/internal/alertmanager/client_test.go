@@ -167,3 +167,19 @@ func TestAlertLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestAnnotationsCarryImpact(t *testing.T) {
+	tests := []struct {
+		impact string
+		want   int
+	}{
+		{"", 2},
+		{"Can hit its callers: api", 3},
+	}
+	for _, tc := range tests {
+		notes := annotations(Alert{Summary: "act", Severity: "critical", Impact: tc.impact})
+		if len(notes) != tc.want || (tc.impact != "" && notes["impact"] != tc.impact) {
+			t.Errorf("impact %q: got %v", tc.impact, notes)
+		}
+	}
+}

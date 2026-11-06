@@ -53,6 +53,7 @@ type Handlers struct {
     infraRegistry *dag.Registry
     demoMode      bool
     failureModes  FailureEstimates
+	callGraph CallGraphSource
 	inputs InputCoverage
 	horizon time.Duration
 	levelScope string

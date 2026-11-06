@@ -7,6 +7,7 @@
   import Settings     from './pages/Settings.svelte'
   import Fleet        from './pages/Fleet.svelte'
   import Failures     from './pages/Failures.svelte'
+  import CallGraph    from './pages/CallGraph.svelte'
   import Infra        from './pages/Infra.svelte'
   import Notifications from './pages/Notifications.svelte'
   import Logs         from './pages/Logs.svelte'
@@ -24,6 +25,7 @@
   const HOME_PAGE = 'failures'
   const PRIMARY_NAV = [
     { id: 'failures', label: 'Rupture Horizon' },
+    { id: 'callgraph', label: 'Call graph' },
     { id: 'fleet', label: 'Fleet' },
     { id: 'infra', label: 'Infra' },
     { id: 'alerts', label: 'Anomalies' },
@@ -56,6 +58,7 @@
     orgs:            'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
     slos:            'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
     dashboard:       'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2zM9 22V12h6v10',
+    callgraph:       'M5 6a2 2 0 100-4 2 2 0 000 4zM19 14a2 2 0 100-4 2 2 0 000 4zM5 22a2 2 0 100-4 2 2 0 000 4zM7 4h4a2 2 0 012 2v4a2 2 0 002 2h2M7 20h4a2 2 0 002-2v-4a2 2 0 012-2',
     failures:        'M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
     fleet:           'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
     infra:           'M5 12H3m4-7l-2-2m10 2 2-2M5 19l-2 2m14-2 2 2M12 3v2m0 14v2M7 7l10 10M17 7 7 17',
@@ -145,6 +148,8 @@
         <Dashboard />
       {:else if $currentPage === 'failures'}
         <Failures />
+      {:else if $currentPage === 'callgraph'}
+        <CallGraph />
       {:else if $currentPage === 'fleet'}
         <Fleet />
       {:else if $currentPage === 'infra'}

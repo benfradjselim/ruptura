@@ -30,6 +30,8 @@ type Alert struct {
 	Target   string
 	Kind     string
 	Summary  string
+	// Impact names the callers a failure can hit, empty when none is known.
+	Impact string
 }
 
 type postableAlert struct {
@@ -133,7 +135,7 @@ func (c *Client) Send(ctx context.Context, alerts []Alert) error {
 	for _, alert := range alerts {
 		payload = append(payload, postableAlert{
 			Labels:      alertLabels(alert),
-			Annotations: map[string]string{"summary": alert.Summary, "state": alert.Severity},
+			Annotations: annotations(alert),
 			EndsAt:      endsAt,
 		})
 	}
@@ -163,4 +165,12 @@ func (c *Client) Send(ctx context.Context, alerts []Alert) error {
 		return fmt.Errorf("alertmanager: status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func annotations(alert Alert) map[string]string {
+	notes := map[string]string{"summary": alert.Summary, "state": alert.Severity}
+	if alert.Impact != "" {
+		notes["impact"] = alert.Impact
+	}
+	return notes
 }
