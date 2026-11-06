@@ -16,6 +16,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/alerter"
 	"github.com/benfradjselim/ruptura/internal/analyzer"
 	"github.com/benfradjselim/ruptura/internal/api"
+	"github.com/benfradjselim/ruptura/internal/callgraph"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/admission"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/co"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/dag"
@@ -507,6 +508,12 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		handlers.SetDiscovery(inf)
 	}
 	handlers.SetInfraRegistry(infraRegistry)
+	if graph, err := callgraph.New(); err == nil {
+		go graph.Run(ctx)
+		handlers.SetCallGraph(graph)
+	} else {
+		logger.Default.Info("call graph disabled", "reason", err.Error())
+	}
 	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store)
 	if tracker != nil {
 		handlers.SetFailureModes(tracker)

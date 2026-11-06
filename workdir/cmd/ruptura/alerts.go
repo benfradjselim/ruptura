@@ -81,6 +81,7 @@ func sendAlerts(ctx context.Context, clients []*alertmanager.Client, failures []
 			Target:   failure.Target,
 			Kind:     failure.Kind,
 			Summary:  failure.RecommendedAction,
+			Impact:   api.ImpactText(failure.Affects),
 		})
 	}
 	for _, client := range clients {
