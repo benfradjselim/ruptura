@@ -19,12 +19,13 @@ LABEL name="ruptura-ui" \
       org.opencontainers.image.source="https://github.com/benfradjselim/ruptura" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-# The engine Service the console proxies /api/ to. A mounted default.conf
-# replaces this template, as the Helm chart does.
+# The engine Service the console proxies /api/ to. A default.conf mounted
+# read-only, as the Helm chart does, is used as is.
 ENV RUPTURA_BACKEND_URL=http://ruptura:8080
 
 COPY LICENSE /licenses/LICENSE
-COPY ui/nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY ui/nginx/default.conf.template /etc/nginx/ruptura/default.conf.template
+COPY --chmod=0755 ui/nginx/30-ruptura-config.sh /docker-entrypoint.d/30-ruptura-config.sh
 COPY web /usr/share/nginx/html
 
 EXPOSE 8080

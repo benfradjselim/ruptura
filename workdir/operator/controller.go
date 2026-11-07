@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultImage = "docker.io/selimbf/ruptura:v8.7.2"
+	defaultImage = "docker.io/selimbf/ruptura:v8.7.3"
 	// relatedImageEnv is set by OLM from the CSV, so a disconnected mirror can
 	// rewrite the engine image by digest.
 	relatedImageEnv    = "RELATED_IMAGE_RUPTURA"
