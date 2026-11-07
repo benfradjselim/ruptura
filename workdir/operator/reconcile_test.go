@@ -115,7 +115,7 @@ func TestReconcile_SecurityContextByPlatform(t *testing.T) {
 // Defect 2: default image.
 func TestReconcile_DefaultImage(t *testing.T) {
 	cases := []struct{ name, image, want string }{
-		{"default", "", "docker.io/selimbf/ruptura:v8.7.1"},
+		{"default", "", "docker.io/selimbf/ruptura:v8.7.2"},
 		{"override", "example.com/x:1", "example.com/x:1"},
 	}
 	for _, tc := range cases {
@@ -132,18 +132,18 @@ func TestReconcile_DefaultImage(t *testing.T) {
 			}
 		})
 	}
-	if defaultImage != "docker.io/selimbf/ruptura:v8.7.1" {
+	if defaultImage != "docker.io/selimbf/ruptura:v8.7.2" {
 		t.Fatalf("defaultImage = %s", defaultImage)
 	}
 }
 
 // Defect 3: one version constant, used in the startup log line.
 func TestOperatorVersion(t *testing.T) {
-	if operatorVersion != "1.4.1" {
-		t.Fatalf("operatorVersion = %s, want 1.4.1", operatorVersion)
+	if operatorVersion != "1.4.2" {
+		t.Fatalf("operatorVersion = %s, want 1.4.2", operatorVersion)
 	}
 	line := startupMessage("30s")
-	if !strings.Contains(line, `version="1.4.1"`) || strings.Contains(line, "0.6.9") {
+	if !strings.Contains(line, `version="1.4.2"`) || strings.Contains(line, "0.6.9") {
 		t.Fatalf("startup line has wrong version: %s", line)
 	}
 }
@@ -267,5 +267,31 @@ func TestReconcile_RouteEdgeRedirect(t *testing.T) {
 	tls := route["spec"].(map[string]interface{})["tls"].(map[string]interface{})
 	if tls["termination"] != "edge" || tls["insecureEdgeTerminationPolicy"] != "Redirect" {
 		t.Fatalf("tls = %v", tls)
+	}
+}
+
+// The engine pod meets the Pod Security restricted profile on both platforms.
+func TestReconcile_RestrictedPodSecurity(t *testing.T) {
+	for _, isOCP := range []bool{false, true} {
+		c, rec := recordingClient(t, false)
+		if err := reconcile(context.Background(), c, makeInstance("ri", testNS), isOCP); err != nil {
+			t.Fatal(err)
+		}
+		pod := podSpecOf(t, rec)
+		seccomp, _ := pod["securityContext"].(map[string]interface{})["seccompProfile"].(map[string]interface{})
+		if seccomp["type"] != "RuntimeDefault" {
+			t.Errorf("openshift=%v: pod seccompProfile = %v", isOCP, seccomp)
+		}
+		ctr := pod["containers"].([]interface{})[0].(map[string]interface{})
+		sc := ctr["securityContext"].(map[string]interface{})
+		drop, _ := sc["capabilities"].(map[string]interface{})["drop"].([]interface{})
+		if sc["allowPrivilegeEscalation"] != false || sc["readOnlyRootFilesystem"] != true || sc["runAsNonRoot"] != true || len(drop) != 1 || drop[0] != "ALL" {
+			t.Errorf("openshift=%v: container securityContext = %v", isOCP, sc)
+		}
+		ready := ctr["readinessProbe"].(map[string]interface{})["httpGet"].(map[string]interface{})["path"]
+		live := ctr["livenessProbe"].(map[string]interface{})["httpGet"].(map[string]interface{})["path"]
+		if ready != "/api/v2/ready" || live != "/api/v2/health" {
+			t.Errorf("openshift=%v: readiness %v, liveness %v", isOCP, ready, live)
+		}
 	}
 }
