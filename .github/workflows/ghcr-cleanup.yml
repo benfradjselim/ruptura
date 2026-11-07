@@ -1,0 +1,46 @@
+name: GHCR — Clean up old build images
+
+# Deletes per-commit build images (tags "sha-<hex>") older than N days from
+# the ruptura and ruptura-operator packages, with their cosign signatures.
+# Release tags (v*, latest), untagged versions (multi-arch platform
+# manifests) and anything newer than N days are never touched.
+#
+# Manual only. Runs as a dry run by default: read the log, then run again
+# with dry_run set to false to really delete.
+#
+# Deleting needs the repository to have the Admin role on each package:
+# Package settings > Manage Actions access > benfradjselim/ruptura > Admin.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only list what would be deleted"
+        type: boolean
+        default: true
+      min_age_days:
+        description: "Only delete build images older than this many days"
+        type: number
+        default: 120
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clean up sha-* build images
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          args=(--owner benfradjselim --owner-type user \
+                --package ruptura --package ruptura-operator \
+                --min-age-days "${{ inputs.min_age_days }}")
+          if [ "${{ inputs.dry_run }}" = "false" ]; then
+            args+=(--apply)
+          fi
+          python3 scripts/ghcr-cleanup.py "${args[@]}"

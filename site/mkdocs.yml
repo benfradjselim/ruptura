@@ -31,6 +31,8 @@ nav:
   - Failure modes: failures.md
   - Alerting: alerting.md
   - API: reference/api.md
+  - Blog:
+    - Predict an OOM kill before it happens: blog/predict-an-oom-before-it-happens.md
   - Community:
     - Roadmap: community/roadmap.md
     - Contributing: community/contributing.md
