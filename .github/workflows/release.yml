@@ -178,9 +178,11 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.UI_IMAGE }}:${{ steps.resolve-tag.outputs.tag }}
             ${{ env.REGISTRY }}/${{ env.UI_IMAGE }}:latest
-          # amd64 only: the lab runs amd64, and QEMU arm64 npm builds take 40+ min.
-          # Add linux/arm64 back once the Dockerfile is confirmed stable on amd64.
-          platforms: linux/amd64
+          build-args: |
+            VERSION=${{ steps.resolve-tag.outputs.tag }}
+          # npm runs on the runner before this step; the image only copies static
+          # files, so the arm64 build needs no emulated npm.
+          platforms: linux/amd64,linux/arm64
 
   # ── Stage 3–4: Build & push ruptura core Docker image ────────────────────
   docker:

@@ -24,8 +24,11 @@ func (h *Handlers) handleReady(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+// prometheusTextFormat is the content type of the Prometheus text exposition format.
+const prometheusTextFormat = "text/plain; version=0.0.4; charset=utf-8"
+
 func (h *Handlers) handleMetrics(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "text/plain")
+    w.Header().Set("Content-Type", prometheusTextFormat)
     w.Write([]byte(h.metrics.Render()))
 }
 

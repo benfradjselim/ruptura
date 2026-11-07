@@ -144,6 +144,9 @@ spec:
           - path: readyReplicas
             displayName: Ready Replicas
             x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:podCount"]
+          - path: conditions
+            displayName: Conditions
+            x-descriptors: ["urn:alm:descriptor:io.kubernetes.conditions"]
   install:
     strategy: deployment
     spec:
@@ -188,7 +191,7 @@ spec:
               verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
             - apiGroups: [""]
               resources: ["secrets"]
-              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+              verbs: ["get", "create", "update", "patch", "delete"]
             # OpenShift Routes (no-op on vanilla K8s — API simply won't be present)
             - apiGroups: ["route.openshift.io"]
               resources: ["routes"]
@@ -226,6 +229,8 @@ spec:
                 serviceAccountName: ruptura-operator
                 securityContext:
                   runAsNonRoot: true
+                  seccompProfile:
+                    type: RuntimeDefault
                 containers:
                   - name: ruptura-operator
                     image: ghcr.io/benfradjselim/ruptura-operator@sha256:c9fa70a2b4f962fb09b962f75bba98ea903947b82c9f1e5a89fe307be233c75e
@@ -254,6 +259,8 @@ spec:
                       allowPrivilegeEscalation: false
                       readOnlyRootFilesystem: true
                       runAsNonRoot: true
+                      capabilities:
+                        drop: [ALL]
                     resources:
                       requests:
                         cpu: "50m"

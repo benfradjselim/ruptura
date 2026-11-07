@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultImage = "docker.io/selimbf/ruptura:v8.7.1"
+	defaultImage = "docker.io/selimbf/ruptura:v8.7.2"
 	// relatedImageEnv is set by OLM from the CSV, so a disconnected mirror can
 	// rewrite the engine image by digest.
 	relatedImageEnv    = "RELATED_IMAGE_RUPTURA"
@@ -302,8 +302,9 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 	trueVal := true
 
 	// OpenShift assigns UID and fsGroup from the namespace SCC range and
-	// rejects fixed values, so they are set on plain Kubernetes only.
-	podSC := &PodSecurityContext{RunAsNonRoot: true}
+	// rejects fixed values, so they are set on plain Kubernetes only. The rest
+	// meets the Pod Security restricted profile on both.
+	podSC := &PodSecurityContext{RunAsNonRoot: true, SeccompProfile: &SeccompProfile{Type: "RuntimeDefault"}}
 	if !isOCP {
 		podSC.RunAsUser = 65532
 		podSC.FSGroup = 65532
@@ -355,7 +356,9 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 							Resources:    resources,
 							SecurityContext: &ContainerSecurityContext{
 								AllowPrivilegeEscalation: false,
+								ReadOnlyRootFilesystem:   true,
 								RunAsNonRoot:             trueVal,
+								Capabilities:             &Capabilities{Drop: []string{"ALL"}},
 							},
 							LivenessProbe: &Probe{
 								HTTPGet:             HTTPGetAction{Path: "/api/v2/health", Port: 8080},
@@ -365,7 +368,7 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 								TimeoutSeconds:      5,
 							},
 							ReadinessProbe: &Probe{
-								HTTPGet:             HTTPGetAction{Path: "/api/v2/health", Port: 8080},
+								HTTPGet:             HTTPGetAction{Path: "/api/v2/ready", Port: 8080},
 								InitialDelaySeconds: 5,
 								PeriodSeconds:       10,
 								FailureThreshold:    3,
@@ -456,6 +459,7 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
 		ObservedGeneration: inst.Metadata.Generation,
 	}
+	status.Conditions = conditions(inst.Status.Conditions, status.Phase, status.Message, status.ReadyReplicas, inst.Metadata.Generation, time.Now())
 
 	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s", ns, name)
 	return c.patchStatus(path, status)
@@ -480,6 +484,7 @@ func writeDegradedStatus(c *k8sClient, inst RupturaInstance, problem error) erro
 		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
 		ObservedGeneration: inst.Metadata.Generation,
 	}
+	status.Conditions = conditions(inst.Status.Conditions, status.Phase, status.Message, status.ReadyReplicas, inst.Metadata.Generation, time.Now())
 	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s", inst.Metadata.Namespace, inst.Metadata.Name)
 	return c.patchStatus(path, status)
 }
@@ -493,6 +498,7 @@ func writeInvalidStatus(c *k8sClient, inst RupturaInstance, problem error) error
 		LastReconcileTime:  time.Now().UTC().Format(time.RFC3339),
 		ObservedGeneration: inst.Metadata.Generation,
 	}
+	status.Conditions = conditions(inst.Status.Conditions, status.Phase, status.Message, status.ReadyReplicas, inst.Metadata.Generation, time.Now())
 	path := fmt.Sprintf("/apis/ruptura.io/v1alpha1/namespaces/%s/rupturainstances/%s", inst.Metadata.Namespace, inst.Metadata.Name)
 	return c.patchStatus(path, status)
 }
