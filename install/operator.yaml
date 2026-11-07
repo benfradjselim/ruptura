@@ -346,6 +346,29 @@ spec:
                   format: date-time
                 observedGeneration:
                   type: integer
+                conditions:
+                  type: array
+                  description: "Standard conditions: Available, Progressing, Degraded."
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys: [type]
+                  items:
+                    type: object
+                    required: [type, status, reason, message, lastTransitionTime]
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      observedGeneration:
+                        type: integer
 ---
 # ServiceAccount for the operator pod itself.
 apiVersion: v1
@@ -413,7 +436,7 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    verbs: ["get", "create", "update", "patch", "delete"]
   # OpenShift Routes (no-op on vanilla K8s — API simply won't be present)
   - apiGroups: ["route.openshift.io"]
     resources: ["routes"]
@@ -479,7 +502,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/component: operator
-    app.kubernetes.io/version: "1.4.1"
+    app.kubernetes.io/version: "1.4.2"
 spec:
   replicas: 1
   selector:
@@ -491,7 +514,7 @@ spec:
       labels:
         app.kubernetes.io/name: ruptura
         app.kubernetes.io/component: operator
-        app.kubernetes.io/version: "1.4.1"
+        app.kubernetes.io/version: "1.4.2"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
@@ -500,11 +523,11 @@ spec:
       serviceAccountName: ruptura-operator
       securityContext:
         runAsNonRoot: true
-      imagePullSecrets:
-        - name: ghcr-pull-secret
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: ruptura-operator
-          image: ghcr.io/benfradjselim/ruptura-operator:v1.4.1
+          image: ghcr.io/benfradjselim/ruptura-operator:v1.4.2
           imagePullPolicy: IfNotPresent
           args: ["--interval=30s", "--metrics-addr=:9090"]
           ports:
@@ -527,6 +550,8 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+            capabilities:
+              drop: [ALL]
           resources:
             requests:
               cpu: "50m"

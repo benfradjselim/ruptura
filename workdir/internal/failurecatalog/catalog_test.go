@@ -60,6 +60,9 @@ func set(values ...string) map[string]bool {
 
 func load(t *testing.T) []card {
 	t.Helper()
+	if _, err := os.Stat(catalogDir); os.IsNotExist(err) {
+		t.Skipf("%s is outside this checkout, as in an image build context", catalogDir)
+	}
 	files, err := filepath.Glob(filepath.Join(catalogDir, "*.yaml"))
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no catalog files in %s: %v", catalogDir, err)

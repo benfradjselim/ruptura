@@ -118,6 +118,8 @@ type RupturaInstanceStatus struct {
 	Operator           string `json:"operator,omitempty"`
 	LastReconcileTime  string `json:"lastReconcileTime,omitempty"`
 	ObservedGeneration int64  `json:"observedGeneration,omitempty"`
+	// Conditions are the standard Available, Progressing and Degraded.
+	Conditions []Condition `json:"conditions,omitempty"`
 }
 
 // ObjectMeta is a minimal subset of k8s ObjectMeta.
@@ -171,9 +173,20 @@ type PodSpec struct {
 }
 
 type PodSecurityContext struct {
-	RunAsNonRoot bool  `json:"runAsNonRoot"`
-	RunAsUser    int64 `json:"runAsUser,omitempty"`
-	FSGroup      int64 `json:"fsGroup,omitempty"`
+	RunAsNonRoot   bool            `json:"runAsNonRoot"`
+	RunAsUser      int64           `json:"runAsUser,omitempty"`
+	FSGroup        int64           `json:"fsGroup,omitempty"`
+	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty"`
+}
+
+// SeccompProfile selects the seccomp filter of a pod.
+type SeccompProfile struct {
+	Type string `json:"type"`
+}
+
+// Capabilities adds or drops Linux capabilities of a container.
+type Capabilities struct {
+	Drop []string `json:"drop,omitempty"`
 }
 
 type Container struct {
@@ -193,9 +206,10 @@ type Container struct {
 }
 
 type ContainerSecurityContext struct {
-	AllowPrivilegeEscalation bool `json:"allowPrivilegeEscalation"`
-	ReadOnlyRootFilesystem   bool `json:"readOnlyRootFilesystem,omitempty"`
-	RunAsNonRoot             bool `json:"runAsNonRoot"`
+	AllowPrivilegeEscalation bool          `json:"allowPrivilegeEscalation"`
+	ReadOnlyRootFilesystem   bool          `json:"readOnlyRootFilesystem,omitempty"`
+	RunAsNonRoot             bool          `json:"runAsNonRoot"`
+	Capabilities             *Capabilities `json:"capabilities,omitempty"`
 }
 
 type ContainerPort struct {

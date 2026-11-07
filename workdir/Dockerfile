@@ -5,7 +5,7 @@
 # Running npm inside Docker for a multi-arch build (amd64 + arm64 via QEMU)
 # can take 60+ minutes. Building locally and committing the bundle is faster
 # and more reliable — the Vite content hash guarantees correctness.
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /src
 
@@ -28,15 +28,23 @@ RUN CGO_ENABLED=0 GOOS=linux \
 # ubi-micro: minimal Red Hat UBI — required for Red Hat OperatorHub preflight certification.
 FROM registry.access.redhat.com/ubi9/ubi-micro
 
-ARG VERSION=6.7.0
+ARG VERSION=dev
 
 LABEL name="ruptura" \
       vendor="Ruptura" \
       version="${VERSION}" \
       release="1" \
       summary="Predictive workload health platform for Kubernetes" \
-      description="Ruptura detects workload ruptures before they happen by modeling composite health signals from OTLP metrics, logs, and traces."
+      description="Ruptura names Kubernetes workload failures before and as they happen, with evidence and a recommended action." \
+      maintainer="Selim Ben Fradj" \
+      url="https://github.com/benfradjselim/ruptura" \
+      io.k8s.display-name="Ruptura" \
+      io.k8s.description="Predictive failure engine for Kubernetes and OpenShift workloads." \
+      io.openshift.tags="ruptura,monitoring,observability,aiops" \
+      org.opencontainers.image.source="https://github.com/benfradjselim/ruptura" \
+      org.opencontainers.image.licenses="Apache-2.0"
 
+COPY LICENSE /licenses/LICENSE
 COPY --from=builder /ruptura /ruptura
 
 # REST API + Prometheus remote_write
