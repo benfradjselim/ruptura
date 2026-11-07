@@ -38,6 +38,13 @@ While the engine is not ready, `status.message` gives the cause Kubernetes repor
 
 One operator manages an instance at a time. It holds a Lease named `<instance>-operator` in the namespace of the instance, and `status.operator` names its namespace. A second operator on the same cluster leaves the instance alone, and takes it over only after the holder stops renewing for two minutes. Operators older than 1.4.0 do not use the Lease: remove them before installing 1.4.0.
 
+### Upgrading to 1.4.2
+
+- The engine pod meets the Pod Security `restricted` profile: seccomp `RuntimeDefault`, all capabilities dropped, read-only root filesystem. It restarts once after the upgrade.
+- `status.conditions` reports `Available`, `Progressing` and `Degraded`, read by the OpenShift console, Argo CD and kstatus.
+- The operator no longer lists or watches Secrets across the cluster.
+- The web console image listens on 8080 with any user ID and proxies `/api/` to `RUPTURA_BACKEND_URL`.
+
 ### Upgrading to 1.4.0
 
 - OTLP over HTTP moved from port 4317, paths `/otlp/v1/*`, to the standard port 4318, paths `/v1/metrics`, `/v1/logs`, `/v1/traces`. Port 4317 now serves OTLP gRPC. Point `otlphttp` exporters at `:4318`, and `otlp` exporters at `:4317`.

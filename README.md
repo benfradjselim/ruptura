@@ -30,7 +30,8 @@ Ruptura runs in your cluster, on top of the monitoring stack you already have. I
 
 ## Why Ruptura
 
-- **Conclusions, not charts.** One structured result per failure, ready for your alerts and your tools.
+- **Conclusions first.** One structured result per failure, ready for your alerts and your tools, with a forecast chart and the time range when you want to see why.
+- **Knows what it takes down.** A call graph read from what your cluster already declares names the callers each failure can hit.
 - **Your scope, your rules.** Choose the level to watch, how deep to collect, and where results go.
 - **Learns each workload.** Compares every workload with its own history, not with a global threshold.
 - **Honest by design.** Separates predicted from detected failures, and reports the data it cannot see.
@@ -65,17 +66,20 @@ Each failure is one structured result, from `GET /api/v2/failures`:
 ```json
 {
   "level": "workload",
-  "target": "demo-shop/Deployment/step-leak",
+  "target": "demo-shop/Deployment/shop-db",
   "failureMode": "saturation",
   "kind": "predicted",
   "state": "degraded",
   "etaSeconds": 626,
+  "etaEarlySeconds": 540,
+  "etaLateSeconds": 790,
   "recommendedAction": "Review the memory limit or restart the pod before it is killed",
-  "evidence": ["Memory at 75% of its limit"]
+  "evidence": ["Memory at 75% of its limit", "Can hit its callers: shop-api, shop-load"],
+  "affects": ["demo-shop/Deployment/shop-api", "demo-shop/Deployment/shop-load"]
 }
 ```
 
-Failures covered today: memory saturation, OOM kill, crash loop, pod stuck at startup, unavailable replicas, stuck rollout, CPU throttling, and failures recurring on a regular rhythm.
+Failures covered today: memory saturation, a replica that diverges from its siblings, a release that leaks, OOM kill, crash loop, pod stuck at startup, unavailable replicas, stuck rollout, CPU throttling, and failures recurring on a regular rhythm. The [failure catalog](failures/) lists 66 Kubernetes and OpenShift failures and where Ruptura stands on each.
 
 ## Getting started
 
@@ -131,7 +135,7 @@ Then open <http://localhost:8081> and sign in with password `ruptura-local-dev`.
 | Status | Scope |
 |---|---|
 | **Now** | Pod and workload failures, Kubernetes Events, `RupturaInstance` configuration, Alertmanager, including the OpenShift cluster Alertmanager |
-| **Next** | Node level, noisy neighbours, failure propagation, logs |
+| **Next** | Node level, pods without a memory limit, failure propagation along the call graph, logs |
 | **Later** | Namespace and cluster levels, traces, eBPF, OpenShift Console plugin |
 
 Ruptura is in active development and not yet recommended for production. Early adopters are welcome.
