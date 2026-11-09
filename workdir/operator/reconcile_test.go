@@ -295,3 +295,26 @@ func TestReconcile_RestrictedPodSecurity(t *testing.T) {
 		}
 	}
 }
+
+// level.namespaceSelector reaches the engine as RUPTURA_NAMESPACE_SELECTOR.
+func TestReconcile_NamespaceSelector(t *testing.T) {
+	tests := []struct {
+		name   string
+		labels map[string]string
+		want   string
+	}{
+		{"opt-in label", map[string]string{"ruptura.io/enabled": "true"}, "ruptura.io/enabled=true"},
+		{"empty watches every namespace", nil, ""},
+	}
+	for _, tc := range tests {
+		c, rec := recordingClient(t, false)
+		inst := makeInstance("ri", testNS)
+		inst.Spec.Level.NamespaceSelector.MatchLabels = tc.labels
+		if err := reconcile(context.Background(), c, inst, false); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := envOf(t, rec)["RUPTURA_NAMESPACE_SELECTOR"]["value"].(string); got != tc.want {
+			t.Errorf("%s: RUPTURA_NAMESPACE_SELECTOR = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}

@@ -106,6 +106,13 @@ spec:
                         matchLabels:
                           type: object
                           additionalProperties: {type: string}
+                    namespaceSelector:
+                      type: object
+                      description: "Watch only namespaces with these labels, for example ruptura.io/enabled: \"true\". Empty watches every namespace."
+                      properties:
+                        matchLabels:
+                          type: object
+                          additionalProperties: {type: string}
                 input:
                   type: object
                   description: "How much telemetry this instance collects."

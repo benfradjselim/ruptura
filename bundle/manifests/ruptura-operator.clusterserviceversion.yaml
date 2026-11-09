@@ -55,6 +55,8 @@ spec:
 
     ## Configuration
 
+    - `level.namespaceSelector`: watch only the namespaces that carry a label,
+      for example `ruptura.io/enabled: "true"`; empty watches every namespace.
     - `level.scope` and `level.selector`: report per workload, pod or namespace,
       and limit results to workloads with given labels.
     - `input.profile`: which metrics the engine reads.

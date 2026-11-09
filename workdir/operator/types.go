@@ -59,6 +59,9 @@ type LabelSelector struct {
 type LevelConfig struct {
 	Scope    string        `json:"scope,omitempty"`
 	Selector LabelSelector `json:"selector,omitempty"`
+	// NamespaceSelector limits results to namespaces with these labels; empty
+	// watches every namespace.
+	NamespaceSelector LabelSelector `json:"namespaceSelector,omitempty"`
 }
 
 // InputConfig selects the input profile.

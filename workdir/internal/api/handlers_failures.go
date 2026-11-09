@@ -244,6 +244,7 @@ func (h *Handlers) Failures() []*FailureResult {
 		}
 	}
 	selected := selectFailures(results, h.levelSelector, h.workloadLabels)
+	selected = selectNamespaces(selected, h.namespaceSelector, h.namespaceLabels)
 	scoped := make([]*FailureResult, 0, len(selected))
 	now := time.Now()
 	changes := h.discovery.RecentChanges(now.Add(-changeWindow))
@@ -293,4 +294,41 @@ func oomExplained(est *failuremodes.Estimate) bool {
 		return false
 	}
 	return est.Mode == failuremodes.ModeOOMKilled || (est.Mode == failuremodes.ModeRecurrentFailure && est.Reason == failuremodes.OOMReason)
+}
+
+// NamespaceLabels returns the labels of a namespace, false when unknown.
+type NamespaceLabels interface {
+	Of(namespace string) (map[string]string, bool)
+}
+
+// SetNamespaceSelector limits failure results to namespaces with these labels,
+// read from source. An empty selector keeps every namespace.
+func (h *Handlers) SetNamespaceSelector(selector map[string]string, source NamespaceLabels) {
+	h.namespaceSelector, h.namespaceLabels = selector, source
+}
+
+// selectNamespaces keeps results whose namespace has every selected label. A
+// namespace with unknown labels is left out, because it cannot be shown to match.
+func selectNamespaces(results []*FailureResult, selector map[string]string, source NamespaceLabels) []*FailureResult {
+	if len(selector) == 0 {
+		return results
+	}
+	kept := []*FailureResult{}
+	for _, result := range results {
+		if source == nil {
+			continue
+		}
+		labels, ok := source.Of(strings.SplitN(result.Workload, "/", 2)[0])
+		if !ok {
+			continue
+		}
+		matches := true
+		for key, value := range selector {
+			matches = matches && labels[key] == value
+		}
+		if matches {
+			kept = append(kept, result)
+		}
+	}
+	return kept
 }

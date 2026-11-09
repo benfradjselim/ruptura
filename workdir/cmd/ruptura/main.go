@@ -17,6 +17,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/analyzer"
 	"github.com/benfradjselim/ruptura/internal/api"
 	"github.com/benfradjselim/ruptura/internal/callgraph"
+	"github.com/benfradjselim/ruptura/internal/namespaces"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/admission"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/co"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/dag"
@@ -523,6 +524,16 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	handlers.SetLevelScope(os.Getenv("RUPTURA_LEVEL_SCOPE"))
 	handlers.SetLevelSelector(api.ParseSelector(os.Getenv("RUPTURA_LEVEL_SELECTOR")))
+	if selector := api.ParseSelector(os.Getenv("RUPTURA_NAMESPACE_SELECTOR")); len(selector) > 0 {
+		var source api.NamespaceLabels
+		if labels, err := namespaces.New(); err != nil {
+			logger.Default.Warn("namespace selector set but namespace labels unavailable, no failure is reported", "err", err)
+		} else {
+			go labels.Run(ctx)
+			source = labels
+		}
+		handlers.SetNamespaceSelector(selector, source)
+	}
 	startAlerts(ctx, handlers)
 	if horizon := os.Getenv("RUPTURA_HORIZON"); horizon != "" {
 		parsed, err := time.ParseDuration(horizon)

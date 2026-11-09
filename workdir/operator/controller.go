@@ -548,6 +548,7 @@ func configEnv(spec RupturaInstanceSpec) []EnvVar {
 	values := []EnvVar{
 		{Name: "RUPTURA_LEVEL_SCOPE", Value: spec.Level.Scope},
 		{Name: "RUPTURA_LEVEL_SELECTOR", Value: selectorString(spec.Level.Selector.MatchLabels)},
+		{Name: "RUPTURA_NAMESPACE_SELECTOR", Value: selectorString(spec.Level.NamespaceSelector.MatchLabels)},
 		{Name: "RUPTURA_INPUT_PROFILE", Value: spec.Input.Profile},
 		{Name: "RUPTURA_SENSITIVITY", Value: spec.Analysis.Sensitivity},
 		{Name: "RUPTURA_HORIZON", Value: spec.Analysis.Horizon},

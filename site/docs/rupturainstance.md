@@ -34,6 +34,7 @@ spec:
 |---|---|---|---|
 | `level.scope` | `pod`, `workload`, `namespace` | `workload` | How results are reported. Other values in the schema are planned and refused for now. |
 | `level.selector.matchLabels` | labels | none | Only workloads with these labels are reported and alerted. |
+| `level.namespaceSelector.matchLabels` | labels | none | Only namespaces with these labels are reported and alerted, for example `ruptura.io/enabled: "true"` with `oc label namespace shop ruptura.io/enabled=true`. Empty watches every namespace. |
 | `input.profile` | `minimal`, `standard` | `standard` | How much telemetry is collected. `full` and `deep` are planned. |
 | `input.prometheus.url` | `http` or `https` URL | OpenShift: the cluster Thanos querier. Kubernetes: none | Prometheus compatible query endpoint. Without it only `crash_loop` is reported. |
 | `analysis.sensitivity` | `conservative`, `balanced`, `aggressive` | `balanced` | How early forecasts warn. |

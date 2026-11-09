@@ -54,6 +54,8 @@ type Handlers struct {
     demoMode      bool
     failureModes  FailureEstimates
 	callGraph CallGraphSource
+	namespaceSelector map[string]string
+	namespaceLabels   NamespaceLabels
 	inputs InputCoverage
 	horizon time.Duration
 	levelScope string
