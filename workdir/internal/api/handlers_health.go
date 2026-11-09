@@ -30,6 +30,9 @@ const prometheusTextFormat = "text/plain; version=0.0.4; charset=utf-8"
 func (h *Handlers) handleMetrics(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", prometheusTextFormat)
     w.Write([]byte(h.metrics.Render()))
+    if h.store != nil {
+        w.Write([]byte(failureMetrics(h.Failures())))
+    }
 }
 
 func (h *Handlers) handleTimeline(w http.ResponseWriter, r *http.Request) {

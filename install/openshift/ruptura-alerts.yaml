@@ -1,0 +1,68 @@
+# Raises every failure Ruptura names as a native OpenShift alert, shown in
+# Observe > Alerting and routed by the cluster Alertmanager. Apply in the
+# namespace of the Ruptura engine (here ruptura-system), labelled for platform
+# monitoring:
+#   oc label namespace ruptura-system openshift.io/cluster-monitoring=true
+#   oc apply -n ruptura-system -f ruptura-alerts.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ruptura-prometheus-k8s
+rules:
+- apiGroups: [""]
+  resources: [services, endpoints, pods]
+  verbs: [get, list, watch]
+- apiGroups: [discovery.k8s.io]
+  resources: [endpointslices]
+  verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ruptura-prometheus-k8s
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: ruptura-prometheus-k8s}
+subjects:
+- {kind: ServiceAccount, name: prometheus-k8s, namespace: openshift-monitoring}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ruptura
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: ruptura}
+    matchExpressions:
+    - {key: app.kubernetes.io/component, operator: DoesNotExist}
+  endpoints:
+  - port: api
+    path: /api/v2/metrics
+    interval: 30s
+    # Keep the namespace and pod of the failing workload, not the engine's.
+    honorLabels: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ruptura-failures
+spec:
+  groups:
+  - name: ruptura.failures
+    rules:
+    - alert: RupturaFailurePredicted
+      expr: ruptura_failure_eta_seconds{failure_kind="predicted"} > 0
+      labels:
+        source: ruptura
+      annotations:
+        summary: '{{ $labels.workload }} in {{ $labels.namespace }}: {{ $labels.failure_mode }} predicted by Ruptura in {{ $value | humanizeDuration }}'
+        description: >-
+          Ruptura predicts {{ $labels.failure_mode }} for {{ $labels.workload_kind }} {{ $labels.workload }}
+          (pod {{ $labels.pod }}) in {{ $value | humanizeDuration }}{{ with query (printf "ruptura_failure_eta_early_seconds{namespace='%s',workload='%s',failure_mode='%s'}" $labels.namespace $labels.workload $labels.failure_mode) }},
+          window {{ . | first | value | humanizeDuration }}{{ end }}{{ with query (printf "ruptura_failure_eta_late_seconds{namespace='%s',workload='%s',failure_mode='%s'}" $labels.namespace $labels.workload $labels.failure_mode) }}
+          to {{ . | first | value | humanizeDuration }}{{ end }}. Action: {{ $labels.action }}.
+    - alert: RupturaFailureDetected
+      expr: ruptura_failure_eta_seconds{failure_kind="detected"} == 0
+      labels:
+        source: ruptura
+      annotations:
+        summary: '{{ $labels.workload }} in {{ $labels.namespace }}: {{ $labels.failure_mode }} detected by Ruptura'
+        description: 'Ruptura detects {{ $labels.failure_mode }} on {{ $labels.workload_kind }} {{ $labels.workload }}. Action: {{ $labels.action }}.'
