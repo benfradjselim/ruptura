@@ -48,7 +48,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "8.7.4"
+const version = "8.7.5"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {

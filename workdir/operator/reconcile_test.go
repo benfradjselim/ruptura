@@ -115,7 +115,7 @@ func TestReconcile_SecurityContextByPlatform(t *testing.T) {
 // Defect 2: default image.
 func TestReconcile_DefaultImage(t *testing.T) {
 	cases := []struct{ name, image, want string }{
-		{"default", "", "docker.io/selimbf/ruptura:v8.7.4"},
+		{"default", "", "docker.io/selimbf/ruptura:v8.7.5"},
 		{"override", "example.com/x:1", "example.com/x:1"},
 	}
 	for _, tc := range cases {
@@ -132,18 +132,18 @@ func TestReconcile_DefaultImage(t *testing.T) {
 			}
 		})
 	}
-	if defaultImage != "docker.io/selimbf/ruptura:v8.7.4" {
+	if defaultImage != "docker.io/selimbf/ruptura:v8.7.5" {
 		t.Fatalf("defaultImage = %s", defaultImage)
 	}
 }
 
 // Defect 3: one version constant, used in the startup log line.
 func TestOperatorVersion(t *testing.T) {
-	if operatorVersion != "1.4.4" {
-		t.Fatalf("operatorVersion = %s, want 1.4.4", operatorVersion)
+	if operatorVersion != "1.4.5" {
+		t.Fatalf("operatorVersion = %s, want 1.4.5", operatorVersion)
 	}
 	line := startupMessage("30s")
-	if !strings.Contains(line, `version="1.4.4"`) || strings.Contains(line, "0.6.9") {
+	if !strings.Contains(line, `version="1.4.5"`) || strings.Contains(line, "0.6.9") {
 		t.Fatalf("startup line has wrong version: %s", line)
 	}
 }
