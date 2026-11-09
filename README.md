@@ -144,6 +144,7 @@ Ruptura is in active development and not yet recommended for production. Early a
 
 - [Discussions](https://github.com/benfradjselim/ruptura/discussions) for questions and ideas
 - [Issues](https://github.com/benfradjselim/ruptura/issues) for bugs and requests
+- [Become an early adopter](https://github.com/benfradjselim/ruptura/issues/new?template=early-adopter.yml): try Ruptura on a test cluster and shape the roadmap · [Adopters](ADOPTERS.md)
 - [Contributing guide](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Security policy](SECURITY.md) · [Governance](GOVERNANCE.md)
 
 ## License

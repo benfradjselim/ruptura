@@ -1,0 +1,43 @@
+name: Become an early adopter
+description: Try Ruptura on a test cluster and help shape the roadmap.
+title: "Early adopter: <your team or company>"
+labels: ["early-adopter"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Ruptura. Early adopters get help with installation, a 30 minute call every two weeks if they want one, and their needs at the top of the roadmap.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - OpenShift
+        - Kubernetes (managed)
+        - Kubernetes (self-managed)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: size
+    attributes:
+      label: Cluster size
+      description: Number of nodes and workloads, roughly.
+  - type: textarea
+    id: pain
+    attributes:
+      label: Which failures page you most often?
+      description: For example OOM kills, crash loops, stuck rollouts.
+    validations:
+      required: true
+  - type: textarea
+    id: stack
+    attributes:
+      label: Monitoring stack
+      description: Prometheus, Thanos, Alertmanager, OpenTelemetry, other.
+  - type: checkboxes
+    id: adopters
+    attributes:
+      label: Listing
+      options:
+        - label: You may list my organization in ADOPTERS.md
