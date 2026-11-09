@@ -183,3 +183,13 @@ func TestAnnotationsCarryImpact(t *testing.T) {
 		}
 	}
 }
+
+func TestAnnotationsCarryDetails(t *testing.T) {
+	notes := annotations(Alert{Summary: "act", Severity: "degraded", Description: "Predicted saturation in 14 min.", TimeLeft: "14 min", Window: "11 min to 19 min"})
+	if notes["description"] != "Predicted saturation in 14 min." || notes["time_left"] != "14 min" || notes["failure_window"] != "11 min to 19 min" {
+		t.Errorf("got %v", notes)
+	}
+	if _, ok := annotations(Alert{Summary: "act"})["time_left"]; ok {
+		t.Error("an empty time left must be left out")
+	}
+}

@@ -74,14 +74,18 @@ func startAlerts(ctx context.Context, handlers *api.Handlers) {
 func sendAlerts(ctx context.Context, clients []*alertmanager.Client, failures []*api.FailureResult) {
 	alerts := make([]alertmanager.Alert, 0, len(failures))
 	for _, failure := range failures {
+		description, timeLeft, window := api.AlertDetails(failure)
 		alerts = append(alerts, alertmanager.Alert{
-			Name:     failure.FailureMode,
-			Severity: failure.State,
-			Level:    failure.Level,
-			Target:   failure.Target,
-			Kind:     failure.Kind,
-			Summary:  failure.RecommendedAction,
-			Impact:   api.ImpactText(failure.Affects),
+			Name:        failure.FailureMode,
+			Severity:    failure.State,
+			Level:       failure.Level,
+			Target:      failure.Target,
+			Kind:        failure.Kind,
+			Summary:     failure.RecommendedAction,
+			Impact:      api.ImpactText(failure.Affects),
+			Description: description,
+			TimeLeft:    timeLeft,
+			Window:      window,
 		})
 	}
 	for _, client := range clients {

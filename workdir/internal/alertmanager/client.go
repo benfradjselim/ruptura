@@ -32,6 +32,11 @@ type Alert struct {
 	Summary  string
 	// Impact names the callers a failure can hit, empty when none is known.
 	Impact string
+	// Description, TimeLeft and Window detail a failure for whoever reads the
+	// alert; empty values are left out.
+	Description string
+	TimeLeft    string
+	Window      string
 }
 
 type postableAlert struct {
@@ -169,8 +174,10 @@ func (c *Client) Send(ctx context.Context, alerts []Alert) error {
 
 func annotations(alert Alert) map[string]string {
 	notes := map[string]string{"summary": alert.Summary, "state": alert.Severity}
-	if alert.Impact != "" {
-		notes["impact"] = alert.Impact
+	for key, value := range map[string]string{"impact": alert.Impact, "description": alert.Description, "time_left": alert.TimeLeft, "failure_window": alert.Window} {
+		if value != "" {
+			notes[key] = value
+		}
 	}
 	return notes
 }
