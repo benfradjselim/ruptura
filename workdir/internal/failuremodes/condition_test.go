@@ -1,6 +1,7 @@
 package failuremodes
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -122,6 +123,31 @@ func TestTracker_MostUrgentMode(t *testing.T) {
 			est, ok := tr.Worst(w, last)
 			if ok != tt.wantAlive || est.Mode != tt.wantMode {
 				t.Fatalf("worst = %+v ok = %v, want mode %s", est, ok, tt.wantMode)
+			}
+		})
+	}
+}
+
+func TestCondition_NonFiniteRatioIsNotThrottling(t *testing.T) {
+	tests := []struct {
+		name  string
+		ratio float64
+		want  bool
+	}{
+		{"positive infinity", math.Inf(1), false},
+		{"negative infinity", math.Inf(-1), false},
+		{"not a number", math.NaN(), false},
+		{"negative", -0.5, false},
+		{"above one", 3, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			est, ok := ratioRun(NewCondition(), 0, 10, tt.ratio)
+			if ok != tt.want {
+				t.Fatalf("active = %v, want %v", ok, tt.want)
+			}
+			if ok && est.Usage != 1 {
+				t.Fatalf("usage = %v, want 1", est.Usage)
 			}
 		})
 	}

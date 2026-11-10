@@ -1,6 +1,9 @@
 package failuremodes
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 // ModeCPUThrottling is a condition that is already happening: the container is
 // being throttled by its CPU limit.
@@ -43,6 +46,7 @@ func NewCondition() *Condition { return &Condition{} }
 // The estimate has a zero ETF because the condition is already happening, and
 // Usage carries the current ratio.
 func (c *Condition) Observe(at time.Time, ratio float64) (Estimate, bool) {
+	ratio = clampRatio(ratio)
 	if !c.last.IsZero() && at.Sub(c.last) > conditionMaxGap {
 		c.runStart, c.belowSince = time.Time{}, time.Time{}
 	}
@@ -68,6 +72,15 @@ func (c *Condition) Observe(at time.Time, ratio float64) (Estimate, bool) {
 		return Estimate{}, false
 	}
 	return Estimate{Mode: ModeCPUThrottling, Confidence: 1, Usage: ratio}, true
+}
+
+// clampRatio bounds a throttled-periods ratio to [0, 1]. A query dividing by a
+// zero periods rate returns NaN or +Inf, which counts as no throttling.
+func clampRatio(ratio float64) float64 {
+	if math.IsNaN(ratio) || math.IsInf(ratio, 0) || ratio < 0 {
+		return 0
+	}
+	return math.Min(ratio, 1)
 }
 
 // urgency orders estimates: the smallest value is the most urgent.
