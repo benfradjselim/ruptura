@@ -43,6 +43,8 @@ spec:
 | `logging.level` | `debug`, `info`, `warn`, `error` | `info` | Engine log level. |
 | `image` | image reference | engine version of the operator | Engine image. |
 | `storageSize` | quantity | `10Gi` | Size of the engine volume. |
+| `storageClassName` | StorageClass name | cluster default | StorageClass of the engine volume claim. |
+| `ephemeralStorage` | `true`, `false` | `false` | Keep engine data in an emptyDir instead of a volume claim, for clusters without working storage. History is lost when the pod restarts. |
 | `apiKeyRef` | Secret name | generated | Secret holding the API key under `api-key`. |
 | `resources` | requests and limits | 100m and 128Mi, 1 CPU and 512Mi | Engine resources. |
 

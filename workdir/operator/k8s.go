@@ -6,8 +6,10 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -113,9 +115,22 @@ func (c *k8sClient) apply(path string, obj interface{}) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("apply %s → %d", path, resp.StatusCode)
+		return fmt.Errorf("apply %s → %d: %s", path, resp.StatusCode, statusMessage(resp.Body))
 	}
 	return nil
+}
+
+// statusMessage returns the message of a Kubernetes Status body, so an error
+// says why the API server refused the request.
+func statusMessage(body io.Reader) string {
+	var st struct {
+		Message string `json:"message"`
+	}
+	raw, _ := io.ReadAll(io.LimitReader(body, 64<<10))
+	if json.Unmarshal(raw, &st) == nil && st.Message != "" {
+		return st.Message
+	}
+	return strings.TrimSpace(string(raw))
 }
 
 // patchStatus updates the /status subresource with a merge-patch.

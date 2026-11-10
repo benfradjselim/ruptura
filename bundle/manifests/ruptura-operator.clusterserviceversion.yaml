@@ -118,6 +118,14 @@ spec:
             displayName: Storage Size
             description: Size of the engine storage volume, for example 10Gi.
             x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:text"]
+          - path: storageClassName
+            displayName: Storage Class
+            description: StorageClass of the engine volume. Empty uses the cluster default.
+            x-descriptors: ["urn:alm:descriptor:io.kubernetes:StorageClass"]
+          - path: ephemeralStorage
+            displayName: Ephemeral Storage
+            description: Keep engine data in an emptyDir instead of a volume claim. History is lost when the pod restarts.
+            x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:booleanSwitch"]
           - path: apiKeyRef
             displayName: API Key Secret
             description: Secret with an api-key key. Generated when empty.
@@ -175,7 +183,7 @@ spec:
               resources: ["configmaps"]
               verbs: ["get", "create", "update", "patch", "delete"]
             - apiGroups: [""]
-              resources: ["pods"]
+              resources: ["pods", "events"]
               verbs: ["get", "list"]
             - apiGroups: ["coordination.k8s.io"]
               resources: ["leases"]

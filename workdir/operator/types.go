@@ -23,6 +23,12 @@ type RupturaInstanceSpec struct {
 	Replicas int32 `json:"replicas,omitempty"`
 	// StorageSize is the PVC size for BadgerDB persistence (default: 10Gi).
 	StorageSize string `json:"storageSize,omitempty"`
+	// StorageClassName selects the StorageClass of the data PVC. Empty uses the
+	// cluster default.
+	StorageClassName string `json:"storageClassName,omitempty"`
+	// EphemeralStorage keeps engine data in an emptyDir instead of a PVC, for
+	// clusters without working storage. History is lost when the pod restarts.
+	EphemeralStorage bool `json:"ephemeralStorage,omitempty"`
 	// APIKeyRef is the name of a Secret whose "api-key" key becomes RUPTURA_API_KEY.
 	APIKeyRef string `json:"apiKeyRef,omitempty"`
 	// Edition is "community" or "autopilot" (default: community).
@@ -253,8 +259,14 @@ type HTTPGetAction struct {
 type Volume struct {
 	Name                  string                 `json:"name"`
 	PersistentVolumeClaim *PVCVolumeSource       `json:"persistentVolumeClaim,omitempty"`
+	EmptyDir              *EmptyDirVolumeSource  `json:"emptyDir,omitempty"`
 	ConfigMap             *ConfigMapVolumeSource `json:"configMap,omitempty"`
 	Projected             *ProjectedVolumeSource `json:"projected,omitempty"`
+}
+
+// EmptyDirVolumeSource is a pod-lifetime scratch volume.
+type EmptyDirVolumeSource struct {
+	SizeLimit string `json:"sizeLimit,omitempty"`
 }
 
 // ConfigMapVolumeSource mounts selected keys of a ConfigMap.
@@ -311,8 +323,9 @@ type PVC struct {
 }
 
 type PVCSpec struct {
-	AccessModes []string                `json:"accessModes"`
-	Resources   PVCResourceRequirements `json:"resources"`
+	AccessModes      []string                `json:"accessModes"`
+	StorageClassName string                  `json:"storageClassName,omitempty"`
+	Resources        PVCResourceRequirements `json:"resources"`
 }
 
 type PVCResourceRequirements struct {

@@ -178,8 +178,10 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	if err := reconcileServiceAccount(c, ns, labels); err != nil {
 		return fmt.Errorf("ServiceAccount: %w", err)
 	}
-	if err := reconcilePVC(c, ns, name, storageSize, labels); err != nil {
-		return fmt.Errorf("PVC: %w", err)
+	if !inst.Spec.EphemeralStorage {
+		if err := reconcilePVC(c, ns, name, storageSize, inst.Spec.StorageClassName, labels); err != nil {
+			return fmt.Errorf("PVC: %w", err)
+		}
 	}
 	apiKeyRef := inst.Spec.APIKeyRef
 	if apiKeyRef == "" {
@@ -228,7 +230,7 @@ func reconcileServiceAccount(c *k8sClient, ns string, labels map[string]string) 
 	return c.apply(path, sa)
 }
 
-func reconcilePVC(c *k8sClient, ns, name, size string, labels map[string]string) error {
+func reconcilePVC(c *k8sClient, ns, name, size, storageClass string, labels map[string]string) error {
 	pvc := PVC{
 		APIVersion: "v1",
 		Kind:       "PersistentVolumeClaim",
@@ -238,7 +240,8 @@ func reconcilePVC(c *k8sClient, ns, name, size string, labels map[string]string)
 			Labels:    labels,
 		},
 		Spec: PVCSpec{
-			AccessModes: []string{"ReadWriteOnce"},
+			AccessModes:      []string{"ReadWriteOnce"},
+			StorageClassName: storageClass,
 			Resources: PVCResourceRequirements{
 				Requests: map[string]string{"storage": size},
 			},
@@ -263,7 +266,7 @@ func reconcileDeployment(c *k8sClient, ns, name, image, edition, apiKeyRef strin
 		},
 	})
 	mounts := []VolumeMount{{Name: "data", MountPath: "/var/lib/ruptura/data"}}
-	volumes := []Volume{{Name: "data", PersistentVolumeClaim: &PVCVolumeSource{ClaimName: name + "-data"}}}
+	volumes := []Volume{dataVolume(name, spec)}
 	if url := prometheusURL(spec, isOCP); url != "" {
 		env = append(env, EnvVar{Name: "RUPTURA_THANOS_URL", Value: url})
 	}
@@ -447,7 +450,7 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 
 	phase, message := "Running", ""
 	if dep.Status.ReadyReplicas == 0 {
-		phase, message = "Pending", notReadyReason(c, ns, name)
+		phase, message = "Pending", notReadyReason(c, ns, name, inst.Spec.EphemeralStorage)
 	}
 
 	status := RupturaInstanceStatus{
@@ -563,6 +566,19 @@ func configEnv(spec RupturaInstanceSpec) []EnvVar {
 		}
 	}
 	return env
+}
+
+// dataVolume is the engine data volume: the instance PVC, or an emptyDir
+// bounded by the storage size when storage is ephemeral.
+func dataVolume(name string, spec RupturaInstanceSpec) Volume {
+	if spec.EphemeralStorage {
+		size := spec.StorageSize
+		if size == "" {
+			size = defaultStorageSize
+		}
+		return Volume{Name: "data", EmptyDir: &EmptyDirVolumeSource{SizeLimit: size}}
+	}
+	return Volume{Name: "data", PersistentVolumeClaim: &PVCVolumeSource{ClaimName: name + "-data"}}
 }
 
 // generatedSecretName returns the name of the operator-generated API key Secret.

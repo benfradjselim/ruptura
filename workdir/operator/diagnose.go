@@ -47,7 +47,7 @@ var startingReasons = map[string]bool{"": true, "ContainerCreating": true, "PodI
 
 // notReadyReason reads what Kubernetes reports about an instance that is not
 // ready, so the status names the cause instead of only "Pending".
-func notReadyReason(c *k8sClient, ns, name string) string {
+func notReadyReason(c *k8sClient, ns, name string, ephemeral bool) string {
 	var pods struct {
 		Items []podInfo `json:"items"`
 	}
@@ -58,7 +58,9 @@ func notReadyReason(c *k8sClient, ns, name string) string {
 			Phase string `json:"phase"`
 		} `json:"status"`
 	}
-	_ = c.get(fmt.Sprintf("/api/v1/namespaces/%s/persistentvolumeclaims/%s-data", ns, name), &pvc)
+	if !ephemeral {
+		_ = c.get(fmt.Sprintf("/api/v1/namespaces/%s/persistentvolumeclaims/%s-data", ns, name), &pvc)
+	}
 	var dep struct {
 		Status struct {
 			Conditions []condition `json:"conditions"`
@@ -71,7 +73,34 @@ func notReadyReason(c *k8sClient, ns, name string) string {
 			failed = cond.Message
 		}
 	}
-	return explainNotReady(name, pods.Items, pvc.Status.Phase, failed)
+	reason := explainNotReady(name, pods.Items, pvc.Status.Phase, failed)
+	if pvc.Status.Phase != "" && pvc.Status.Phase != "Bound" && strings.HasPrefix(reason, "volume claim") {
+		if warning := latestWarning(c, ns, "PersistentVolumeClaim", name+"-data"); warning != "" {
+			reason = bounded(reason + ": " + warning)
+		}
+	}
+	return reason
+}
+
+// latestWarning returns the message of the most recent Warning event about an
+// object, such as the provisioner saying why a volume cannot be created.
+func latestWarning(c *k8sClient, ns, kind, name string) string {
+	var events struct {
+		Items []struct {
+			Type          string `json:"type"`
+			Message       string `json:"message"`
+			LastTimestamp string `json:"lastTimestamp"`
+		} `json:"items"`
+	}
+	query := url.Values{"fieldSelector": {"involvedObject.kind=" + kind + ",involvedObject.name=" + name}}.Encode()
+	_ = c.get(fmt.Sprintf("/api/v1/namespaces/%s/events?%s", ns, query), &events)
+	latest, message := "", ""
+	for _, ev := range events.Items {
+		if ev.Type == "Warning" && ev.LastTimestamp >= latest {
+			latest, message = ev.LastTimestamp, ev.Message
+		}
+	}
+	return message
 }
 
 // explainNotReady picks the most specific cause: a failing container, then a

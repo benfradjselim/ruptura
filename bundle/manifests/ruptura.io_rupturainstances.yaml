@@ -59,6 +59,13 @@ spec:
                   type: string
                   default: "10Gi"
                   description: "PVC size for BadgerDB persistence."
+                storageClassName:
+                  type: string
+                  description: "StorageClass of the data PVC. Empty uses the cluster default."
+                ephemeralStorage:
+                  type: boolean
+                  default: false
+                  description: "Keep engine data in an emptyDir instead of a PVC, for clusters without working storage. History is lost when the pod restarts."
                 apiKeyRef:
                   type: string
                   description: "Name of a Secret with an 'api-key' key. Becomes RUPTURA_API_KEY."
