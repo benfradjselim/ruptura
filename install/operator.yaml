@@ -340,6 +340,17 @@ spec:
                       type: string
                       enum: [debug, info, warn, error]
                       default: info
+                console:
+                  type: object
+                  description: "Web console deployed next to the engine."
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                      description: "Deploy the console, its Service and, on OpenShift, its Route."
+                    image:
+                      type: string
+                      description: "Console image. Defaults to the console of the operator release."
             status:
               type: object
               properties:
@@ -516,7 +527,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/component: operator
-    app.kubernetes.io/version: "1.4.6"
+    app.kubernetes.io/version: "1.4.7"
 spec:
   replicas: 1
   selector:
@@ -528,7 +539,7 @@ spec:
       labels:
         app.kubernetes.io/name: ruptura
         app.kubernetes.io/component: operator
-        app.kubernetes.io/version: "1.4.6"
+        app.kubernetes.io/version: "1.4.7"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
@@ -541,7 +552,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ruptura-operator
-          image: ghcr.io/benfradjselim/ruptura-operator:v1.4.6
+          image: ghcr.io/benfradjselim/ruptura-operator:v1.4.7
           imagePullPolicy: IfNotPresent
           args: ["--interval=30s", "--metrics-addr=:9090"]
           ports:

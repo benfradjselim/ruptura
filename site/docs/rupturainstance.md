@@ -45,6 +45,8 @@ spec:
 | `storageSize` | quantity | `10Gi` | Size of the engine volume. |
 | `storageClassName` | StorageClass name | cluster default | StorageClass of the engine volume claim. |
 | `ephemeralStorage` | `true`, `false` | `false` | Keep engine data in an emptyDir instead of a volume claim, for clusters without working storage. History is lost when the pod restarts. |
+| `console.enabled` | `true`, `false` | `true` | Deploy the web console as `<name>-console`, with its Service and, on OpenShift, its Route. Sign in with the API key. |
+| `console.image` | image reference | console of the operator release | Console image. |
 | `apiKeyRef` | Secret name | generated | Secret holding the API key under `api-key`. |
 | `resources` | requests and limits | 100m and 128Mi, 1 CPU and 512Mi | Engine resources. |
 

@@ -332,6 +332,17 @@ spec:
                       type: string
                       enum: [debug, info, warn, error]
                       default: info
+                console:
+                  type: object
+                  description: "Web console deployed next to the engine."
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                      description: "Deploy the console, its Service and, on OpenShift, its Route."
+                    image:
+                      type: string
+                      description: "Console image. Defaults to the console of the operator release."
             status:
               type: object
               properties:

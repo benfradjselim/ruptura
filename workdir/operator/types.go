@@ -49,6 +49,16 @@ type RupturaInstanceSpec struct {
 	Alerting AlertingConfig `json:"alerting,omitempty"`
 	// Logging sets the engine log level.
 	Logging LoggingConfig `json:"logging,omitempty"`
+	// Console deploys the web console next to the engine.
+	Console ConsoleConfig `json:"console,omitempty"`
+}
+
+// ConsoleConfig controls the web console the operator deploys.
+type ConsoleConfig struct {
+	// Enabled deploys the console; nil means true.
+	Enabled *bool `json:"enabled,omitempty"`
+	// Image overrides the console image.
+	Image string `json:"image,omitempty"`
 }
 
 // DeploymentConfig selects how the engine runs.
