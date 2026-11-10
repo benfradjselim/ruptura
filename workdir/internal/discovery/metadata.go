@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -88,18 +89,6 @@ type podListResp struct {
 		Continue        string `json:"continue"`
 	} `json:"metadata"`
 	Items []k8sPod `json:"items"`
-}
-
-// workloadWatchEvent wraps a single k8sWorkload watch event.
-type workloadWatchEvent struct {
-	Type   string      `json:"type"`
-	Object k8sWorkload `json:"object"`
-}
-
-// podWatchEvent wraps a single k8sPod watch event.
-type podWatchEvent struct {
-	Type   string `json:"type"`
-	Object k8sPod `json:"object"`
 }
 
 func toWorkloadMeta(w k8sWorkload, kind string) WorkloadMeta {
@@ -194,35 +183,92 @@ func (inf *Informer) listWorkloads(ctx context.Context, path, kind string) (stri
 	}
 }
 
-// watchWorkloads streams WATCH events for one resource type and updates cache.
-func (inf *Informer) watchWorkloads(ctx context.Context, path, kind, rv string) error {
-	url := fmt.Sprintf("%s/%s?watch=true&resourceVersion=%s&timeoutSeconds=300", inf.apiBase, path, rv)
+// errWatchExpired reports that the API server no longer holds the requested
+// resourceVersion, so the cache must be rebuilt with a LIST.
+var errWatchExpired = errors.New("resource version expired")
+
+// rawWatchEvent is the envelope shared by every WATCH event; Object is decoded
+// by the caller once the type is known.
+type rawWatchEvent struct {
+	Type   string          `json:"type"`
+	Object json.RawMessage `json:"object"`
+}
+
+// openWatch starts a WATCH on path from rv. A 410 answer is errWatchExpired.
+func (inf *Informer) openWatch(ctx context.Context, path, rv string) (*http.Response, error) {
+	url := fmt.Sprintf("%s/%s?watch=true&allowWatchBookmarks=true&resourceVersion=%s&timeoutSeconds=300", inf.apiBase, path, rv)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+inf.token)
-
 	resp, err := inf.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("watch %s: %w", path, err)
+		return nil, fmt.Errorf("watch %s: %w", path, err)
 	}
-	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return resp, nil
+	case http.StatusGone:
+		resp.Body.Close()
+		return nil, errWatchExpired
+	default:
+		resp.Body.Close()
+		return nil, fmt.Errorf("watch %s: unexpected status %d", path, resp.StatusCode)
+	}
+}
 
-	dec := json.NewDecoder(resp.Body)
+// streamWatch decodes events until the stream ends and returns the last
+// resourceVersion seen, from which the next WATCH resumes. The server closing
+// the stream after timeoutSeconds is the normal end and returns a nil error.
+// An ERROR event, which carries 410 when rv has expired, returns errWatchExpired.
+func streamWatch(body io.Reader, rv string, handle func(eventType string, object json.RawMessage) string) (string, error) {
+	dec := json.NewDecoder(body)
 	for {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		var ev workloadWatchEvent
+		var ev rawWatchEvent
 		if err := dec.Decode(&ev); err != nil {
-			return fmt.Errorf("decode watch %s: %w", path, err)
-		}
-		m := ev.Object
-		if m.Metadata.Namespace == "" || m.Metadata.Name == "" {
-			continue
+			if errors.Is(err, io.EOF) {
+				return rv, nil
+			}
+			return rv, fmt.Errorf("decode watch: %w", err)
 		}
 		switch ev.Type {
+		case "ERROR":
+			return rv, errWatchExpired
+		case "BOOKMARK":
+			var b struct {
+				Metadata struct {
+					ResourceVersion string `json:"resourceVersion"`
+				} `json:"metadata"`
+			}
+			if json.Unmarshal(ev.Object, &b) == nil && b.Metadata.ResourceVersion != "" {
+				rv = b.Metadata.ResourceVersion
+			}
+		default:
+			if next := handle(ev.Type, ev.Object); next != "" {
+				rv = next
+			}
+		}
+	}
+}
+
+// watchWorkloads streams WATCH events for one resource type, updates the cache
+// and returns the resourceVersion to resume from.
+func (inf *Informer) watchWorkloads(ctx context.Context, path, kind, rv string) (string, error) {
+	resp, err := inf.openWatch(ctx, path, rv)
+	if err != nil {
+		return rv, err
+	}
+	defer resp.Body.Close()
+	return streamWatch(resp.Body, rv, func(eventType string, object json.RawMessage) string {
+		var m k8sWorkload
+		if json.Unmarshal(object, &m) != nil {
+			return ""
+		}
+		if m.Metadata.Namespace == "" || m.Metadata.Name == "" {
+			return m.Metadata.ResourceVersion
+		}
+		switch eventType {
 		case "ADDED", "MODIFIED":
 			meta := toWorkloadMeta(m, kind)
 			inf.cache.recordChange(m.Metadata.Namespace, kind, m.Metadata.Name, meta.Image, meta.Generation, time.Now())
@@ -230,7 +276,8 @@ func (inf *Informer) watchWorkloads(ctx context.Context, path, kind, rv string) 
 		case "DELETED":
 			inf.cache.deleteWorkload(m.Metadata.Namespace, kind, m.Metadata.Name)
 		}
-	}
+		return m.Metadata.ResourceVersion
+	})
 }
 
 // listPods performs a full LIST of pods and populates the pod cache.
@@ -269,32 +316,20 @@ func (inf *Informer) listPods(ctx context.Context) (string, error) {
 	}
 }
 
-// watchPods streams WATCH events for pods and updates the pod cache.
-func (inf *Informer) watchPods(ctx context.Context, rv string) error {
-	url := fmt.Sprintf("%s/api/v1/pods?watch=true&resourceVersion=%s&timeoutSeconds=300", inf.apiBase, rv)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+// watchPods streams WATCH events for pods, updates the pod cache and returns
+// the resourceVersion to resume from.
+func (inf *Informer) watchPods(ctx context.Context, rv string) (string, error) {
+	resp, err := inf.openWatch(ctx, "api/v1/pods", rv)
 	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+inf.token)
-
-	resp, err := inf.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("watch pods: %w", err)
+		return rv, err
 	}
 	defer resp.Body.Close()
-
-	dec := json.NewDecoder(resp.Body)
-	for {
-		if ctx.Err() != nil {
-			return ctx.Err()
+	return streamWatch(resp.Body, rv, func(eventType string, object json.RawMessage) string {
+		var p k8sPod
+		if json.Unmarshal(object, &p) != nil {
+			return ""
 		}
-		var ev podWatchEvent
-		if err := dec.Decode(&ev); err != nil {
-			return fmt.Errorf("decode watch pods: %w", err)
-		}
-		p := ev.Object
-		switch ev.Type {
+		switch eventType {
 		case "ADDED", "MODIFIED":
 			if cp, ok := toCachedPod(p); ok {
 				inf.cache.upsertPod(cp)
@@ -304,5 +339,6 @@ func (inf *Informer) watchPods(ctx context.Context, rv string) error {
 				inf.cache.deletePod(p.Metadata.Namespace, p.Metadata.Name)
 			}
 		}
-	}
+		return p.Metadata.ResourceVersion
+	})
 }

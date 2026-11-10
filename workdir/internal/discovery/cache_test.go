@@ -6,7 +6,7 @@ func TestMetadataCache_SetGet(t *testing.T) {
 	c := newMetadataCache()
 	c.setWorkload("prod", "Deployment", "api", WorkloadMeta{
 		Namespace: "prod", Kind: "Deployment", Name: "api",
-		Image: "api:v1.2.3",
+		Image:    "api:v1.2.3",
 		Replicas: ReplicaStatus{Desired: 3, Ready: 3, Available: 3},
 	})
 	m, ok := c.Get("prod", "Deployment", "api")
@@ -149,8 +149,8 @@ func TestIsRSOwnedBy(t *testing.T) {
 		{"api-7d9f4b6c8", "api", true},
 		{"payment-api-7d9f4b6c8", "payment-api", true},
 		{"other-7d9f4b6c8", "api", false},
-		{"api", "api", false},     // no suffix
-		{"api-", "api", false},    // empty suffix
+		{"api", "api", false},  // no suffix
+		{"api-", "api", false}, // empty suffix
 	}
 	for _, c := range cases {
 		if got := isRSOwnedBy(c.rs, c.dep); got != c.want {

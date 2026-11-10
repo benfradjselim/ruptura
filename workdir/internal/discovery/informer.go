@@ -7,6 +7,7 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -212,9 +213,9 @@ func (inf *Informer) runMetadataLoop(ctx context.Context, path, kind string) {
 			continue
 		}
 		backoff = time.Second
-		if err := inf.watchWorkloads(ctx, path, kind, rv); err != nil && ctx.Err() == nil {
-			inf.logf("discovery: metadata watch %s error: %v — re-listing", path, err)
-		}
+		inf.resumeWatch(ctx, "metadata watch "+path, rv, func(rv string) (string, error) {
+			return inf.watchWorkloads(ctx, path, kind, rv)
+		})
 	}
 }
 
@@ -241,9 +242,28 @@ func (inf *Informer) runPodLoop(ctx context.Context) {
 			continue
 		}
 		backoff = time.Second
-		if err := inf.watchPods(ctx, rv); err != nil && ctx.Err() == nil {
-			inf.logf("discovery: pod watch error: %v — re-listing", err)
+		inf.resumeWatch(ctx, "pod watch", rv, func(rv string) (string, error) {
+			return inf.watchPods(ctx, rv)
+		})
+	}
+}
+
+// resumeWatch reopens a WATCH from the last resourceVersion each time the
+// server ends it, and returns when the caller must LIST again: the version
+// expired, or the watch failed. Only a failure is logged.
+func (inf *Informer) resumeWatch(ctx context.Context, name, rv string, watch func(rv string) (string, error)) {
+	for ctx.Err() == nil {
+		next, err := watch(rv)
+		if errors.Is(err, errWatchExpired) {
+			return
 		}
+		if err != nil {
+			if ctx.Err() == nil {
+				inf.logf("discovery: %s error: %v — re-listing", name, err)
+			}
+			return
+		}
+		rv = next
 	}
 }
 

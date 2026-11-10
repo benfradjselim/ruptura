@@ -29,7 +29,7 @@ type k8sObjectMeta struct {
 
 // watchEvent is the envelope for a single watch stream event.
 type watchEvent struct {
-	Type   string        `json:"type"`   // ADDED|MODIFIED|DELETED|BOOKMARK|ERROR
+	Type   string        `json:"type"` // ADDED|MODIFIED|DELETED|BOOKMARK|ERROR
 	Object k8sObjectMeta `json:"object"`
 }
 
