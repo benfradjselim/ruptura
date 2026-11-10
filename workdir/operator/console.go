@@ -23,14 +23,14 @@ func consoleName(name string) string { return name + "-console" }
 // consoleEnabled reports whether the instance wants the console, true unless
 // disabled.
 func consoleEnabled(spec RupturaInstanceSpec) bool {
-	return spec.Console.Enabled == nil || *spec.Console.Enabled
+	return spec.Output.UI.Enabled == nil || *spec.Output.UI.Enabled
 }
 
 // consoleImage picks the console image: the instance spec, then the image OLM
 // passes to the operator, then the built-in default.
 func consoleImage(spec RupturaInstanceSpec) string {
-	if spec.Console.Image != "" {
-		return spec.Console.Image
+	if spec.Output.UI.Image != "" {
+		return spec.Output.UI.Image
 	}
 	if related := os.Getenv(relatedConsoleImageEnv); related != "" {
 		return related

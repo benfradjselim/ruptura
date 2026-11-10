@@ -13,8 +13,10 @@ func TestDataVolume(t *testing.T) {
 		wantSize string
 	}{
 		{"volume claim by default", RupturaInstanceSpec{}, true, ""},
-		{"emptyDir with the default size", RupturaInstanceSpec{EphemeralStorage: true}, false, defaultStorageSize},
-		{"emptyDir bounded by storageSize", RupturaInstanceSpec{EphemeralStorage: true, StorageSize: "2Gi"}, false, "2Gi"},
+		{"persistent named explicitly", RupturaInstanceSpec{Storage: StorageConfig{Type: StoragePersistent}}, true, ""},
+		{"emptyDir with the default size", RupturaInstanceSpec{Storage: StorageConfig{Type: StorageEphemeral}}, false, defaultStorageSize},
+		{"emptyDir bounded by the older storageSize", RupturaInstanceSpec{Storage: StorageConfig{Type: StorageEphemeral}, StorageSize: "2Gi"}, false, "2Gi"},
+		{"storage.size wins over storageSize", RupturaInstanceSpec{Storage: StorageConfig{Type: StorageEphemeral, Size: "3Gi"}, StorageSize: "2Gi"}, false, "3Gi"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

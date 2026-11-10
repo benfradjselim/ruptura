@@ -159,10 +159,7 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	}
 
 	image := engineImage(inst.Spec.Image)
-	storageSize := inst.Spec.StorageSize
-	if storageSize == "" {
-		storageSize = defaultStorageSize
-	}
+	size := storageSize(inst.Spec)
 	edition := inst.Spec.Edition
 	if edition == "" {
 		edition = defaultEdition
@@ -181,8 +178,8 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	if err := reconcileServiceAccount(c, ns, labels); err != nil {
 		return fmt.Errorf("ServiceAccount: %w", err)
 	}
-	if !inst.Spec.EphemeralStorage {
-		if err := reconcilePVC(c, ns, name, storageSize, inst.Spec.StorageClassName, labels); err != nil {
+	if !ephemeral(inst.Spec) {
+		if err := reconcilePVC(c, ns, name, size, inst.Spec.Storage.StorageClassName, labels); err != nil {
 			return fmt.Errorf("PVC: %w", err)
 		}
 	}
@@ -456,7 +453,7 @@ func updateStatus(c *k8sClient, inst RupturaInstance) error {
 
 	phase, message := "Running", ""
 	if dep.Status.ReadyReplicas == 0 {
-		phase, message = "Pending", notReadyReason(c, ns, name, inst.Spec.EphemeralStorage)
+		phase, message = "Pending", notReadyReason(c, ns, name, ephemeral(inst.Spec))
 	}
 
 	status := RupturaInstanceStatus{
@@ -574,15 +571,28 @@ func configEnv(spec RupturaInstanceSpec) []EnvVar {
 	return env
 }
 
+// ephemeral reports whether the instance keeps its data in an emptyDir.
+func ephemeral(spec RupturaInstanceSpec) bool {
+	return spec.Storage.Type == StorageEphemeral
+}
+
+// storageSize is the data volume size: storage.size, then the older
+// storageSize, then the default.
+func storageSize(spec RupturaInstanceSpec) string {
+	if spec.Storage.Size != "" {
+		return spec.Storage.Size
+	}
+	if spec.StorageSize != "" {
+		return spec.StorageSize
+	}
+	return defaultStorageSize
+}
+
 // dataVolume is the engine data volume: the instance PVC, or an emptyDir
 // bounded by the storage size when storage is ephemeral.
 func dataVolume(name string, spec RupturaInstanceSpec) Volume {
-	if spec.EphemeralStorage {
-		size := spec.StorageSize
-		if size == "" {
-			size = defaultStorageSize
-		}
-		return Volume{Name: "data", EmptyDir: &EmptyDirVolumeSource{SizeLimit: size}}
+	if ephemeral(spec) {
+		return Volume{Name: "data", EmptyDir: &EmptyDirVolumeSource{SizeLimit: storageSize(spec)}}
 	}
 	return Volume{Name: "data", PersistentVolumeClaim: &PVCVolumeSource{ClaimName: name + "-data"}}
 }

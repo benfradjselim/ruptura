@@ -121,13 +121,17 @@ spec:
             displayName: Storage Size
             description: Size of the engine storage volume, for example 10Gi.
             x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:text"]
-          - path: storageClassName
+          - path: storage.type
+            displayName: Storage Type
+            description: persistent keeps history in a volume claim; ephemeral uses an emptyDir and loses history when the pod restarts.
+            x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:select:persistent", "urn:alm:descriptor:com.tectonic.ui:select:ephemeral"]
+          - path: storage.storageClassName
             displayName: Storage Class
             description: StorageClass of the engine volume. Empty uses the cluster default.
             x-descriptors: ["urn:alm:descriptor:io.kubernetes:StorageClass"]
-          - path: ephemeralStorage
-            displayName: Ephemeral Storage
-            description: Keep engine data in an emptyDir instead of a volume claim. History is lost when the pod restarts.
+          - path: output.ui.enabled
+            displayName: Web Console
+            description: Deploy the Ruptura web console with its Route.
             x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:booleanSwitch"]
           - path: apiKeyRef
             displayName: API Key Secret

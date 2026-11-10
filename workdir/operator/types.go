@@ -23,12 +23,8 @@ type RupturaInstanceSpec struct {
 	Replicas int32 `json:"replicas,omitempty"`
 	// StorageSize is the PVC size for BadgerDB persistence (default: 10Gi).
 	StorageSize string `json:"storageSize,omitempty"`
-	// StorageClassName selects the StorageClass of the data PVC. Empty uses the
-	// cluster default.
-	StorageClassName string `json:"storageClassName,omitempty"`
-	// EphemeralStorage keeps engine data in an emptyDir instead of a PVC, for
-	// clusters without working storage. History is lost when the pod restarts.
-	EphemeralStorage bool `json:"ephemeralStorage,omitempty"`
+	// Storage selects where the engine keeps its data.
+	Storage StorageConfig `json:"storage,omitempty"`
 	// APIKeyRef is the name of a Secret whose "api-key" key becomes RUPTURA_API_KEY.
 	APIKeyRef string `json:"apiKeyRef,omitempty"`
 	// Edition is "community" or "autopilot" (default: community).
@@ -49,12 +45,36 @@ type RupturaInstanceSpec struct {
 	Alerting AlertingConfig `json:"alerting,omitempty"`
 	// Logging sets the engine log level.
 	Logging LoggingConfig `json:"logging,omitempty"`
-	// Console deploys the web console next to the engine.
-	Console ConsoleConfig `json:"console,omitempty"`
+	// Output selects where results are shown.
+	Output OutputConfig `json:"output,omitempty"`
 }
 
-// ConsoleConfig controls the web console the operator deploys.
-type ConsoleConfig struct {
+// Storage types.
+const (
+	StoragePersistent = "persistent"
+	StorageEphemeral  = "ephemeral"
+)
+
+// StorageConfig selects where the engine keeps its data.
+type StorageConfig struct {
+	// Type is "persistent" (a PVC, the default) or "ephemeral" (an emptyDir,
+	// for clusters without working storage; history is lost on restart).
+	Type string `json:"type,omitempty"`
+	// Size of the volume; overrides storageSize.
+	Size string `json:"size,omitempty"`
+	// StorageClassName selects the StorageClass of the PVC. Empty uses the
+	// cluster default.
+	StorageClassName string `json:"storageClassName,omitempty"`
+}
+
+// OutputConfig selects where results are shown.
+type OutputConfig struct {
+	// UI is the Ruptura web console.
+	UI UIOutput `json:"ui,omitempty"`
+}
+
+// UIOutput controls the web console the operator deploys.
+type UIOutput struct {
 	// Enabled deploys the console; nil means true.
 	Enabled *bool `json:"enabled,omitempty"`
 	// Image overrides the console image.

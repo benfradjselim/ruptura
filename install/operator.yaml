@@ -67,13 +67,21 @@ spec:
                   type: string
                   default: "10Gi"
                   description: "PVC size for BadgerDB persistence."
-                storageClassName:
-                  type: string
-                  description: "StorageClass of the data PVC. Empty uses the cluster default."
-                ephemeralStorage:
-                  type: boolean
-                  default: false
-                  description: "Keep engine data in an emptyDir instead of a PVC, for clusters without working storage. History is lost when the pod restarts."
+                storage:
+                  type: object
+                  description: "Where the engine keeps its data."
+                  properties:
+                    type:
+                      type: string
+                      enum: [persistent, ephemeral]
+                      default: persistent
+                      description: "persistent keeps history in a PVC. ephemeral uses an emptyDir, for clusters without working storage; history is lost when the pod restarts."
+                    size:
+                      type: string
+                      description: "Volume size, for example 10Gi. Overrides storageSize."
+                    storageClassName:
+                      type: string
+                      description: "StorageClass of the PVC. Empty uses the cluster default."
                 apiKeyRef:
                   type: string
                   description: "Name of a Secret with an 'api-key' key. Becomes RUPTURA_API_KEY."
@@ -340,17 +348,20 @@ spec:
                       type: string
                       enum: [debug, info, warn, error]
                       default: info
-                console:
+                output:
                   type: object
-                  description: "Web console deployed next to the engine."
+                  description: "Where results are shown."
                   properties:
-                    enabled:
-                      type: boolean
-                      default: true
-                      description: "Deploy the console, its Service and, on OpenShift, its Route."
-                    image:
-                      type: string
-                      description: "Console image. Defaults to the console of the operator release."
+                    ui:
+                      type: object
+                      description: "Ruptura web console, deployed as <name>-console with its Service and, on OpenShift, its Route."
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: true
+                        image:
+                          type: string
+                          description: "Console image. Defaults to the console of the operator release."
             status:
               type: object
               properties:

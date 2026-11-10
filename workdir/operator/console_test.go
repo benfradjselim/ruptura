@@ -15,7 +15,7 @@ func TestConsoleEnabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := consoleEnabled(RupturaInstanceSpec{Console: ConsoleConfig{Enabled: tt.enabled}}); got != tt.want {
+			if got := consoleEnabled(RupturaInstanceSpec{Output: OutputConfig{UI: UIOutput{Enabled: tt.enabled}}}); got != tt.want {
 				t.Fatalf("consoleEnabled() = %v, want %v", got, tt.want)
 			}
 		})
@@ -33,7 +33,7 @@ func TestConsoleImage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv(relatedConsoleImageEnv, tt.related)
-			if got := consoleImage(RupturaInstanceSpec{Console: ConsoleConfig{Image: tt.spec}}); got != tt.want {
+			if got := consoleImage(RupturaInstanceSpec{Output: OutputConfig{UI: UIOutput{Image: tt.spec}}}); got != tt.want {
 				t.Fatalf("consoleImage() = %q, want %q", got, tt.want)
 			}
 		})
