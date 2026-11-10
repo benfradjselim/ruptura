@@ -78,6 +78,7 @@
   }
 
   $: activeAlerts     = recentAnomalies(alerts, Date.now())
+  $: notScored        = fleet ? Math.max(0, (fleet.total_hosts || 0) - (fleet.healthy_hosts || 0) - (fleet.degraded_hosts || 0) - (fleet.critical_hosts || 0)) : null
   $: namespaceCount   = new Set(infraGroups.map(g => g.namespace).filter(Boolean)).size
   $: agitatedGroups   = infraGroups.filter(g => g.agitated).length
   $: notableHosts     = (fleet?.hosts || []).filter(h => h.state === 'critical' || h.state === 'degraded').slice(0, 6)
@@ -152,19 +153,25 @@
       <span class="kicker">Data ingest</span>
     </div>
 
-    <div class="stat-card" style="grid-column:1/5">
-      <p class="stat-label">Metrics ingested</p>
-      <p class="stat-value mono accent">{fmtNum(dataflow?.metrics)}</p>
+    <div class="stat-card" style="grid-column:1/4">
+      <p class="stat-label">Prometheus series</p>
+      <p class="stat-value mono accent">{fmtNum(dataflow?.prometheus_series)}</p>
+      <p class="stat-sub">read last cycle, {dataflow?.prometheus_signals ?? 0} signals with data</p>
+    </div>
+
+    <div class="stat-card" style="grid-column:4/7">
+      <p class="stat-label">Metrics pushed</p>
+      <p class="stat-value mono">{fmtNum(dataflow?.metrics)}</p>
       <p class="stat-sub">OTLP datapoints</p>
     </div>
 
-    <div class="stat-card" style="grid-column:5/9">
+    <div class="stat-card" style="grid-column:7/10">
       <p class="stat-label">Logs ingested</p>
       <p class="stat-value mono">{fmtNum(dataflow?.logs)}</p>
       <p class="stat-sub">log entries</p>
     </div>
 
-    <div class="stat-card" style="grid-column:9/13">
+    <div class="stat-card" style="grid-column:10/13">
       <p class="stat-label">Traces ingested</p>
       <p class="stat-value mono">{fmtNum(dataflow?.traces)}</p>
       <p class="stat-sub">spans</p>
@@ -239,6 +246,12 @@
       <p class="stat-label">Critical</p>
       <p class="stat-value mono text-err">{fleet?.critical_hosts ?? '—'}</p>
       <p class="stat-sub">&lt; 40 HS</p>
+    </div>
+
+    <div class="stat-card" style="grid-column:10/13">
+      <p class="stat-label">Not scored</p>
+      <p class="stat-value mono">{notScored ?? '—'}</p>
+      <p class="stat-sub">calibrating, or no pushed metrics</p>
     </div>
 
     {#if notableHosts.length > 0}

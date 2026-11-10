@@ -11,6 +11,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/actions/engine"
 	"github.com/benfradjselim/ruptura/internal/alerter"
 	apicontext "github.com/benfradjselim/ruptura/internal/context"
+	"github.com/benfradjselim/ruptura/internal/normalize"
 	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/gorilla/mux"
 )
@@ -93,17 +94,37 @@ func (h *Handlers) handleRupture(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, snap)
 }
 
-// handleDataflow returns cumulative ingest counts (metrics, logs, traces).
+// handleDataflow returns cumulative ingest counts (metrics, logs, traces) and
+// the series read from Prometheus in the latest collection, the main input on
+// OpenShift where nothing pushes OTLP.
 func (h *Handlers) handleDataflow(w http.ResponseWriter, r *http.Request) {
 	var mCount, lCount, tCount int64
 	if h.ingest != nil {
 		mCount, lCount, tCount = h.ingest.IngestCounts()
 	}
+	series, signals := int64(0), int64(0)
+	if h.inputs != nil {
+		series, signals = prometheusCoverage(h.inputs.Coverage())
+	}
 	writeJSON(w, http.StatusOK, map[string]int64{
-		"metrics": mCount,
-		"logs":    lCount,
-		"traces":  tCount,
+		"metrics":            mCount,
+		"logs":               lCount,
+		"traces":             tCount,
+		"prometheus_series":  series,
+		"prometheus_signals": signals,
 	})
+}
+
+// prometheusCoverage returns the series read and the signals that returned
+// data in the latest Prometheus collection.
+func prometheusCoverage(coverage []normalize.Coverage) (series, signals int64) {
+	for _, c := range coverage {
+		series += int64(c.Targets)
+		if c.Available {
+			signals++
+		}
+	}
+	return series, signals
 }
 
 // handleRuptures returns all KPISnapshots for all known hosts.

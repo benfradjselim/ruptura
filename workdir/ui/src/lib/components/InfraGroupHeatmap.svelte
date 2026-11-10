@@ -36,17 +36,18 @@
     return 'Critical'
   }
 
-  // Aggregate groups: one row per group name, worst health across namespaces
+  // Aggregate groups: one cell per group name with the worst health across
+  // namespaces, and the objects and namespaces of every namespace.
   $: byGroup = (() => {
     const m = new Map()
     for (const g of groups) {
-      const key = g.group
-      const prev = m.get(key)
-      if (!prev || g.health < prev.health) {
-        m.set(key, { ...g, namespaces: [] })
-      }
-      const entry = m.get(key)
-      if (g.namespace) entry.namespaces.push(g.namespace)
+      const prev = m.get(g.group)
+      const worst = !prev || g.health < prev.health ? g : prev
+      m.set(g.group, {
+        ...worst,
+        objectCount: (prev?.objectCount || 0) + (g.objectCount || 0),
+        namespaces: [...(prev?.namespaces || []), ...(g.namespace ? [g.namespace] : [])],
+      })
     }
     return GROUP_ORDER
       .filter(k => m.has(k))
