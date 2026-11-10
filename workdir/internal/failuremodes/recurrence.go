@@ -76,5 +76,16 @@ func (t *Tracker) recurrenceEstimate(workload string, now time.Time) (Estimate, 
 		return Estimate{}, false
 	}
 	interval := times[len(times)-1].Sub(times[0]) / time.Duration(len(times)-1)
+	if !recurrenceWarns(remaining, interval) {
+		return Estimate{}, false
+	}
 	return Estimate{Mode: ModeRecurrentFailure, ETF: remaining, Confidence: confidence, Interval: interval, Failures: len(times)}, true
+}
+
+// recurrenceWarns keeps a rhythm forecast to the second half of the interval
+// and drops it once due. Warning right after a failure says only that the
+// workload fails regularly, and an overdue rhythm either failed unseen yet or
+// broke, so neither names a coming failure.
+func recurrenceWarns(remaining, interval time.Duration) bool {
+	return remaining > 0 && remaining <= interval/2
 }

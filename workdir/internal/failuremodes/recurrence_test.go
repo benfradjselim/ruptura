@@ -73,8 +73,8 @@ func TestTracker_RecurrentFailure(t *testing.T) {
 	for i := 0; i <= 7; i++ {
 		tr.ObserveRestarts("w", "n/p", start.Add(time.Duration(i)*30*time.Minute), i)
 	}
-	est, ok := tr.Worst("w", start.Add(215*time.Minute))
-	if !ok || est.Mode != ModeRecurrentFailure || est.ETF != 25*time.Minute {
+	est, ok := tr.Worst("w", start.Add(225*time.Minute))
+	if !ok || est.Mode != ModeRecurrentFailure || est.ETF != 15*time.Minute {
 		t.Errorf("estimate = %+v, %v", est, ok)
 	}
 }
@@ -88,7 +88,7 @@ func TestTracker_RecurrenceSpansReplacedPods(t *testing.T) {
 	for i := 0; i <= 4; i++ {
 		tr.ObserveRestarts("w", "n/new", start.Add(time.Duration(i+4)*30*time.Minute), i)
 	}
-	if est, ok := tr.Worst("w", start.Add(245*time.Minute)); !ok || est.Mode != ModeRecurrentFailure {
+	if est, ok := tr.Worst("w", start.Add(255*time.Minute)); !ok || est.Mode != ModeRecurrentFailure {
 		t.Errorf("estimate = %+v, %v", est, ok)
 	}
 }
@@ -103,7 +103,7 @@ func TestTracker_HistorySurvivesPrunedPods(t *testing.T) {
 	for i := 0; i <= 4; i++ {
 		tr.ObserveRestarts("w", "n/new", start.Add(time.Duration(i+4)*30*time.Minute), i)
 	}
-	if est, ok := tr.Worst("w", start.Add(245*time.Minute)); !ok || est.Mode != ModeRecurrentFailure {
+	if est, ok := tr.Worst("w", start.Add(255*time.Minute)); !ok || est.Mode != ModeRecurrentFailure {
 		t.Errorf("estimate = %+v, %v", est, ok)
 	}
 }
@@ -127,7 +127,40 @@ func TestTracker_FailureRecorderAndRestore(t *testing.T) {
 	}
 	restored := NewTracker()
 	restored.RestoreFailures("w", times)
-	if est, ok := restored.Worst("w", start.Add(185*time.Minute)); !ok || est.Mode != ModeRecurrentFailure {
+	if est, ok := restored.Worst("w", start.Add(195*time.Minute)); !ok || est.Mode != ModeRecurrentFailure {
 		t.Errorf("estimate after restore = %+v, %v", est, ok)
+	}
+}
+
+func TestRecurrenceWarns(t *testing.T) {
+	interval := 30 * time.Minute
+	tests := []struct {
+		name      string
+		remaining time.Duration
+		want      bool
+	}{
+		{"just after a failure", 29 * time.Minute, false},
+		{"first half", 16 * time.Minute, false},
+		{"half way", 15 * time.Minute, true},
+		{"close", 2 * time.Minute, true},
+		{"due", 0, false},
+	}
+	for _, tc := range tests {
+		if got := recurrenceWarns(tc.remaining, interval); got != tc.want {
+			t.Errorf("%s: recurrenceWarns(%v) = %v, want %v", tc.name, tc.remaining, got, tc.want)
+		}
+	}
+}
+
+func TestTracker_RecurrenceSilentAfterFailureAndWhenOverdue(t *testing.T) {
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	tr := NewTracker()
+	for i := 0; i <= 7; i++ {
+		tr.ObserveRestarts("w", "n/p", start.Add(time.Duration(i)*30*time.Minute), i)
+	}
+	for _, at := range []time.Duration{212 * time.Minute, 241 * time.Minute} {
+		if est, ok := tr.Worst("w", start.Add(at)); ok && est.Mode == ModeRecurrentFailure {
+			t.Errorf("at +%v the rhythm must stay silent, got %+v", at, est)
+		}
 	}
 }
