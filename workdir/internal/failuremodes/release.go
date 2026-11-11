@@ -26,6 +26,10 @@ const (
 	releaseHorizon = 2 * time.Hour
 	// releaseSteady is how long a version must run before it is a reference.
 	releaseSteady = 15 * time.Minute
+	// releaseRecent is how long after its start a pod is compared with the
+	// previous version. Later growth is a trend for saturation to judge, not a
+	// release regression.
+	releaseRecent = 2 * time.Hour
 	// releaseMaxSamples bounds memory per pod: two hours at 30 seconds.
 	releaseMaxSamples = 240
 )
@@ -140,7 +144,8 @@ func (s *releaseState) estimate(now time.Time) (Estimate, bool) {
 	var best Estimate
 	found := false
 	for name, p := range s.pods {
-		if p.version != newest || now.Sub(p.first) < releaseMinAge || p.capacity <= 0 || len(p.samples) == 0 {
+		age := now.Sub(p.first)
+		if p.version != newest || age < releaseMinAge || age > releaseRecent || p.capacity <= 0 || len(p.samples) == 0 {
 			continue
 		}
 		r, low, high, ok := rateBand(p.samples, now.Add(-releaseWindow))

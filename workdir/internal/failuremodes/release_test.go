@@ -101,3 +101,33 @@ func TestReleaseRegression_PrunesOldProfiles(t *testing.T) {
 		t.Error("a recent profile must be kept")
 	}
 }
+
+// A pod long past its rollout that grows for a while is judged by saturation,
+// not compared with the release before it.
+func TestReleaseRegression_OnlyNearTheRollout(t *testing.T) {
+	tr := NewTracker()
+	start := time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC)
+	flat := curve(60, 3, 0)
+	now := start
+	for i := 0; i < 60; i++ {
+		now = start.Add(time.Duration(i) * 30 * time.Second)
+		tr.ObserveVersion("ns/app-a-1", "app-a")
+		tr.Observe("ns/Deployment/app", "ns/app-a-1", now, flat(float64(i)/2), 256*mib, 0)
+		tr.Worst("ns/Deployment/app", now)
+	}
+	rollout := now.Add(30 * time.Second)
+	burstAt := 3 * 60.0
+	for i := 0; i < int((burstAt+30)*2); i++ {
+		m := float64(i) / 2
+		usage := flat(m)
+		if m > burstAt {
+			usage += 3 * mib * (m - burstAt)
+		}
+		now = rollout.Add(time.Duration(i) * 30 * time.Second)
+		tr.ObserveVersion("ns/app-b-1", "app-b")
+		tr.Observe("ns/Deployment/app", "ns/app-b-1", now, usage, 256*mib, 0)
+		if est, ok := tr.Worst("ns/Deployment/app", now); ok && est.Mode == ModeReleaseRegression {
+			t.Fatalf("release regression %.1f min after the rollout, want none past %s", m, releaseRecent)
+		}
+	}
+}
