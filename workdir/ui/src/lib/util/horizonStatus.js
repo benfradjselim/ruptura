@@ -83,3 +83,23 @@ export function readableInputs(inputs = []) {
     .map(input => ({ ...input, label: INPUT_LABELS[input.role] || input.role }))
     .sort((a, b) => Number(b.available) - Number(a.available) || b.targets - a.targets)
 }
+
+// A trend below this share of the limit per hour reads as flat.
+const FLAT_TREND_PER_HOUR = 0.01
+
+/**
+ * One row of the pods closest to their memory limit.
+ * @param {{ workload: string, pod: string, usage: number, trendPerHour: number }} p
+ * @returns {{ pod: string, namespace: string, share: string, trend: string, rising: boolean, reachesIn: string }}
+ */
+export function closestRow(p) {
+  const [namespace, pod] = p.pod.includes('/') ? p.pod.split('/') : ['', p.pod]
+  const trend = p.trendPerHour || 0
+  const rising = trend >= FLAT_TREND_PER_HOUR
+  let trendText = 'flat'
+  if (rising) trendText = `+${Math.round(trend * 100)}%/h`
+  else if (trend <= -FLAT_TREND_PER_HOUR) trendText = `${Math.round(trend * 100)}%/h`
+  const left = 1 - p.usage
+  const reachesIn = rising && left > 0 ? `limit in ${formatEta(Math.round((left / trend) * 3600))} at this pace` : ''
+  return { pod, namespace, share: `${Math.round(p.usage * 100)}%`, trend: trendText, rising, reachesIn }
+}

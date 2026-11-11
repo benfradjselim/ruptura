@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { warmup, confidenceLabel, etaRange, blindSpotsByNamespace, readableInputs } from './horizonStatus.js'
+import { warmup, confidenceLabel, etaRange, blindSpotsByNamespace, readableInputs, closestRow } from './horizonStatus.js'
 
 const NOW = new Date(2026, 10, 6, 10, 0).getTime()
 
@@ -66,5 +66,21 @@ describe('readableInputs', () => {
       { role: 'container.restarts', targets: 137, available: true },
     ])
     expect(got.map(i => [i.label, i.targets])).toEqual([['Restarts', 137], ['Memory limit', 36], ['disk.used', 0]])
+  })
+})
+
+describe('closestRow', () => {
+  it('reads a flat pod', () => {
+    expect(closestRow({ pod: 'shop/api-1', usage: 0.624, trendPerHour: 0.002 }))
+      .toEqual({ pod: 'api-1', namespace: 'shop', share: '62%', trend: 'flat', rising: false, reachesIn: '' })
+  })
+  it('reads a rising pod and when it reaches the limit at that pace', () => {
+    const row = closestRow({ pod: 'shop/api-1', usage: 0.8, trendPerHour: 0.4 })
+    expect(row.trend).toBe('+40%/h')
+    expect(row.rising).toBe(true)
+    expect(row.reachesIn).toBe('limit in 30 min at this pace')
+  })
+  it('reads a falling pod', () => {
+    expect(closestRow({ pod: 'shop/api-1', usage: 0.5, trendPerHour: -0.05 }).trend).toBe('-5%/h')
   })
 })

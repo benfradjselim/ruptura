@@ -119,6 +119,7 @@ export const api = {
   fleet: () => req('GET', '/fleet'),
   failures: () => req('GET', '/failures'),
   callGraph: () => req('GET', '/callgraph'),
+  failureClosest: () => req('GET', '/failures/closest'),
   failureSeries: (workload) => req('GET', `/failures/series?workload=${encodeURIComponent(workload)}`),
   inputs: () => req('GET', '/inputs'),
   trackRecord: () => req('GET', '/track-record'),

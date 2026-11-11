@@ -4,7 +4,7 @@
   import { formatEta, sortFailures, missingRoles, horizonClusters, pastPlacement, relatedEvents } from '../lib/util/failures.js'
   import { hasForecastChart } from '../lib/util/forecastChart.js'
   import ForecastChart from '../lib/components/ForecastChart.svelte'
-  import { warmup, confidenceLabel, etaRange, blindSpotsByNamespace, readableInputs } from '../lib/util/horizonStatus.js'
+  import { warmup, confidenceLabel, etaRange, blindSpotsByNamespace, readableInputs, closestRow } from '../lib/util/horizonStatus.js'
 
   const REFRESH_MS = 15000
   const HORIZON_SECONDS = 30 * 60
@@ -15,7 +15,7 @@
   const MINUTE_MS = 60 * 1000
 
   let failures = [], missing = [], record = null, protection = null, history = [], selected = null, loading = true, error = '', timer
-  let series = {}, readAt = Date.now(), warm = null, sources = []
+  let series = {}, readAt = Date.now(), warm = null, sources = [], closest = []
 
   async function loadSeries(found) {
     const workloads = [...new Set(found.filter(hasForecastChart).map(f => f.workload).filter(Boolean))].slice(0, MAX_CHARTS)
@@ -29,13 +29,14 @@
 
   async function load() {
     try {
-      const [found, inputs, track, coverage, past, health] = await Promise.all([
+      const [found, inputs, track, coverage, past, health, near] = await Promise.all([
         api.failures(),
         api.inputs().catch(() => []),
         api.trackRecord().catch(() => null),
         api.coverage().catch(() => null),
         api.eventHistory().catch(() => []),
         api.health().catch(() => null),
+        api.failureClosest().catch(() => []),
       ])
       failures = sortFailures(found || [])
       series = await loadSeries(failures)
@@ -46,6 +47,7 @@
       record = track
       protection = coverage
       history = past || []
+      closest = (near || []).map(closestRow)
       error = ''
     } catch (e) {
       error = e.message
@@ -148,6 +150,27 @@
           </li>
         {/each}
       </ol>
+    {/if}
+
+    {#if closest.length > 0}
+      <section class="closest" aria-label="Pods closest to their memory limit">
+        <h2>Closest to their memory limit <span>{failures.length === 0 ? 'nothing heading to a failure yet' : 'watched every 30 s'}</span></h2>
+        <table>
+          <thead><tr><th>Pod</th><th>Namespace</th><th class="num">Of limit</th><th class="num">Trend</th><th></th></tr></thead>
+          <tbody>
+            {#each closest as row}
+              <tr class:rising={row.rising}>
+                <td>{row.pod}</td>
+                <td>{row.namespace}</td>
+                <td class="num">{row.share}</td>
+                <td class="num">{row.trend}</td>
+                <td class="pace">{row.reachesIn}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        <p class="quiet">A forecast appears when a pod climbs steadily toward its limit for at least 10 minutes.</p>
+      </section>
     {/if}
   {/if}
 
@@ -328,6 +351,14 @@
   .time em { display: block; font: 400 11px var(--font-mono); font-style: normal; color: var(--text-2); font-variant-numeric: tabular-nums; margin-top: 2px; }
   .drawer .when { margin-top: 10px; color: var(--text-2); font-variant-numeric: tabular-nums; }
   .drawer .when strong { color: var(--text); font-family: var(--font-mono); }
+  .closest { margin-top: 28px; }
+  .closest h2 span { font-weight: 400; color: var(--text-3); margin-left: 8px; font-size: 13px; }
+  .closest table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  .closest th { text-align: left; color: var(--text-3); font-weight: 400; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); }
+  .closest td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--border); font-family: var(--font-mono); word-break: break-all; }
+  .closest .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .closest tr.rising td { color: var(--amber); }
+  .closest .pace { color: var(--text-3); font-family: inherit; }
   .blind { margin-top: 12px; font-size: 13px; }
   .blind summary { cursor: pointer; color: var(--accent); }
   .blind ul { list-style: none; margin-top: 8px; max-height: 260px; overflow-y: auto; }

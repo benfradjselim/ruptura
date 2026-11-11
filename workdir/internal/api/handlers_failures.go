@@ -315,20 +315,30 @@ func selectNamespaces(results []*FailureResult, selector map[string]string, sour
 	}
 	kept := []*FailureResult{}
 	for _, result := range results {
-		if source == nil {
-			continue
-		}
-		labels, ok := source.Of(strings.SplitN(result.Workload, "/", 2)[0])
-		if !ok {
-			continue
-		}
-		matches := true
-		for key, value := range selector {
-			matches = matches && labels[key] == value
-		}
-		if matches {
+		if namespaceSelected(strings.SplitN(result.Workload, "/", 2)[0], selector, source) {
 			kept = append(kept, result)
 		}
 	}
 	return kept
+}
+
+// namespaceSelected reports whether namespace has every selected label. An
+// empty selector selects every namespace; unknown labels select none.
+func namespaceSelected(namespace string, selector map[string]string, source NamespaceLabels) bool {
+	if len(selector) == 0 {
+		return true
+	}
+	if source == nil {
+		return false
+	}
+	labels, ok := source.Of(namespace)
+	if !ok {
+		return false
+	}
+	for key, value := range selector {
+		if labels[key] != value {
+			return false
+		}
+	}
+	return true
 }
