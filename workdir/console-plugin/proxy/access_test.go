@@ -81,9 +81,9 @@ func TestCachedChecker(t *testing.T) {
 		}
 	}
 	ask("a", "shop", true, 1)
-	ask("a", "shop", true, 1)     // fresh: answered from the cache
-	ask("a", "hidden", false, 2)  // another namespace
-	ask("b", "shop", true, 3)     // another user
+	ask("a", "shop", true, 1)       // fresh: answered from the cache
+	ask("a", "hidden", false, 2)    // another namespace
+	ask("b", "shop", true, 3)       // another user
 	now = now.Add(31 * time.Second) // expired
 	ask("a", "shop", true, 4)
 	if len(cache.seen) != 1 {
