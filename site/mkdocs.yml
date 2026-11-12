@@ -37,6 +37,7 @@ nav:
   - RupturaInstance: rupturainstance.md
   - Failure modes: failures.md
   - Alerting: alerting.md
+  - Console plugin: console-plugin.md
   - API: reference/api.md
   - Blog:
     - Predict an OOM kill before it happens: blog/predict-an-oom-before-it-happens.md
