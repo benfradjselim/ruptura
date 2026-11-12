@@ -109,18 +109,25 @@ func TestReconcileConsolePlugin(t *testing.T) {
 		pluginBody string
 		// expected methods per path, "" means the path is never touched
 		deployment, service, plugin string
+		note                        string
 	}{
-		{"enabled on OpenShift applies all three", true, &on, "", http.MethodPatch, http.MethodPatch, http.MethodPatch},
-		{"disabled removes its own plugin", true, &off, ownPluginBody, http.MethodDelete, http.MethodDelete, http.MethodDelete},
-		{"disabled keeps another instance's plugin", true, &off, otherPluginBody, http.MethodDelete, http.MethodDelete, ""},
-		{"disabled with no plugin deletes nothing cluster-wide", true, nil, "", http.MethodDelete, http.MethodDelete, ""},
-		{"nothing off OpenShift", false, &on, "", "", "", ""},
+		{"enabled on OpenShift applies all three", true, &on, "", http.MethodPatch, http.MethodPatch, http.MethodPatch, ""},
+		{"enabled with its own plugin applies all three", true, &on, ownPluginBody, http.MethodPatch, http.MethodPatch, http.MethodPatch, ""},
+		{"enabled leaves another instance's plugin and says so", true, &on, otherPluginBody, http.MethodDelete, http.MethodDelete, "", "console plugin already provided by elsewhere/other"},
+		{"disabled removes its own plugin", true, &off, ownPluginBody, http.MethodDelete, http.MethodDelete, http.MethodDelete, ""},
+		{"disabled keeps another instance's plugin", true, &off, otherPluginBody, http.MethodDelete, http.MethodDelete, "", ""},
+		{"disabled with no plugin deletes nothing cluster-wide", true, nil, "", http.MethodDelete, http.MethodDelete, "", ""},
+		{"nothing off OpenShift", false, &on, "", "", "", "", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c, s := pluginClient(t, tt.pluginBody)
-			if err := reconcileConsolePlugin(c, testNS, "ri", tt.isOCP, pluginSpec(tt.enabled, ""), "ri-api-key", nil); err != nil {
+			note, err := reconcileConsolePlugin(c, testNS, "ri", tt.isOCP, pluginSpec(tt.enabled, ""), "ri-api-key", nil)
+			if err != nil {
 				t.Fatalf("reconcileConsolePlugin: %v", err)
+			}
+			if note != tt.note {
+				t.Errorf("note = %q, want %q", note, tt.note)
 			}
 			checks := []struct{ path, method string }{
 				{testPluginDepPath, tt.deployment},
@@ -223,9 +230,24 @@ func TestConsolePluginDeployment_Shape(t *testing.T) {
 	if dep.Metadata.Name != "ri-console-plugin" {
 		t.Fatalf("name = %q", dep.Metadata.Name)
 	}
-	c := dep.Spec.Template.Spec.Containers[0]
+	containers := dep.Spec.Template.Spec.Containers
+	if len(containers) != 2 || containers[0].Name != "console-plugin" || containers[1].Name != "proxy" {
+		t.Fatalf("containers = %+v, want console-plugin and proxy", containers)
+	}
+	nginx, proxy := containers[0], containers[1]
+	for _, m := range nginx.VolumeMounts {
+		if m.Name == "api-key" {
+			t.Fatal("the nginx container mounts the API key; only the proxy may")
+		}
+	}
+	if len(nginx.Env) != 0 {
+		t.Fatalf("nginx env = %+v, want none", nginx.Env)
+	}
+	if len(proxy.Command) != 1 || proxy.Command[0] != consolePluginProxyBinary {
+		t.Fatalf("proxy command = %v", proxy.Command)
+	}
 	env := map[string]string{}
-	for _, e := range c.Env {
+	for _, e := range proxy.Env {
 		env[e.Name] = e.Value
 		if e.ValueFrom != nil {
 			t.Fatalf("env %s reads a Secret; the key must be mounted as a file", e.Name)
@@ -237,11 +259,16 @@ func TestConsolePluginDeployment_Shape(t *testing.T) {
 	if env["RUPTURA_API_KEY_FILE"] != consolePluginKeyMount+"/api-key" {
 		t.Fatalf("key file = %q", env["RUPTURA_API_KEY_FILE"])
 	}
-	if !c.SecurityContext.ReadOnlyRootFilesystem {
-		t.Fatal("root filesystem must be read-only")
+	if len(proxy.VolumeMounts) != 1 || proxy.VolumeMounts[0].Name != "api-key" || !proxy.VolumeMounts[0].ReadOnly {
+		t.Fatalf("proxy mounts = %+v, want the API key read-only only", proxy.VolumeMounts)
 	}
-	if c.ReadinessProbe.HTTPGet.Scheme != "HTTPS" || c.ReadinessProbe.HTTPGet.Port != consolePluginPort {
-		t.Fatalf("readiness probe = %+v, want HTTPS on %d", c.ReadinessProbe.HTTPGet, consolePluginPort)
+	for _, c := range containers {
+		if !c.SecurityContext.ReadOnlyRootFilesystem {
+			t.Fatalf("%s: root filesystem must be read-only", c.Name)
+		}
+	}
+	if nginx.ReadinessProbe.HTTPGet.Scheme != "HTTPS" || nginx.ReadinessProbe.HTTPGet.Port != consolePluginPort {
+		t.Fatalf("readiness probe = %+v, want HTTPS on %d", nginx.ReadinessProbe.HTTPGet, consolePluginPort)
 	}
 	if sc := dep.Spec.Template.Spec.SecurityContext; sc.RunAsUser != 0 {
 		t.Fatalf("OpenShift assigns the UID, got runAsUser %d", sc.RunAsUser)

@@ -59,20 +59,24 @@ The browser never holds the API key.
 - The pages read the engine through the console's plugin proxy
   (`/api/proxy/plugin/ruptura/engine/...`), which reaches the plugin pod with
   the token of the signed-in user.
-- In the plugin pod, nginx checks that token against the API server (a read
-  of the user's own identity; anything else is refused with 401), then
-  forwards only the read endpoints `GET /api/v2/failures`,
-  `/api/v2/failures/series`, `/api/v2/failures/closest` and
-  `/api/v2/callgraph` to the engine Service, replacing the token with the
-  `Authorization` header built from the API key Secret mounted in the pod. Any
-  other path or method is refused with 403.
+- In the plugin pod, nginx serves the assets and hands only `GET` on
+  `/api/v2/failures`, `/api/v2/failures/series`, `/api/v2/failures/closest`
+  and `/api/v2/callgraph` to a proxy container on localhost; any other path
+  or method is refused with 403.
+- The proxy container is the only one that mounts the API key. For each
+  answer it asks the API server, with the user's own token, a
+  `SelfSubjectAccessReview` per namespace: may this user list pods there? It
+  keeps only the failures, pods, callers and call graph nodes of namespaces
+  where the answer is yes. A token the API server refuses gets 401. Decisions
+  are kept 30 seconds, keyed by a hash of the token; tokens are never stored.
 
-The Ruptures page shows the failures of the projects the user can see, as the
-console lists them; the Ruptura tab appears only on workloads the user can
-open. The proxy itself answers any user signed in to the console with the
-read-only results of the whole instance, so such a user can read failure names
-of other namespaces by calling the proxy directly; keep that in mind on a
-cluster where namespace names are confidential.
+So a user sees, on the pages and through the proxy alike, only the namespaces
+whose pods they may list, which is what the console itself shows them.
+
+One plugin per cluster: the `ConsolePlugin` is cluster-wide. If a second
+instance enables it while another instance already provides it, the second
+instance leaves it alone, deploys nothing for it, and says so in its status
+message: `console plugin already provided by <namespace>/<name>`.
 
 The API key is read when the plugin pod starts; after rotating the key,
 restart the `<name>-console-plugin` Deployment.

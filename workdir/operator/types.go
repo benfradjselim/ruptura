@@ -242,6 +242,7 @@ type Capabilities struct {
 type Container struct {
 	Name            string                    `json:"name"`
 	Image           string                    `json:"image"`
+	Command         []string                  `json:"command,omitempty"`
 	Args            []string                  `json:"args,omitempty"`
 	Ports           []ContainerPort           `json:"ports,omitempty"`
 	Env             []EnvVar                  `json:"env,omitempty"`
