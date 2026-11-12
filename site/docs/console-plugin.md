@@ -57,19 +57,22 @@ The browser never holds the API key.
 - The console loads the plugin assets from the plugin Service, over the
   service serving certificate.
 - The pages read the engine through the console's plugin proxy
-  (`/api/proxy/plugin/ruptura/engine/...`), which reaches the plugin pod.
-- In the plugin pod, nginx forwards only the read endpoints `GET
-  /api/v2/failures`, `/api/v2/failures/series`, `/api/v2/failures/closest`
-  and `/api/v2/callgraph` to the engine Service, adding the `Authorization`
-  header from the API key Secret mounted in the pod. Any other path or method
-  is refused with 403.
+  (`/api/proxy/plugin/ruptura/engine/...`), which reaches the plugin pod with
+  the token of the signed-in user.
+- In the plugin pod, nginx checks that token against the API server (a read
+  of the user's own identity; anything else is refused with 401), then
+  forwards only the read endpoints `GET /api/v2/failures`,
+  `/api/v2/failures/series`, `/api/v2/failures/closest` and
+  `/api/v2/callgraph` to the engine Service, replacing the token with the
+  `Authorization` header built from the API key Secret mounted in the pod. Any
+  other path or method is refused with 403.
 
 The Ruptures page shows the failures of the projects the user can see, as the
 console lists them; the Ruptura tab appears only on workloads the user can
-open. The proxy itself is reachable by any user signed in to the console and
-serves read-only results, so a user who can open the console can read failure
-names of other namespaces by calling the proxy directly; keep that in mind on
-a cluster where namespace names are confidential.
+open. The proxy itself answers any user signed in to the console with the
+read-only results of the whole instance, so such a user can read failure names
+of other namespaces by calling the proxy directly; keep that in mind on a
+cluster where namespace names are confidential.
 
 The API key is read when the plugin pod starts; after rotating the key,
 restart the `<name>-console-plugin` Deployment.

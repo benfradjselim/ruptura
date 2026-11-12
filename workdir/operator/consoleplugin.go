@@ -212,7 +212,10 @@ func consolePluginService(ns, name string, labels map[string]string) Service {
 
 // consolePluginObject is the cluster-wide ConsolePlugin: the console loads the
 // plugin assets from the plugin Service and proxies the engine API through the
-// same Service under the alias, so the browser never holds the API key.
+// same Service under the alias, so the browser never holds the API key. The
+// proxy forwards the console user's token (UserToken): the console answers
+// only signed-in users, and the plugin checks the token against the API server
+// before it swaps it for the API key.
 func consolePluginObject(ns, name string, labels map[string]string) map[string]interface{} {
 	service := map[string]interface{}{
 		"name":      consolePluginName(name),
@@ -229,7 +232,7 @@ func consolePluginObject(ns, name string, labels map[string]string) map[string]i
 			"backend":     map[string]interface{}{"type": "Service", "service": backend},
 			"proxy": []interface{}{map[string]interface{}{
 				"alias":         consolePluginProxyAlias,
-				"authorization": "None",
+				"authorization": "UserToken",
 				"endpoint":      map[string]interface{}{"type": "Service", "service": service},
 			}},
 		},

@@ -25,6 +25,7 @@ umask 077
 mkdir -p /tmp/ruptura /tmp/nginx
 cat > /tmp/ruptura/proxy.conf <<EOF
 limit_except GET { deny all; }
+auth_request /_auth;
 proxy_pass ${backend};
 proxy_http_version 1.1;
 proxy_set_header Authorization "Bearer ${key}";
@@ -33,4 +34,5 @@ proxy_read_timeout 30s;
 EOF
 
 echo "ruptura: console plugin proxies the engine read endpoints to ${backend}"
-exec nginx -c /etc/nginx/nginx.conf -g 'daemon off;'
+# -e sends the startup log to stderr, before the configuration is read.
+exec nginx -e stderr -c /etc/nginx/nginx.conf -g 'daemon off;'

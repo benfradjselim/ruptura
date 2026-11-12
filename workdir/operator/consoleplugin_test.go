@@ -267,7 +267,7 @@ func TestConsolePluginObject_ProxiesThroughItsOwnService(t *testing.T) {
 		t.Fatalf("proxies = %v, want one", proxies)
 	}
 	proxy := proxies[0].(map[string]interface{})
-	if proxy["alias"] != consolePluginProxyAlias || proxy["authorization"] != "None" {
+	if proxy["alias"] != consolePluginProxyAlias || proxy["authorization"] != "UserToken" {
 		t.Fatalf("proxy = %v", proxy)
 	}
 	endpoint := proxy["endpoint"].(map[string]interface{})["service"].(map[string]interface{})
