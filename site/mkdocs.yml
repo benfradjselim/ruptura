@@ -27,6 +27,7 @@ plugins:
 nav:
   - Home: index.md
   - Installation: install.md
+  - Disconnected install: install-disconnected.md
   - RupturaInstance: rupturainstance.md
   - Failure modes: failures.md
   - Alerting: alerting.md

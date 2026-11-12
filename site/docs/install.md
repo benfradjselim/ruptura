@@ -28,7 +28,9 @@ spec:
 oc get rupturainstance -n ruptura-demo
 ```
 
-The instance reaches `Running` in about a minute. The operator creates, in the namespace of the instance: the engine Deployment, a Service, a PersistentVolumeClaim, an API key Secret and a ServiceAccount. On OpenShift it also creates a Route, a ConfigMap filled with the service CA, and bindings to `cluster-monitoring-view` so the engine reads cluster metrics through Thanos.
+The instance reaches `Running` in about a minute. The operator creates, in the namespace of the instance: the engine Deployment, a Service, a PersistentVolumeClaim (an emptyDir with `storage.type: ephemeral`), an API key Secret, a ServiceAccount, and the web console `<name>-console` (turn it off with `output.ui.enabled: false`). On OpenShift it also creates Routes for the engine and the console, a ConfigMap filled with the service CA, and bindings to `cluster-monitoring-view` so the engine reads cluster metrics through Thanos.
+
+On a cluster without internet access, see [Disconnected install](install-disconnected.md).
 
 An invalid instance deploys nothing: its status reports phase `Failed` with every problem found.
 
