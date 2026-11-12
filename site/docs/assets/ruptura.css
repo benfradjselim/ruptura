@@ -1,0 +1,40 @@
+/* Ruptura identity for the docs: basalt, mineral white, one fissure yellow. Same tokens as getruptura.dev. */
+:root {
+  --md-primary-fg-color: #18222b;
+  --md-primary-fg-color--light: #2a3743;
+  --md-primary-fg-color--dark: #0f161c;
+  --md-primary-bg-color: #f4f5f2;
+  --md-accent-fg-color: #b38600;
+  --md-typeset-a-color: #18222b;
+}
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: #f4f5f2;
+  --md-default-fg-color: #18222b;
+  --md-default-fg-color--light: #4a5763;
+  --md-code-bg-color: #ebeee9;
+}
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #11181e;
+  --md-default-fg-color--light: #a3afb8;
+  --md-code-bg-color: #17212a;
+  --md-typeset-a-color: #f5c02e;
+  --md-accent-fg-color: #f5c02e;
+  --md-primary-fg-color: #0b1116;
+}
+.md-header, .md-tabs { background-color: #18222b; }
+[data-md-color-scheme="slate"] .md-header, [data-md-color-scheme="slate"] .md-tabs { background-color: #0b1116; }
+.md-header__button.md-logo img { width: 38px; height: 16px; }
+.md-typeset h1, .md-typeset h2, .md-typeset h3 { font-weight: 800; letter-spacing: -.02em; color: var(--md-default-fg-color); }
+.md-typeset a { text-decoration: underline; text-decoration-color: #f0b400; text-underline-offset: 3px; }
+.md-typeset a:hover { color: var(--md-accent-fg-color); }
+.md-typeset code { font-size: .82em; }
+.md-typeset table:not([class]) th { background: transparent; border-bottom: 2px solid var(--md-default-fg-color); }
+.md-nav__link--active { font-weight: 700; }
+.md-typeset h1::after { content: ""; display: block; width: 76px; height: 10px; margin-top: 14px;
+  background: linear-gradient(#18222b, #18222b) 0 2px / 34px 2px no-repeat,
+              linear-gradient(#f0b400, #f0b400) 34px 2px / 3px 8px no-repeat,
+              linear-gradient(#18222b, #18222b) 37px 8px / 39px 2px no-repeat; }
+[data-md-color-scheme="slate"] .md-typeset h1::after {
+  background: linear-gradient(#e8ecee, #e8ecee) 0 2px / 34px 2px no-repeat,
+              linear-gradient(#f5c02e, #f5c02e) 34px 2px / 3px 8px no-repeat,
+              linear-gradient(#e8ecee, #e8ecee) 37px 8px / 39px 2px no-repeat; }

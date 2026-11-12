@@ -6,8 +6,11 @@ copyright: "© 2026 Selim Benfradj — Apache 2.0"
 
 theme:
   name: material
-  logo: ruptura-icon.png
-  favicon: ruptura-icon.png
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  font:
+    text: Schibsted Grotesk
+    code: Martian Mono
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -19,6 +22,9 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+
+extra_css:
+  - assets/ruptura.css
 
 plugins:
   - search
