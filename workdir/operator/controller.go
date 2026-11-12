@@ -89,6 +89,11 @@ func cleanup(c *k8sClient, inst RupturaInstance, isOCP bool) error {
 	if err := deleteConsole(c, ns, name, isOCP); err != nil {
 		return fmt.Errorf("delete console: %w", err)
 	}
+	if isOCP {
+		if err := deleteConsolePlugin(c, ns, name); err != nil {
+			return fmt.Errorf("delete console plugin: %w", err)
+		}
+	}
 	if err := c.delete(readerBindingPath(ns, name)); err != nil {
 		return fmt.Errorf("delete reader ClusterRoleBinding: %w", err)
 	}
@@ -214,6 +219,9 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	}
 	if err := reconcileConsole(c, ns, name, isOCP, inst.Spec, labels); err != nil {
 		return fmt.Errorf("console: %w", err)
+	}
+	if err := reconcileConsolePlugin(c, ns, name, isOCP, inst.Spec, apiKeyRef, labels); err != nil {
+		return fmt.Errorf("console plugin: %w", err)
 	}
 
 	return updateStatus(c, inst)

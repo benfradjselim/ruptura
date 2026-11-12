@@ -71,6 +71,17 @@ type StorageConfig struct {
 type OutputConfig struct {
 	// UI is the Ruptura web console.
 	UI UIOutput `json:"ui,omitempty"`
+	// ConsolePlugin is the OpenShift console plugin.
+	ConsolePlugin ConsolePluginOutput `json:"consolePlugin,omitempty"`
+}
+
+// ConsolePluginOutput controls the OpenShift console plugin the operator
+// deploys. It is off unless enabled, so existing instances are unchanged.
+type ConsolePluginOutput struct {
+	// Enabled deploys the plugin; nil means false.
+	Enabled *bool `json:"enabled,omitempty"`
+	// Image overrides the plugin image.
+	Image string `json:"image,omitempty"`
 }
 
 // UIOutput controls the web console the operator deploys.
@@ -284,6 +295,8 @@ type Probe struct {
 type HTTPGetAction struct {
 	Path string `json:"path"`
 	Port int32  `json:"port"`
+	// Scheme is HTTP unless set to HTTPS.
+	Scheme string `json:"scheme,omitempty"`
 }
 
 type Volume struct {
@@ -292,6 +305,13 @@ type Volume struct {
 	EmptyDir              *EmptyDirVolumeSource  `json:"emptyDir,omitempty"`
 	ConfigMap             *ConfigMapVolumeSource `json:"configMap,omitempty"`
 	Projected             *ProjectedVolumeSource `json:"projected,omitempty"`
+	Secret                *SecretVolumeSource    `json:"secret,omitempty"`
+}
+
+// SecretVolumeSource mounts selected keys of a Secret.
+type SecretVolumeSource struct {
+	SecretName string      `json:"secretName"`
+	Items      []KeyToPath `json:"items,omitempty"`
 }
 
 // EmptyDirVolumeSource is a pod-lifetime scratch volume.
