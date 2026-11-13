@@ -48,6 +48,8 @@ spec:
 | `storage.storageClassName` | StorageClass name | cluster default | StorageClass of the volume claim. |
 | `output.ui.enabled` | `true`, `false` | `true` | Deploy the web console as `<name>-console`, with its Service and, on OpenShift, its Route. Sign in with the API key. |
 | `output.ui.image` | image reference | console of the operator release | Console image. |
+| `output.consolePlugin.enabled` | `true`, `false` | `false` | On OpenShift, show the failures in the OpenShift console, see [Console plugin](console-plugin.md). |
+| `output.consolePlugin.image` | image reference | plugin of the operator release | Console plugin image. |
 | `apiKeyRef` | Secret name | generated | Secret holding the API key under `api-key`. |
 | `resources` | requests and limits | 100m and 128Mi, 1 CPU and 512Mi | Engine resources. |
 

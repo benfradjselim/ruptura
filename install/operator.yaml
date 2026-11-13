@@ -362,6 +362,16 @@ spec:
                         image:
                           type: string
                           description: "Console image. Defaults to the console of the operator release."
+                    consolePlugin:
+                      type: object
+                      description: "OpenShift console plugin, deployed as <name>-console-plugin with its Service and a cluster-wide ConsolePlugin named ruptura. Off unless enabled."
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: false
+                        image:
+                          type: string
+                          description: "Plugin image. Defaults to the plugin of the operator release."
             status:
               type: object
               properties:
@@ -477,6 +487,10 @@ rules:
   - apiGroups: ["route.openshift.io"]
     resources: ["routes"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # The console plugin of an instance, when output.consolePlugin is enabled
+  - apiGroups: ["console.openshift.io"]
+    resources: ["consoleplugins"]
+    verbs: ["get", "create", "update", "patch", "delete"]
   # OpenShift SCC probe (read-only)
   - apiGroups: ["security.openshift.io"]
     resources: ["securitycontextconstraints"]

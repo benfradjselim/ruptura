@@ -1,0 +1,45 @@
+[
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "ruptura-ruptures",
+      "perspective": "admin",
+      "section": "observe",
+      "name": "Ruptures",
+      "href": "/ruptura/ruptures",
+      "insertAfter": "alerting"
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": ["/ruptura/ruptures"],
+      "component": { "$codeRef": "RupturesPage" }
+    }
+  },
+  {
+    "type": "console.tab/horizontalNav",
+    "properties": {
+      "model": { "group": "apps", "version": "v1", "kind": "Deployment" },
+      "page": { "name": "Ruptura", "href": "ruptura" },
+      "component": { "$codeRef": "WorkloadTab" }
+    }
+  },
+  {
+    "type": "console.tab/horizontalNav",
+    "properties": {
+      "model": { "group": "apps", "version": "v1", "kind": "StatefulSet" },
+      "page": { "name": "Ruptura", "href": "ruptura" },
+      "component": { "$codeRef": "WorkloadTab" }
+    }
+  },
+  {
+    "type": "console.tab/horizontalNav",
+    "properties": {
+      "model": { "group": "apps", "version": "v1", "kind": "DaemonSet" },
+      "page": { "name": "Ruptura", "href": "ruptura" },
+      "component": { "$codeRef": "WorkloadTab" }
+    }
+  }
+]
