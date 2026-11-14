@@ -1,0 +1,59 @@
+# What a user writes to cover their own namespaces without Ruptura, Nov 16 benchmark
+# part E. The OpenShift rules only watch openshift-*, kube-* and default, so each is
+# copied without that filter. OpenShift 4.22 ships no CPU throttling or OOM rule; the
+# two community rules below fill the gap, and predict_linear covers memory limits.
+# It also needs user workload monitoring enabled (cluster-monitoring-config) and a
+# route to Alertmanager. Ruptura replaces all of it with one RupturaInstance.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: workload-failures
+  namespace: my-app
+spec:
+  groups:
+    - name: workload-failures
+      rules:
+        - alert: KubePodCrashLooping
+          expr: max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",job="kube-state-metrics"}[5m]) >= 1
+          for: 15m
+          labels: {severity: warning}
+        - alert: KubePodNotReady
+          expr: |
+            sum by (namespace, pod) (
+              max by (namespace, pod) (kube_pod_status_phase{job="kube-state-metrics", phase=~"Pending|Unknown"}
+                unless ignoring(phase) (kube_pod_status_unschedulable{job="kube-state-metrics"} == 1))
+              * on (namespace, pod) group_left(owner_kind)
+              topk by (namespace, pod) (1, max by (namespace, pod, owner_kind) (kube_pod_owner{owner_kind!="Job"}))
+            ) > 0
+          for: 15m
+          labels: {severity: warning}
+        - alert: KubeDeploymentReplicasMismatch
+          expr: |
+            (kube_deployment_spec_replicas{job="kube-state-metrics"} > kube_deployment_status_replicas_available{job="kube-state-metrics"})
+            and (changes(kube_deployment_status_replicas_updated{job="kube-state-metrics"}[5m]) == 0)
+          for: 15m
+          labels: {severity: warning}
+        - alert: KubeDeploymentRolloutStuck
+          expr: kube_deployment_status_condition{condition="Progressing", status="false", job="kube-state-metrics"} != 0
+          for: 15m
+          labels: {severity: warning}
+        - alert: KubeContainerWaiting
+          expr: kube_pod_container_status_waiting_reason{reason!="CrashLoopBackOff", job="kube-state-metrics"} > 0
+          for: 1h
+          labels: {severity: warning}
+        - alert: CPUThrottlingHigh
+          expr: |
+            sum by (namespace, pod) (increase(container_cpu_cfs_throttled_periods_total{container!=""}[5m]))
+            / sum by (namespace, pod) (increase(container_cpu_cfs_periods_total{container!=""}[5m])) > 0.25
+          for: 15m
+          labels: {severity: info}
+        - alert: KubernetesContainerOomKiller
+          expr: |
+            (kube_pod_container_status_restarts_total - kube_pod_container_status_restarts_total offset 10m >= 1)
+            and ignoring(reason) min_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[10m]) == 1
+          labels: {severity: warning}
+        - alert: MemoryLimitSoon
+          expr: |
+            predict_linear(sum by (namespace, pod) (container_memory_working_set_bytes{container!="",container!="POD"})[30m:30s], 1800)
+            > sum by (namespace, pod) (kube_pod_container_resource_limits{resource="memory"})
+          labels: {severity: warning}

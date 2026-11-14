@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Service
+metadata: {name: shop-db, namespace: demo-shop}
+spec:
+  selector: {app: shop-db}
+  ports: [{port: 8080}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: shop-api, namespace: demo-shop}
+spec:
+  selector: {app: shop-api}
+  ports: [{port: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: shop-db, namespace: demo-shop}
+spec:
+  selector: {matchLabels: {app: shop-db}}
+  template:
+    metadata: {labels: {app: shop-db}}
+    spec:
+      containers:
+        - name: app
+          image: localhost/shop-app:dev
+          imagePullPolicy: IfNotPresent
+          env: [{name: ROLE, value: db}]
+          resources: {requests: {cpu: 20m, memory: 32Mi}, limits: {cpu: 500m, memory: 128Mi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: shop-api, namespace: demo-shop}
+spec:
+  selector: {matchLabels: {app: shop-api}}
+  template:
+    metadata: {labels: {app: shop-api}}
+    spec:
+      containers:
+        - name: app
+          image: localhost/shop-app:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: ROLE, value: api}
+            - {name: DB_URL, value: "http://shop-db:8080/q"}
+          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {cpu: 1000m, memory: 256Mi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: shop-load, namespace: demo-shop}
+spec:
+  selector: {matchLabels: {app: shop-load}}
+  template:
+    metadata: {labels: {app: shop-load}}
+    spec:
+      containers:
+        - name: app
+          image: localhost/shop-app:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: ROLE, value: load}
+            - {name: API_URL, value: "http://shop-api:8080/buy"}
+          resources: {requests: {cpu: 20m, memory: 32Mi}, limits: {cpu: 500m, memory: 128Mi}}

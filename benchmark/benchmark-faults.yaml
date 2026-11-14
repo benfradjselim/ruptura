@@ -1,0 +1,179 @@
+# Benchmark faults. step-leak fails by irregular jumps, sawtooth-batch is healthy
+# and must stay silent. Both write to a memory backed volume to raise usage.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: step-leak
+  namespace: demo-shop
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: step-leak}}
+  template:
+    metadata: {labels: {app: step-leak}}
+    spec:
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/ubi-minimal
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              rm -f /m/*; i=0
+              while true; do
+                i=$((i+1))
+                dd if=/dev/zero of=/m/block$i bs=1M count=48 2>/dev/null
+                sleep $((180 + (i % 3) * 180))
+              done
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 256Mi}
+          volumeMounts: [{name: m, mountPath: /m}]
+      volumes: [{name: m, emptyDir: {medium: Memory}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sawtooth-batch
+  namespace: demo-shop
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: sawtooth-batch}}
+  template:
+    metadata: {labels: {app: sawtooth-batch}}
+    spec:
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/ubi-minimal
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              rm -f /m/*
+              while true; do
+                for i in 1 2 3 4 5 6 7 8; do
+                  dd if=/dev/zero of=/m/block$i bs=1M count=24 2>/dev/null
+                  sleep 75
+                done
+                rm -f /m/block*
+                sleep 120
+              done
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 256Mi}
+          volumeMounts: [{name: m, mountPath: /m}]
+      volumes: [{name: m, emptyDir: {medium: Memory}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad-image
+  namespace: demo-shop
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: bad-image}}
+  template:
+    metadata: {labels: {app: bad-image}}
+    spec:
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/does-not-exist:1
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: missing-mount
+  namespace: demo-shop
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: missing-mount}}
+  template:
+    metadata: {labels: {app: missing-mount}}
+    spec:
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/ubi-minimal
+          command: ["sleep", "infinity"]
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+          volumeMounts: [{name: s, mountPath: /s}]
+      volumes:
+        - name: s
+          secret: {secretName: does-not-exist}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oom-spike
+  namespace: demo-shop
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: oom-spike}}
+  template:
+    metadata: {labels: {app: oom-spike}}
+    spec:
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/ubi-minimal
+          command: ["sh", "-c"]
+          args: ["rm -f /m/*; sleep 600; dd if=/dev/zero of=/m/spike bs=1M count=300; sleep 60"]
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+          volumeMounts: [{name: m, mountPath: /m}]
+      volumes: [{name: m, emptyDir: {medium: Memory}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accel-leak
+  namespace: demo-shop
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: accel-leak}}
+  template:
+    metadata: {labels: {app: accel-leak}}
+    spec:
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/ubi-minimal
+          command: ["sh", "-c"]
+          args:
+            - |
+              rm -f /m/*; i=0
+              while true; do
+                i=$((i+1))
+                dd if=/dev/zero of=/m/b$i bs=1M count=$i 2>/dev/null
+                sleep 60
+              done
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 256Mi}
+          volumeMounts: [{name: m, mountPath: /m}]
+      volumes: [{name: m, emptyDir: {medium: Memory}}]
+---
+# periodic-spike: a sudden jump past the limit every 45 min, like a scheduled job.
+# No trend for predict_linear, no crash loop, only the failure memory can warn.
+# Added 2026-11-03 for the Nov 9 checkpoint.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: periodic-spike
+  namespace: demo-shop
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: periodic-spike}}
+  template:
+    metadata: {labels: {app: periodic-spike}}
+    spec:
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/ubi-minimal
+          command: ["sh", "-c"]
+          args: ["rm -f /m/*; sleep 2700; dd if=/dev/zero of=/m/spike bs=1M count=300; sleep 60"]
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+          volumeMounts: [{name: m, mountPath: /m}]
+      volumes: [{name: m, emptyDir: {medium: Memory}}]
