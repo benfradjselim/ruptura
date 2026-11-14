@@ -1,5 +1,10 @@
 # Benchmark faults. step-leak fails by irregular jumps, sawtooth-batch is healthy
-# and must stay silent. Both write to a memory backed volume to raise usage.
+# and must stay silent.
+# Amendment 2026-11-14, before any Nov 16 data: faults that restart after an OOM kill
+# hold anonymous process memory (Python) instead of files on a memory backed volume.
+# Files on that volume outlived the killed container, kept the pod cgroup full, and the
+# kernel then killed crun while it created the next container (CreateContainerError).
+# Sizes, pace, timing and limits are unchanged. sawtooth-batch never restarts and is unchanged.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,21 +18,19 @@ spec:
     spec:
       containers:
         - name: app
-          image: registry.access.redhat.com/ubi9/ubi-minimal
-          command: ["/bin/sh", "-c"]
+          image: registry.access.redhat.com/ubi9/python-312
+          command: ["python3", "-c"]
           args:
             - |
-              rm -f /m/*; i=0
-              while true; do
-                i=$((i+1))
-                dd if=/dev/zero of=/m/block$i bs=1M count=48 2>/dev/null
-                sleep $((180 + (i % 3) * 180))
-              done
+              import time
+              held, i = [], 0
+              while True:
+                  i += 1
+                  held.append(b"\x01" * (48 << 20))
+                  time.sleep(180 + (i % 3) * 180)
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 100m, memory: 256Mi}
-          volumeMounts: [{name: m, mountPath: /m}]
-      volumes: [{name: m, emptyDir: {medium: Memory}}]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -115,14 +118,17 @@ spec:
     spec:
       containers:
         - name: app
-          image: registry.access.redhat.com/ubi9/ubi-minimal
-          command: ["sh", "-c"]
-          args: ["rm -f /m/*; sleep 600; dd if=/dev/zero of=/m/spike bs=1M count=300; sleep 60"]
+          image: registry.access.redhat.com/ubi9/python-312
+          command: ["python3", "-c"]
+          args:
+            - |
+              import time
+              time.sleep(600)
+              spike = b"\x01" * (300 << 20)
+              time.sleep(60)
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 100m, memory: 128Mi}
-          volumeMounts: [{name: m, mountPath: /m}]
-      volumes: [{name: m, emptyDir: {medium: Memory}}]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -137,21 +143,19 @@ spec:
     spec:
       containers:
         - name: app
-          image: registry.access.redhat.com/ubi9/ubi-minimal
-          command: ["sh", "-c"]
+          image: registry.access.redhat.com/ubi9/python-312
+          command: ["python3", "-c"]
           args:
             - |
-              rm -f /m/*; i=0
-              while true; do
-                i=$((i+1))
-                dd if=/dev/zero of=/m/b$i bs=1M count=$i 2>/dev/null
-                sleep 60
-              done
+              import time
+              held, i = [], 0
+              while True:
+                  i += 1
+                  held.append(b"\x01" * (i << 20))
+                  time.sleep(60)
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 100m, memory: 256Mi}
-          volumeMounts: [{name: m, mountPath: /m}]
-      volumes: [{name: m, emptyDir: {medium: Memory}}]
 ---
 # periodic-spike: a sudden jump past the limit every 45 min, like a scheduled job.
 # No trend for predict_linear, no crash loop, only the failure memory can warn.
@@ -169,11 +173,42 @@ spec:
     spec:
       containers:
         - name: app
-          image: registry.access.redhat.com/ubi9/ubi-minimal
-          command: ["sh", "-c"]
-          args: ["rm -f /m/*; sleep 2700; dd if=/dev/zero of=/m/spike bs=1M count=300; sleep 60"]
+          image: registry.access.redhat.com/ubi9/python-312
+          command: ["python3", "-c"]
+          args:
+            - |
+              import time
+              time.sleep(2700)
+              spike = b"\x01" * (300 << 20)
+              time.sleep(60)
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 100m, memory: 128Mi}
-          volumeMounts: [{name: m, mountPath: /m}]
-      volumes: [{name: m, emptyDir: {medium: Memory}}]
+---
+# leak-orders: steady leak of 2 MiB every 15 s, OOM about every 32 min.
+# Deployed by hand on Nov 1, added to this file by the 2026-11-14 amendment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: leak-orders
+  namespace: demo-shop
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: leak-orders}}
+  template:
+    metadata: {labels: {app: leak-orders}}
+    spec:
+      containers:
+        - name: leak
+          image: registry.access.redhat.com/ubi9/python-312
+          command: ["python3", "-c"]
+          args:
+            - |
+              import time
+              held = []
+              while True:
+                  held.append(b"\x01" * (2 << 20))
+                  time.sleep(15)
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 256Mi}

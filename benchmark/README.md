@@ -26,8 +26,19 @@ The files here are byte-identical to the frozen versions used for scoring:
 | `benchmark-replica.sh` | `1f0104eef6296c9c` | F1, one replica of three diverges |
 | `benchmark-release.sh` | `094969d755d3144d` | F2, a bad release beside healthy and heavier ones |
 | `score-variant.py` | `6936953635bb5d97` | F1 and F2 scoring |
-| `benchmark-faults.yaml` | `aa62b44f704aaf15` | Fault workloads (leaks, periodic spike, crash loop, bad image, missing mount, throttling) |
+| `benchmark-faults.yaml` | `3a1e78a193f6acf3` | Fault workloads (leaks, periodic spike, crash loop, bad image, missing mount, throttling), amended 14 Nov, see below |
 | `shop-app/` | | A small three-tier app that runs beside the faults |
+
+### Amendment, 14 November 2026, before the main benchmark day
+
+The faults that restart after an OOM kill wrote files to a memory-backed `emptyDir`. Those files
+outlive the killed container, so the pod's memory cgroup stays full and the kernel kills the container
+runtime while it creates the next container; the pod then sticks in `CreateContainerError`. This
+happened three times on 14 November and would void a 12-hour window. The five restarting faults
+(step-leak, oom-spike, accel-leak, periodic-spike, leak-orders) now hold anonymous Python memory with
+the same sizes, pace, timing and limits; the process starts about 10 MiB higher than a shell. The
+healthy control and all scoring scripts are unchanged. Previous version of the file: sha256
+`aa62b44f704aaf15...`.
 
 Results and raw outputs are added to this folder when the benchmark is frozen, on 17 November 2026.
 
