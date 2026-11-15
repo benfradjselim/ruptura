@@ -28,6 +28,7 @@ metadata:
     repository: https://github.com/benfradjselim/ruptura
     support: https://github.com/benfradjselim/ruptura/issues
     features.operators.openshift.io/disconnected: "true"
+    console.openshift.io/plugins: '["ruptura"]'
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
     features.operators.openshift.io/tls-profiles: "false"
@@ -60,6 +61,10 @@ spec:
       without working storage, and history is lost when the pod restarts.
     - `output.ui.enabled`: deploy the web console as `<name>-console`; sign in
       with the API key.
+    - `output.consolePlugin.enabled`: show the failures in the OpenShift
+      console, under Observe > Ruptures and in a Ruptura tab on Deployments,
+      StatefulSets and DaemonSets. Enable the `ruptura` console plugin when the
+      console proposes it at operator install.
     - `level.namespaceSelector`: watch only the namespaces that carry a label,
       for example `ruptura.io/enabled: "true"`; empty watches every namespace.
     - `level.scope` and `level.selector`: report per workload, pod or namespace,
@@ -87,6 +92,8 @@ spec:
       image: docker.io/selimbf/ruptura@sha256:b9a9a9b779ad50c1d44ea2fde0e2229e9df1864efa4bf235363b906b3afdb391
     - name: ruptura-ui
       image: ghcr.io/benfradjselim/ruptura-ui@sha256:69f0bd9e5a5fa0e74109a4b1a8e67755e948d8a1d07ce95645a9f2a4ff9aba26
+    - name: ruptura-console-plugin
+      image: ghcr.io/benfradjselim/ruptura-console-plugin:plugin-v8.7.8
   icon:
     - base64data: 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
       mediatype: image/png
@@ -137,6 +144,10 @@ spec:
           - path: output.ui.enabled
             displayName: Web Console
             description: Deploy the Ruptura web console with its Route.
+          - path: output.consolePlugin.enabled
+            displayName: OpenShift Console Plugin
+            description: Show the failures in the OpenShift console, under Observe > Ruptures and on workload details.
+            x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:booleanSwitch"]
             x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:booleanSwitch"]
           - path: apiKeyRef
             displayName: API Key Secret
@@ -218,6 +229,10 @@ spec:
             - apiGroups: ["route.openshift.io"]
               resources: ["routes"]
               verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+            # The console plugin of an instance, when output.consolePlugin is enabled
+            - apiGroups: ["console.openshift.io"]
+              resources: ["consoleplugins"]
+              verbs: ["get", "create", "update", "patch", "delete"]
             # OpenShift SCC probe (read-only)
             - apiGroups: ["security.openshift.io"]
               resources: ["securitycontextconstraints"]
@@ -263,6 +278,8 @@ spec:
                         value: docker.io/selimbf/ruptura@sha256:b9a9a9b779ad50c1d44ea2fde0e2229e9df1864efa4bf235363b906b3afdb391
                       - name: RELATED_IMAGE_RUPTURA_UI
                         value: ghcr.io/benfradjselim/ruptura-ui@sha256:69f0bd9e5a5fa0e74109a4b1a8e67755e948d8a1d07ce95645a9f2a4ff9aba26
+                      - name: RELATED_IMAGE_RUPTURA_CONSOLE_PLUGIN
+                        value: ghcr.io/benfradjselim/ruptura-console-plugin:plugin-v8.7.8
                     ports:
                       - name: metrics
                         containerPort: 9090

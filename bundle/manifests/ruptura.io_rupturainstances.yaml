@@ -354,6 +354,16 @@ spec:
                         image:
                           type: string
                           description: "Console image. Defaults to the console of the operator release."
+                    consolePlugin:
+                      type: object
+                      description: "OpenShift console plugin, deployed as <name>-console-plugin with its Service and a cluster-wide ConsolePlugin named ruptura. Off unless enabled."
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: false
+                        image:
+                          type: string
+                          description: "Plugin image. Defaults to the plugin of the operator release."
             status:
               type: object
               properties:

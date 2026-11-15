@@ -85,7 +85,7 @@ func TestUpdateStatus_ExplainsPending(t *testing.T) {
 			_, _ = w.Write([]byte(`{}`))
 		},
 	})
-	if err := updateStatus(c, makeInstance("ri", "ns")); err != nil {
+	if err := updateStatus(c, makeInstance("ri", "ns"), ""); err != nil {
 		t.Fatal(err)
 	}
 	st := patched["status"]
@@ -105,7 +105,7 @@ func TestUpdateStatus_RunningClearsMessage(t *testing.T) {
 			_, _ = w.Write([]byte(`{}`))
 		},
 	})
-	if err := updateStatus(c, makeInstance("ri", "ns")); err != nil {
+	if err := updateStatus(c, makeInstance("ri", "ns"), ""); err != nil {
 		t.Fatal(err)
 	}
 	msg, present := raw["status"]["message"]

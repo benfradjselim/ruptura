@@ -9,6 +9,7 @@ Ruptura needs three images. Every bundle from 1.4.7 references them by digest, s
 | Operator | `ghcr.io/benfradjselim/ruptura-operator` |
 | Engine | `docker.io/selimbf/ruptura` |
 | Console | `ghcr.io/benfradjselim/ruptura-ui` |
+| OpenShift console plugin | `ghcr.io/benfradjselim/ruptura-console-plugin` |
 
 OperatorHub also pulls the bundle image, from `quay.io/community-operator-pipeline-prod/ruptura-operator`.
 
@@ -39,6 +40,8 @@ If an `ImageContentSourcePolicy` exists, add these entries to it. Otherwise crea
     mirrors: [mirror.example.com/selimbf/ruptura]
   - source: ghcr.io/benfradjselim/ruptura-ui
     mirrors: [mirror.example.com/benfradjselim/ruptura-ui]
+  - source: ghcr.io/benfradjselim/ruptura-console-plugin
+    mirrors: [mirror.example.com/benfradjselim/ruptura-console-plugin]
 ```
 
 Adding mirrors does not reboot the nodes. Wait until the machine config pools are updated before installing:
@@ -86,6 +89,8 @@ spec:
   output:
     ui:
       image: mirror.example.com/benfradjselim/ruptura-ui:ui-v8.7.8
+    consolePlugin:
+      image: mirror.example.com/benfradjselim/ruptura-console-plugin:plugin-v8.7.8
 ```
 
 ### Storage
