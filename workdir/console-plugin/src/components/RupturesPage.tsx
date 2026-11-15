@@ -1,12 +1,13 @@
 // Observe > Ruptures: every failure Ruptura names, predicted first, in the
 // namespaces the user may see.
 import * as React from 'react';
-import { Alert, EmptyState, EmptyStateBody, EmptyStateHeader, Flex, FlexItem, PageSection, Spinner, Title } from '@patternfly/react-core';
+import { Alert, EmptyState, EmptyStateBody, EmptyStateHeader, PageSection, Spinner } from '@patternfly/react-core';
 import { K8sResourceCommon, useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
 import { fetchFailures, usePolling } from '../api';
 import { predictedFirst } from '../util/failures';
 import { visibleFailures } from '../util/workload';
 import FailureTable from './FailureTable';
+import './plugin.css';
 
 // Projects are the namespaces the console lists for the user, whatever their
 // role, so the page shows exactly what the user may see.
@@ -14,12 +15,10 @@ const PROJECT = { group: 'project.openshift.io', version: 'v1', kind: 'Project' 
 
 function Count({ label, value }: { label: string; value: number }): JSX.Element {
   return (
-    <FlexItem>
-      <Title headingLevel="h2" size="2xl" className="ruptura-when">
-        {value}
-      </Title>
-      <span className="ruptura-fact">{label}</span>
-    </FlexItem>
+    <div className="ruptura-count">
+      <span className="ruptura-count__value">{value}</span>
+      <span className="ruptura-count__label">{label}</span>
+    </div>
   );
 }
 
@@ -35,10 +34,10 @@ export default function RupturesPage(): JSX.Element {
 
   return (
     <>
-      <PageSection variant="light">
-        <Title headingLevel="h1">Ruptures</Title>
-        <p className="ruptura-fact">Failures Ruptura names before and as they happen, with evidence and a recommended action.</p>
-      </PageSection>
+      <header className="ruptura-header">
+        <h1 className="ruptura-header__title">Ruptures</h1>
+        <p className="ruptura-header__lead">Failures Ruptura names before and as they happen, with evidence and a recommended action.</p>
+      </header>
       <PageSection>
         {error && <Alert variant="danger" isInline title="Ruptura engine unreachable" style={{ marginBottom: 16 }}>{error}</Alert>}
         {projectsError && (
@@ -48,11 +47,11 @@ export default function RupturesPage(): JSX.Element {
         )}
         {!ready && !error && <Spinner aria-label="Reading failures" />}
         {ready && (
-          <Flex spaceItems={{ default: 'spaceItems2xl' }} style={{ marginBottom: 16 }}>
+          <div className="ruptura-counts">
             <Count label="Predicted" value={predicted} />
             <Count label="Detected" value={failures.length - predicted} />
             <Count label="Critical" value={critical} />
-          </Flex>
+          </div>
         )}
         {ready && failures.length === 0 && (
           <EmptyState>

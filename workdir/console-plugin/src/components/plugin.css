@@ -118,3 +118,42 @@
   color: var(--pf-v5-global--Color--200, #6a6e73);
   font-size: var(--pf-v5-global--FontSize--sm, 14px);
 }
+
+/* Page header and counters. The console moved from PatternFly 5 to 6 in
+   OpenShift 4.19, so these read PatternFly 6 tokens first, then PatternFly 5,
+   then fixed values, and render the same on every supported console. */
+.ruptura-header {
+  padding: var(--pf-t--global--spacer--lg, var(--pf-v5-global--spacer--lg, 24px));
+  border-bottom: 1px solid var(--pf-t--global--border--color--default, var(--pf-v5-global--BorderColor--100, #d2d2d2));
+}
+.ruptura-header__title {
+  margin: 0 0 var(--pf-t--global--spacer--sm, var(--pf-v5-global--spacer--sm, 8px));
+  font-size: var(--pf-t--global--font--size--heading--h1, var(--pf-v5-global--FontSize--2xl, 1.75rem));
+  font-weight: var(--pf-t--global--font--weight--heading--default, var(--pf-v5-global--FontWeight--normal, 400));
+  line-height: 1.3;
+  color: var(--pf-t--global--text--color--regular, var(--pf-v5-global--Color--100, #151515));
+}
+.ruptura-header__lead {
+  margin: 0;
+  color: var(--pf-t--global--text--color--subtle, var(--pf-v5-global--Color--200, #6a6e73));
+}
+.ruptura-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pf-t--global--spacer--2xl, var(--pf-v5-global--spacer--2xl, 48px));
+  margin-bottom: var(--pf-t--global--spacer--md, var(--pf-v5-global--spacer--md, 16px));
+}
+.ruptura-count {
+  display: flex;
+  flex-direction: column;
+}
+.ruptura-count__value {
+  font-size: var(--pf-t--global--font--size--heading--h2, var(--pf-v5-global--FontSize--2xl, 1.5rem));
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: var(--pf-t--global--text--color--regular, var(--pf-v5-global--Color--100, #151515));
+}
+.ruptura-count__label {
+  color: var(--pf-t--global--text--color--subtle, var(--pf-v5-global--Color--200, #6a6e73));
+}
