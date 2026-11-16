@@ -1,5 +1,41 @@
 # Ruptura benchmark results, 16 November 2026
 
+## In plain words
+
+**The question.** When an application on Kubernetes is about to crash, can a tool warn you *before* it
+happens, with enough time to act, and without crying wolf? We compared Ruptura with what most teams
+already have for free: alert rules in Prometheus, the standard monitoring tool (`predict_linear`).
+
+**How.** On a test cluster we caused real failures again and again for 12 hours (programs that slowly use
+up their memory until they crash, failures that come back every 45 minutes, a new version that leaks,
+pods that cannot start). We wrote the rules of the test before running it and published them, so we could
+not adjust anything afterwards. Losses are published like wins.
+
+**What Ruptura wins**
+- **Memory running out**, the most common crash: Ruptura warned **15 minutes** ahead on average, the
+  classic rule **7 minutes**, and Ruptura raised **no false alarm**. Tuned to be faster, the classic rule
+  warns earlier but raised **67 false alarms** in 12 hours.
+- **Failures that come back on a schedule** (every 45 minutes): Ruptura saw **14 out of 14** coming.
+  The classic rules saw **none**.
+- **One copy of an application leaking while its twins stay healthy**: Ruptura warned **57 minutes**
+  before the crash, the classic rules **30 minutes**.
+- **Applications that cannot start** (missing image, missing file, crash at start): spotted in
+  **about 30 seconds**, against **16 to 18 minutes** for the classic rules.
+- **A stuck software update**: spotted every time, within seconds to two minutes.
+
+**What Ruptura loses**
+- **A new version that leaks fast**: the classic rule warned about **10 minutes earlier**, and Ruptura
+  raised some false alarms during that test.
+- **Two failures named wrong**: Ruptura saw them, even earlier than the rules, but gave them the wrong name.
+- **Healthy applications**: Ruptura flagged a few more real CPU slowdowns than the classic rules did.
+
+**In one sentence.** On what Ruptura is built for, warning before a crash, it beats the free tool everyone
+already has, without false alarms; its losses are specific, known, and being fixed.
+
+---
+
+## Detailed results
+
 Ruptura against the alert rules a team already has, on the same OpenShift lab, the same injected
 faults and the same windows. Rules, scripts and criteria were published before the runs
 (see [README](README.md), including the 14 November amendment). Each part was scored once.
