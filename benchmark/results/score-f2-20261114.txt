@@ -1,0 +1,92 @@
+{
+ "test": "release",
+ "start": "06:00",
+ "end": "13:42",
+ "targets": [
+  {
+   "phase": "round 1 bad",
+   "start": "07:26",
+   "oom": "08:32",
+   "ruptura_warn_min": 12.2,
+   "ruptura_modes": [
+    "release_regression"
+   ],
+   "ruptura_lead_min": 54.4,
+   "30m/30m_warn_min": 2.0,
+   "30m/30m_lead_min": 64.5,
+   "10m/30m_warn_min": 2.0,
+   "10m/30m_lead_min": 64.5
+  },
+  {
+   "phase": "round 2 bad",
+   "start": "09:53",
+   "oom": "11:00",
+   "ruptura_warn_min": 11.2,
+   "ruptura_modes": [
+    "saturation"
+   ],
+   "ruptura_lead_min": 55.5,
+   "30m/30m_warn_min": 1.0,
+   "30m/30m_lead_min": 65.7,
+   "10m/30m_warn_min": 1.0,
+   "10m/30m_lead_min": 65.7
+  },
+  {
+   "phase": "round 3 bad",
+   "start": "12:20",
+   "oom": "13:27",
+   "ruptura_warn_min": 11.6,
+   "ruptura_modes": [
+    "saturation"
+   ],
+   "ruptura_lead_min": 55.2,
+   "30m/30m_warn_min": 2.0,
+   "30m/30m_lead_min": 64.8,
+   "10m/30m_warn_min": 2.0,
+   "10m/30m_lead_min": 64.8
+  }
+ ],
+ "false": 28,
+ "false_first": [
+  [
+   "round 1 heavy",
+   "2026-11-14T06:57:19Z",
+   "saturation:predicted:586"
+  ],
+  [
+   "round 1 heavy",
+   "2026-11-14T06:57:49Z",
+   "saturation:predicted:622"
+  ],
+  [
+   "round 1 heavy",
+   "2026-11-14T06:58:19Z",
+   "saturation:predicted:645"
+  ],
+  [
+   "round 1 undo",
+   "2026-11-14T08:32:38Z",
+   "release_regression:predicted:86"
+  ],
+  [
+   "round 1 undo",
+   "2026-11-14T08:33:08Z",
+   "release_regression:predicted:26"
+  ]
+ ],
+ "predict_linear_calm_firing_pods": {
+  "30m/30m": 38,
+  "10m/30m": 32
+ },
+ "median_lead_min": {
+  "ruptura": 55.2,
+  "30m/30m": 64.8,
+  "10m/30m": 64.8
+ },
+ "rules": {
+  "R1": true,
+  "R2": false,
+  "R3": false
+ },
+ "pass": false
+}

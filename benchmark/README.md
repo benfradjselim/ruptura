@@ -40,7 +40,7 @@ the same sizes, pace, timing and limits; the process starts about 10 MiB higher 
 healthy control and all scoring scripts are unchanged. Previous version of the file: sha256
 `aa62b44f704aaf15...`.
 
-Results and raw outputs are added to this folder when the benchmark is frozen, on 17 November 2026.
+Results: [RESULTS.md](RESULTS.md), raw outputs in [results/](results/).
 
 ## Running it on your cluster
 

@@ -1,0 +1,11 @@
+round 1 healthy rollout: nothing listed, ok
+round 1 stuck rollout: Progressing=False 14:29:23, rollout_stuck 14:29:54, delay 31 s, ok
+round 1 undo: last rollout_stuck 16 s after undo, ok
+round 2 healthy rollout: nothing listed, ok
+round 2 stuck rollout: Progressing=False 14:47:39, rollout_stuck 14:47:55, delay 16 s, ok
+round 2 undo: last rollout_stuck 0 s after undo, ok
+round 3 healthy rollout: nothing listed, ok
+round 3 stuck rollout: Progressing=False 15:05:59, rollout_stuck 15:08:02, delay 123 s, ok
+round 3 undo: last rollout_stuck 91 s after undo, ok
+other failures ever listed: none
+R1 True  R2 True  R3 True  R4 True  -> PASS

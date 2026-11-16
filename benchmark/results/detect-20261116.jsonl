@@ -1,0 +1,19 @@
+{"round": 0, "fault": "det-crash-r0", "expected": "crash_loop", "first_mode": "crash_loop", "ruptura_seconds": 49.97756052017212, "rule_seconds": 1092.6659824848175}
+{"round": 0, "fault": "det-image-r0", "expected": "startup_stuck", "first_mode": "startup_stuck", "ruptura_seconds": 17.728611707687378, "rule_seconds": 982.5928230285645}
+{"round": 0, "fault": "det-mount-r0", "expected": "startup_stuck", "first_mode": "startup_stuck", "ruptura_seconds": 17.728611707687378, "rule_seconds": 982.8455679416656}
+{"round": 0, "fault": "det-replicas-r0", "expected": "replicas_unavailable", "first_mode": "startup_stuck", "ruptura_seconds": 1222.6588299274445, "rule_seconds": 983.1256814002991}
+{"round": 0, "fault": "det-throttle-r0", "expected": "cpu_throttling", "first_mode": "cpu_throttling", "ruptura_seconds": 741.689122915268, "rule_seconds": 1030.004189491272}
+{"round": 0, "fault": "det-oom-r0", "expected": "oom_killed", "first_mode": "replicas_unavailable", "ruptura_seconds": 209.0683238506317, "rule_seconds": 681.5828168392181}
+{"round": 1, "fault": "det-crash-r1", "expected": "crash_loop", "first_mode": "crash_loop", "ruptura_seconds": 34.81195664405823, "rule_seconds": 967.7864720821381}
+{"round": 1, "fault": "det-image-r1", "expected": "startup_stuck", "first_mode": "startup_stuck", "ruptura_seconds": 34.81195664405823, "rule_seconds": 967.9865028858185}
+{"round": 1, "fault": "det-mount-r1", "expected": "startup_stuck", "first_mode": "startup_stuck", "ruptura_seconds": 17.927246809005737, "rule_seconds": 968.134281873703}
+{"round": 1, "fault": "det-replicas-r1", "expected": "replicas_unavailable", "first_mode": "startup_stuck", "ruptura_seconds": 1237.4867315292358, "rule_seconds": 968.377815246582}
+{"round": 1, "fault": "det-throttle-r1", "expected": "cpu_throttling", "first_mode": "cpu_throttling", "ruptura_seconds": 756.6715624332428, "rule_seconds": 1015.1802794933319}
+{"round": 1, "fault": "det-oom-r1", "expected": "oom_killed", "first_mode": "crash_loop", "ruptura_seconds": 191.70999360084534, "rule_seconds": 666.5066039562225}
+{"round": 2, "fault": "det-crash-r2", "expected": "crash_loop", "first_mode": "crash_loop", "ruptura_seconds": 34.19975161552429, "rule_seconds": 1200.6620378494263}
+{"round": 2, "fault": "det-image-r2", "expected": "startup_stuck", "first_mode": "startup_stuck", "ruptura_seconds": 34.19975161552429, "rule_seconds": 966.3960387706757}
+{"round": 2, "fault": "det-mount-r2", "expected": "startup_stuck", "first_mode": "startup_stuck", "ruptura_seconds": 34.19975161552429, "rule_seconds": 966.5777199268341}
+{"round": 2, "fault": "det-replicas-r2", "expected": "replicas_unavailable", "first_mode": "startup_stuck", "ruptura_seconds": 1222.3109529018402, "rule_seconds": 966.7768354415894}
+{"round": 2, "fault": "det-throttle-r2", "expected": "cpu_throttling", "first_mode": "cpu_throttling", "ruptura_seconds": 726.3831975460052, "rule_seconds": 1013.6738646030426}
+{"round": 2, "fault": "det-oom-r2", "expected": "oom_killed", "first_mode": "crash_loop", "ruptura_seconds": 175.24900913238525, "rule_seconds": 666.2647883892059}
+{"done": true}

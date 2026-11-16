@@ -1,0 +1,23 @@
+window 2026-11-16T00:00 to 2026-11-16T12:00 UTC
+
+Ruptura: 8 findings on 3 workloads without injected fault
+  07:04 boutique/inventory cpu_throttling
+  06:49 openshift-network-operator/iptables-alerter cpu_throttling
+  07:58 openshift-network-operator/iptables-alerter cpu_throttling
+  09:04 openshift-network-operator/iptables-alerter cpu_throttling
+  10:12 openshift-network-operator/iptables-alerter cpu_throttling
+  03:52 ruptura-h/otel cpu_throttling
+  06:50 ruptura-h/otel cpu_throttling
+  08:05 ruptura-h/otel cpu_throttling
+
+Opponent rules: 5 findings on 2 workloads without injected fault
+  01:00 ac-system/agent-runner-1-build KubeContainerWaiting
+  03:38 ruptura-h/otel CPUThrottlingHigh
+  06:51 ruptura-h/otel CPUThrottlingHigh
+  07:40 ruptura-h/otel CPUThrottlingHigh
+  10:10 ruptura-h/otel CPUThrottlingHigh
+
+Resources
+  engine: CPU mean 46m, highest 96m, memory highest 442 Mi
+  operator: no data
+

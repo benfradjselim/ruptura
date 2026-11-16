@@ -1,0 +1,69 @@
+{
+ "test": "replica",
+ "start": "08:27",
+ "end": "16:45",
+ "targets": [
+  {
+   "phase": "round 1 one replica-test-647fd688c6-jhrpg",
+   "start": "09:12",
+   "oom": "-",
+   "ruptura_warn_min": 8.1,
+   "ruptura_modes": [
+    "replica_divergence"
+   ],
+   "ruptura_lead_min": null,
+   "names_leaker": true,
+   "30m/30m_warn_min": 35.0,
+   "30m/30m_lead_min": 0.0,
+   "10m/30m_warn_min": 35.0,
+   "10m/30m_lead_min": 0.0
+  },
+  {
+   "phase": "round 2 one replica-test-64c4c84499-559gd",
+   "start": "12:08",
+   "oom": "13:13",
+   "ruptura_warn_min": 7.6,
+   "ruptura_modes": [
+    "replica_divergence"
+   ],
+   "ruptura_lead_min": 57.7,
+   "names_leaker": true,
+   "30m/30m_warn_min": 34.5,
+   "30m/30m_lead_min": 30.7,
+   "10m/30m_warn_min": 34.5,
+   "10m/30m_lead_min": 30.7
+  },
+  {
+   "phase": "round 3 one replica-test-59dc8bbd7d-6jss9",
+   "start": "14:39",
+   "oom": "15:45",
+   "ruptura_warn_min": 8.1,
+   "ruptura_modes": [
+    "replica_divergence"
+   ],
+   "ruptura_lead_min": 57.2,
+   "names_leaker": true,
+   "30m/30m_warn_min": 35.5,
+   "30m/30m_lead_min": 29.8,
+   "10m/30m_warn_min": 35.5,
+   "10m/30m_lead_min": 29.8
+  }
+ ],
+ "false": 0,
+ "false_first": [],
+ "predict_linear_calm_firing_pods": {
+  "30m/30m": 3,
+  "10m/30m": 3
+ },
+ "median_lead_min": {
+  "ruptura": 57.2,
+  "30m/30m": 29.8,
+  "10m/30m": 29.8
+ },
+ "rules": {
+  "R1": true,
+  "R2": true,
+  "R3": true
+ },
+ "pass": true
+}

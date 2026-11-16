@@ -1,0 +1,81 @@
+window 2026-11-16T00:00 to 2026-11-16T12:00 UTC, cycles count from 00:30 UTC
+
+predict_linear 30m/30m
+  leak-orders  18 of 21 warned fresh, 21 standing, firing share 0.27
+               standing leads [28.0, 30.0, 30.0, 28.0, 30.0, 30.0, 28.0, 30.0, 30.0, 28.0, 30.0, 30.0, 28.0, 30.0, 30.0, 28.0, 30.0, 30.0, 28.0, 30.0, 28.0]
+               fresh leads    [5.0, 6.0, 6.0, 5.0, 6.0, 6.0, None, 6.0, 6.0, 5.0, 5.5, 6.0, 5.0, 5.5, 6.5, 5.0, 5.5, 6.5, None, 5.5, None]
+  step-leak    20 of 20 warned fresh, 20 standing, firing share 0.33
+               standing leads [30.0, 32.0, 30.0, 32.0, 30.0, 32.0, 30.0, 32.0, 32.0, 30.0, 32.0, 30.0, 32.0, 30.0, 32.0, 30.0, 32.0, 32.0, 30.0, 32.0]
+               fresh leads    [7.5, 8.5, 7.0, 8.0, 7.0, 8.0, 6.5, 7.0, 8.5, 7.5, 8.0, 7.5, 8.0, 7.5, 8.0, 7.0, 7.5, 8.5, 7.0, 8.5]
+  accel-leak   0 of 32 warned fresh, 0 standing, firing share 0.0
+               standing leads [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+               fresh leads    [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+  oom-spike    0 of 68 warned fresh, 0 standing, firing share 0.0
+               standing leads [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+               fresh leads    [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+  periodic-spike 0 of 14 warned fresh, 0 standing, firing share 0.0
+               standing leads [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+               fresh leads    [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+  total 38 of 155 warned fresh, 41 standing, median fresh lead 7.0 min
+  false episodes on controls sawtooth-batch 0, stable-web 0, cpu-batch 0
+  false episodes on the cluster 0 on 0 workloads, worst []
+
+predict_linear 10m/30m
+  leak-orders  21 of 21 warned fresh, 21 standing, firing share 0.7
+               standing leads [21.5, 22.5, 22.5, 21.5, 22.5, 22.5, 21.5, 22.5, 22.5, 21.5, 22.5, 22.5, 21.5, 22.5, 23.5, 21.5, 22.5, 23.5, 21.5, 22.5, 21.5]
+               fresh leads    [21.5, 22.5, 22.5, 21.5, 22.5, 22.5, 21.5, 22.5, 22.5, 21.5, 22.5, 22.5, 21.5, 22.5, 23.5, 21.5, 22.5, 23.5, 21.5, 22.5, 21.5]
+  step-leak    20 of 20 warned fresh, 20 standing, firing share 0.63
+               standing leads [23.5, 24.5, 23.5, 24.5, 23.5, 24.5, 22.5, 23.5, 24.5, 23.5, 24.5, 23.5, 24.5, 23.5, 24.5, 23.5, 23.5, 24.5, 23.5, 24.5]
+               fresh leads    [23.5, 24.5, 23.5, 24.5, 23.5, 24.5, 22.5, 23.5, 24.5, 23.5, 24.5, 23.5, 24.5, 23.5, 24.5, 23.5, 23.5, 24.5, 23.5, 24.5]
+  accel-leak   32 of 32 warned fresh, 32 standing, firing share 0.57
+               standing leads [12.0, 11.5, 12.5, 11.5, 12.0, 11.0, 11.5, 10.5, 11.5, 10.5, 11.5, 10.5, 11.0, 12.0, 11.0, 12.0, 11.0, 12.0, 11.0, 12.0, 10.5, 11.0, 10.0, 11.5, 12.5, 11.0, 12.5, 11.0, 12.5, 11.5, 12.0, 11.0]
+               fresh leads    [12.0, 11.5, 12.5, 11.5, 12.0, 11.0, 11.5, 10.5, 11.5, 10.5, 11.5, 10.5, 11.0, 12.0, 11.0, 12.0, 11.0, 12.0, 11.0, 12.0, 10.5, 11.0, 10.0, 11.5, 12.5, 11.0, 12.5, 11.0, 12.5, 11.5, 12.0, 11.0]
+  oom-spike    0 of 68 warned fresh, 0 standing, firing share 0.0
+               standing leads [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+               fresh leads    [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+  periodic-spike 0 of 14 warned fresh, 0 standing, firing share 0.0
+               standing leads [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+               fresh leads    [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+  total 73 of 155 warned fresh, 73 standing, median fresh lead 21.5 min
+  false episodes on controls sawtooth-batch 61, stable-web 0, cpu-batch 0
+  false episodes on the cluster 67 on 3 workloads, worst [('demo-shop/sawtooth-batch', 61), ('st/ruptura', 5), ('ruptura-h/ruptura', 1)]
+
+Ruptura saturation
+  leak-orders  21 of 21 warned fresh, 21 standing, firing share 0.64
+               standing leads [19.6, 21.4, 21.2, 19.1, 20.8, 21.6, 19.4, 19.2, 22.0, 19.8, 21.6, 21.3, 19.0, 20.7, 21.4, 20.1, 21.9, 21.7, 19.5, 21.4, 19.3]
+               fresh leads    [19.6, 21.4, 21.2, 19.1, 20.8, 21.6, 19.4, 19.2, 22.0, 19.8, 21.6, 21.3, 19.0, 20.7, 21.4, 20.1, 21.9, 21.7, 19.5, 21.4, 19.3]
+  step-leak    18 of 20 warned fresh, 18 standing, firing share 0.41
+               standing leads [14.6, 15.4, 14.2, 16.0, 13.7, 23.6, 13.3, None, 15.9, 14.7, 15.4, 15.1, 15.8, 17.5, 19.1, 16.9, None, 18.5, 17.4, 18.3]
+               fresh leads    [14.6, 15.4, 14.2, 16.0, 13.7, 23.6, 13.3, None, 15.9, 14.7, 15.4, 15.1, 15.8, 17.5, 19.1, 16.9, None, 18.5, 17.4, 18.3]
+  accel-leak   26 of 32 warned fresh, 26 standing, firing share 0.03
+               standing leads [11.6, 9.6, 11.4, 9.3, 11.2, 9.1, 11.0, 8.8, None, 9.4, None, 9.2, None, 10.9, 8.8, 11.7, 9.6, 11.4, 10.1, 10.9, 9.7, None, 9.3, None, 11.0, 9.8, None, 9.5, 11.4, 9.4, 11.3, 9.2]
+               fresh leads    [11.6, 9.6, 11.4, 9.3, 11.2, 9.1, 11.0, 8.8, None, 9.4, None, 9.2, None, 10.9, 8.8, 11.7, 9.6, 11.4, 10.1, 10.9, 9.7, None, 9.3, None, 11.0, 9.8, None, 9.5, 11.4, 9.4, 11.3, 9.2]
+  oom-spike    0 of 68 warned fresh, 0 standing, firing share 0.0
+               standing leads [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+               fresh leads    [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+  periodic-spike 0 of 14 warned fresh, 0 standing, firing share 0.0
+               standing leads [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+               fresh leads    [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+  total 65 of 155 warned fresh, 65 standing, median fresh lead 15.4 min
+  false episodes on controls sawtooth-batch 0, stable-web 0, cpu-batch 0
+  false episodes on the cluster 0 on 0 workloads, worst []
+
+Ruptura + failure memory
+  leak-orders  21 of 21 warned fresh, 21 standing, firing share 0.7
+               standing leads [22.6, 24.4, 24.2, 22.1, 23.8, 24.6, 22.4, 24.2, 24.0, 22.8, 24.6, 21.3, 19.0, 20.7, 21.4, 20.1, 21.9, 21.7, 19.5, 21.4, 19.3]
+               fresh leads    [22.6, 24.4, 24.2, 22.1, 23.8, 24.6, 22.4, 24.2, 24.0, 22.8, 24.6, 21.3, 19.0, 20.7, 21.4, 20.1, 21.9, 21.7, 19.5, 21.4, 19.3]
+  step-leak    20 of 20 warned fresh, 20 standing, firing share 0.75
+               standing leads [27.6, 29.5, 27.3, 30.1, 27.9, 29.6, 27.4, 30.2, 30.0, 27.7, 29.6, 27.2, 29.9, 17.5, 19.1, 16.9, 15.7, 18.5, 17.4, 18.3]
+               fresh leads    [27.6, 29.5, 27.3, 30.1, 27.9, 29.6, 27.4, 30.2, 30.0, 27.7, 29.6, 27.2, 29.9, 17.5, 19.1, 16.9, 15.7, 18.5, 17.4, 18.3]
+  accel-leak   32 of 32 warned fresh, 32 standing, firing share 0.48
+               standing leads [11.6, 9.6, 11.4, 9.3, 11.2, 9.1, 11.0, 8.8, 10.6, 9.4, 10.3, 9.2, 10.1, 10.9, 8.8, 11.7, 9.6, 11.4, 10.1, 10.9, 9.7, 10.6, 9.3, 10.1, 11.0, 9.8, 10.7, 9.5, 11.4, 9.4, 11.3, 9.2]
+               fresh leads    [11.6, 9.6, 11.4, 9.3, 11.2, 9.1, 11.0, 8.8, 10.6, 9.4, 10.3, 9.2, 10.1, 10.9, 8.8, 11.7, 9.6, 11.4, 10.1, 10.9, 9.7, 10.6, 9.3, 10.1, 11.0, 9.8, 10.7, 9.5, 11.4, 9.4, 11.3, 9.2]
+  oom-spike    14 of 68 warned fresh, 14 standing, firing share 0.44
+               standing leads [None, None, None, None, None, None, None, None, None, None, None, 5.2, 5.1, 5.1, 5.0, None, None, None, None, None, None, None, None, None, None, 5.2, 7.2, 5.1, 5.0, None, None, None, None, None, None, None, None, None, None, 5.2, 5.1, None, None, None, None, None, None, None, None, 5.2, 5.1, 7.0, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 5.2]
+               fresh leads    [None, None, None, None, None, None, None, None, None, None, None, 5.2, 5.1, 5.1, 5.0, None, None, None, None, None, None, None, None, None, None, 5.2, 7.2, 5.1, 5.0, None, None, None, None, None, None, None, None, None, None, 5.2, 5.1, None, None, None, None, None, None, None, None, 5.2, 5.1, 7.0, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 5.2]
+  periodic-spike 14 of 14 warned fresh, 14 standing, firing share 0.63
+               standing leads [29.5, 27.2, 30.0, 29.6, 27.3, 30.1, 27.8, 29.5, 28.0, 29.6, 28.1, 29.8, 29.5, 27.4]
+               fresh leads    [29.5, 27.2, 30.0, 29.6, 27.3, 30.1, 27.8, 29.5, 28.0, 29.6, 28.1, 29.8, 29.5, 27.4]
+  total 101 of 155 warned fresh, 101 standing, median fresh lead 18.3 min
+  false episodes on controls sawtooth-batch 0, stable-web 0, cpu-batch 0
+  false episodes on the cluster 2 on 2 workloads, worst [('demo-shop/periodic-spike', 1), ('demo-shop/oom-spike', 1)]

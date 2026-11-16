@@ -1,0 +1,11 @@
+2026-11-16T14:17:13Z start
+2026-11-16T14:22:18Z round 1 healthy rollout
+2026-11-16T14:27:22Z round 1 stuck rollout
+2026-11-16T14:35:27Z round 1 undo
+2026-11-16T14:40:31Z round 2 healthy rollout
+2026-11-16T14:45:36Z round 2 stuck rollout
+2026-11-16T14:53:45Z round 2 undo
+2026-11-16T14:58:50Z round 3 healthy rollout
+2026-11-16T15:03:56Z round 3 stuck rollout
+2026-11-16T15:12:06Z round 3 undo
+2026-11-16T15:17:10Z end

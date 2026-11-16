@@ -1,0 +1,20 @@
+2026-11-13T08:27:24Z start
+2026-11-13T08:47:33Z round 1 quiet
+2026-11-13T09:12:44Z round 1 one replica-test-647fd688c6-jhrpg
+2026-11-13T10:42:45Z round 1 oom or timeout
+2026-11-13T10:42:54Z round 1 settle
+2026-11-13T10:58:01Z round 1 all
+2026-11-13T11:28:21Z round 1 settle
+2026-11-13T11:43:25Z round 2 quiet
+2026-11-13T12:08:37Z round 2 one replica-test-64c4c84499-559gd
+2026-11-13T13:13:52Z round 2 oom or timeout
+2026-11-13T13:14:02Z round 2 settle
+2026-11-13T13:29:09Z round 2 all
+2026-11-13T13:59:30Z round 2 settle
+2026-11-13T14:14:37Z round 3 quiet
+2026-11-13T14:39:46Z round 3 one replica-test-59dc8bbd7d-6jss9
+2026-11-13T15:45:03Z round 3 oom or timeout
+2026-11-13T15:45:14Z round 3 settle
+2026-11-13T16:00:22Z round 3 all
+2026-11-13T16:30:42Z round 3 settle
+2026-11-13T16:45:48Z end
