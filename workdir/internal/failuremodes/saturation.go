@@ -94,7 +94,7 @@ func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, resta
 	if slope <= 0 || agree < saturationMinAgreeing {
 		return Estimate{}, false
 	}
-	if !sustained(s.points, slope) {
+	if !sustained(s.points, slope) || decelerating(s.points, slope) {
 		return Estimate{}, false
 	}
 	remaining := 1 - usage
@@ -126,6 +126,31 @@ func sustained(points []point, slope float64) bool {
 		}
 	}
 	return true
+}
+
+// minTailRise is the share of the expected rise the last third of the window
+// must still show.
+const minTailRise = 0.5
+
+// decelerating reports whether the recent samples, the last third of the window
+// by time and at least saturationMinSamples points, grow at less than
+// minTailRise of the full-window slope. A heavy release that warms up and then
+// stabilises is concave: its early climb dominates the window slope while the
+// recent samples are flat. A leak keeps its pace. The median of pairwise
+// slopes keeps one outlier from deciding.
+func decelerating(points []point, slope float64) bool {
+	last := points[len(points)-1].at
+	start := last.Add(-last.Sub(points[0].at) / 3)
+	from := sort.Search(len(points), func(i int) bool { return !points[i].at.Before(start) })
+	if max := len(points) - saturationMinSamples; from > max {
+		from = max
+	}
+	recent := points[from:]
+	median, _ := theilSen(pairSlopes(recent))
+	span := recent[len(recent)-1].at.Sub(recent[0].at).Seconds()
+	// Either measure clears a leak: the median ignores an outlier, the net
+	// rise accepts a leak that grows in steps.
+	return median < slope*minTailRise && netRise(recent) < slope*span*minTailRise
 }
 
 // netRise compares the average of the last and first samples of a range, so that
