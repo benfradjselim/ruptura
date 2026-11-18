@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -46,6 +47,7 @@ type k8sWorkload struct {
 		AvailableReplicas int `json:"availableReplicas"`
 		Conditions        []struct {
 			Type               string `json:"type"`
+			Message            string `json:"message"`
 			LastTransitionTime string `json:"lastTransitionTime"`
 		} `json:"conditions"`
 	} `json:"status"`
@@ -54,10 +56,11 @@ type k8sWorkload struct {
 // k8sPod is the parsed shape of a Pod.
 type k8sPod struct {
 	Metadata struct {
-		Name            string `json:"name"`
-		Namespace       string `json:"namespace"`
-		ResourceVersion string `json:"resourceVersion"`
-		OwnerReferences []struct {
+		Name              string `json:"name"`
+		Namespace         string `json:"namespace"`
+		ResourceVersion   string `json:"resourceVersion"`
+		DeletionTimestamp string `json:"deletionTimestamp"`
+		OwnerReferences   []struct {
 			Kind string `json:"kind"`
 			Name string `json:"name"`
 		} `json:"ownerReferences"`
@@ -111,6 +114,9 @@ func toWorkloadMeta(w k8sWorkload, kind string) WorkloadMeta {
 		if c.Type == "Available" && c.LastTransitionTime != "" {
 			m.LastDeploy = c.LastTransitionTime
 		}
+		if c.Type == "Progressing" {
+			m.ReplicaSet = progressingReplicaSet(c.Message)
+		}
 	}
 
 	if len(w.Spec.Template.Spec.Containers) > 0 {
@@ -134,9 +140,10 @@ func toCachedPod(p k8sPod) (cachedPod, bool) {
 		restarts = p.Status.ContainerStatuses[0].RestartCount
 	}
 	return cachedPod{
-		namespace: p.Metadata.Namespace,
-		ownerKind: owner.Kind,
-		ownerName: owner.Name,
+		namespace:   p.Metadata.Namespace,
+		terminating: p.Metadata.DeletionTimestamp != "",
+		ownerKind:   owner.Kind,
+		ownerName:   owner.Name,
 		info: PodInfo{
 			Name:     p.Metadata.Name,
 			Node:     p.Spec.NodeName,
@@ -144,6 +151,24 @@ func toCachedPod(p k8sPod) (cachedPod, bool) {
 			Restarts: restarts,
 		},
 	}, true
+}
+
+// progressingReplicaSet returns the ReplicaSet a Deployment's Progressing
+// condition names, such as `ReplicaSet "web-5d4f" has successfully progressed.`,
+// which is the ReplicaSet of the Deployment's current template. It returns ""
+// when the message names none.
+func progressingReplicaSet(message string) string {
+	const prefix = `ReplicaSet "`
+	start := strings.Index(message, prefix)
+	if start < 0 {
+		return ""
+	}
+	rest := message[start+len(prefix):]
+	end := strings.IndexByte(rest, '"')
+	if end <= 0 {
+		return ""
+	}
+	return rest[:end]
 }
 
 // listWorkloads performs a full LIST for one resource type, populates cache.

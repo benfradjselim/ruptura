@@ -16,7 +16,10 @@ type WorkloadMeta struct {
 	Labels     map[string]string `json:"labels"`
 	Generation int64             `json:"generation,omitempty"`
 	LastDeploy string            `json:"last_deploy"` // RFC3339, empty when unknown
-	Pods       []PodInfo         `json:"pods"`
+	// ReplicaSet is the ReplicaSet of a Deployment's current template, empty
+	// when unknown or for other kinds.
+	ReplicaSet string    `json:"replicaset,omitempty"`
+	Pods       []PodInfo `json:"pods"`
 }
 
 // ReplicaStatus mirrors k8s replica counts.
@@ -48,10 +51,11 @@ type PodInfo struct {
 
 // cachedPod stores a pod and its owner reference for later workload association.
 type cachedPod struct {
-	info      PodInfo
-	namespace string
-	ownerKind string // "StatefulSet", "DaemonSet", or "ReplicaSet"
-	ownerName string // direct owner name
+	info        PodInfo
+	namespace   string
+	terminating bool   // deletionTimestamp is set
+	ownerKind   string // "StatefulSet", "DaemonSet", or "ReplicaSet"
+	ownerName   string // direct owner name
 }
 
 // MetadataCache stores WorkloadMeta and pod data concurrency-safely.
@@ -180,6 +184,34 @@ func (c *MetadataCache) PodReplicaSet(ns, podName string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// PodRetiring reports whether a pod is on its way out: it is terminating, or it
+// belongs to a ReplicaSet its Deployment no longer runs, as during a rollout or
+// a rollback. Unknown pods and Deployments whose current ReplicaSet is unknown
+// are not retiring.
+func (c *MetadataCache) PodRetiring(ns, podName string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for i := range c.pods {
+		p := &c.pods[i]
+		if p.namespace != ns || p.info.Name != podName {
+			continue
+		}
+		if p.terminating {
+			return true
+		}
+		if p.ownerKind != "ReplicaSet" {
+			return false
+		}
+		for _, m := range c.workloads {
+			if m.Kind == "Deployment" && m.Namespace == ns && isRSOwnedBy(p.ownerName, m.Name) {
+				return m.ReplicaSet != "" && m.ReplicaSet != p.ownerName
+			}
+		}
+		return false
+	}
+	return false
 }
 
 func (c *MetadataCache) upsertPod(p cachedPod) {

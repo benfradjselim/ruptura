@@ -42,6 +42,8 @@ type releasePod struct {
 	since    time.Time
 	// divergentSince is when the pod started to outgrow its siblings.
 	divergentSince time.Time
+	// retiring marks a terminating pod or one of a superseded release.
+	retiring bool
 }
 
 type versionProfile struct {
@@ -123,7 +125,7 @@ func (s *releaseState) estimate(now time.Time) (Estimate, bool) {
 	s.refreshProfiles(now)
 	newest, newestStart := "", time.Time{}
 	for _, p := range s.pods {
-		if p.first.After(newestStart) {
+		if !p.retiring && p.first.After(newestStart) {
 			newest, newestStart = p.version, p.first
 		}
 	}
@@ -145,7 +147,7 @@ func (s *releaseState) estimate(now time.Time) (Estimate, bool) {
 	found := false
 	for name, p := range s.pods {
 		age := now.Sub(p.first)
-		if p.version != newest || age < releaseMinAge || age > releaseRecent || p.capacity <= 0 || len(p.samples) == 0 {
+		if p.retiring || p.version != newest || age < releaseMinAge || age > releaseRecent || p.capacity <= 0 || len(p.samples) == 0 {
 			continue
 		}
 		r, low, high, ok := rateBand(p.samples, now.Add(-releaseWindow))

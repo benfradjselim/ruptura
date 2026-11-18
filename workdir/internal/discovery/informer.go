@@ -92,6 +92,15 @@ func (inf *Informer) PodReplicaSet(ns, podName string) (string, bool) {
 	return inf.cache.PodReplicaSet(ns, podName)
 }
 
+// PodRetiring reports whether a pod is terminating or belongs to a superseded
+// ReplicaSet of its Deployment.
+func (inf *Informer) PodRetiring(ns, podName string) bool {
+	if inf == nil || inf.cache == nil {
+		return false
+	}
+	return inf.cache.PodRetiring(ns, podName)
+}
+
 // Run starts goroutines for workload + pod watching and blocks until ctx is cancelled.
 // onAdd is called for every ADDED/MODIFIED workload event; onDelete for DELETED.
 // onFirstSync (may be nil) is called exactly once, after the initial LIST phase

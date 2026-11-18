@@ -30,6 +30,10 @@ type podState struct {
 	eventReason string
 	backOffSeen time.Time
 	lastOOM     bool
+
+	// retiring marks a pod that is terminating or belongs to a superseded
+	// release: its forecasts describe a pod about to go away.
+	retiring bool
 }
 
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
@@ -137,6 +141,16 @@ func (t *Tracker) ObserveVersion(pod, version string) {
 	t.versions[pod] = version
 }
 
+// ObserveRetiring records whether a pod is terminating or belongs to a release
+// its workload no longer runs. A retiring pod keeps feeding history, but its
+// saturation, throttling, regression and divergence forecasts are not reported:
+// a rollout or a rollback replaces it before they matter.
+func (t *Tracker) ObserveRetiring(workload, pod string, retiring bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.podLocked(workload, pod).retiring = retiring
+}
+
 func (t *Tracker) podLocked(workload, pod string) *podState {
 	state, ok := t.pods[pod]
 	if !ok {
@@ -176,6 +190,10 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 	regression, regressing := Estimate{}, false
 	divergent, diverging := Estimate{}, false
 	if release, ok := t.releases[workload]; ok {
+		for pod, p := range release.pods {
+			state, known := t.pods[pod]
+			p.retiring = known && state.retiring
+		}
 		regression, regressing = release.estimate(now)
 		divergent, diverging = release.divergence(now)
 	}
@@ -189,10 +207,10 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 			continue
 		}
 		explained := (regressing && t.versions[pod] == regression.Version) || (!regressing && diverging && pod == divergent.Pod)
-		if state.valid && now.Sub(state.seen) <= estimateMaxAge && !(explained && state.estimate.Mode == ModeSaturation) {
+		if state.valid && now.Sub(state.seen) <= estimateMaxAge && !(explained && state.estimate.Mode == ModeSaturation) && !state.retiring {
 			consider(state.estimate)
 		}
-		if state.condValid && now.Sub(state.condSeen) <= estimateMaxAge {
+		if state.condValid && now.Sub(state.condSeen) <= estimateMaxAge && !state.retiring {
 			consider(state.condEstimate)
 		}
 		if est, ok := state.oomEstimate(pod, now); ok {
