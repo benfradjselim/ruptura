@@ -77,7 +77,9 @@ describe('etaRange', () => {
 
 describe('labels', () => {
   it('reads a failure mode as words', () => {
-    expect(modeLabel('crash_loop')).toBe('crash loop');
+    expect(modeLabel('crash_loop')).toBe('Crash loop');
+    expect(modeLabel('memory_beyond_usual')).toBe('Memory beyond usual');
+    expect(modeLabel('some_new_mode')).toBe('some new mode');
   });
 
   it('says when the failure is expected', () => {

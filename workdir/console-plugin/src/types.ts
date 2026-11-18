@@ -46,3 +46,19 @@ export interface WorkloadRef {
   kind: string;
   name: string;
 }
+
+/** One pod of GET /api/v2/failures/closest: memory as a share of its limit. */
+export interface ClosestPod {
+  workload: string;
+  /** namespace/pod */
+  pod: string;
+  usage: number;
+  /** Change of usage per hour, as a share of the limit. */
+  trendPerHour?: number;
+}
+
+/** What the plugin reads of GET /api/v2/health. */
+export interface EngineHealth {
+  version?: string;
+  uptime_seconds?: number;
+}

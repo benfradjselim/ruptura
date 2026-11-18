@@ -31,7 +31,7 @@ func engineServer(t *testing.T) (*httptest.Server, *[]string) {
 		case "/api/v2/callgraph":
 			_, _ = io.WriteString(w, `{"nodes":[{"id":"n","namespace":"shop"}],"edges":[]}`)
 		case "/api/v2/health":
-			_, _ = io.WriteString(w, `{"status":"ok"}`)
+			_, _ = io.WriteString(w, `{"status":"ok","version":"8.7.9","uptime_seconds":60,"analyzer":{"workloads":130}}`)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -58,7 +58,8 @@ func TestHandler(t *testing.T) {
 		{"series without a workload", "GET", "/api/v2/failures/series", "user", 403, "", ""},
 		{"call graph", "GET", "/api/v2/callgraph", "user", 200, `"nodes":[{"id":"n"`, ""},
 		{"no token", "GET", "/api/v2/failures", "", 401, "", "shop"},
-		{"health is not proxied", "GET", "/api/v2/health", "user", 403, "", "ok"},
+		{"health gives uptime and version only", "GET", "/api/v2/health", "user", 200, `{"uptime_seconds":60,"version":"8.7.9"}`, "workloads"},
+		{"health needs a user token", "GET", "/api/v2/health", "", 401, "", "version"},
 		{"anything else is not proxied", "GET", "/api/v2/auth/login", "user", 403, "", ""},
 		{"writes are refused", "POST", "/api/v2/failures", "user", 405, "", "shop"},
 		{"trailing slash is another path", "GET", "/api/v2/failures/", "user", 403, "", "shop"},
@@ -84,7 +85,7 @@ func TestHandler(t *testing.T) {
 		})
 	}
 	for _, uri := range *seen {
-		if strings.HasPrefix(uri, "/api/v2/health") || strings.HasPrefix(uri, "/api/v2/auth") {
+		if strings.HasPrefix(uri, "/api/v2/auth") {
 			t.Fatalf("engine was asked %s", uri)
 		}
 	}
