@@ -13,6 +13,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/normalize"
 	"github.com/benfradjselim/ruptura/internal/sources"
 	"github.com/benfradjselim/ruptura/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/outage"
 )
 
 const (
@@ -42,7 +43,16 @@ func (c *inputCollector) Coverage() []normalize.Coverage {
 	return append([]normalize.Coverage{}, c.coverage...)
 }
 
+// inputsOutage reports Prometheus outages seen by the input poll once each.
+var inputsOutage = outage.New("inputs: Prometheus", warnf)
+
 func (c *inputCollector) collect(ctx context.Context, source *sources.Thanos, catalog sources.Catalog, profile string) {
+	failed := false
+	defer func() {
+		if !failed {
+			inputsOutage.Succeeded()
+		}
+	}()
 	coverage := []normalize.Coverage{}
 	frames := make(map[string][]normalize.Frame, len(inputLevels))
 	for _, level := range inputLevels {
@@ -53,7 +63,8 @@ func (c *inputCollector) collect(ctx context.Context, source *sources.Thanos, ca
 			names = append(names, role.Name)
 			values, err := source.CollectRole(ctx, role)
 			if err != nil {
-				logger.Default.Warn("inputs: collect failed", "role", role.Name, "err", err)
+				inputsOutage.Failed("role "+role.Name, err)
+				failed = true
 				continue
 			}
 			collected[role.Name] = values

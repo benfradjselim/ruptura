@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/sources"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/outage"
 )
 
 const (
@@ -77,12 +79,23 @@ func newCeilings(raw string) *ceilings {
 	return &ceilings{defaults: defaults}
 }
 
+// failureModesOutage reports Prometheus outages seen by the failure mode poll
+// once each.
+var failureModesOutage = outage.New("failure modes: Prometheus", warnf)
+
+// warnf writes a formatted warning.
+func warnf(format string, args ...interface{}) {
+	logger.Default.Warn(fmt.Sprintf(format, args...))
+}
+
 func pollFailureModes(ctx context.Context, source *sources.Thanos, catalog sources.Catalog, inf *discovery.Informer, tracker *failuremodes.Tracker, limits *ceilings) {
 	now := time.Now()
+	failed := false
 	for _, signal := range catalog.Signals {
 		readings, err := source.Collect(ctx, signal)
 		if err != nil {
-			logger.Default.Warn("failure modes: collect failed", "signal", signal.Name, "err", err)
+			failureModesOutage.Failed("signal "+signal.Name, err)
+			failed = true
 			continue
 		}
 		for _, reading := range readings {
@@ -112,6 +125,9 @@ func pollFailureModes(ctx context.Context, source *sources.Thanos, catalog sourc
 			}
 			tracker.Observe(workload, pod, now, reading.Usage, reading.Capacity, reading.Restarts)
 		}
+	}
+	if !failed {
+		failureModesOutage.Succeeded()
 	}
 	observeWarningEvents(ctx, inf, tracker)
 	tracker.Prune(now.Add(-failureModePodTTL))
