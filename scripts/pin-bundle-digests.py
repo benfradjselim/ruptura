@@ -4,9 +4,9 @@ disconnected install requires: mirrors only redirect references by digest.
 
   python3 scripts/pin-bundle-digests.py bundle/manifests/ruptura-operator.clusterserviceversion.yaml
 
-Run after the images of the release are published. Rewrites `image:` and
-`value:` lines that name a tag, then checks that relatedImages lists every
-image the CSV uses and that no tag is left.
+Run after the images of the release are published. Rewrites `image:`,
+`value:` and the `containerImage:` annotation lines that name a tag, then checks
+that relatedImages lists every image the CSV uses and that no tag is left.
 """
 import json
 import re
@@ -25,7 +25,7 @@ ACCEPT = ', '.join([
     'application/vnd.oci.image.manifest.v1+json',
     'application/vnd.docker.distribution.manifest.v2+json',
 ])
-REF = re.compile(r'^(\s*-?\s*(?:image|value):\s*)"?((?:%s)/[^\s"@:]+):([^\s"@]+)"?\s*$' % '|'.join(re.escape(r) for r in REGISTRIES))
+REF = re.compile(r'^(\s*-?\s*(?:image|value|containerImage):\s*)"?((?:%s)/[^\s"@:]+):([^\s"@]+)"?\s*$' % '|'.join(re.escape(r) for r in REGISTRIES))
 
 
 def digest(registry, repo, tag):
@@ -60,7 +60,7 @@ def pin(lines):
 
 
 def check(text):
-    used = set(re.findall(r'(?:image|value):\s*"?(\S+@sha256:[0-9a-f]{64})', text))
+    used = set(re.findall(r'(?:image|value|containerImage):\s*"?(\S+@sha256:[0-9a-f]{64})', text))
     related = text.split('relatedImages:', 1)[1].split('\n  icon:', 1)[0] if 'relatedImages:' in text else ''
     missing = sorted(i for i in used if i not in related)
     tags = [m.group(0).strip() for m in map(REF.match, text.splitlines(True)) if m]
