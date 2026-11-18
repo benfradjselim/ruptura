@@ -14,6 +14,9 @@ import (
 const (
 	failureModePollInterval = 30 * time.Second
 	failureModePodTTL       = 10 * time.Minute
+	// failureModeSaveInterval is how often the tracker state is saved, so a
+	// restart loses at most this much history.
+	failureModeSaveInterval = time.Minute
 )
 
 // startFailureModes polls the configured Thanos endpoint and feeds the tracker.
@@ -38,11 +41,17 @@ func startFailureModes(ctx context.Context, url string, inf *discovery.Informer,
 	}
 	tracker := failuremodes.NewTracker()
 	restoreFailureHistory(tracker, store)
+	restoreTrackerState(tracker, store, time.Now())
 	go func() {
 		ticker := time.NewTicker(failureModePollInterval)
 		defer ticker.Stop()
+		var saved time.Time
 		for {
 			pollFailureModes(ctx, source, catalog, inf, tracker)
+			if now := time.Now(); now.Sub(saved) >= failureModeSaveInterval {
+				saveTrackerState(tracker, store, now)
+				saved = now
+			}
 			select {
 			case <-ctx.Done():
 				return
@@ -102,6 +111,41 @@ func observeWarningEvents(ctx context.Context, inf *discovery.Informer, tracker 
 		workload := event.Namespace + "/" + kind + "/" + name
 		tracker.ObserveEvent(workload, event.Namespace+"/"+event.Pod, event.Reason, event.Message, event.At)
 	}
+}
+
+// saveTrackerState writes the tracker's recent readings to storage. A nil
+// tracker, as when failure modes are disabled, saves nothing.
+func saveTrackerState(tracker *failuremodes.Tracker, store *storage.Store, now time.Time) {
+	if tracker == nil {
+		return
+	}
+	data, err := failuremodes.EncodeState(tracker.Snapshot(now))
+	if err == nil {
+		err = store.PutTrackerState(data)
+	}
+	if err != nil {
+		logger.Default.Warn("failure modes: state not saved", "err", err)
+	}
+}
+
+// restoreTrackerState reloads the readings saved before a restart, so forecasts
+// resume without a new warm-up. A missing or unreadable state starts cold.
+func restoreTrackerState(tracker *failuremodes.Tracker, store *storage.Store, now time.Time) {
+	data, err := store.GetTrackerState()
+	if err != nil {
+		logger.Default.Warn("failure modes: state not restored", "err", err)
+		return
+	}
+	if len(data) == 0 {
+		return
+	}
+	state, err := failuremodes.DecodeState(data)
+	if err != nil {
+		logger.Default.Warn("failure modes: state not restored", "err", err)
+		return
+	}
+	tracker.Restore(state, now)
+	logger.Default.Info("failure modes: state restored", "pods", len(state.Pods), "saved_at", time.Unix(state.At, 0).UTC())
 }
 
 // restoreFailureHistory reloads saved failures and saves each new one, so a restart

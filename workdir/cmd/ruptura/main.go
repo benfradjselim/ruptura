@@ -574,6 +574,8 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		if err := srv.Shutdown(shutCtx); err != nil {
 			logger.Default.Error("shutdown error", "err", err)
 		}
+		// Save the failure mode readings so the next start resumes its forecasts.
+		saveTrackerState(tracker, store, time.Now())
 		// NFR-05: flush all in-memory snapshots to BadgerDB before exit.
 		if err := store.FlushSnapshots(); err != nil {
 			logger.Default.Error("snapshot flush failed", "err", err)
