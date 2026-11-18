@@ -33,6 +33,7 @@ func TestValidateSpec(t *testing.T) {
 		{"unknown sensitivity", RupturaInstanceSpec{Analysis: AnalysisConfig{Sensitivity: "high"}}, "analysis.sensitivity"},
 		{"bad horizon", RupturaInstanceSpec{Analysis: AnalysisConfig{Horizon: "soon"}}, "analysis.horizon"},
 		{"zero horizon", RupturaInstanceSpec{Analysis: AnalysisConfig{Horizon: "0s"}}, "analysis.horizon"},
+		{"bad default memory limit", RupturaInstanceSpec{Analysis: AnalysisConfig{DefaultMemoryLimits: map[string]string{"shop": "lots"}}}, "analysis.defaultMemoryLimits.shop"},
 		{"unknown log level", RupturaInstanceSpec{Logging: LoggingConfig{Level: "trace"}}, "logging.level"},
 		{"channel without name", RupturaInstanceSpec{Alerting: AlertingConfig{Channels: []AlertChannel{{Alertmanager: &AlertmanagerChannel{URL: "u"}}}}}, "alerting.channels"},
 		{"duplicate channel", RupturaInstanceSpec{Alerting: AlertingConfig{Channels: []AlertChannel{channel("a"), channel("a")}}}, "duplicate"},
@@ -88,7 +89,7 @@ func TestReconcile_ConfigReachesTheEngine(t *testing.T) {
 		Spec: RupturaInstanceSpec{
 			Level:    LevelConfig{Scope: "namespace", Selector: LabelSelector{MatchLabels: map[string]string{"tier": "db", "team": "shop"}}},
 			Input:    InputConfig{Profile: "minimal"},
-			Analysis: AnalysisConfig{Sensitivity: "conservative", Horizon: "45m"},
+			Analysis: AnalysisConfig{Sensitivity: "conservative", Horizon: "45m", DefaultMemoryLimits: map[string]string{"shop": "512Mi", "batch": "2Gi"}, InferMemoryCeilings: new(bool)},
 			Logging:  LoggingConfig{Level: "debug"},
 			Alerting: AlertingConfig{Channels: []AlertChannel{{Name: "ops", Alertmanager: &AlertmanagerChannel{URL: "http://am:9093"}}}},
 		},
@@ -98,12 +99,14 @@ func TestReconcile_ConfigReachesTheEngine(t *testing.T) {
 	}
 	env := envOf(t, rec)
 	want := map[string]string{
-		"RUPTURA_LEVEL_SCOPE":       "namespace",
-		"RUPTURA_INPUT_PROFILE":     "minimal",
-		"RUPTURA_SENSITIVITY":       "conservative",
-		"RUPTURA_HORIZON":           "45m",
-		"LOG_LEVEL":                 "debug",
-		"RUPTURA_ALERTMANAGER_URLS": "http://am:9093",
+		"RUPTURA_LEVEL_SCOPE":           "namespace",
+		"RUPTURA_INPUT_PROFILE":         "minimal",
+		"RUPTURA_SENSITIVITY":           "conservative",
+		"RUPTURA_HORIZON":               "45m",
+		"RUPTURA_DEFAULT_MEMORY_LIMITS": "batch=2Gi,shop=512Mi",
+		"RUPTURA_INFERRED_CEILINGS":     "false",
+		"LOG_LEVEL":                     "debug",
+		"RUPTURA_ALERTMANAGER_URLS":     "http://am:9093",
 	}
 	for name, value := range want {
 		if env[name] == nil || env[name]["value"] != value {

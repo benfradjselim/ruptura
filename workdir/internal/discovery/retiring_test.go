@@ -79,3 +79,33 @@ func TestMetadataCache_PodRetiring(t *testing.T) {
 		t.Fatal("unknown pod reported retiring")
 	}
 }
+
+func TestMetadataCache_WorkloadForPodName(t *testing.T) {
+	c := newMetadataCache()
+	for _, w := range []WorkloadMeta{
+		{Namespace: "shop", Kind: "Deployment", Name: "web"},
+		{Namespace: "shop", Kind: "Deployment", Name: "web-api"},
+		{Namespace: "shop", Kind: "StatefulSet", Name: "db"},
+		{Namespace: "shop", Kind: "DaemonSet", Name: "agent"},
+	} {
+		c.setWorkload(w.Namespace, w.Kind, w.Name, w)
+	}
+	tests := []struct {
+		pod, kind, name string
+		ok              bool
+	}{
+		{"web-5d4f8b-x2k9q", "Deployment", "web", true},
+		{"web-api-6c7b9-abcde", "Deployment", "web-api", true},
+		{"db-0", "StatefulSet", "db", true},
+		{"db-12", "StatefulSet", "db", true},
+		{"db-x", "", "", false},
+		{"agent-q8w2e", "DaemonSet", "agent", true},
+		{"cache-5d4f8b-x2k9q", "", "", false},
+	}
+	for _, tt := range tests {
+		kind, name, ok := c.WorkloadForPodName("shop", tt.pod)
+		if kind != tt.kind || name != tt.name || ok != tt.ok {
+			t.Errorf("WorkloadForPodName(%q) = %q %q %v, want %q %q %v", tt.pod, kind, name, ok, tt.kind, tt.name, tt.ok)
+		}
+	}
+}

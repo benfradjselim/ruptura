@@ -112,6 +112,11 @@ func failureEvidence(est failuremodes.Estimate) []string {
 	switch est.Mode {
 	case failuremodes.ModeSaturation:
 		return []string{fmt.Sprintf("Memory at %d%% of its limit", int(math.Round(est.Usage*100)))}
+	case failuremodes.ModeMemoryBeyondUsual:
+		return []string{
+			"No memory limit set",
+			fmt.Sprintf("Memory at %d%% of its usual level of %d MiB (%s)", int(math.Round(est.Usage*100)), mebibytes(est.Ceiling), est.CeilingSource),
+		}
 	case failuremodes.ModeCPUThrottling:
 		return []string{fmt.Sprintf("CPU throttled %d%% of the time", int(math.Round(est.Usage*100)))}
 	case failuremodes.ModeStartupStuck:
@@ -164,7 +169,7 @@ func failureResult(workload, state string, est *failuremodes.Estimate, crashLoop
 		result.Evidence = failureEvidence(*est)
 		result.Kind = failureKindDetected
 		switch est.Mode {
-		case failuremodes.ModeSaturation, failuremodes.ModeRecurrentFailure, failuremodes.ModeReleaseRegression, failuremodes.ModeReplicaDivergence:
+		case failuremodes.ModeSaturation, failuremodes.ModeMemoryBeyondUsual, failuremodes.ModeRecurrentFailure, failuremodes.ModeReleaseRegression, failuremodes.ModeReplicaDivergence:
 			result.Kind = failureKindPredicted
 			result.ETASeconds = int(est.ETF.Seconds())
 			result.ETAEarlySeconds = int(est.ETFEarly.Seconds())

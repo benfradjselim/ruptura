@@ -570,6 +570,8 @@ func configEnv(spec RupturaInstanceSpec) []EnvVar {
 		{Name: "RUPTURA_INPUT_PROFILE", Value: spec.Input.Profile},
 		{Name: "RUPTURA_SENSITIVITY", Value: spec.Analysis.Sensitivity},
 		{Name: "RUPTURA_HORIZON", Value: spec.Analysis.Horizon},
+		{Name: "RUPTURA_DEFAULT_MEMORY_LIMITS", Value: selectorString(spec.Analysis.DefaultMemoryLimits)},
+		{Name: "RUPTURA_INFERRED_CEILINGS", Value: inferCeilingsValue(spec.Analysis.InferMemoryCeilings)},
 		{Name: "LOG_LEVEL", Value: spec.Logging.Level},
 		{Name: "RUPTURA_ALERTMANAGER_URLS", Value: alertmanagerURLs(spec.Alerting.Channels, false)},
 		{Name: "RUPTURA_ALERTMANAGER_TOKEN_URLS", Value: alertmanagerURLs(spec.Alerting.Channels, true)},
@@ -581,6 +583,15 @@ func configEnv(spec RupturaInstanceSpec) []EnvVar {
 		}
 	}
 	return env
+}
+
+// inferCeilingsValue is "false" when inference is turned off, else empty so
+// the engine default applies.
+func inferCeilingsValue(infer *bool) string {
+	if infer != nil && !*infer {
+		return "false"
+	}
+	return ""
 }
 
 // ephemeral reports whether the instance keeps its data in an emptyDir.

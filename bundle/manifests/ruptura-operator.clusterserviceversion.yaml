@@ -72,6 +72,10 @@ spec:
     - `input.profile`: which metrics the engine reads.
     - `analysis.sensitivity` and `analysis.horizon`: how early a predicted failure
       turns a workload degraded.
+    - `analysis.defaultMemoryLimits`: the usual memory level per namespace for pods
+      with no memory limit. Without it, the engine uses the 7-day 99th percentile
+      plus 20 percent, and reports growth past it as `memory_beyond_usual`, never
+      as an OOM kill.
     - `alerting.channels`: Alertmanager endpoints that receive active failures.
     - `logging.level`: engine log level.
 

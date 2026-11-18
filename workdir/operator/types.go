@@ -132,6 +132,12 @@ type PrometheusSource struct {
 type AnalysisConfig struct {
 	Sensitivity string `json:"sensitivity,omitempty"`
 	Horizon     string `json:"horizon,omitempty"`
+	// DefaultMemoryLimits gives, per namespace, the usual memory level of
+	// pods that set no memory limit, such as 512Mi. Without one, the engine
+	// uses the 7-day 99th percentile of the workload plus 20 percent.
+	DefaultMemoryLimits map[string]string `json:"defaultMemoryLimits,omitempty"`
+	// InferMemoryCeilings turns the 7-day inference off when false.
+	InferMemoryCeilings *bool `json:"inferMemoryCeilings,omitempty"`
 }
 
 // AlertmanagerChannel sends results to an Alertmanager.

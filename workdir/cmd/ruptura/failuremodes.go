@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/discovery"
@@ -42,12 +43,14 @@ func startFailureModes(ctx context.Context, url string, inf *discovery.Informer,
 	tracker := failuremodes.NewTracker()
 	restoreFailureHistory(tracker, store)
 	restoreTrackerState(tracker, store, time.Now())
+	limits := newCeilings(os.Getenv("RUPTURA_DEFAULT_MEMORY_LIMITS"))
+	startCeilings(ctx, limits, source, inf, os.Getenv("RUPTURA_INFERRED_CEILINGS") == "false")
 	go func() {
 		ticker := time.NewTicker(failureModePollInterval)
 		defer ticker.Stop()
 		var saved time.Time
 		for {
-			pollFailureModes(ctx, source, catalog, inf, tracker)
+			pollFailureModes(ctx, source, catalog, inf, tracker, limits)
 			if now := time.Now(); now.Sub(saved) >= failureModeSaveInterval {
 				saveTrackerState(tracker, store, now)
 				saved = now
@@ -63,7 +66,18 @@ func startFailureModes(ctx context.Context, url string, inf *discovery.Informer,
 	return tracker
 }
 
-func pollFailureModes(ctx context.Context, source *sources.Thanos, catalog sources.Catalog, inf *discovery.Informer, tracker *failuremodes.Tracker) {
+// newCeilings returns the ceilings with the namespace defaults in raw. An
+// unreadable value is reported and ignored, so inference still applies.
+func newCeilings(raw string) *ceilings {
+	defaults, err := parseDefaultLimits(raw)
+	if err != nil {
+		logger.Default.Warn("failure modes: default memory limits ignored", "err", err)
+		defaults = nil
+	}
+	return &ceilings{defaults: defaults}
+}
+
+func pollFailureModes(ctx context.Context, source *sources.Thanos, catalog sources.Catalog, inf *discovery.Informer, tracker *failuremodes.Tracker, limits *ceilings) {
 	now := time.Now()
 	for _, signal := range catalog.Signals {
 		readings, err := source.Collect(ctx, signal)
@@ -89,6 +103,12 @@ func pollFailureModes(ctx context.Context, source *sources.Thanos, catalog sourc
 			if reading.RestartsOnly {
 				tracker.ObserveRestarts(workload, pod, now, reading.Restarts)
 				continue
+			}
+			if reading.Capacity <= 0 && signal.Mode == "saturation" {
+				if ceiling, from, ok := limits.lookup(reading.Namespace, workload); ok {
+					tracker.ObserveUnlimited(workload, pod, now, reading.Usage, ceiling, from, reading.Restarts)
+					continue
+				}
 			}
 			tracker.Observe(workload, pod, now, reading.Usage, reading.Capacity, reading.Restarts)
 		}

@@ -92,6 +92,14 @@ func (inf *Informer) PodReplicaSet(ns, podName string) (string, bool) {
 	return inf.cache.PodReplicaSet(ns, podName)
 }
 
+// WorkloadForPodName returns the workload of a pod name, live or gone.
+func (inf *Informer) WorkloadForPodName(ns, podName string) (kind, name string, ok bool) {
+	if inf == nil || inf.cache == nil {
+		return "", "", false
+	}
+	return inf.cache.WorkloadForPodName(ns, podName)
+}
+
 // PodRetiring reports whether a pod is terminating or belongs to a superseded
 // ReplicaSet of its Deployment.
 func (inf *Informer) PodRetiring(ns, podName string) bool {

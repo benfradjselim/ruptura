@@ -3,9 +3,25 @@ package main
 import (
 	"fmt"
 	"net/url"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
+
+// memoryQuantity matches the memory quantities the engine reads: a positive
+// number with an optional binary or decimal suffix.
+var memoryQuantity = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?(Ki|Mi|Gi|Ti|k|K|M|G|T)?$`)
+
+// sortedKeys returns the keys of m in order, so problems are listed stably.
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
 
 var (
 	availableScopes   = set("pod", "workload", "namespace")
@@ -65,6 +81,11 @@ func validateSpec(spec RupturaInstanceSpec) error {
 	if horizon := spec.Analysis.Horizon; horizon != "" {
 		if parsed, err := time.ParseDuration(horizon); err != nil || parsed <= 0 {
 			problems = append(problems, fmt.Sprintf("analysis.horizon: invalid duration %q", horizon))
+		}
+	}
+	for _, ns := range sortedKeys(spec.Analysis.DefaultMemoryLimits) {
+		if !memoryQuantity.MatchString(spec.Analysis.DefaultMemoryLimits[ns]) {
+			problems = append(problems, fmt.Sprintf("analysis.defaultMemoryLimits.%s: %q is not a memory quantity such as 512Mi", ns, spec.Analysis.DefaultMemoryLimits[ns]))
 		}
 	}
 	if prometheus := spec.Input.Prometheus; prometheus != nil {

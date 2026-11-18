@@ -33,10 +33,12 @@ type State struct {
 type sample [2]float64
 
 type podSnapshot struct {
-	Pod      string   `json:"p"`
-	Workload string   `json:"w"`
-	Restarts int      `json:"r"`
-	Counted  bool     `json:"c,omitempty"`
+	Pod      string `json:"p"`
+	Workload string `json:"w"`
+	Restarts int    `json:"r"`
+	Counted  bool   `json:"c,omitempty"`
+	// Capacity is the capacity the points are shares of.
+	Capacity float64  `json:"k,omitempty"`
 	Points   []sample `json:"s,omitempty"`
 	// History is the cycle guard's usage range as [unix seconds, low, high].
 	History [][3]float64 `json:"h,omitempty"`
@@ -108,7 +110,7 @@ func (t *Tracker) Snapshot(now time.Time) State {
 	from := now.Add(-stateMaxAge)
 	state := State{Version: stateVersion, At: now.Unix()}
 	for pod, s := range t.pods {
-		snap := podSnapshot{Pod: pod, Workload: s.workload, Restarts: s.restarts, Counted: s.counted}
+		snap := podSnapshot{Pod: pod, Workload: s.workload, Restarts: s.restarts, Counted: s.counted, Capacity: s.capacity}
 		if s.detector != nil {
 			snap.Points = toSamples(s.detector.points, from)
 			for _, b := range s.detector.history {
@@ -146,7 +148,7 @@ func (t *Tracker) Restore(state State, now time.Time) {
 	from := now.Add(-stateMaxAge)
 	for _, snap := range state.Pods {
 		s := t.podLocked(snap.Workload, snap.Pod)
-		s.restarts, s.counted = snap.Restarts, snap.Counted
+		s.restarts, s.counted, s.capacity = snap.Restarts, snap.Counted, snap.Capacity
 		s.seen = unixTime(float64(state.At))
 		var history []bucket
 		for _, h := range snap.History {

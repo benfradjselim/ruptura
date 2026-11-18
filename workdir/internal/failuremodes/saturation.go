@@ -47,6 +47,10 @@ type Estimate struct {
 	PreviousRate    float64
 	// Siblings counts the other replicas a diverging pod is compared with.
 	Siblings int
+	// Ceiling, in bytes, and CeilingSource name the usual level a pod with no
+	// memory limit is compared with.
+	Ceiling       float64
+	CeilingSource string
 }
 
 type point struct {
@@ -155,6 +159,18 @@ func decelerating(points []point, slope float64) bool {
 	// Either measure clears a leak: the median ignores an outlier, the net
 	// rise accepts a leak that grows in steps.
 	return median < slope*minTailRise && netRise(recent) < slope*span*minTailRise
+}
+
+// rescale multiplies the stored usage shares by factor, so that history read
+// against one capacity stays comparable after the capacity changes.
+func (s *Saturation) rescale(factor float64) {
+	for i := range s.points {
+		s.points[i].usage *= factor
+	}
+	for i := range s.history {
+		s.history[i].low *= factor
+		s.history[i].high *= factor
+	}
 }
 
 // netRise compares the average of the last and first samples of a range, so that

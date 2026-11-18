@@ -116,3 +116,30 @@ func TestTracker_SnapshotReleaseAndCondition(t *testing.T) {
 		t.Fatalf("release pod version = %q, want app-a", got)
 	}
 }
+
+func TestTracker_ObserveUnlimited(t *testing.T) {
+	tr := NewTracker()
+	const workload, pod = "ns/Deployment/cache", "ns/cache-1"
+	start := time.Date(2026, 11, 18, 9, 0, 0, 0, time.UTC)
+	var last Estimate
+	found := false
+	for i := 0; i <= 40; i++ {
+		at := start.Add(time.Duration(i) * 30 * time.Second)
+		ceiling := 400.0 * benchMiB
+		if i > 25 {
+			ceiling = 420 * benchMiB // the hourly refresh moved the ceiling
+		}
+		tr.ObserveUnlimited(workload, pod, at, (100+4*float64(i)/2)*benchMiB, ceiling, "7-day P99 + 20%", 0)
+		last, found = tr.Worst(workload, at)
+	}
+	if !found || last.Mode != ModeMemoryBeyondUsual {
+		t.Fatalf("Worst = %+v %v, want memory_beyond_usual", last, found)
+	}
+	if last.Ceiling != 420*benchMiB || last.CeilingSource != "7-day P99 + 20%" {
+		t.Fatalf("ceiling %v from %q", last.Ceiling, last.CeilingSource)
+	}
+	// 180 MiB now, growing 4 MiB per minute, 240 MiB to go: about 60 minutes.
+	if m := last.ETF.Minutes(); m < 55 || m > 65 {
+		t.Fatalf("ETF %v min, want about 60 after the ceiling moved", m)
+	}
+}

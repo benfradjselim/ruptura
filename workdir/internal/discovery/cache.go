@@ -173,6 +173,51 @@ func (c *MetadataCache) ResolvePodOwner(ns, podName string) (kind, name string, 
 	return "", "", false
 }
 
+// WorkloadForPodName returns the workload a pod name belongs to, including pods
+// that no longer exist, such as those found in seven days of metrics. A cached
+// pod is resolved by its owner; another name is matched by the naming rules of
+// its controller: <deployment>-<hash>-<id>, <statefulset>-<ordinal> or
+// <daemonset>-<id>. The longest matching workload name wins.
+func (c *MetadataCache) WorkloadForPodName(ns, podName string) (kind, name string, ok bool) {
+	if kind, name, ok := c.ResolvePodOwner(ns, podName); ok {
+		return kind, name, true
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, m := range c.workloads {
+		if m.Namespace != ns || len(m.Name) <= len(name) || !strings.HasPrefix(podName, m.Name+"-") {
+			continue
+		}
+		suffix := podName[len(m.Name)+1:]
+		parts := strings.Split(suffix, "-")
+		matches := false
+		switch m.Kind {
+		case "Deployment":
+			matches = len(parts) == 2 && parts[0] != "" && parts[1] != ""
+		case "StatefulSet":
+			matches = len(parts) == 1 && isDigits(parts[0])
+		case "DaemonSet":
+			matches = len(parts) == 1 && parts[0] != ""
+		}
+		if matches {
+			kind, name, ok = m.Kind, m.Name, true
+		}
+	}
+	return kind, name, ok
+}
+
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // PodReplicaSet returns the ReplicaSet that owns a pod, which names the
 // release of a Deployment, or ok=false for other owners or unknown pods.
 func (c *MetadataCache) PodReplicaSet(ns, podName string) (string, bool) {

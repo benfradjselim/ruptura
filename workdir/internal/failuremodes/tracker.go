@@ -34,6 +34,13 @@ type podState struct {
 	// retiring marks a pod that is terminating or belongs to a superseded
 	// release: its forecasts describe a pod about to go away.
 	retiring bool
+
+	// ceiling and ceilingSource are the usual level of a pod with no memory
+	// limit, zero for a pod with one.
+	ceiling       float64
+	ceilingSource string
+	// capacity is the last capacity the saturation history was read against.
+	capacity float64
 }
 
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
@@ -114,6 +121,40 @@ func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity fl
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	state := t.podLocked(workload, pod)
+	t.useCeilingLocked(state, capacity, "")
+	t.observeLocked(state, workload, pod, at, usage, capacity, capacity, restarts)
+}
+
+// ObserveUnlimited records one reading for a pod with no memory limit, against
+// ceiling, the usual level of its workload described by source. A forecast to
+// pass the ceiling is reported as ModeMemoryBeyondUsual, never as saturation,
+// because nothing kills the pod there. Release and divergence forecasts, which
+// need a limit, are skipped.
+func (t *Tracker) ObserveUnlimited(workload, pod string, at time.Time, usage, ceiling float64, source string, restarts int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	state := t.podLocked(workload, pod)
+	t.useCeilingLocked(state, ceiling, source)
+	t.observeLocked(state, workload, pod, at, usage, ceiling, 0, restarts)
+	if state.valid {
+		state.estimate.Mode = ModeMemoryBeyondUsual
+		state.estimate.Ceiling, state.estimate.CeilingSource = ceiling, source
+	}
+}
+
+// useCeilingLocked rescales a pod's history when its capacity changes, so that
+// a new ceiling, or a limit set on a pod that had none, keeps the trend intact.
+func (t *Tracker) useCeilingLocked(state *podState, capacity float64, source string) {
+	state.ceiling, state.ceilingSource = 0, ""
+	if source != "" {
+		state.ceiling, state.ceilingSource = capacity, source
+	}
+	if state.detector != nil && capacity > 0 && state.capacity > 0 && state.capacity != capacity {
+		state.detector.rescale(state.capacity / capacity)
+	}
+}
+
+func (t *Tracker) observeLocked(state *podState, workload, pod string, at time.Time, usage, capacity, releaseCapacity float64, restarts int) {
 	if state.detector == nil {
 		state.detector = NewSaturation()
 	}
@@ -123,13 +164,16 @@ func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity fl
 	state.estimate, state.valid = state.detector.Observe(at, usage, capacity, restarts)
 	state.estimate.Pod = pod
 	state.seen = at
+	if capacity > 0 {
+		state.capacity = capacity
+	}
 	if version := t.versions[pod]; version != "" {
 		release, ok := t.releases[workload]
 		if !ok {
 			release = newReleaseState()
 			t.releases[workload] = release
 		}
-		release.observe(pod, version, at, usage, capacity)
+		release.observe(pod, version, at, usage, releaseCapacity)
 	}
 }
 
