@@ -122,6 +122,9 @@ func failureEvidence(est failuremodes.Estimate) []string {
 	case failuremodes.ModeStartupStuck:
 		return []string{"Kubernetes reports " + est.Reason}
 	case failuremodes.ModeReplicasUnavailable:
+		if est.Reason != "" {
+			return []string{fmt.Sprintf("%s unavailable", replicaCount(int(est.Usage))), fmt.Sprintf("Kubernetes reports %s for pod %s", est.Reason, podName(est.Pod))}
+		}
 		return []string{fmt.Sprintf("%s unavailable for over 5 minutes", replicaCount(int(est.Usage)))}
 	case failuremodes.ModeRecurrentFailure:
 		rhythm := fmt.Sprintf("%d failures, about every %d min", est.Failures, int(math.Round(est.Interval.Minutes())))

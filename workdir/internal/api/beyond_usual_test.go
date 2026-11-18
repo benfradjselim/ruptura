@@ -44,3 +44,18 @@ func TestMemoryBeyondUsual_NeverCriticalNorOOM(t *testing.T) {
 		t.Errorf("text announces a kill: %q", text)
 	}
 }
+
+func TestReplicasUnavailable_Unschedulable(t *testing.T) {
+	est := failuremodes.Estimate{Mode: failuremodes.ModeReplicasUnavailable, Pod: "shop/det-replicas-2", Reason: "FailedScheduling", Usage: 1, Confidence: 1}
+	result := failureResult("shop/Deployment/det-replicas", "degraded", &est, false)
+	text := strings.Join(append(result.Evidence, result.RecommendedAction), " | ")
+	for _, want := range []string{"1 replica unavailable", "FailedScheduling for pod det-replicas-2", "scheduling constraints"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %q in %q", want, text)
+		}
+	}
+	oom := failuremodes.Estimate{Mode: failuremodes.ModeOOMKilled, Pod: "shop/det-oom-1", Confidence: 1}
+	if got := failureResult("shop/Deployment/det-oom", "critical", &oom, true); got.FailureMode != "oom_killed" {
+		t.Errorf("crash loop caused by OOM reported as %q", got.FailureMode)
+	}
+}

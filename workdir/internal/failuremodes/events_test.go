@@ -17,7 +17,6 @@ func TestTracker_StartupStuck(t *testing.T) {
 		wantWhy string
 	}{
 		{"mount failure", "FailedMount", "", start, start.Add(time.Minute), true, "FailedMount"},
-		{"scheduling failure", "FailedScheduling", "", start, start.Add(time.Minute), true, "FailedScheduling"},
 		{"image pull failure", "Failed", "Error: ErrImagePull", start, start.Add(time.Minute), true, "ImagePull"},
 		{"image backoff", "Failed", "Error: ImagePullBackOff", start, start.Add(time.Minute), true, "ImagePull"},
 		{"waiting to pull again", "BackOff", "Back-off pulling image \"x\"", start, start.Add(time.Minute), true, "ImagePull"},

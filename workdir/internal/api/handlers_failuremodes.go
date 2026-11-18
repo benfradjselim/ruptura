@@ -215,6 +215,9 @@ func estimateAction(est failuremodes.Estimate) string {
 	if est.Mode == failuremodes.ModeOOMKilled {
 		return "Raise the memory limit or find the memory spike"
 	}
+	if est.Mode == failuremodes.ModeReplicasUnavailable && est.Reason == "FailedScheduling" {
+		return "Free node capacity or relax the scheduling constraints of pod " + podName(est.Pod)
+	}
 	if est.Mode == failuremodes.ModeReplicasUnavailable {
 		return "Check why the missing pods are not ready"
 	}

@@ -231,6 +231,7 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 			worst, found = est, true
 		}
 	}
+	oom, oomFound := Estimate{}, false
 	regression, regressing := Estimate{}, false
 	divergent, diverging := Estimate{}, false
 	if release, ok := t.releases[workload]; ok {
@@ -259,9 +260,12 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 		}
 		if est, ok := state.oomEstimate(pod, now); ok {
 			consider(est)
+			if !oomFound {
+				oom, oomFound = est, true
+			}
 		}
 		if !state.eventSeen.IsZero() && now.Sub(state.eventSeen) <= startupEventMaxAge {
-			consider(Estimate{Mode: ModeStartupStuck, Pod: pod, Confidence: 1, Reason: state.eventReason})
+			consider(t.startupEstimate(workload, pod, state.eventReason, now))
 		}
 	}
 	if est, ok := t.replicaEstimate(workload, now); ok {
@@ -276,7 +280,39 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 		}
 		consider(est)
 	}
+	// A recent OOM kill is the cause of the restarts, missing replicas or
+	// stalled rollout it brings: report the cause. A forecast of the next
+	// failure still comes first.
+	if oomFound && found && worst.Mode.symptom() {
+		return oom, true
+	}
 	return worst, found
+}
+
+// symptom reports whether a mode describes a consequence that an OOM kill
+// can cause, rather than a forecast or a cause of its own.
+func (m Mode) symptom() bool {
+	switch m {
+	case ModeReplicasUnavailable, ModeStartupStuck, ModeRolloutStuck, ModeCPUThrottling, ModeOOMKilled:
+		return true
+	}
+	return false
+}
+
+// startupEstimate names a pod start blocked by an event. A pod the scheduler
+// cannot place leaves its workload short of replicas, which is the failure:
+// it is reported at once as replicas_unavailable, with the missing count when
+// known. Other causes, such as an image or a mount, are startup_stuck.
+// The caller holds the lock.
+func (t *Tracker) startupEstimate(workload, pod, reason string, now time.Time) Estimate {
+	if reason != schedulingReason {
+		return Estimate{Mode: ModeStartupStuck, Pod: pod, Confidence: 1, Reason: reason}
+	}
+	missing := 1
+	if state, ok := t.replicas[workload]; ok && now.Sub(state.seen) <= estimateMaxAge && state.missing > 0 {
+		missing = state.missing
+	}
+	return Estimate{Mode: ModeReplicasUnavailable, Pod: pod, Confidence: 1, Reason: reason, Usage: float64(missing)}
 }
 
 // RecentRestarts counts restarts observed for a workload inside the window.
