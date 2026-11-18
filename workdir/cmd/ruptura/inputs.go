@@ -34,6 +34,8 @@ type inputCollector struct {
 	mu       sync.RWMutex
 	coverage []normalize.Coverage
 	frames   map[string][]normalize.Frame
+	// usual tells whether a namespace/pod with no limit has a usual level.
+	usual func(target string) bool
 }
 
 // Coverage returns the latest coverage of every role.
@@ -163,7 +165,7 @@ func (c *inputCollector) observeWorkloads(tracker *failuremodes.Tracker, inf *di
 func (c *inputCollector) Protection() normalize.Protection {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return normalize.ProtectionOf(c.frames["pod"], "memory.usage", "memory.limit")
+	return normalize.ProtectionOf(c.frames["pod"], "memory.usage", "memory.limit", c.usual)
 }
 
 // inputProfile returns the configured profile, standard by default.
@@ -174,8 +176,28 @@ func inputProfile() string {
 	return sources.ProfileStandard
 }
 
+// usualLevelKnown tells whether a namespace/pod belongs to a workload with a
+// usual memory level, so that a pod with no limit still gets forecasts.
+func usualLevelKnown(inf *discovery.Informer, limits *ceilings) func(target string) bool {
+	if limits == nil {
+		return nil
+	}
+	return func(target string) bool {
+		parts := strings.SplitN(target, "/", 2)
+		if len(parts) != 2 {
+			return false
+		}
+		kind, name, ok := inf.ResolvePodOwner(parts[0], parts[1])
+		if !ok {
+			return false
+		}
+		_, _, found := limits.lookup(parts[0], parts[0]+"/"+kind+"/"+name)
+		return found
+	}
+}
+
 // startInputs polls the catalog roles. It returns nil without a Thanos endpoint.
-func startInputs(ctx context.Context, url string, tracker *failuremodes.Tracker, inf *discovery.Informer) *inputCollector {
+func startInputs(ctx context.Context, url string, tracker *failuremodes.Tracker, inf *discovery.Informer, limits *ceilings) *inputCollector {
 	if url == "" {
 		return nil
 	}
@@ -189,7 +211,7 @@ func startInputs(ctx context.Context, url string, tracker *failuremodes.Tracker,
 		logger.Default.Warn("inputs disabled: thanos client", "err", err)
 		return nil
 	}
-	collector := &inputCollector{}
+	collector := &inputCollector{usual: usualLevelKnown(inf, limits)}
 	profile := inputProfile()
 	go func() {
 		ticker := time.NewTicker(inputPollInterval)

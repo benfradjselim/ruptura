@@ -516,11 +516,12 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	} else {
 		logger.Default.Info("call graph disabled", "reason", err.Error())
 	}
-	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store)
+	limits := newCeilings(os.Getenv("RUPTURA_DEFAULT_MEMORY_LIMITS"))
+	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store, limits)
 	if tracker != nil {
 		handlers.SetFailureModes(tracker)
 	}
-	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker, inf); inputs != nil {
+	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker, inf, limits); inputs != nil {
 		handlers.SetInputs(inputs)
 	}
 	handlers.SetLevelScope(os.Getenv("RUPTURA_LEVEL_SCOPE"))

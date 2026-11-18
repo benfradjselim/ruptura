@@ -24,7 +24,7 @@ const (
 
 // startFailureModes polls the configured Thanos endpoint and feeds the tracker.
 // It returns nil when no endpoint is configured, and reports every failure.
-func startFailureModes(ctx context.Context, url string, inf *discovery.Informer, store *storage.Store) *failuremodes.Tracker {
+func startFailureModes(ctx context.Context, url string, inf *discovery.Informer, store *storage.Store, limits *ceilings) *failuremodes.Tracker {
 	if url == "" {
 		return nil
 	}
@@ -45,7 +45,6 @@ func startFailureModes(ctx context.Context, url string, inf *discovery.Informer,
 	tracker := failuremodes.NewTracker()
 	restoreFailureHistory(tracker, store)
 	restoreTrackerState(tracker, store, time.Now())
-	limits := newCeilings(os.Getenv("RUPTURA_DEFAULT_MEMORY_LIMITS"))
 	startCeilings(ctx, limits, source, inf, os.Getenv("RUPTURA_INFERRED_CEILINGS") == "false")
 	go func() {
 		ticker := time.NewTicker(failureModePollInterval)

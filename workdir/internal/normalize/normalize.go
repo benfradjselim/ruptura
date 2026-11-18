@@ -55,18 +55,25 @@ func CoverageOf(roles []string, collected map[string]map[string]float64) []Cover
 	return out
 }
 
-// Protection says how many targets have a limit to predict against.
+// Protection says how many targets have something to predict against: a
+// limit, or for a target without one, the usual level of its workload.
 type Protection struct {
-	Watched     int      `json:"watched"`
-	Protected   int      `json:"protected"`
+	Watched   int `json:"watched"`
+	Protected int `json:"protected"`
+	// UsualLevel counts targets with no limit that are compared with the
+	// usual level of their workload.
+	UsualLevel int `json:"usualLevel"`
+	// Uncovered counts targets with neither; Unprotected lists some of them.
+	Uncovered   int      `json:"uncovered"`
 	Unprotected []string `json:"unprotected"`
 }
 
 // maxListedTargets keeps the report readable on large clusters.
 const maxListedTargets = 20
 
-// ProtectionOf reports targets that have a usage reading but no limit.
-func ProtectionOf(frames []Frame, usageRole, limitRole string) Protection {
+// ProtectionOf reports targets that have a usage reading but no limit. usual,
+// which may be nil, tells whether such a target has a usual level instead.
+func ProtectionOf(frames []Frame, usageRole, limitRole string, usual func(target string) bool) Protection {
 	report := Protection{Unprotected: []string{}}
 	for _, frame := range frames {
 		if _, ok := frame.Values[usageRole]; !ok {
@@ -75,7 +82,14 @@ func ProtectionOf(frames []Frame, usageRole, limitRole string) Protection {
 		report.Watched++
 		if _, ok := frame.Values[limitRole]; ok {
 			report.Protected++
-		} else if len(report.Unprotected) < maxListedTargets {
+			continue
+		}
+		if usual != nil && usual(frame.Target) {
+			report.UsualLevel++
+			continue
+		}
+		report.Uncovered++
+		if len(report.Unprotected) < maxListedTargets {
 			report.Unprotected = append(report.Unprotected, frame.Target)
 		}
 	}

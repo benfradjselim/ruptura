@@ -45,9 +45,14 @@ func TestProtectionOf(t *testing.T) {
 		{Target: "n/a", Values: map[string]float64{"use": 1, "lim": 2}},
 		{Target: "n/b", Values: map[string]float64{"use": 1}},
 		{Target: "n/c", Values: map[string]float64{"lim": 2}},
+		{Target: "n/d", Values: map[string]float64{"use": 1}},
 	}
-	got := ProtectionOf(frames, "use", "lim")
-	if got.Watched != 2 || got.Protected != 1 || !reflect.DeepEqual(got.Unprotected, []string{"n/b"}) {
+	got := ProtectionOf(frames, "use", "lim", nil)
+	if got.Watched != 3 || got.Protected != 1 || got.UsualLevel != 0 || got.Uncovered != 2 || !reflect.DeepEqual(got.Unprotected, []string{"n/b", "n/d"}) {
 		t.Errorf("report = %+v", got)
+	}
+	got = ProtectionOf(frames, "use", "lim", func(target string) bool { return target == "n/d" })
+	if got.UsualLevel != 1 || got.Uncovered != 1 || !reflect.DeepEqual(got.Unprotected, []string{"n/b"}) {
+		t.Errorf("with usual levels, report = %+v", got)
 	}
 }
