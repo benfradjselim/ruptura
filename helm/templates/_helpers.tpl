@@ -118,3 +118,15 @@ UI image reference.
 {{- $tag := .Values.ui.image.tag | default (printf "ui-v%s" .Chart.AppVersion) -}}
 {{ .Values.ui.image.repository }}:{{ $tag }}
 {{- end }}
+
+{{/*
+Default memory limits per namespace as "namespace=quantity,...", sorted, as the
+engine reads RUPTURA_DEFAULT_MEMORY_LIMITS.
+*/}}
+{{- define "ruptura.memoryLimits" -}}
+{{- $pairs := list -}}
+{{- range $ns, $q := . -}}
+{{- $pairs = append $pairs (printf "%s=%s" $ns $q) -}}
+{{- end -}}
+{{- join "," (sortAlpha $pairs) -}}
+{{- end -}}
