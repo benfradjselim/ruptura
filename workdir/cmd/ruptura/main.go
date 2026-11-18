@@ -162,6 +162,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	// in LIFO order, so cancel() runs first, then store.Close().
 	defer cancel()
 	defer store.Close()
+	startProfiling(ctx, os.Getenv(profilingEnv))
 
 	// Periodic BadgerDB value-log GC — prevents vlog files from accumulating and
 	// reclaims space from TTL-expired entries. Runs every 10 minutes; each pass
