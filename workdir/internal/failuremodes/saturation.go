@@ -60,6 +60,9 @@ type Saturation struct {
 	points   []point
 	restarts int
 	seen     bool
+	// history is the coarse usage range of the pod since its last restart,
+	// read by the cycle guard.
+	history []bucket
 }
 
 // NewSaturation returns an empty estimator.
@@ -69,13 +72,14 @@ func NewSaturation() *Saturation { return &Saturation{} }
 // usage shows a significant upward trend. The window resets when restarts grow.
 func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, restarts int) (Estimate, bool) {
 	if s.seen && restarts > s.restarts {
-		s.points = nil
+		s.points, s.history = nil, nil
 	}
 	s.restarts, s.seen = restarts, true
 	if limitBytes <= 0 {
 		return Estimate{}, false
 	}
 	usage := usageBytes / limitBytes
+	s.history = record(s.history, at, usage)
 	s.points = append(s.points, point{at, usage})
 	cut := 0
 	for cut < len(s.points)-1 && at.Sub(s.points[cut].at) > saturationWindow {
@@ -94,7 +98,7 @@ func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, resta
 	if slope <= 0 || agree < saturationMinAgreeing {
 		return Estimate{}, false
 	}
-	if !sustained(s.points, slope) || decelerating(s.points, slope) {
+	if !sustained(s.points, slope) || decelerating(s.points, slope) || withinCycle(s.history, s.points[0].at, usage) {
 		return Estimate{}, false
 	}
 	remaining := 1 - usage

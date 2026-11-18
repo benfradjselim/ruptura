@@ -38,6 +38,8 @@ type podSnapshot struct {
 	Restarts int      `json:"r"`
 	Counted  bool     `json:"c,omitempty"`
 	Points   []sample `json:"s,omitempty"`
+	// History is the cycle guard's usage range as [unix seconds, low, high].
+	History [][3]float64 `json:"h,omitempty"`
 	// Throttling timers in unix seconds, zero when unset.
 	CondRun   int64 `json:"cr,omitempty"`
 	CondBelow int64 `json:"cb,omitempty"`
@@ -109,6 +111,9 @@ func (t *Tracker) Snapshot(now time.Time) State {
 		snap := podSnapshot{Pod: pod, Workload: s.workload, Restarts: s.restarts, Counted: s.counted}
 		if s.detector != nil {
 			snap.Points = toSamples(s.detector.points, from)
+			for _, b := range s.detector.history {
+				snap.History = append(snap.History, [3]float64{float64(b.at.Unix()), b.low, b.high})
+			}
 		}
 		if c := s.condition; c != nil {
 			snap.CondRun, snap.CondBelow, snap.CondLast, snap.CondOn = unixSeconds(c.runStart), unixSeconds(c.belowSince), unixSeconds(c.last), c.active
@@ -143,8 +148,14 @@ func (t *Tracker) Restore(state State, now time.Time) {
 		s := t.podLocked(snap.Workload, snap.Pod)
 		s.restarts, s.counted = snap.Restarts, snap.Counted
 		s.seen = unixTime(float64(state.At))
-		if points := fromSamples(snap.Points, from); len(points) > 0 {
-			s.detector = &Saturation{points: points, restarts: snap.Restarts, seen: true}
+		var history []bucket
+		for _, h := range snap.History {
+			if at := unixTime(h[0]); now.Sub(at) <= cycleHistory {
+				history = append(history, bucket{at: at, low: h[1], high: h[2]})
+			}
+		}
+		if points := fromSamples(snap.Points, from); len(points) > 0 || len(history) > 0 {
+			s.detector = &Saturation{points: points, restarts: snap.Restarts, seen: true, history: history}
 		}
 		if snap.CondLast != 0 {
 			s.condition = &Condition{runStart: fromUnixSeconds(snap.CondRun), belowSince: fromUnixSeconds(snap.CondBelow), last: fromUnixSeconds(snap.CondLast), active: snap.CondOn}
