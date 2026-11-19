@@ -24,6 +24,10 @@ RUN CGO_ENABLED=0 GOOS=linux \
       -o /ruptura \
       ./cmd/ruptura
 
+# Data directory owned by the runtime user, writable by group 0 (OpenShift UIDs),
+# so a fresh Docker volume mounted on it is writable too.
+RUN mkdir -p /out/data
+
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 # ubi-micro: minimal Red Hat UBI — required for Red Hat OperatorHub preflight certification.
 FROM registry.access.redhat.com/ubi9/ubi-micro
@@ -46,6 +50,7 @@ LABEL name="ruptura" \
 
 COPY LICENSE /licenses/LICENSE
 COPY --from=builder /ruptura /ruptura
+COPY --from=builder --chown=65532:0 --chmod=0775 /out/data /var/lib/ruptura/data
 
 # REST API + Prometheus remote_write
 EXPOSE 8080
