@@ -27,7 +27,7 @@ const (
 func (s *releaseState) divergence(now time.Time) (Estimate, bool) {
 	groups := map[string][]string{}
 	for name, p := range s.pods {
-		if now.Sub(p.first) >= releaseMinAge && p.capacity > 0 && len(p.samples) > 0 {
+		if !p.retiring && now.Sub(p.first) >= releaseMinAge && p.capacity > 0 && len(p.samples) > 0 {
 			groups[p.version] = append(groups[p.version], name)
 		}
 	}

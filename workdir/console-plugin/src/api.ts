@@ -3,7 +3,7 @@
 // sees console URLs and the console session cookie.
 import { useEffect, useState } from 'react';
 import { consoleFetchJSON } from '@openshift-console/dynamic-plugin-sdk';
-import { Failure, FailureSeries } from './types';
+import { ClosestPod, EngineHealth, Failure, FailureSeries } from './types';
 
 /** Console proxy of the plugin, as declared in the ConsolePlugin spec.proxy. */
 export const PROXY_BASE = '/api/proxy/plugin/ruptura/engine';
@@ -17,6 +17,14 @@ export function fetchFailures(): Promise<Failure[]> {
 
 export function fetchSeries(workload: string): Promise<FailureSeries> {
   return consoleFetchJSON(`${PROXY_BASE}/api/v2/failures/series?workload=${encodeURIComponent(workload)}`) as Promise<FailureSeries>;
+}
+
+export function fetchClosest(): Promise<ClosestPod[]> {
+  return consoleFetchJSON(`${PROXY_BASE}/api/v2/failures/closest`).then((data: unknown) => (Array.isArray(data) ? (data as ClosestPod[]) : []));
+}
+
+export function fetchHealth(): Promise<EngineHealth> {
+  return consoleFetchJSON(`${PROXY_BASE}/api/v2/health`) as Promise<EngineHealth>;
 }
 
 /** Message of an error the console fetch helpers throw. */

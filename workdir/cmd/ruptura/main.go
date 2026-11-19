@@ -48,7 +48,7 @@ import (
 	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
-const version = "8.7.8"
+const version = "8.7.9"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
@@ -162,6 +162,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	// in LIFO order, so cancel() runs first, then store.Close().
 	defer cancel()
 	defer store.Close()
+	startProfiling(ctx, os.Getenv(profilingEnv))
 
 	// Periodic BadgerDB value-log GC — prevents vlog files from accumulating and
 	// reclaims space from TTL-expired entries. Runs every 10 minutes; each pass
@@ -515,11 +516,12 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	} else {
 		logger.Default.Info("call graph disabled", "reason", err.Error())
 	}
-	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store)
+	limits := newCeilings(os.Getenv("RUPTURA_DEFAULT_MEMORY_LIMITS"))
+	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store, limits)
 	if tracker != nil {
 		handlers.SetFailureModes(tracker)
 	}
-	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker, inf); inputs != nil {
+	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker, inf, limits); inputs != nil {
 		handlers.SetInputs(inputs)
 	}
 	handlers.SetLevelScope(os.Getenv("RUPTURA_LEVEL_SCOPE"))
@@ -574,6 +576,8 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		if err := srv.Shutdown(shutCtx); err != nil {
 			logger.Default.Error("shutdown error", "err", err)
 		}
+		// Save the failure mode readings so the next start resumes its forecasts.
+		saveTrackerState(tracker, store, time.Now())
 		// NFR-05: flush all in-memory snapshots to BadgerDB before exit.
 		if err := store.FlushSnapshots(); err != nil {
 			logger.Default.Error("snapshot flush failed", "err", err)

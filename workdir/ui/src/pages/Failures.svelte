@@ -64,6 +64,8 @@
   $: detected = failures.length - predicted
   $: critical = failures.filter(f => f.state === 'critical').length
   $: blindSpots = blindSpotsByNamespace(protection?.unprotected)
+  // Older engines report no uncovered count: every pod without a limit is.
+  $: uncovered = protection ? (protection.uncovered ?? protection.watched - protection.protected) : 0
 
   onMount(() => { load(); timer = setInterval(load, REFRESH_MS) })
   onDestroy(() => clearInterval(timer))
@@ -227,14 +229,19 @@
       {#if protection && protection.watched > 0}
         <dl>
           <div><dt>Pods watched</dt><dd>{protection.watched}</dd></div>
-          <div class:warn={protection.protected < protection.watched}><dt>No memory limit</dt><dd>{protection.watched - protection.protected}</dd></div>
+          <div><dt>With a memory limit</dt><dd>{protection.protected}</dd></div>
+          <div><dt>Against their usual level</dt><dd>{protection.usualLevel || 0}</dd></div>
+          <div class:warn={uncovered > 0}><dt>Not covered yet</dt><dd>{uncovered}</dd></div>
         </dl>
-        {#if protection.protected < protection.watched}
-          <p class="quiet">Without a limit, Ruptura cannot forecast memory exhaustion on these pods.</p>
+        {#if (protection.usualLevel || 0) > 0}
+          <p class="quiet">Pods with no memory limit are compared with the usual level of their workload: the namespace default, else its 7-day peak plus 20%. Growth past it is reported as memory beyond usual, never as an OOM kill.</p>
+        {/if}
+        {#if uncovered > 0}
+          <p class="quiet">Not covered yet: no memory limit, no namespace default, and less than 24 hours of history.</p>
         {/if}
         {#if blindSpots.length > 0}
           <details class="blind">
-            <summary>Pods without a memory limit, by namespace</summary>
+            <summary>Pods not covered yet, by namespace</summary>
             <ul>
               {#each blindSpots as group}
                 <li>

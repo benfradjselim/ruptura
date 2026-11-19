@@ -22,6 +22,7 @@ const (
 	byWorkload route = iota // a list of items with a workload key
 	bySeries                // one workload, named in the query
 	byGraph                 // nodes and edges
+	byHealth                // engine uptime and version only
 )
 
 var routes = map[string]route{
@@ -29,6 +30,7 @@ var routes = map[string]route{
 	"/api/v2/failures/closest": byWorkload,
 	"/api/v2/failures/series":  bySeries,
 	"/api/v2/callgraph":        byGraph,
+	"/api/v2/health":           byHealth,
 }
 
 type handler struct {
@@ -97,6 +99,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		out, err = filterByWorkload(body, filter)
 	case byGraph:
 		out, err = filterGraph(body, filter)
+	case byHealth:
+		out, err = healthSummary(body)
 	default:
 		out = body
 	}

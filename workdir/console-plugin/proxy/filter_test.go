@@ -136,3 +136,16 @@ func TestFilterGraph_EmptyStaysArrays(t *testing.T) {
 		t.Fatalf("got %s", out)
 	}
 }
+
+func TestHealthSummary(t *testing.T) {
+	out, err := healthSummary([]byte(`{"status":"ok","version":"8.7.9","uptime_seconds":120,"analyzer":{"workloads":130},"ingest":{"hosts":["a"]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != `{"uptime_seconds":120,"version":"8.7.9"}` {
+		t.Fatalf("healthSummary = %s", out)
+	}
+	if _, err := healthSummary([]byte("not json")); err == nil {
+		t.Fatal("no error on a malformed answer")
+	}
+}

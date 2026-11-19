@@ -323,6 +323,15 @@ spec:
                     horizon:
                       type: string
                       default: 30m
+                    defaultMemoryLimits:
+                      type: object
+                      description: Usual memory level per namespace for pods that set no memory limit, such as 512Mi. Without one, the 7-day 99th percentile plus 20 percent is used.
+                      additionalProperties:
+                        type: string
+                        pattern: '^[0-9]+(\.[0-9]+)?(Ki|Mi|Gi|Ti|k|K|M|G|T)?$'
+                    inferMemoryCeilings:
+                      type: boolean
+                      description: Set false to turn off the 7-day inference for pods with no memory limit.
                 alerting:
                   type: object
                   properties:
@@ -552,7 +561,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ruptura
     app.kubernetes.io/component: operator
-    app.kubernetes.io/version: "1.4.8"
+    app.kubernetes.io/version: "1.4.9"
 spec:
   replicas: 1
   selector:
@@ -564,7 +573,7 @@ spec:
       labels:
         app.kubernetes.io/name: ruptura
         app.kubernetes.io/component: operator
-        app.kubernetes.io/version: "1.4.8"
+        app.kubernetes.io/version: "1.4.9"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
@@ -577,7 +586,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ruptura-operator
-          image: ghcr.io/benfradjselim/ruptura-operator:v1.4.8
+          image: ghcr.io/benfradjselim/ruptura-operator:v1.4.9
           imagePullPolicy: IfNotPresent
           args: ["--interval=30s", "--metrics-addr=:9090"]
           ports:

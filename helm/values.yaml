@@ -70,6 +70,15 @@ openshift:
 thanos:
   url: ""
 
+# -- Pods with no memory limit are compared with a usual level: the default of
+# their namespace here (for example `shop: 512Mi`), else the 7-day 99th
+# percentile of their workload plus 20 percent. Growth past it is reported as
+# memory_beyond_usual, never as an OOM kill. Set inferMemoryCeilings to false
+# to turn the 7-day inference off.
+analysis:
+  defaultMemoryLimits: {}
+  inferMemoryCeilings: true
+
 ports:
   api: 8080    # REST API + Prometheus metrics
   otlpGrpc: 4317   # OTLP gRPC ingest (metrics, logs, traces)

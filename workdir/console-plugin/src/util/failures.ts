@@ -46,9 +46,24 @@ export function etaRange(failure: Pick<Failure, 'etaEarlySeconds' | 'etaLateSeco
   return `${formatEta(failure.etaEarlySeconds)} to ${formatEta(failure.etaLateSeconds)}`;
 }
 
-/** "saturation" -> "saturation", "crash_loop" -> "crash loop". */
+// Names an operator reads at a glance. An unknown mode keeps its own name.
+const MODE_NAMES: Record<string, string> = {
+  saturation: 'Memory limit ahead',
+  memory_beyond_usual: 'Memory beyond usual',
+  release_regression: 'Release regression',
+  replica_divergence: 'Replica diverging',
+  recurrent_failure: 'Recurring failure',
+  oom_killed: 'OOM killed',
+  crash_loop: 'Crash loop',
+  startup_stuck: 'Cannot start',
+  replicas_unavailable: 'Replicas unavailable',
+  rollout_stuck: 'Rollout stuck',
+  cpu_throttling: 'CPU throttling',
+};
+
+/** "crash_loop" -> "Crash loop"; an unknown mode reads without underscores. */
 export function modeLabel(mode: string): string {
-  return mode.replace(/_/g, ' ');
+  return MODE_NAMES[mode] || mode.replace(/_/g, ' ');
 }
 
 /** "in 8 min" for a forecast, "now" for a detected failure. */

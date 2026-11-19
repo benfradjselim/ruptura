@@ -80,6 +80,16 @@ spec:
             {{- end }}
             - name: RUPTURA_AUTODISCOVERY
               value: {{ .Values.autodiscovery.enabled | default false | quote }}
+            {{- with .Values.analysis }}
+            {{- if .defaultMemoryLimits }}
+            - name: RUPTURA_DEFAULT_MEMORY_LIMITS
+              value: {{ include "ruptura.memoryLimits" .defaultMemoryLimits | quote }}
+            {{- end }}
+            {{- if eq (toString .inferMemoryCeilings) "false" }}
+            - name: RUPTURA_INFERRED_CEILINGS
+              value: "false"
+            {{- end }}
+            {{- end }}
             - name: GOMEMLIMIT
               value: {{ .Values.goMemLimit | default "419430400" | quote }}
             {{- if .Values.notify.slackWebhookURL }}

@@ -63,7 +63,7 @@ func (inf *Informer) watchResource(ctx context.Context, res resource, onAdd, onD
 			if ctx.Err() != nil {
 				return
 			}
-			inf.logf("discovery: list %s failed: %v — retrying in %s", res.path, err, backoff)
+			inf.apiLog().Failed("list "+res.path, err)
 			select {
 			case <-ctx.Done():
 				return
@@ -73,6 +73,7 @@ func (inf *Informer) watchResource(ctx context.Context, res resource, onAdd, onD
 			continue
 		}
 		backoff = time.Second // reset after successful list
+		inf.apiLog().Succeeded()
 
 		if !firstListDone {
 			firstListDone = true
@@ -84,7 +85,7 @@ func (inf *Informer) watchResource(ctx context.Context, res resource, onAdd, onD
 		// WATCH from the resource version we got from the list.
 		relistNeeded, err := inf.watchStream(ctx, res, rv, onAdd, onDelete)
 		if err != nil && ctx.Err() == nil {
-			inf.logf("discovery: watch %s error: %v — re-listing", res.path, err)
+			inf.apiLog().Failed("watch "+res.path, err)
 		}
 		if !relistNeeded && ctx.Err() != nil {
 			return

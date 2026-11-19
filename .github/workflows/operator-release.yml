@@ -151,6 +151,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Render the catalog from this release's bundle
+        env:
+          OPM_VERSION: v1.48.0
+        run: |
+          curl -fsSL -o /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/linux-amd64-opm"
+          chmod +x /usr/local/bin/opm
+          scripts/render-catalog.sh "${{ env.BUNDLE_IMAGE }}:${{ needs.resolve-version.outputs.op-tag }}" "${{ needs.resolve-version.outputs.op-tag }}"
+
       - name: Build and push catalog image
         uses: docker/build-push-action@v5
         with:

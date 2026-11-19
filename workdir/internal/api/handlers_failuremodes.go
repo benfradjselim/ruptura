@@ -114,6 +114,16 @@ func applyCrashLoop(state string, risk float64, restarts int) (string, float64) 
 // applyEstimate raises a workload's state and risk from its time to failure.
 // It never lowers a state or a risk that is already higher.
 func applyEstimate(state string, risk float64, est failuremodes.Estimate, horizon time.Duration) (string, float64) {
+	if est.Mode == failuremodes.ModeMemoryBeyondUsual {
+		// Growth past a usual level is a warning at most: no limit kills the pod.
+		if est.ETF > riskHorizon && est.ETF > horizon {
+			return state, risk
+		}
+		if state != "critical" {
+			state = "degraded"
+		}
+		return state, math.Max(risk, conditionRisk)
+	}
 	if est.Mode == failuremodes.ModeStartupStuck || est.Mode == failuremodes.ModeOOMKilled {
 		return "critical", math.Max(risk, crashLoopRisk)
 	}
@@ -146,13 +156,16 @@ func applyEstimate(state string, risk float64, est failuremodes.Estimate, horizo
 // saturation forecast beyond the cut applyEstimate uses, so a failure days away
 // is never listed or sent to Alertmanager.
 func reportedEstimate(est failuremodes.Estimate, horizon time.Duration) *failuremodes.Estimate {
-	if est.Mode == failuremodes.ModeSaturation && est.ETF > riskHorizon && est.ETF > horizon {
+	if (est.Mode == failuremodes.ModeSaturation || est.Mode == failuremodes.ModeMemoryBeyondUsual) && est.ETF > riskHorizon && est.ETF > horizon {
 		return nil
 	}
 	return &est
 }
 
 func estimateHeadline(name string, est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeMemoryBeyondUsual {
+		return fmt.Sprintf("%s has no memory limit and is projected to pass its usual level of %d MiB in %d minutes.", name, mebibytes(est.Ceiling), int(math.Round(est.ETF.Minutes())))
+	}
 	if est.Mode == failuremodes.ModeReplicaDivergence {
 		return fmt.Sprintf("%s pod %s is projected to reach its memory limit in %d minutes, unlike its replicas.", name, podName(est.Pod), int(math.Round(est.ETF.Minutes())))
 	}
@@ -181,6 +194,9 @@ func estimateHeadline(name string, est failuremodes.Estimate) string {
 }
 
 func estimateAction(est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeMemoryBeyondUsual {
+		return "Set a memory limit, or find why memory grows past its usual level"
+	}
 	if est.Mode == failuremodes.ModeReplicaDivergence {
 		return "Restart or delete pod " + podName(est.Pod) + ", the only replica growing, and check its node and its state"
 	}
@@ -199,6 +215,9 @@ func estimateAction(est failuremodes.Estimate) string {
 	if est.Mode == failuremodes.ModeOOMKilled {
 		return "Raise the memory limit or find the memory spike"
 	}
+	if est.Mode == failuremodes.ModeReplicasUnavailable && est.Reason == "FailedScheduling" {
+		return "Free node capacity or relax the scheduling constraints of pod " + podName(est.Pod)
+	}
 	if est.Mode == failuremodes.ModeReplicasUnavailable {
 		return "Check why the missing pods are not ready"
 	}
@@ -209,6 +228,11 @@ func estimateAction(est failuremodes.Estimate) string {
 		return "Raise the CPU limit or reduce the workload's CPU demand"
 	}
 	return "Review the memory limit or restart the pod before it is killed"
+}
+
+// mebibytes rounds bytes to whole MiB.
+func mebibytes(bytes float64) int {
+	return int(math.Round(bytes / 1024 / 1024))
 }
 
 // podName drops the namespace of a namespace/pod key.

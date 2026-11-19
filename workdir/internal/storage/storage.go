@@ -501,6 +501,39 @@ func (s *Store) ListOutcomes() ([]Outcome, error) {
 	return out, err
 }
 
+// --- Failure mode tracker state ---
+//
+//	fts:state   recent readings of the failure mode tracker   1h
+//
+// One record, rewritten every minute and at shutdown, so an engine restart does
+// not start every forecast from scratch.
+const (
+	trackerStateKey = "fts:state"
+	trackerStateTTL = time.Hour
+)
+
+// PutTrackerState replaces the saved tracker state with data.
+func (s *Store) PutTrackerState(data []byte) error {
+	return s.setRaw(trackerStateKey, data, trackerStateTTL)
+}
+
+// GetTrackerState returns the saved tracker state, or nil when there is none.
+func (s *Store) GetTrackerState() ([]byte, error) {
+	var out []byte
+	err := s.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte(trackerStateKey))
+		if err == badger.ErrKeyNotFound {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		out, err = item.ValueCopy(nil)
+		return err
+	})
+	return out, err
+}
+
 // --- Infra signal history (v8.0 Infrastructure & Cluster Intelligence Layer) ---
 // Key schema (docs/v8.0.0/RUPTURA-PLATFORM-EXTENSION.md §6.4, additive-only,
 // never change existing prefixes):

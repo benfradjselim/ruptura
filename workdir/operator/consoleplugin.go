@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	defaultConsolePluginImage = "ghcr.io/benfradjselim/ruptura-console-plugin:plugin-v8.7.8"
+	defaultConsolePluginImage = "ghcr.io/benfradjselim/ruptura-console-plugin:plugin-v8.7.9"
 	// relatedConsolePluginImageEnv is set by OLM from the CSV, so a
 	// disconnected mirror can rewrite the plugin image by digest.
 	relatedConsolePluginImageEnv = "RELATED_IMAGE_RUPTURA_CONSOLE_PLUGIN"

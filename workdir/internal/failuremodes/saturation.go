@@ -47,6 +47,10 @@ type Estimate struct {
 	PreviousRate    float64
 	// Siblings counts the other replicas a diverging pod is compared with.
 	Siblings int
+	// Ceiling, in bytes, and CeilingSource name the usual level a pod with no
+	// memory limit is compared with.
+	Ceiling       float64
+	CeilingSource string
 }
 
 type point struct {
@@ -60,6 +64,9 @@ type Saturation struct {
 	points   []point
 	restarts int
 	seen     bool
+	// history is the coarse usage range of the pod since its last restart,
+	// read by the cycle guard.
+	history []bucket
 }
 
 // NewSaturation returns an empty estimator.
@@ -69,13 +76,14 @@ func NewSaturation() *Saturation { return &Saturation{} }
 // usage shows a significant upward trend. The window resets when restarts grow.
 func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, restarts int) (Estimate, bool) {
 	if s.seen && restarts > s.restarts {
-		s.points = nil
+		s.points, s.history = nil, nil
 	}
 	s.restarts, s.seen = restarts, true
 	if limitBytes <= 0 {
 		return Estimate{}, false
 	}
 	usage := usageBytes / limitBytes
+	s.history = record(s.history, at, usage)
 	s.points = append(s.points, point{at, usage})
 	cut := 0
 	for cut < len(s.points)-1 && at.Sub(s.points[cut].at) > saturationWindow {
@@ -94,7 +102,7 @@ func (s *Saturation) Observe(at time.Time, usageBytes, limitBytes float64, resta
 	if slope <= 0 || agree < saturationMinAgreeing {
 		return Estimate{}, false
 	}
-	if !sustained(s.points, slope) {
+	if !sustained(s.points, slope) || decelerating(s.points, slope) || withinCycle(s.history, s.points[0].at, usage) {
 		return Estimate{}, false
 	}
 	remaining := 1 - usage
@@ -126,6 +134,43 @@ func sustained(points []point, slope float64) bool {
 		}
 	}
 	return true
+}
+
+// minTailRise is the share of the expected rise the last third of the window
+// must still show.
+const minTailRise = 0.5
+
+// decelerating reports whether the recent samples, the last third of the window
+// by time and at least saturationMinSamples points, grow at less than
+// minTailRise of the full-window slope. A heavy release that warms up and then
+// stabilises is concave: its early climb dominates the window slope while the
+// recent samples are flat. A leak keeps its pace. The median of pairwise
+// slopes keeps one outlier from deciding.
+func decelerating(points []point, slope float64) bool {
+	last := points[len(points)-1].at
+	start := last.Add(-last.Sub(points[0].at) / 3)
+	from := sort.Search(len(points), func(i int) bool { return !points[i].at.Before(start) })
+	if max := len(points) - saturationMinSamples; from > max {
+		from = max
+	}
+	recent := points[from:]
+	median, _ := theilSen(pairSlopes(recent))
+	span := recent[len(recent)-1].at.Sub(recent[0].at).Seconds()
+	// Either measure clears a leak: the median ignores an outlier, the net
+	// rise accepts a leak that grows in steps.
+	return median < slope*minTailRise && netRise(recent) < slope*span*minTailRise
+}
+
+// rescale multiplies the stored usage shares by factor, so that history read
+// against one capacity stays comparable after the capacity changes.
+func (s *Saturation) rescale(factor float64) {
+	for i := range s.points {
+		s.points[i].usage *= factor
+	}
+	for i := range s.history {
+		s.history[i].low *= factor
+		s.history[i].high *= factor
+	}
 }
 
 // netRise compares the average of the last and first samples of a range, so that

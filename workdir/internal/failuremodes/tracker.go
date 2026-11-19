@@ -30,6 +30,17 @@ type podState struct {
 	eventReason string
 	backOffSeen time.Time
 	lastOOM     bool
+
+	// retiring marks a pod that is terminating or belongs to a superseded
+	// release: its forecasts describe a pod about to go away.
+	retiring bool
+
+	// ceiling and ceilingSource are the usual level of a pod with no memory
+	// limit, zero for a pod with one.
+	ceiling       float64
+	ceilingSource string
+	// capacity is the last capacity the saturation history was read against.
+	capacity float64
 }
 
 // Tracker keeps one estimator per pod and answers per workload. It is safe for
@@ -110,6 +121,40 @@ func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity fl
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	state := t.podLocked(workload, pod)
+	t.useCeilingLocked(state, capacity, "")
+	t.observeLocked(state, workload, pod, at, usage, capacity, capacity, restarts)
+}
+
+// ObserveUnlimited records one reading for a pod with no memory limit, against
+// ceiling, the usual level of its workload described by source. A forecast to
+// pass the ceiling is reported as ModeMemoryBeyondUsual, never as saturation,
+// because nothing kills the pod there. Release and divergence forecasts, which
+// need a limit, are skipped.
+func (t *Tracker) ObserveUnlimited(workload, pod string, at time.Time, usage, ceiling float64, source string, restarts int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	state := t.podLocked(workload, pod)
+	t.useCeilingLocked(state, ceiling, source)
+	t.observeLocked(state, workload, pod, at, usage, ceiling, 0, restarts)
+	if state.valid {
+		state.estimate.Mode = ModeMemoryBeyondUsual
+		state.estimate.Ceiling, state.estimate.CeilingSource = ceiling, source
+	}
+}
+
+// useCeilingLocked rescales a pod's history when its capacity changes, so that
+// a new ceiling, or a limit set on a pod that had none, keeps the trend intact.
+func (t *Tracker) useCeilingLocked(state *podState, capacity float64, source string) {
+	state.ceiling, state.ceilingSource = 0, ""
+	if source != "" {
+		state.ceiling, state.ceilingSource = capacity, source
+	}
+	if state.detector != nil && capacity > 0 && state.capacity > 0 && state.capacity != capacity {
+		state.detector.rescale(state.capacity / capacity)
+	}
+}
+
+func (t *Tracker) observeLocked(state *podState, workload, pod string, at time.Time, usage, capacity, releaseCapacity float64, restarts int) {
 	if state.detector == nil {
 		state.detector = NewSaturation()
 	}
@@ -119,13 +164,16 @@ func (t *Tracker) Observe(workload, pod string, at time.Time, usage, capacity fl
 	state.estimate, state.valid = state.detector.Observe(at, usage, capacity, restarts)
 	state.estimate.Pod = pod
 	state.seen = at
+	if capacity > 0 {
+		state.capacity = capacity
+	}
 	if version := t.versions[pod]; version != "" {
 		release, ok := t.releases[workload]
 		if !ok {
 			release = newReleaseState()
 			t.releases[workload] = release
 		}
-		release.observe(pod, version, at, usage, capacity)
+		release.observe(pod, version, at, usage, releaseCapacity)
 	}
 }
 
@@ -135,6 +183,16 @@ func (t *Tracker) ObserveVersion(pod, version string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.versions[pod] = version
+}
+
+// ObserveRetiring records whether a pod is terminating or belongs to a release
+// its workload no longer runs. A retiring pod keeps feeding history, but its
+// saturation, throttling, regression and divergence forecasts are not reported:
+// a rollout or a rollback replaces it before they matter.
+func (t *Tracker) ObserveRetiring(workload, pod string, retiring bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.podLocked(workload, pod).retiring = retiring
 }
 
 func (t *Tracker) podLocked(workload, pod string) *podState {
@@ -173,9 +231,14 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 			worst, found = est, true
 		}
 	}
+	oom, oomFound := Estimate{}, false
 	regression, regressing := Estimate{}, false
 	divergent, diverging := Estimate{}, false
 	if release, ok := t.releases[workload]; ok {
+		for pod, p := range release.pods {
+			state, known := t.pods[pod]
+			p.retiring = known && state.retiring
+		}
 		regression, regressing = release.estimate(now)
 		divergent, diverging = release.divergence(now)
 	}
@@ -189,17 +252,20 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 			continue
 		}
 		explained := (regressing && t.versions[pod] == regression.Version) || (!regressing && diverging && pod == divergent.Pod)
-		if state.valid && now.Sub(state.seen) <= estimateMaxAge && !(explained && state.estimate.Mode == ModeSaturation) {
+		if state.valid && now.Sub(state.seen) <= estimateMaxAge && !(explained && state.estimate.Mode == ModeSaturation) && !state.retiring {
 			consider(state.estimate)
 		}
-		if state.condValid && now.Sub(state.condSeen) <= estimateMaxAge {
+		if state.condValid && now.Sub(state.condSeen) <= estimateMaxAge && !state.retiring {
 			consider(state.condEstimate)
 		}
 		if est, ok := state.oomEstimate(pod, now); ok {
 			consider(est)
+			if !oomFound {
+				oom, oomFound = est, true
+			}
 		}
 		if !state.eventSeen.IsZero() && now.Sub(state.eventSeen) <= startupEventMaxAge {
-			consider(Estimate{Mode: ModeStartupStuck, Pod: pod, Confidence: 1, Reason: state.eventReason})
+			consider(t.startupEstimate(workload, pod, state.eventReason, now))
 		}
 	}
 	if est, ok := t.replicaEstimate(workload, now); ok {
@@ -214,7 +280,39 @@ func (t *Tracker) Worst(workload string, now time.Time) (Estimate, bool) {
 		}
 		consider(est)
 	}
+	// A recent OOM kill is the cause of the restarts, missing replicas or
+	// stalled rollout it brings: report the cause. A forecast of the next
+	// failure still comes first.
+	if oomFound && found && worst.Mode.symptom() {
+		return oom, true
+	}
 	return worst, found
+}
+
+// symptom reports whether a mode describes a consequence that an OOM kill
+// can cause, rather than a forecast or a cause of its own.
+func (m Mode) symptom() bool {
+	switch m {
+	case ModeReplicasUnavailable, ModeStartupStuck, ModeRolloutStuck, ModeCPUThrottling, ModeOOMKilled:
+		return true
+	}
+	return false
+}
+
+// startupEstimate names a pod start blocked by an event. A pod the scheduler
+// cannot place leaves its workload short of replicas, which is the failure:
+// it is reported at once as replicas_unavailable, with the missing count when
+// known. Other causes, such as an image or a mount, are startup_stuck.
+// The caller holds the lock.
+func (t *Tracker) startupEstimate(workload, pod, reason string, now time.Time) Estimate {
+	if reason != schedulingReason {
+		return Estimate{Mode: ModeStartupStuck, Pod: pod, Confidence: 1, Reason: reason}
+	}
+	missing := 1
+	if state, ok := t.replicas[workload]; ok && now.Sub(state.seen) <= estimateMaxAge && state.missing > 0 {
+		missing = state.missing
+	}
+	return Estimate{Mode: ModeReplicasUnavailable, Pod: pod, Confidence: 1, Reason: reason, Usage: float64(missing)}
 }
 
 // RecentRestarts counts restarts observed for a workload inside the window.

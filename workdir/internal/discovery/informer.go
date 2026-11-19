@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/benfradjselim/ruptura/pkg/models"
+	"github.com/benfradjselim/ruptura/pkg/outage"
 )
 
 // Informer watches k8s workload resources and pre-registers them in Ruptura.
@@ -24,6 +25,10 @@ type Informer struct {
 	logMu      sync.Mutex
 	logFn      func(msg string, args ...interface{})
 	cache      *MetadataCache
+	// api logs one line when the API server stops answering and one when it
+	// answers again, instead of one per failed call of each loop.
+	apiOnce sync.Once
+	api     *outage.Log
 
 	// knownMu/known track the informer's own view of "what k8s actually has
 	// right now" (FBL-A3-4 / REFERENCE.md A8), independent of whatever the
@@ -90,6 +95,23 @@ func (inf *Informer) PodReplicaSet(ns, podName string) (string, bool) {
 		return "", false
 	}
 	return inf.cache.PodReplicaSet(ns, podName)
+}
+
+// WorkloadForPodName returns the workload of a pod name, live or gone.
+func (inf *Informer) WorkloadForPodName(ns, podName string) (kind, name string, ok bool) {
+	if inf == nil || inf.cache == nil {
+		return "", "", false
+	}
+	return inf.cache.WorkloadForPodName(ns, podName)
+}
+
+// PodRetiring reports whether a pod is terminating or belongs to a superseded
+// ReplicaSet of its Deployment.
+func (inf *Informer) PodRetiring(ns, podName string) bool {
+	if inf == nil || inf.cache == nil {
+		return false
+	}
+	return inf.cache.PodRetiring(ns, podName)
 }
 
 // Run starts goroutines for workload + pod watching and blocks until ctx is cancelled.
@@ -203,7 +225,7 @@ func (inf *Informer) runMetadataLoop(ctx context.Context, path, kind string) {
 			if ctx.Err() != nil {
 				return
 			}
-			inf.logf("discovery: metadata list %s failed: %v — retrying in %s", path, err, backoff)
+			inf.apiLog().Failed("list "+path, err)
 			select {
 			case <-ctx.Done():
 				return
@@ -213,6 +235,7 @@ func (inf *Informer) runMetadataLoop(ctx context.Context, path, kind string) {
 			continue
 		}
 		backoff = time.Second
+		inf.apiLog().Succeeded()
 		inf.resumeWatch(ctx, "metadata watch "+path, rv, func(rv string) (string, error) {
 			return inf.watchWorkloads(ctx, path, kind, rv)
 		})
@@ -232,7 +255,7 @@ func (inf *Informer) runPodLoop(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
-			inf.logf("discovery: pod list failed: %v — retrying in %s", err, backoff)
+			inf.apiLog().Failed("list pods", err)
 			select {
 			case <-ctx.Done():
 				return
@@ -242,6 +265,7 @@ func (inf *Informer) runPodLoop(ctx context.Context) {
 			continue
 		}
 		backoff = time.Second
+		inf.apiLog().Succeeded()
 		inf.resumeWatch(ctx, "pod watch", rv, func(rv string) (string, error) {
 			return inf.watchPods(ctx, rv)
 		})
@@ -259,12 +283,18 @@ func (inf *Informer) resumeWatch(ctx context.Context, name, rv string, watch fun
 		}
 		if err != nil {
 			if ctx.Err() == nil {
-				inf.logf("discovery: %s error: %v — re-listing", name, err)
+				inf.apiLog().Failed(name, err)
 			}
 			return
 		}
 		rv = next
 	}
+}
+
+// apiLog returns the outage log of the Kubernetes API.
+func (inf *Informer) apiLog() *outage.Log {
+	inf.apiOnce.Do(func() { inf.api = outage.New("discovery: Kubernetes API", inf.logf) })
+	return inf.api
 }
 
 func (inf *Informer) logf(format string, args ...interface{}) {

@@ -55,6 +55,23 @@ type keyed struct {
 // filterByWorkload keeps the items whose workload namespace the user may see,
 // and drops from their affects list the callers it may not see. Other fields
 // are passed through untouched.
+// healthSummary keeps the engine uptime and version of a health answer, which
+// the plugin needs to tell a warm-up apart from a quiet cluster. Counts of
+// workloads and ingest across namespaces are dropped.
+func healthSummary(raw []byte) ([]byte, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, err
+	}
+	out := map[string]json.RawMessage{}
+	for _, key := range []string{"uptime_seconds", "version"} {
+		if v, ok := fields[key]; ok {
+			out[key] = v
+		}
+	}
+	return json.Marshal(out)
+}
+
 func filterByWorkload(raw []byte, f *namespaceFilter) ([]byte, error) {
 	var items []json.RawMessage
 	if err := json.Unmarshal(raw, &items); err != nil {

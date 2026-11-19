@@ -24,6 +24,9 @@ var startupFailureReasons = map[string]bool{
 	"FailedCreate":           true,
 }
 
+// schedulingReason is the event of a pod the scheduler cannot place.
+const schedulingReason = "FailedScheduling"
+
 // imagePullReason names image failures, which Kubernetes reports with the generic
 // reason Failed and details in the message.
 const imagePullReason = "ImagePull"
