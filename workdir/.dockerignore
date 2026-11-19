@@ -4,3 +4,4 @@ ohe
 *.test
 **/*_test.go
 .git
+web

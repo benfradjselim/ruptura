@@ -3,9 +3,8 @@
 #   docker compose up --build
 #
 # Starts the engine in demo mode (7 days of synthetic data, no calibration
-# wait — see internal/sim/seed.go) and the dashboard, wired together the
-# same way the Helm chart wires them in-cluster (deploy/docker-compose-ui-nginx.conf
-# mirrors helm/templates/configmap-ui.yaml's proxy_pass rule).
+# wait — see internal/sim/seed.go) and the dashboard, which proxies /api/ to
+# the ruptura service (the image's default RUPTURA_BACKEND_URL).
 #
 # Dashboard: http://localhost:8081/ — log in with any username and the
 # password below (auth is fail-closed with no key configured, see
@@ -42,16 +41,11 @@ services:
 
   ruptura-ui:
     build:
-      # Context is ./workdir (not ./workdir/ui): the Dockerfile's `COPY web
-      # /usr/share/nginx/html` is relative to workdir/, matching how
-      # release.yml's docker-ui job builds it (workdir/web is the Vite build
-      # output, committed to git so no separate npm build step is needed here).
+      # Context is ./workdir, as in release.yml; the Dockerfile builds the UI.
       context: ./workdir
       dockerfile: ui/Dockerfile
     ports:
-      - "127.0.0.1:8081:80"
-    volumes:
-      - ./deploy/docker-compose-ui-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - "127.0.0.1:8081:8080"
     depends_on:
       - ruptura
 
