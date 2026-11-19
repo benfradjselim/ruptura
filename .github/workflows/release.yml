@@ -250,7 +250,6 @@ jobs:
     needs: ci
     outputs:
       digest: ${{ steps.push.outputs.digest }}
-      image-ref: docker.io/${{ env.DOCKERHUB_IMAGE }}
       image-tag: ${{ steps.resolve-tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
@@ -313,14 +312,14 @@ jobs:
       - name: Sign image digest (keyless OIDC)
         run: |
           cosign sign --yes \
-            "${{ needs.docker.outputs.image-ref }}@${{ needs.docker.outputs.digest }}"
+            "docker.io/${{ env.DOCKERHUB_IMAGE }}@${{ needs.docker.outputs.digest }}"
 
       - name: Verify signature
         run: |
           cosign verify \
             --certificate-identity-regexp "https://github.com/${{ github.repository }}.*" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            "${{ needs.docker.outputs.image-ref }}@${{ needs.docker.outputs.digest }}"
+            "docker.io/${{ env.DOCKERHUB_IMAGE }}@${{ needs.docker.outputs.digest }}"
 
   # ── Stage 6: Helm — lint, package, push to GHCR OCI ─────────────────────
   helm-publish:
