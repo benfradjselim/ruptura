@@ -89,17 +89,19 @@ jobs:
       # ── Build and push bundle image to local registry ───────────────────────
       - name: Build & push bundle image
         run: |
+          # Docker only allows plain HTTP to localhost, so push through localhost:5000;
+          # the cluster pulls the same registry as k3d-registry.localhost:5000.
           BUNDLE_IMG="k3d-registry.localhost:5000/ruptura-operator-bundle:smoke"
-          docker build -t "${BUNDLE_IMG}" ./bundle
-          docker push "${BUNDLE_IMG}"
+          docker build -t localhost:5000/ruptura-operator-bundle:smoke ./bundle
+          docker push localhost:5000/ruptura-operator-bundle:smoke
           echo "bundle_img=${BUNDLE_IMG}" >> "$GITHUB_ENV"
 
       # ── Build and push operator image to local registry ──────────────────────
       - name: Build & push operator image
         run: |
           OP_IMG="k3d-registry.localhost:5000/ruptura-operator:smoke"
-          docker build -t "${OP_IMG}" ./workdir/operator
-          docker push "${OP_IMG}"
+          docker build -t localhost:5000/ruptura-operator:smoke ./workdir/operator
+          docker push localhost:5000/ruptura-operator:smoke
           # Patch CSV to reference the local operator image
           sed -i "s|ghcr.io/benfradjselim/ruptura-operator:[^\"]*|${OP_IMG}|g" \
             bundle/manifests/ruptura-operator.clusterserviceversion.yaml
@@ -113,6 +115,7 @@ jobs:
           operator-sdk run bundle \
             "${{ env.bundle_img }}" \
             --namespace operators \
+            --use-http \
             --timeout 5m
           kubectl -n operators wait deployment \
             --selector "app.kubernetes.io/name=ruptura,app.kubernetes.io/component=operator" \
