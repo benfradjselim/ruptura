@@ -7,14 +7,14 @@ import (
 )
 
 const (
-	gniWindow          = 5 * time.Minute // sliding window for transition counting
-	gniAgitatedGNI     = 0.4             // GNI threshold above which a group is considered agitated
-	gniAgitatedHealth  = 0.8             // health threshold: agitated only when still "green"
+	gniWindow         = 5 * time.Minute // sliding window for transition counting
+	gniAgitatedGNI    = 0.4             // GNI threshold above which a group is considered agitated
+	gniAgitatedHealth = 0.8             // health threshold: agitated only when still "green"
 )
 
 // transitionEntry records one state transition observed in a group.
 type transitionEntry struct {
-	kind string    // e.g. "Ready:True->False", "Phase:Pending->Bound"
+	kind string // e.g. "Ready:True->False", "Phase:Pending->Bound"
 	ts   time.Time
 }
 

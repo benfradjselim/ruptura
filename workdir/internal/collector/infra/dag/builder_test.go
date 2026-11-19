@@ -30,11 +30,11 @@ func TestBuildNamespaceInput(t *testing.T) {
 		wantAbsent []string           // groups that must NOT appear in activation
 	}{
 		{
-			name:       "no snapshots — empty maps",
-			snapshots:  nil,
-			ns:         "default",
-			wantAct:    map[string]float64{},
-			wantGNI:    map[string]float64{},
+			name:      "no snapshots — empty maps",
+			snapshots: nil,
+			ns:        "default",
+			wantAct:   map[string]float64{},
+			wantGNI:   map[string]float64{},
 		},
 		{
 			name: "cluster-scoped snapshot applies to every namespace",
@@ -66,7 +66,7 @@ func TestBuildNamespaceInput(t *testing.T) {
 		{
 			name: "cluster-scoped and namespace-scoped for same group — higher activation wins",
 			snapshots: []infra.GroupSnapshot{
-				snap(infra.GroupControlPlane, "", 0.9, 0.1),   // activation=0.1
+				snap(infra.GroupControlPlane, "", 0.9, 0.1),    // activation=0.1
 				snap(infra.GroupControlPlane, "ns1", 0.5, 0.4), // activation=0.5 (worse)
 			},
 			ns:      "ns1",
@@ -76,7 +76,7 @@ func TestBuildNamespaceInput(t *testing.T) {
 		{
 			name: "multiple groups mixed scope",
 			snapshots: []infra.GroupSnapshot{
-				snap(infra.GroupControlPlane, "", 0.7, 0.0),     // cluster-scoped: activation=0.3
+				snap(infra.GroupControlPlane, "", 0.7, 0.0),      // cluster-scoped: activation=0.3
 				snap(infra.GroupNetwork, "production", 0.8, 0.2), // ns-scoped match
 				snap(infra.GroupStorage, "staging", 0.6, 0.5),    // ns-scoped mismatch
 			},

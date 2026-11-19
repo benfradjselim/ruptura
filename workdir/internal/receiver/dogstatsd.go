@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/storage"
-	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/benfradjselim/ruptura/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // DogStatsDReceiver listens on UDP 8125 for DogStatsD / StatsD protocol metrics.

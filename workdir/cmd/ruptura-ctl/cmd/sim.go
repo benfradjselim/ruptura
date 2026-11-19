@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	simWorkload  string
-	simDuration  int
+	simWorkload string
+	simDuration int
 )
 
 var simCmd = &cobra.Command{

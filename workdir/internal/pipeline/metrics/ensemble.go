@@ -21,9 +21,9 @@ type seriesEnsemble struct {
 	ar   *ARIMA
 
 	// running MSE tracker per model for inverse-MSE ensemble weighting
-	ilrMSE  *mseTracker
-	hwMSE   *mseTracker
-	arMSE   *mseTracker
+	ilrMSE *mseTracker
+	hwMSE  *mseTracker
+	arMSE  *mseTracker
 
 	lastValue float64
 	hasValue  bool

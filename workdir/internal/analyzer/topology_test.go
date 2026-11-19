@@ -24,15 +24,15 @@ func TestTopologyAnalyzer_IngestSpan(t *testing.T) {
 
 	// Child span from service B (calls A)
 	child := models.Span{
-		TraceID:   "trace-001",
-		SpanID:    "span-B",
-		ParentID:  "span-A",
-		Service:   "service-b",
-		Operation: "db.query",
-		StartTime: time.Now(),
+		TraceID:    "trace-001",
+		SpanID:     "span-B",
+		ParentID:   "span-A",
+		Service:    "service-b",
+		Operation:  "db.query",
+		StartTime:  time.Now(),
 		DurationNS: 5_000_000, // 5ms
-		Status:    "ok",
-		Host:      "host-2",
+		Status:     "ok",
+		Host:       "host-2",
 	}
 	topo.IngestSpan(child)
 

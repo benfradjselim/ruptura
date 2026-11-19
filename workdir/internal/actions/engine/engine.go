@@ -37,10 +37,10 @@ type ActionRecommendation struct {
 	ID         string
 	EventID    string
 	Host       string
-	Namespace  string     // K8s namespace for kubernetes provider
-	Kind       string     // Deployment|StatefulSet|DaemonSet
-	NodeName   string     // Node name for cordon actions
-	ActionType string     // "scale"|"restart"|"cordon"|"alert"|"notify"|"page"|"custom"
+	Namespace  string // K8s namespace for kubernetes provider
+	Kind       string // Deployment|StatefulSet|DaemonSet
+	NodeName   string // Node name for cordon actions
+	ActionType string // "scale"|"restart"|"cordon"|"alert"|"notify"|"page"|"custom"
 	Tier       ActionTier
 	Confidence float64
 	R          float64 // rupture index at time of recommendation
@@ -60,8 +60,8 @@ type ActionEngine interface {
 
 type Rule struct {
 	Name       string  `yaml:"name"`
-	Profile    string  `yaml:"profile"`    // matches RuptureEvent.Profile; "" = any
-	MinR       float64 `yaml:"min_r"`      // R threshold to activate rule
+	Profile    string  `yaml:"profile"` // matches RuptureEvent.Profile; "" = any
+	MinR       float64 `yaml:"min_r"`   // R threshold to activate rule
 	ActionType string  `yaml:"action_type"`
 }
 

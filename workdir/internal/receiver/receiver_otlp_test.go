@@ -279,11 +279,11 @@ func TestOTLPReceiver_LogsHandler(t *testing.T) {
 			}},
 			ScopeLogs: []models.OTLPScopeLogs{{
 				LogRecords: []models.OTLPLogRecord{{
-					TimeUnixNano:   fmt.Sprintf("%d", ts),
-					SeverityText:   "ERROR",
-					Body:           models.OTLPAnyValue{StringValue: strPtr("something failed")},
-					TraceID:        "trace-abc",
-					SpanID:         "span-xyz",
+					TimeUnixNano: fmt.Sprintf("%d", ts),
+					SeverityText: "ERROR",
+					Body:         models.OTLPAnyValue{StringValue: strPtr("something failed")},
+					TraceID:      "trace-abc",
+					SpanID:       "span-xyz",
 				}},
 			}},
 		}},
@@ -347,7 +347,10 @@ func TestOTLPReceiver_LogsHandler_ZeroTimestamp(t *testing.T) {
 // --- normalizeSeverity tests ---
 
 func TestNormalizeSeverity_Text(t *testing.T) {
-	cases := []struct{ text string; want string }{
+	cases := []struct {
+		text string
+		want string
+	}{
 		{"ERROR", "error"}, {"error", "error"}, {"FATAL", "error"}, {"critical", "error"},
 		{"WARN", "warn"}, {"warning", "warn"},
 		{"DEBUG", "debug"}, {"trace", "debug"},
@@ -362,7 +365,10 @@ func TestNormalizeSeverity_Text(t *testing.T) {
 }
 
 func TestNormalizeSeverity_Number(t *testing.T) {
-	cases := []struct{ num int; want string }{
+	cases := []struct {
+		num  int
+		want string
+	}{
 		{0, "info"}, {1, "debug"}, {5, "debug"}, {9, "info"}, {12, "info"},
 		{13, "warn"}, {16, "warn"}, {17, "error"}, {21, "error"},
 	}

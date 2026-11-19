@@ -1,6 +1,13 @@
-# Static files are pre-built by Vite into workdir/web/; the build context is ./workdir.
+# The UI is built by Vite in the first stage; the build context is ./workdir.
 # nginx-unprivileged listens on 8080 and runs with any UID in group 0, as the
 # OpenShift restricted-v2 SCC assigns.
+FROM --platform=$BUILDPLATFORM docker.io/library/node:22-alpine AS build
+WORKDIR /src/ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY ui/ ./
+RUN npm run build
+
 FROM nginxinc/nginx-unprivileged:1.28-alpine
 
 ARG VERSION=dev
@@ -26,6 +33,6 @@ ENV RUPTURA_BACKEND_URL=http://ruptura:8080
 COPY LICENSE /licenses/LICENSE
 COPY ui/nginx/default.conf.template /etc/nginx/ruptura/default.conf.template
 COPY --chmod=0755 ui/nginx/30-ruptura-config.sh /docker-entrypoint.d/30-ruptura-config.sh
-COPY web /usr/share/nginx/html
+COPY --from=build /src/web /usr/share/nginx/html
 
 EXPOSE 8080

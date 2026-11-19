@@ -6,10 +6,10 @@ import "strings"
 // In Kubernetes: namespace + kind + name identifies a workload uniquely.
 // For non-K8s (bare-metal, VMs): Namespace="default", Kind="host", Name=hostname.
 type WorkloadRef struct {
-	Cluster   string `json:"cluster,omitempty"`  // optional, defaults to "default"
+	Cluster   string `json:"cluster,omitempty"` // optional, defaults to "default"
 	Namespace string `json:"namespace"`
-	Kind      string `json:"kind"`  // Deployment|StatefulSet|DaemonSet|Job|host
-	Name      string `json:"name"` // workload name
+	Kind      string `json:"kind"`           // Deployment|StatefulSet|DaemonSet|Job|host
+	Name      string `json:"name"`           // workload name
 	Node      string `json:"node,omitempty"` // infra node — secondary dimension
 }
 

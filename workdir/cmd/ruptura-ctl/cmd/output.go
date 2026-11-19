@@ -13,19 +13,19 @@ import (
 
 // ANSI color codes
 const (
-	colorReset  = "\033[0m"
-	colorBold   = "\033[1m"
-	colorDim    = "\033[2m"
-	colorRed    = "\033[31m"
-	colorGreen  = "\033[32m"
-	colorYellow = "\033[33m"
-	colorBlue   = "\033[34m"
+	colorReset   = "\033[0m"
+	colorBold    = "\033[1m"
+	colorDim     = "\033[2m"
+	colorRed     = "\033[31m"
+	colorGreen   = "\033[32m"
+	colorYellow  = "\033[33m"
+	colorBlue    = "\033[34m"
 	colorMagenta = "\033[35m"
-	colorCyan   = "\033[36m"
-	colorWhite  = "\033[37m"
-	colorGray   = "\033[90m"
+	colorCyan    = "\033[36m"
+	colorWhite   = "\033[37m"
+	colorGray    = "\033[90m"
 
-	bgRed   = "\033[41m"
+	bgRed = "\033[41m"
 )
 
 func color(c, s string) string {

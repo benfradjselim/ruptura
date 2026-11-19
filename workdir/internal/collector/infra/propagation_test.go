@@ -33,8 +33,8 @@ func TestComputePropPressure(t *testing.T) {
 			activation: map[string]float64{GroupControlPlane: 0.6},
 			gni:        map[string]float64{},
 			wantExact: map[string]float64{
-				GroupNetwork:  0.6 * 0.9,       // 0.54
-				GroupWorkload: 0.6 * 1.0,       // 0.6 (direct controlplane→workload)
+				GroupNetwork:  0.6 * 0.9, // 0.54
+				GroupWorkload: 0.6 * 1.0, // 0.6 (direct controlplane→workload)
 			},
 			wantZero: []string{GroupStorage, GroupAdmission, GroupOperators, GroupTenancy},
 		},
@@ -95,8 +95,8 @@ func TestComputePropPressure(t *testing.T) {
 			activation: map[string]float64{GroupAdmission: 0.5},
 			gni:        map[string]float64{},
 			wantExact: map[string]float64{
-				GroupNetwork:  0.5 * 0.6,               // 0.30
-				GroupWorkload: 0.5 * 0.7,               // 0.35
+				GroupNetwork:  0.5 * 0.6, // 0.30
+				GroupWorkload: 0.5 * 0.7, // 0.35
 			},
 			wantZero: []string{GroupControlPlane, GroupStorage, GroupOperators, GroupTenancy},
 		},
@@ -182,22 +182,22 @@ func TestComputeBlastRadius(t *testing.T) {
 		name          string
 		activation    map[string]float64
 		gni           map[string]float64
-		wantSourceKey string        // which source to inspect
-		wantMinGroups int           // minimum GroupsReached for that source
-		wantPresence  []string      // groups that must appear in Downstream
-		wantAbsence   []string      // sources below thetaBlast — not in result
+		wantSourceKey string   // which source to inspect
+		wantMinGroups int      // minimum GroupsReached for that source
+		wantPresence  []string // groups that must appear in Downstream
+		wantAbsence   []string // sources below thetaBlast — not in result
 	}{
 		{
-			name:          "all healthy — no blast radius",
-			activation:    map[string]float64{},
-			gni:           map[string]float64{},
-			wantAbsence:   []string{GroupControlPlane, GroupOperators, GroupAdmission, GroupStorage, GroupNetwork},
+			name:        "all healthy — no blast radius",
+			activation:  map[string]float64{},
+			gni:         map[string]float64{},
+			wantAbsence: []string{GroupControlPlane, GroupOperators, GroupAdmission, GroupStorage, GroupNetwork},
 		},
 		{
-			name:          "low activation below thetaBlast — not reported",
-			activation:    map[string]float64{GroupControlPlane: 0.1},
-			gni:           map[string]float64{},
-			wantAbsence:   []string{GroupControlPlane},
+			name:        "low activation below thetaBlast — not reported",
+			activation:  map[string]float64{GroupControlPlane: 0.1},
+			gni:         map[string]float64{},
+			wantAbsence: []string{GroupControlPlane},
 		},
 		{
 			name:          "controlplane fully active — reaches workload and network",

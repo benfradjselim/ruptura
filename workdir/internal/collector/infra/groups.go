@@ -26,19 +26,19 @@ var kindRegistry = map[string]struct{ Group, Scope string }{
 	"StorageClass":          {GroupStorage, ScopeCluster},
 
 	// Control-Plane group — cluster-scoped infrastructure objects.
-	"Node":               {GroupControlPlane, ScopeCluster},
-	"ClusterOperator":    {GroupControlPlane, ScopeCluster}, // OpenShift CO (probed)
-	"MachineConfigPool":  {GroupControlPlane, ScopeCluster}, // OpenShift MCP (probed)
+	"Node":              {GroupControlPlane, ScopeCluster},
+	"ClusterOperator":   {GroupControlPlane, ScopeCluster}, // OpenShift CO (probed)
+	"MachineConfigPool": {GroupControlPlane, ScopeCluster}, // OpenShift MCP (probed)
 
 	// Admission group — policy enforcement objects.
-	"PolicyReport":                    {GroupAdmission, ScopeNamespace}, // Kyverno / wgpolicyk8s.io (probed)
-	"ValidatingWebhookConfiguration":  {GroupAdmission, ScopeCluster},
+	"PolicyReport":                   {GroupAdmission, ScopeNamespace}, // Kyverno / wgpolicyk8s.io (probed)
+	"ValidatingWebhookConfiguration": {GroupAdmission, ScopeCluster},
 
 	// Operators group — OLM lifecycle objects.
-	"Subscription":            {GroupOperators, ScopeNamespace}, // OLM (probed)
-	"ClusterServiceVersion":   {GroupOperators, ScopeNamespace}, // OLM (probed)
+	"Subscription":             {GroupOperators, ScopeNamespace}, // OLM (probed)
+	"ClusterServiceVersion":    {GroupOperators, ScopeNamespace}, // OLM (probed)
 	"CustomResourceDefinition": {GroupOperators, ScopeCluster},
-	"InstallPlan":             {GroupOperators, ScopeNamespace}, // OLM (probed)
+	"InstallPlan":              {GroupOperators, ScopeNamespace}, // OLM (probed)
 
 	// Tenancy group — resource boundary objects.
 	"ResourceQuota": {GroupTenancy, ScopeNamespace},

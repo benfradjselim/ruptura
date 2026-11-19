@@ -16,8 +16,8 @@ import (
 // effective memory. Default λ=0.995 gives ~200-sample window — enough to smooth
 // noise while still adapting within ~50 minutes at 15-second intervals.
 type ILR struct {
-	n     int
-	lam   float64 // forgetting factor [0.9, 1.0]
+	n   int
+	lam float64 // forgetting factor [0.9, 1.0]
 	// RLS state: P is 2×2 covariance matrix (stored as [P00,P01,P10,P11])
 	// θ = [slope, intercept]
 	theta [2]float64

@@ -16,12 +16,12 @@ func TestFusion_weightedAverage(t *testing.T) {
 	e.SetMetricR("h1", 1.0, now)
 	e.SetLogR("h1", 2.0, now)
 	e.SetTraceR("h1", 3.0, now)
-	
+
 	val, _, err := e.FusedR("h1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// 0.6*1.0 + 0.2*2.0 + 0.2*3.0 = 0.6 + 0.4 + 0.6 = 1.6
 	expected := 1.6
 	if math.Abs(val-expected) > 1e-6 {
@@ -35,7 +35,7 @@ func TestFusion_timeLag_rejected(t *testing.T) {
 	e.SetMetricR("h1", 1.0, now)
 	e.SetLogR("h1", 2.0, now.Add(-31*time.Second))
 	e.SetTraceR("h1", 3.0, now)
-	
+
 	_, _, err := e.FusedR("h1")
 	if err == nil {
 		t.Error("expected error for lag, got nil")
@@ -48,7 +48,7 @@ func TestFusion_timeLag_accepted(t *testing.T) {
 	e.SetMetricR("h1", 1.0, now)
 	e.SetLogR("h1", 2.0, now.Add(-29*time.Second))
 	e.SetTraceR("h1", 3.0, now)
-	
+
 	_, _, err := e.FusedR("h1")
 	if err != nil {
 		t.Error(err)
@@ -61,7 +61,7 @@ func TestFusion_conflictDetected(t *testing.T) {
 	e.SetMetricR("h1", 1.0, now)
 	e.SetLogR("h1", 4.0, now) // Diff > 2.0
 	e.SetTraceR("h1", 3.0, now)
-	
+
 	_, _, err := e.FusedR("h1")
 	if err != nil {
 		t.Error(err)
@@ -84,12 +84,12 @@ func TestFusion_twoSignals(t *testing.T) {
 	now := time.Now()
 	e.SetMetricR("h1", 1.0, now)
 	e.SetLogR("h1", 2.0, now)
-	
+
 	val, _, err := e.FusedR("h1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// 0.75*1.0 + 0.25*2.0 = 0.75 + 0.5 = 1.25
 	expected := 1.25
 	if math.Abs(val-expected) > 1e-6 {

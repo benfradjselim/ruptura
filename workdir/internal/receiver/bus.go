@@ -1,11 +1,10 @@
 package receiver
 
 import (
-
 	"github.com/benfradjselim/ruptura/internal/analyzer"
 	"github.com/benfradjselim/ruptura/internal/storage"
-	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/benfradjselim/ruptura/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // Bus wires ingested data from all receivers into the Ruptura pipeline.

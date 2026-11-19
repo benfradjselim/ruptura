@@ -11,9 +11,9 @@ const maxEvents = 300
 type Severity string
 
 const (
-	SevInfo     Severity = "info"
-	SevWarning  Severity = "warning"
-	SevCritical Severity = "critical"
+	SevInfo      Severity = "info"
+	SevWarning   Severity = "warning"
+	SevCritical  Severity = "critical"
 	SevEmergency Severity = "emergency"
 )
 

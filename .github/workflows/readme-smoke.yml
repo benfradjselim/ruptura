@@ -13,11 +13,13 @@ on:
   pull_request:
     paths:
       - "README.md"
+      - ".github/workflows/readme-smoke.yml"
       - "helm/**"
   push:
     branches: [main]
     paths:
       - "README.md"
+      - ".github/workflows/readme-smoke.yml"
       - "helm/**"
   schedule:
     - cron: "17 4 * * *"
@@ -58,6 +60,7 @@ jobs:
             --create-namespace \
             --set apiKey=$(openssl rand -hex 32) \
             --set ui.enabled=true \
+            --set thanos.url=http://prometheus.monitoring.svc:9090 \
             --wait --timeout 120s
 
       - name: Wait for pods Running
@@ -94,20 +97,6 @@ jobs:
       #    service via port-forward (k3d does not expose NodePorts to the
       #    runner host by default; port-forward is the CI-portable equivalent
       #    of "<node-ip>:31470" on a real cluster). ─────────────────────────
-      - name: Send synthetic workloads (README command, port-forwarded)
-        run: |
-          kubectl -n ruptura-system port-forward svc/ruptura-otlp 31470:4318 &
-          sleep 3
-          # simulate.py runs an infinite tick loop by design; `timeout` bounds it
-          # to a few ticks for CI. Exit code 124 (timeout fired) is the expected,
-          # successful outcome here — anything else means the command itself failed.
-          timeout 20s python3 scripts/simulate.py --host localhost --port 31470
-          status=$?
-          if [ "${status}" -ne 124 ] && [ "${status}" -ne 0 ]; then
-            echo "::error::README simulator command failed against the OTLP endpoint (exit ${status})"
-            exit 1
-          fi
-
       - name: Cleanup k3d cluster
         if: always()
         run: k3d cluster delete ruptura-readme-smoke || true

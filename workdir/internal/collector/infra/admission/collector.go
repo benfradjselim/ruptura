@@ -235,7 +235,9 @@ func (c *Collector) watchStream(ctx context.Context, path, kind, rv string) (boo
 				c.remove(kind, meta.Metadata.Name, meta.Metadata.Namespace)
 			}
 		case "ERROR":
-			var errObj struct{ Code int `json:"code"` }
+			var errObj struct {
+				Code int `json:"code"`
+			}
 			if err := json.Unmarshal(ev.Object, &errObj); err == nil && errObj.Code == http.StatusGone {
 				return true, nil
 			}
@@ -315,7 +317,7 @@ func policyReportSignal(obj infra.ObjectID, rawObj json.RawMessage, now time.Tim
 		return infra.InfraSignal{
 			Object: obj, Signal: "policyViolation",
 			Value: 0.5, Severity: infra.SeverityWarning,
-			Message: fmt.Sprintf("%d policy errors", pr.Summary.Error),
+			Message:   fmt.Sprintf("%d policy errors", pr.Summary.Error),
 			Timestamp: now,
 		}
 	}

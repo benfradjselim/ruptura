@@ -9,18 +9,18 @@ on:
   pull_request:
     paths:
       - "docker-compose.yml"
-      - "deploy/docker-compose-ui-nginx.conf"
+      - ".github/workflows/compose-smoke.yml"
       - "workdir/Dockerfile"
       - "workdir/ui/Dockerfile"
-      - "workdir/web/**"
+      - "workdir/ui/**"
   push:
     branches: [main]
     paths:
       - "docker-compose.yml"
-      - "deploy/docker-compose-ui-nginx.conf"
+      - ".github/workflows/compose-smoke.yml"
       - "workdir/Dockerfile"
       - "workdir/ui/Dockerfile"
-      - "workdir/web/**"
+      - "workdir/ui/**"
   schedule:
     - cron: "53 4 * * *"
   workflow_dispatch: {}

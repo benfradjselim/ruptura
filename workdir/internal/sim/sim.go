@@ -101,14 +101,14 @@ func memoryLeakGen(tick int, _ Config) map[string]float64 {
 		errors = clamp((ram-0.60)*0.5, 0, 1)
 	}
 	return map[string]float64{
-		"cpu_percent":        0.25 + jitter(0.05),
-		"memory_percent":     ram,
-		"load_avg_1":         latency,
-		"error_rate":         errors,
-		"timeout_rate":       errors * 0.3,
-		"request_rate":       80 + jitter(10),
-		"uptime_seconds":     float64(tick) * 5,
-		"health_score_hint":  clamp(1-ram, 0, 1),
+		"cpu_percent":       0.25 + jitter(0.05),
+		"memory_percent":    ram,
+		"load_avg_1":        latency,
+		"error_rate":        errors,
+		"timeout_rate":      errors * 0.3,
+		"request_rate":      80 + jitter(10),
+		"uptime_seconds":    float64(tick) * 5,
+		"health_score_hint": clamp(1-ram, 0, 1),
 	}
 }
 

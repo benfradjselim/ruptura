@@ -50,15 +50,15 @@ type KPI struct {
 
 // KPISnapshot holds all current KPIs for a host
 type KPISnapshot struct {
-	Host        string      `json:"host"`
-	Workload    WorkloadRef `json:"workload,omitempty"` // K8s workload identity
-	Timestamp   time.Time   `json:"timestamp"`
-	Stress      KPI         `json:"stress"`
-	Fatigue     KPI         `json:"fatigue"`
-	Mood        KPI         `json:"mood"`
-	Pressure    KPI         `json:"pressure"`
-	Humidity    KPI         `json:"humidity"`
-	Contagion   KPI         `json:"contagion"`
+	Host      string      `json:"host"`
+	Workload  WorkloadRef `json:"workload,omitempty"` // K8s workload identity
+	Timestamp time.Time   `json:"timestamp"`
+	Stress    KPI         `json:"stress"`
+	Fatigue   KPI         `json:"fatigue"`
+	Mood      KPI         `json:"mood"`
+	Pressure  KPI         `json:"pressure"`
+	Humidity  KPI         `json:"humidity"`
+	Contagion KPI         `json:"contagion"`
 	// ETF-style composed KPIs
 	Resilience  KPI `json:"resilience"`   // ability to absorb disruption
 	Entropy     KPI `json:"entropy"`      // system disorder level
@@ -73,9 +73,9 @@ type KPISnapshot struct {
 	// v5.0: dual-scale CA-ILR rupture events (omitted when none detected)
 	RuptureEvents []RuptureEvent `json:"rupture_events,omitempty"`
 	// v6.3: calibration warm-up state
-	WorkloadStatus      string `json:"status"`                                 // "calibrating" | "active"
-	CalibrationProgress int    `json:"calibration_progress"`                    // 0–100
-	CalibrationETA      int    `json:"calibration_eta_minutes,omitempty"`        // minutes until active; 0 when active
+	WorkloadStatus      string `json:"status"`                            // "calibrating" | "active"
+	CalibrationProgress int    `json:"calibration_progress"`              // 0–100
+	CalibrationETA      int    `json:"calibration_eta_minutes,omitempty"` // minutes until active; 0 when active
 	// v6.3: HealthScore trend forecast (nil when calibrating or insufficient data)
 	HealthForecast *HealthForecast `json:"health_forecast,omitempty"`
 	// v6.4: rupture fingerprint pattern match (nil when no historical match found)
@@ -161,24 +161,24 @@ type HealthForecast struct {
 
 // NotificationChannel is a configured alert delivery target
 type NotificationChannel struct {
-	ID       string            `json:"id"`
-	Name     string            `json:"name"`
-	Type     string            `json:"type"`    // "webhook", "slack", "pagerduty"
-	URL      string            `json:"url"`
-	Headers  map[string]string `json:"headers,omitempty"`
-	Enabled  bool              `json:"enabled"`
+	ID      string            `json:"id"`
+	Name    string            `json:"name"`
+	Type    string            `json:"type"` // "webhook", "slack", "pagerduty"
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers,omitempty"`
+	Enabled bool              `json:"enabled"`
 	// Routing: only fire for severities in this list (empty = all)
-	Severities []string        `json:"severities,omitempty"`
+	Severities []string `json:"severities,omitempty"`
 }
 
 // QuotaConfig defines resource limits for an org. Zero values mean unlimited.
 type QuotaConfig struct {
-	MaxDashboards  int `json:"max_dashboards,omitempty"`   // 0 = unlimited
-	MaxDataSources int `json:"max_datasources,omitempty"`  // 0 = unlimited
-	MaxAPIKeys     int `json:"max_api_keys,omitempty"`     // 0 = unlimited
-	MaxAlertRules  int `json:"max_alert_rules,omitempty"`  // 0 = unlimited
-	MaxSLOs        int `json:"max_slos,omitempty"`         // 0 = unlimited
-	IngestRateRPM  int `json:"ingest_rate_rpm,omitempty"`  // requests/min; 0 = unlimited
+	MaxDashboards  int `json:"max_dashboards,omitempty"`  // 0 = unlimited
+	MaxDataSources int `json:"max_datasources,omitempty"` // 0 = unlimited
+	MaxAPIKeys     int `json:"max_api_keys,omitempty"`    // 0 = unlimited
+	MaxAlertRules  int `json:"max_alert_rules,omitempty"` // 0 = unlimited
+	MaxSLOs        int `json:"max_slos,omitempty"`        // 0 = unlimited
+	IngestRateRPM  int `json:"ingest_rate_rpm,omitempty"` // requests/min; 0 = unlimited
 }
 
 // DefaultQuota returns sensible limits for a free-tier org.
@@ -199,7 +199,7 @@ func DefaultQuota() QuotaConfig {
 type Org struct {
 	ID          string      `json:"id"`
 	Name        string      `json:"name"`
-	Slug        string      `json:"slug"`            // URL-safe identifier
+	Slug        string      `json:"slug"` // URL-safe identifier
 	Description string      `json:"description,omitempty"`
 	Quota       QuotaConfig `json:"quota"`
 	CreatedAt   time.Time   `json:"created_at"`
@@ -215,24 +215,24 @@ type OrgMember struct {
 
 // FleetStatus is the aggregated health summary for all known hosts
 type FleetStatus struct {
-	Timestamp    time.Time              `json:"timestamp"`
-	TotalHosts   int                    `json:"total_hosts"`
-	HealthyHosts int                    `json:"healthy_hosts"`
-	DegradedHosts int                   `json:"degraded_hosts"`
-	CriticalHosts int                   `json:"critical_hosts"`
-	Hosts        []HostSummary          `json:"hosts"`
+	Timestamp     time.Time     `json:"timestamp"`
+	TotalHosts    int           `json:"total_hosts"`
+	HealthyHosts  int           `json:"healthy_hosts"`
+	DegradedHosts int           `json:"degraded_hosts"`
+	CriticalHosts int           `json:"critical_hosts"`
+	Hosts         []HostSummary `json:"hosts"`
 }
 
 // HostSummary is a lightweight per-host health view for fleet overview
 type HostSummary struct {
-	Host        string    `json:"host"`
-	HealthScore float64   `json:"health_score"`
-	State       string    `json:"state"`   // "healthy", "degraded", "critical"
-	Stress      float64   `json:"stress"`
-	Fatigue     float64   `json:"fatigue"`
-	Contagion   float64   `json:"contagion"`
-	ActiveAlerts int      `json:"active_alerts"`
-	LastSeen    time.Time `json:"last_seen"`
+	Host         string    `json:"host"`
+	HealthScore  float64   `json:"health_score"`
+	State        string    `json:"state"` // "healthy", "degraded", "critical"
+	Stress       float64   `json:"stress"`
+	Fatigue      float64   `json:"fatigue"`
+	Contagion    float64   `json:"contagion"`
+	ActiveAlerts int       `json:"active_alerts"`
+	LastSeen     time.Time `json:"last_seen"`
 }
 
 // ModelContribution is a single model's contribution inside an ensemble forecast
@@ -254,15 +254,15 @@ type ForecastPoint struct {
 
 // ForecastResult is the full ensemble forecast response
 type ForecastResult struct {
-	Host      string              `json:"host"`
-	Metric    string              `json:"metric"`
-	Current   float64             `json:"current"`
-	Trend     string              `json:"trend"`
-	Confidence float64            `json:"confidence"`
-	Models    []ModelContribution `json:"models"`
-	Points    []ForecastPoint     `json:"points"`
-	Timestamp time.Time           `json:"timestamp"`
-	WarmingUp bool                `json:"warming_up,omitempty"`
+	Host       string              `json:"host"`
+	Metric     string              `json:"metric"`
+	Current    float64             `json:"current"`
+	Trend      string              `json:"trend"`
+	Confidence float64             `json:"confidence"`
+	Models     []ModelContribution `json:"models"`
+	Points     []ForecastPoint     `json:"points"`
+	Timestamp  time.Time           `json:"timestamp"`
+	WarmingUp  bool                `json:"warming_up,omitempty"`
 }
 
 // Prediction is a forecasted value for a metric/KPI
@@ -274,12 +274,12 @@ type Prediction struct {
 	Trend     string    `json:"trend"` // "rising", "stable", "falling"
 	Timestamp time.Time `json:"timestamp"`
 	// v4.5.0: confidence intervals and ensemble metadata (additive, backwards-compatible)
-	Lower80    float64            `json:"lower_80,omitempty"`
-	Upper80    float64            `json:"upper_80,omitempty"`
-	Lower95    float64            `json:"lower_95,omitempty"`
-	Upper95    float64            `json:"upper_95,omitempty"`
-	Confidence float64            `json:"confidence,omitempty"`
-	Method     string             `json:"method,omitempty"`
+	Lower80    float64             `json:"lower_80,omitempty"`
+	Upper80    float64             `json:"upper_80,omitempty"`
+	Lower95    float64             `json:"lower_95,omitempty"`
+	Upper95    float64             `json:"upper_95,omitempty"`
+	Confidence float64             `json:"confidence,omitempty"`
+	Method     string              `json:"method,omitempty"`
 	Models     []ModelContribution `json:"models,omitempty"`
 }
 
@@ -380,24 +380,24 @@ const (
 
 // Alert represents a triggered observability alert
 type Alert struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	Description    string    `json:"description"`
-	Severity       string    `json:"severity"`
-	Status         string    `json:"status"`
-	Host           string    `json:"host"`
-	Metric         string    `json:"metric"`
-	Value          float64   `json:"value"`
-	Threshold      float64   `json:"threshold"`
-	Prediction     string    `json:"prediction,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	ResolvedAt     *time.Time `json:"resolved_at,omitempty"`
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Severity    string     `json:"severity"`
+	Status      string     `json:"status"`
+	Host        string     `json:"host"`
+	Metric      string     `json:"metric"`
+	Value       float64    `json:"value"`
+	Threshold   float64    `json:"threshold"`
+	Prediction  string     `json:"prediction,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	ResolvedAt  *time.Time `json:"resolved_at,omitempty"`
 	// v4.5.0: correlation and grouping metadata
-	CorrelationIDs []string  `json:"correlation_ids,omitempty"`
-	Suppressed     bool      `json:"suppressed,omitempty"`
-	SuppressedBy   string    `json:"suppressed_by,omitempty"`
-	GroupID        string    `json:"group_id,omitempty"`
+	CorrelationIDs []string `json:"correlation_ids,omitempty"`
+	Suppressed     bool     `json:"suppressed,omitempty"`
+	SuppressedBy   string   `json:"suppressed_by,omitempty"`
+	GroupID        string   `json:"group_id,omitempty"`
 }
 
 // User for auth
@@ -426,11 +426,11 @@ type SLO struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
-	Metric      string    `json:"metric"`            // metric or KPI name to track
-	Target      float64   `json:"target"`            // e.g. 99.9 (percent)
-	Window      string    `json:"window"`            // "7d", "30d", "90d"
-	Comparator  string    `json:"comparator"`        // "gte" (value >= threshold = good) | "lte"
-	Threshold   float64   `json:"threshold"`         // value that defines "good" state
+	Metric      string    `json:"metric"`     // metric or KPI name to track
+	Target      float64   `json:"target"`     // e.g. 99.9 (percent)
+	Window      string    `json:"window"`     // "7d", "30d", "90d"
+	Comparator  string    `json:"comparator"` // "gte" (value >= threshold = good) | "lte"
+	Threshold   float64   `json:"threshold"`  // value that defines "good" state
 	OrgID       string    `json:"org_id,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -438,22 +438,22 @@ type SLO struct {
 
 // SLOStatus is the live computed state of an SLO
 type SLOStatus struct {
-	SLO            SLO     `json:"slo"`
-	ErrorBudget    float64 `json:"error_budget_pct"`    // remaining % of allowed bad minutes
-	BurnRate       float64 `json:"burn_rate"`            // current burn rate (1 = steady-state)
-	Compliance     float64 `json:"compliance_pct"`       // actual uptime % over window
-	RemainingMinutes float64 `json:"remaining_minutes"`  // minutes of budget left
-	State          string  `json:"state"`                // "healthy" | "at_risk" | "breached"
+	SLO              SLO     `json:"slo"`
+	ErrorBudget      float64 `json:"error_budget_pct"`  // remaining % of allowed bad minutes
+	BurnRate         float64 `json:"burn_rate"`         // current burn rate (1 = steady-state)
+	Compliance       float64 `json:"compliance_pct"`    // actual uptime % over window
+	RemainingMinutes float64 `json:"remaining_minutes"` // minutes of budget left
+	State            string  `json:"state"`             // "healthy" | "at_risk" | "breached"
 }
 
 // RetentionStats exposes storage tier counts
 type RetentionStats struct {
-	RawMetrics    int64 `json:"raw_metrics"`
-	RawKPIs       int64 `json:"raw_kpis"`
+	RawMetrics      int64 `json:"raw_metrics"`
+	RawKPIs         int64 `json:"raw_kpis"`
 	Rollup5mMetrics int64 `json:"rollup_5m_metrics"`
-	Rollup5mKPIs  int64 `json:"rollup_5m_kpis"`
+	Rollup5mKPIs    int64 `json:"rollup_5m_kpis"`
 	Rollup1hMetrics int64 `json:"rollup_1h_metrics"`
-	Rollup1hKPIs  int64 `json:"rollup_1h_kpis"`
+	Rollup1hKPIs    int64 `json:"rollup_1h_kpis"`
 }
 
 // Widget types
@@ -492,22 +492,22 @@ type DataSource struct {
 
 // SystemMetrics holds all raw collected system metrics
 type SystemMetrics struct {
-	Host         string    `json:"host"`
-	Timestamp    time.Time `json:"timestamp"`
-	CPUPercent   float64   `json:"cpu_percent"`
-	MemoryPercent float64  `json:"memory_percent"`
-	MemoryUsedMB float64   `json:"memory_used_mb"`
-	MemoryTotalMB float64  `json:"memory_total_mb"`
-	DiskPercent  float64   `json:"disk_percent"`
-	DiskUsedGB   float64   `json:"disk_used_gb"`
-	DiskTotalGB  float64   `json:"disk_total_gb"`
-	NetRxBps     float64   `json:"net_rx_bps"`
-	NetTxBps     float64   `json:"net_tx_bps"`
-	LoadAvg1     float64   `json:"load_avg_1"`
-	LoadAvg5     float64   `json:"load_avg_5"`
-	LoadAvg15    float64   `json:"load_avg_15"`
-	Processes    int       `json:"processes"`
-	Uptime       float64   `json:"uptime_seconds"`
+	Host          string    `json:"host"`
+	Timestamp     time.Time `json:"timestamp"`
+	CPUPercent    float64   `json:"cpu_percent"`
+	MemoryPercent float64   `json:"memory_percent"`
+	MemoryUsedMB  float64   `json:"memory_used_mb"`
+	MemoryTotalMB float64   `json:"memory_total_mb"`
+	DiskPercent   float64   `json:"disk_percent"`
+	DiskUsedGB    float64   `json:"disk_used_gb"`
+	DiskTotalGB   float64   `json:"disk_total_gb"`
+	NetRxBps      float64   `json:"net_rx_bps"`
+	NetTxBps      float64   `json:"net_tx_bps"`
+	LoadAvg1      float64   `json:"load_avg_1"`
+	LoadAvg5      float64   `json:"load_avg_5"`
+	LoadAvg15     float64   `json:"load_avg_15"`
+	Processes     int       `json:"processes"`
+	Uptime        float64   `json:"uptime_seconds"`
 }
 
 // APIResponse wraps all API responses
@@ -583,12 +583,12 @@ type HealthResponse struct {
 type APIKey struct {
 	ID        string    `json:"id"`
 	OrgID     string    `json:"org_id"`
-	Name      string    `json:"name"`        // human-readable label
-	Role      string    `json:"role"`        // role granted (viewer/operator/admin)
-	KeyHash   string    `json:"key_hash"`    // bcrypt hash of the full key — never returned to clients
-	Prefix    string    `json:"prefix"`      // first 8 chars of key for display (e.g. "rpt_a1b2")
+	Name      string    `json:"name"`     // human-readable label
+	Role      string    `json:"role"`     // role granted (viewer/operator/admin)
+	KeyHash   string    `json:"key_hash"` // bcrypt hash of the full key — never returned to clients
+	Prefix    string    `json:"prefix"`   // first 8 chars of key for display (e.g. "rpt_a1b2")
 	CreatedAt time.Time `json:"created_at"`
-	ExpiresAt time.Time `json:"expires_at"`  // zero = no expiry
+	ExpiresAt time.Time `json:"expires_at"` // zero = no expiry
 	LastUsed  time.Time `json:"last_used"`
 	Active    bool      `json:"active"`
 }

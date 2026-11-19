@@ -1,65 +1,65 @@
 package api
 
 import (
-    "encoding/json"
-    "net/http"
-    "sync/atomic"
-    "time"
+	"encoding/json"
+	"net/http"
+	"sync/atomic"
+	"time"
 
-    "github.com/benfradjselim/ruptura/internal/actions/engine"
-    "github.com/benfradjselim/ruptura/internal/alerter"
-    "github.com/benfradjselim/ruptura/internal/analyzer"
-    apicontext "github.com/benfradjselim/ruptura/internal/context"
-    "github.com/benfradjselim/ruptura/internal/collector/infra/dag"
-    "github.com/benfradjselim/ruptura/internal/correlator"
-    "github.com/benfradjselim/ruptura/internal/discovery"
-    "github.com/benfradjselim/ruptura/internal/events"
-    "github.com/benfradjselim/ruptura/internal/explain"
-    "github.com/benfradjselim/ruptura/internal/fusion"
-    "github.com/benfradjselim/ruptura/internal/history"
-    pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
-    "github.com/benfradjselim/ruptura/internal/storage"
-    "github.com/benfradjselim/ruptura/internal/telemetry"
+	"github.com/benfradjselim/ruptura/internal/actions/engine"
+	"github.com/benfradjselim/ruptura/internal/alerter"
+	"github.com/benfradjselim/ruptura/internal/analyzer"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/dag"
+	apicontext "github.com/benfradjselim/ruptura/internal/context"
+	"github.com/benfradjselim/ruptura/internal/correlator"
+	"github.com/benfradjselim/ruptura/internal/discovery"
+	"github.com/benfradjselim/ruptura/internal/events"
+	"github.com/benfradjselim/ruptura/internal/explain"
+	"github.com/benfradjselim/ruptura/internal/fusion"
+	"github.com/benfradjselim/ruptura/internal/history"
+	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
+	"github.com/benfradjselim/ruptura/internal/storage"
+	"github.com/benfradjselim/ruptura/internal/telemetry"
 )
 
 // IngestCounter exposes cumulative ingest counts from the ingest engine.
 type IngestCounter interface {
-    IngestCounts() (metrics, logs, traces int64)
+	IngestCounts() (metrics, logs, traces int64)
 }
 
 type Handlers struct {
-    store      *storage.Store
-    engine     *engine.Engine
-    explainer  *explain.Engine
-    alerter    *alerter.Alerter
-    predictor  *pipelinemetrics.Predictor
-    pipeline   pipelinemetrics.MetricPipeline
-    ctxStore   *apicontext.ManualContextStore
-    detector   *apicontext.DeploymentDetector
-    metrics    *telemetry.Registry
-    health     *telemetry.HealthChecker
-    startTime  time.Time
-    ready      int32  // atomic: 1=ready
-    apiKey     string // expected bearer token; "" disables auth
-    edition    string // "community" (default) or "autopilot"
-    version    string
-    analyzer    *analyzer.Analyzer
-    historyMgr  *history.Manager
-    eventBus    *events.Bus
-    ingest      IngestCounter
-    fusionEng     *fusion.Engine
-    topoBuilder   *correlator.TopologyBuilder
-    discovery     *discovery.Informer
-    infraRegistry *dag.Registry
-    demoMode      bool
-    failureModes  FailureEstimates
-	callGraph CallGraphSource
+	store             *storage.Store
+	engine            *engine.Engine
+	explainer         *explain.Engine
+	alerter           *alerter.Alerter
+	predictor         *pipelinemetrics.Predictor
+	pipeline          pipelinemetrics.MetricPipeline
+	ctxStore          *apicontext.ManualContextStore
+	detector          *apicontext.DeploymentDetector
+	metrics           *telemetry.Registry
+	health            *telemetry.HealthChecker
+	startTime         time.Time
+	ready             int32  // atomic: 1=ready
+	apiKey            string // expected bearer token; "" disables auth
+	edition           string // "community" (default) or "autopilot"
+	version           string
+	analyzer          *analyzer.Analyzer
+	historyMgr        *history.Manager
+	eventBus          *events.Bus
+	ingest            IngestCounter
+	fusionEng         *fusion.Engine
+	topoBuilder       *correlator.TopologyBuilder
+	discovery         *discovery.Informer
+	infraRegistry     *dag.Registry
+	demoMode          bool
+	failureModes      FailureEstimates
+	callGraph         CallGraphSource
 	namespaceSelector map[string]string
 	namespaceLabels   NamespaceLabels
-	inputs InputCoverage
-	horizon time.Duration
-	levelScope string
-	levelSelector map[string]string
+	inputs            InputCoverage
+	horizon           time.Duration
+	levelScope        string
+	levelSelector     map[string]string
 }
 
 // SetDemoMode marks the server as running with synthetic demo data
@@ -67,10 +67,10 @@ type Handlers struct {
 // the UI can render the "Demo mode" banner.
 func (h *Handlers) SetDemoMode(v bool) { h.demoMode = v }
 
-func (h *Handlers) SetIngest(c IngestCounter)                       { h.ingest = c }
-func (h *Handlers) SetFusion(f *fusion.Engine)                      { h.fusionEng = f }
-func (h *Handlers) SetTopology(t *correlator.TopologyBuilder)       { h.topoBuilder = t }
-func (h *Handlers) SetDiscovery(d *discovery.Informer)              { h.discovery = d }
+func (h *Handlers) SetIngest(c IngestCounter)                 { h.ingest = c }
+func (h *Handlers) SetFusion(f *fusion.Engine)                { h.fusionEng = f }
+func (h *Handlers) SetTopology(t *correlator.TopologyBuilder) { h.topoBuilder = t }
+func (h *Handlers) SetDiscovery(d *discovery.Informer)        { h.discovery = d }
 
 func (h *Handlers) SetAnalyzer(a *analyzer.Analyzer) { h.analyzer = a }
 func (h *Handlers) SetHistoryMgr(m *history.Manager) { h.historyMgr = m }
@@ -83,23 +83,23 @@ func (h *Handlers) SetEdition(e string) { h.edition = e }
 func (h *Handlers) SetVersion(v string) { h.version = v }
 
 func NewHandlers(
-    store *storage.Store,
-    eng *engine.Engine,
-    exp *explain.Engine,
-    al  *alerter.Alerter,
-    pred *pipelinemetrics.Predictor,
-    pipe pipelinemetrics.MetricPipeline,
-    ctx *apicontext.ManualContextStore,
-    det *apicontext.DeploymentDetector,
-    met *telemetry.Registry,
-    hc  *telemetry.HealthChecker,
-    apiKey string,
+	store *storage.Store,
+	eng *engine.Engine,
+	exp *explain.Engine,
+	al *alerter.Alerter,
+	pred *pipelinemetrics.Predictor,
+	pipe pipelinemetrics.MetricPipeline,
+	ctx *apicontext.ManualContextStore,
+	det *apicontext.DeploymentDetector,
+	met *telemetry.Registry,
+	hc *telemetry.HealthChecker,
+	apiKey string,
 ) *Handlers {
-    return &Handlers{
-        store: store, engine: eng, explainer: exp, alerter: al,
-        predictor: pred, pipeline: pipe, ctxStore: ctx, detector: det,
-        metrics: met, health: hc, startTime: time.Now(), apiKey: apiKey,
-    }
+	return &Handlers{
+		store: store, engine: eng, explainer: exp, alerter: al,
+		predictor: pred, pipeline: pipe, ctxStore: ctx, detector: det,
+		metrics: met, health: hc, startTime: time.Now(), apiKey: apiKey,
+	}
 }
 
 // New is an alias for NewHandlers.
@@ -107,7 +107,7 @@ func New(
 	store *storage.Store,
 	eng *engine.Engine,
 	exp *explain.Engine,
-	al  *alerter.Alerter,
+	al *alerter.Alerter,
 	pred *pipelinemetrics.Predictor,
 	pipe pipelinemetrics.MetricPipeline,
 	ctx *apicontext.ManualContextStore,
@@ -120,14 +120,18 @@ func New(
 }
 
 func (h *Handlers) SetReady(v bool) {
-    if v { atomic.StoreInt32(&h.ready, 1) } else { atomic.StoreInt32(&h.ready, 0) }
+	if v {
+		atomic.StoreInt32(&h.ready, 1)
+	} else {
+		atomic.StoreInt32(&h.ready, 0)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
-    json.NewEncoder(w).Encode(v)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
 }
 func writeError(w http.ResponseWriter, status int, msg string) {
-    writeJSON(w, status, map[string]string{"error": msg})
+	writeJSON(w, status, map[string]string{"error": msg})
 }

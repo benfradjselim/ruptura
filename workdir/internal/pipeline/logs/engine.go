@@ -15,14 +15,14 @@ type LogPipeline interface {
 }
 
 type Engine struct {
-	pipeline    metrics.MetricPipeline
-	bucketSize  time.Duration
-	patterns    map[string]*regexp.Regexp
-	novelty     bool
-	
-	mu          sync.Mutex
+	pipeline   metrics.MetricPipeline
+	bucketSize time.Duration
+	patterns   map[string]*regexp.Regexp
+	novelty    bool
+
+	mu sync.Mutex
 	// service -> bucket data
-	buckets     map[string]*bucket
+	buckets map[string]*bucket
 }
 
 type bucket struct {
@@ -42,12 +42,12 @@ func (e *Engine) emit(service string, b *bucket, ts time.Time) {
 	// ErrorRate
 	rate := float64(b.errorCount) / e.bucketSize.Seconds()
 	e.pipeline.Ingest(service, "log_error_rate", rate, ts)
-	
+
 	// KeywordCounter
 	for name, count := range b.keywordCounts {
 		e.pipeline.Ingest(service, "log_keyword_"+name, float64(count), ts)
 	}
-	
+
 	// BurstDetector
 	bMu.Lock()
 	baseline := baselines[service]
@@ -56,10 +56,10 @@ func (e *Engine) emit(service string, b *bucket, ts time.Time) {
 	}
 	baselines[service] = 0.9*baseline + 0.1*float64(b.totalVolume)
 	bMu.Unlock()
-	
+
 	burstIndex := float64(b.totalVolume) / max(baseline, 1.0)
 	e.pipeline.Ingest(service, "log_burst_index", burstIndex, ts)
-	
+
 	if e.novelty {
 		e.pipeline.Ingest(service, "log_novelty", 0.0, ts)
 	}
@@ -106,7 +106,7 @@ func NewEngine(pipeline metrics.MetricPipeline, opts ...Option) *Engine {
 func (e *Engine) IngestLine(service string, line []byte, ts time.Time) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	b, ok := e.buckets[service]
 	if !ok || ts.Sub(b.start) >= e.bucketSize {
 		if ok {
@@ -118,29 +118,29 @@ func (e *Engine) IngestLine(service string, line []byte, ts time.Time) {
 		}
 		e.buckets[service] = b
 	}
-	
+
 	lineStr := string(line)
 	// ErrorRate
 	if isError(lineStr) {
 		b.errorCount++
 	}
-	
+
 	// KeywordCounter
 	for name, re := range e.patterns {
 		if re.MatchString(lineStr) {
 			b.keywordCounts[name]++
 		}
 	}
-	
+
 	// BurstDetector
 	b.totalVolume++
 }
 
 func isError(line string) bool {
 	lower := strings.ToLower(line)
-	return strings.Contains(lower, "error") || 
-	       strings.Contains(lower, "fatal") || 
-	       strings.Contains(lower, "critical")
+	return strings.Contains(lower, "error") ||
+		strings.Contains(lower, "fatal") ||
+		strings.Contains(lower, "critical")
 }
 
 func (e *Engine) Flush() {
@@ -152,5 +152,5 @@ func (e *Engine) Flush() {
 	}
 }
 
-func (e *Engine) ErrorRate(service string) float64 { return 0.0 }
+func (e *Engine) ErrorRate(service string) float64  { return 0.0 }
 func (e *Engine) BurstIndex(service string) float64 { return 0.0 }

@@ -2,7 +2,8 @@
 //
 // Build:  go build -o ruptura-operator ./
 // Deploy: kubectl apply -f ../deploy/crd/rupturainstances.ruptura.io.yaml
-//         kubectl apply -f ../deploy/operator.yaml
+//
+//	kubectl apply -f ../deploy/operator.yaml
 //
 // The operator polls the API server every --interval seconds, lists all
 // RupturaInstance resources cluster-wide, and reconciles each to the desired

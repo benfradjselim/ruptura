@@ -11,7 +11,7 @@ func TestAnomalyMAD(t *testing.T) {
 	for _, v := range values {
 		detector.Update(v)
 	}
-	
+
 	// Test if 100 is detected as anomaly
 	isAnomaly, _, _ := detector.IsAnomaly(100)
 	if !isAnomaly {

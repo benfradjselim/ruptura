@@ -131,8 +131,8 @@ func newTestStream(ctx context.Context, pts []*GRPCMetricPoint) *grpcClientStrea
 	return &grpcClientStream{ctx: ctx, points: pts}
 }
 
-func (s *grpcClientStream) Context() context.Context        { return s.ctx }
-func (s *grpcClientStream) SendMsg(m interface{}) error     { s.result = m.(*GRPCPushResult); return nil }
+func (s *grpcClientStream) Context() context.Context    { return s.ctx }
+func (s *grpcClientStream) SendMsg(m interface{}) error { s.result = m.(*GRPCPushResult); return nil }
 func (s *grpcClientStream) Recv() (*GRPCMetricPoint, error) {
 	m := new(GRPCMetricPoint)
 	if err := s.RecvMsg(m); err != nil {
