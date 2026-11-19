@@ -7,29 +7,29 @@ import (
 
 func TestParseStatsDLine(t *testing.T) {
 	cases := []struct {
-		line        string
-		wantName    string
-		wantValue   float64
-		wantType    string
-		wantSample  float64
-		wantTagKey  string
-		wantTagVal  string
+		line       string
+		wantName   string
+		wantValue  float64
+		wantType   string
+		wantSample float64
+		wantTagKey string
+		wantTagVal string
 	}{
 		{
-			line: "web.requests:1|c",
+			line:     "web.requests:1|c",
 			wantName: "web.requests", wantValue: 1, wantType: "c", wantSample: 1.0,
 		},
 		{
-			line: "cpu.usage:85.5|g",
+			line:     "cpu.usage:85.5|g",
 			wantName: "cpu.usage", wantValue: 85.5, wantType: "g", wantSample: 1.0,
 		},
 		{
-			line: "response.time:120|ms|@0.5|#env:prod,region:us-east",
+			line:     "response.time:120|ms|@0.5|#env:prod,region:us-east",
 			wantName: "response.time", wantValue: 120, wantType: "ms",
 			wantSample: 0.5, wantTagKey: "env", wantTagVal: "prod",
 		},
 		{
-			line: "page.views:1|c|#host:web-01",
+			line:     "page.views:1|c|#host:web-01",
 			wantName: "page.views", wantValue: 1, wantType: "c",
 			wantSample: 1.0, wantTagKey: "host", wantTagVal: "web-01",
 		},

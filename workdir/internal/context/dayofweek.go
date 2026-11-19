@@ -6,19 +6,19 @@ import "time"
 type Profile int
 
 const (
-    Weekday Profile = iota
-    Weekend
+	Weekday Profile = iota
+	Weekend
 )
 
 type DayOfWeekManager struct{}
 
 func NewDayOfWeekManager() *DayOfWeekManager { return &DayOfWeekManager{} }
 func (m *DayOfWeekManager) ProfileOf(t time.Time) Profile {
-    if t.Weekday() == time.Saturday || t.Weekday() == time.Sunday {
-        return Weekend
-    }
-    return Weekday
+	if t.Weekday() == time.Saturday || t.Weekday() == time.Sunday {
+		return Weekend
+	}
+	return Weekday
 }
 func (m *DayOfWeekManager) IsWeekend(t time.Time) bool {
-    return m.ProfileOf(t) == Weekend
+	return m.ProfileOf(t) == Weekend
 }

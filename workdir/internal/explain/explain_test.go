@@ -15,11 +15,11 @@ func TestExplain_notFound(t *testing.T) {
 func TestExplain_logic(t *testing.T) {
 	e := NewEngine()
 	rec := RuptureRecord{
-		ID:        "r1",
-		MetricR:   1.0,
-		LogR:      2.0,
-		TraceR:    0.5,
-		Metrics:   []MetricContribution{{Weight: 1.0}, {Weight: 1.0}},
+		ID:      "r1",
+		MetricR: 1.0,
+		LogR:    2.0,
+		TraceR:  0.5,
+		Metrics: []MetricContribution{{Weight: 1.0}, {Weight: 1.0}},
 	}
 	e.Record(rec)
 
@@ -38,16 +38,16 @@ func TestExplain_logic(t *testing.T) {
 func TestFormulaAudit_values(t *testing.T) {
 	e := NewEngine()
 	rec := RuptureRecord{
-		ID:           "r1",
-		AlphaBurst:   0.1,
-		AlphaStable:  0.2,
-		R:            0.3,
-		TTFSeconds:   10,
-		Confidence:   0.9,
-		FusedR:       0.4,
-		MetricR:      0.5,
-		LogR:         0.6,
-		TraceR:       0.7,
+		ID:          "r1",
+		AlphaBurst:  0.1,
+		AlphaStable: 0.2,
+		R:           0.3,
+		TTFSeconds:  10,
+		Confidence:  0.9,
+		FusedR:      0.4,
+		MetricR:     0.5,
+		LogR:        0.6,
+		TraceR:      0.7,
 	}
 	e.Record(rec)
 	audit, err := e.FormulaAudit("r1")

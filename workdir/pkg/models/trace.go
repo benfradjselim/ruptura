@@ -10,7 +10,7 @@ import (
 // LogEntry is a single structured log record (Loki/ELK/OTEL compatible)
 type LogEntry struct {
 	Timestamp time.Time         `json:"timestamp"`
-	Level     string            `json:"level"`              // info, warn, error, debug
+	Level     string            `json:"level"` // info, warn, error, debug
 	Message   string            `json:"message"`
 	Service   string            `json:"service,omitempty"`
 	Host      string            `json:"host,omitempty"`
@@ -52,18 +52,18 @@ type TopologyGraph struct {
 
 // StatsDMetric is a parsed DogStatsD / StatsD metric
 type StatsDMetric struct {
-	Name      string            `json:"name"`
-	Value     float64           `json:"value"`
-	Type      string            `json:"type"` // "c" counter, "g" gauge, "ms" timer, "h" histogram, "s" set
-	SampleRate float64          `json:"sample_rate"`
-	Tags      map[string]string `json:"tags,omitempty"`
-	Timestamp time.Time         `json:"timestamp"`
+	Name       string            `json:"name"`
+	Value      float64           `json:"value"`
+	Type       string            `json:"type"` // "c" counter, "g" gauge, "ms" timer, "h" histogram, "s" set
+	SampleRate float64           `json:"sample_rate"`
+	Tags       map[string]string `json:"tags,omitempty"`
+	Timestamp  time.Time         `json:"timestamp"`
 }
 
 // OTLPAttribute is a key-value attribute in OTLP JSON format
 type OTLPAttribute struct {
-	Key   string         `json:"key"`
-	Value OTLPAnyValue   `json:"value"`
+	Key   string       `json:"key"`
+	Value OTLPAnyValue `json:"value"`
 }
 
 // OTLPAnyValue holds OTLP scalar values
@@ -116,7 +116,7 @@ type OTLPTraceRequest struct {
 }
 
 type OTLPResourceSpans struct {
-	Resource   OTLPResource    `json:"resource"`
+	Resource   OTLPResource     `json:"resource"`
 	ScopeSpans []OTLPScopeSpans `json:"scopeSpans"`
 }
 
@@ -173,7 +173,7 @@ type OTLPMetricsRequest struct {
 }
 
 type OTLPResourceMetrics struct {
-	Resource     OTLPResource      `json:"resource"`
+	Resource     OTLPResource       `json:"resource"`
 	ScopeMetrics []OTLPScopeMetrics `json:"scopeMetrics"`
 }
 
@@ -182,10 +182,10 @@ type OTLPScopeMetrics struct {
 }
 
 type OTLPMetric struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description,omitempty"`
-	Gauge       *OTLPGauge      `json:"gauge,omitempty"`
-	Sum         *OTLPSum        `json:"sum,omitempty"`
+	Name        string     `json:"name"`
+	Description string     `json:"description,omitempty"`
+	Gauge       *OTLPGauge `json:"gauge,omitempty"`
+	Sum         *OTLPSum   `json:"sum,omitempty"`
 }
 
 type OTLPGauge struct {
@@ -265,8 +265,8 @@ type LokiStream struct {
 // --- Elasticsearch bulk format ---
 
 type ESBulkAction struct {
-	Index  *ESBulkIndex  `json:"index,omitempty"`
-	Create *ESBulkIndex  `json:"create,omitempty"`
+	Index  *ESBulkIndex `json:"index,omitempty"`
+	Create *ESBulkIndex `json:"create,omitempty"`
 }
 
 type ESBulkIndex struct {

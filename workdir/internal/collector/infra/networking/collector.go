@@ -323,8 +323,12 @@ func netSignal(obj infra.ObjectID, kind string, rawObj json.RawMessage, now time
 func endpointsSignal(obj infra.ObjectID, rawObj json.RawMessage, now time.Time) infra.InfraSignal {
 	var ep struct {
 		Subsets []struct {
-			Addresses         []struct{ IP string `json:"ip"` } `json:"addresses"`
-			NotReadyAddresses []struct{ IP string `json:"ip"` } `json:"notReadyAddresses"`
+			Addresses []struct {
+				IP string `json:"ip"`
+			} `json:"addresses"`
+			NotReadyAddresses []struct {
+				IP string `json:"ip"`
+			} `json:"notReadyAddresses"`
 		} `json:"subsets"`
 	}
 	_ = json.Unmarshal(rawObj, &ep)

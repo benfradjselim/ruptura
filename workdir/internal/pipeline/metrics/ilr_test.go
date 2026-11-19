@@ -390,9 +390,9 @@ func TestMADStreamingMedian(t *testing.T) {
 // the exact sort-based median for a variety of inputs.
 func TestRunningMedianAccuracy(t *testing.T) {
 	cases := [][]float64{
-		{5, 3, 1, 4, 2},         // odd: median=3
-		{10, 20, 30, 40},        // even: median=25
-		{7, 7, 7, 7},            // all same: median=7
+		{5, 3, 1, 4, 2},        // odd: median=3
+		{10, 20, 30, 40},       // even: median=25
+		{7, 7, 7, 7},           // all same: median=7
 		{1, 100, 2, 99, 3, 98}, // mixed: median=50.5
 	}
 	expected := []float64{3, 25, 7, 50.5}

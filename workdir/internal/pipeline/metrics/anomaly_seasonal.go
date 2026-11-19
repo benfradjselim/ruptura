@@ -10,10 +10,10 @@ import (
 // Holt-Winters seasonal fitted value exceeds 3σ of historical residuals.
 // It requires at least one full seasonal period to warm up.
 type SeasonalAnomalyDetector struct {
-	mu       sync.RWMutex
-	models   map[string]*HoltWinters
-	period   int
-	sigmaK   float64
+	mu     sync.RWMutex
+	models map[string]*HoltWinters
+	period int
+	sigmaK float64
 }
 
 // NewSeasonalAnomalyDetector creates a seasonal anomaly detector.

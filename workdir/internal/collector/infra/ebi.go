@@ -26,9 +26,9 @@ type ebiEntry struct {
 //	ebiNorm         = clamp((EBI−1)/9, 0, 1)   — EBI 1→0, 10→1
 //	baseline updated per completed window via EWMA with λ=0.99.
 type ebiTracker struct {
-	mu       sync.Mutex
-	entries  []ebiEntry            // ring of recent observations (across all reasons)
-	baseline map[string]float64    // EWMA baseline rate per reason (events/window)
+	mu        sync.Mutex
+	entries   []ebiEntry           // ring of recent observations (across all reasons)
+	baseline  map[string]float64   // EWMA baseline rate per reason (events/window)
 	lastFlush map[string]time.Time // last window boundary per reason
 }
 

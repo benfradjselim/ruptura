@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/actions/engine"
+	"github.com/benfradjselim/ruptura/internal/actions/providers"
 	"github.com/benfradjselim/ruptura/internal/alerter"
 	"github.com/benfradjselim/ruptura/internal/analyzer"
 	"github.com/benfradjselim/ruptura/internal/api"
 	"github.com/benfradjselim/ruptura/internal/callgraph"
-	"github.com/benfradjselim/ruptura/internal/namespaces"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/admission"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/co"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/dag"
@@ -30,16 +30,16 @@ import (
 	apicontext "github.com/benfradjselim/ruptura/internal/context"
 	"github.com/benfradjselim/ruptura/internal/correlator"
 	"github.com/benfradjselim/ruptura/internal/discovery"
-	"github.com/benfradjselim/ruptura/internal/actions/providers"
 	"github.com/benfradjselim/ruptura/internal/eventbus"
 	"github.com/benfradjselim/ruptura/internal/events"
 	"github.com/benfradjselim/ruptura/internal/explain"
 	"github.com/benfradjselim/ruptura/internal/fusion"
 	"github.com/benfradjselim/ruptura/internal/history"
 	"github.com/benfradjselim/ruptura/internal/ingest"
+	"github.com/benfradjselim/ruptura/internal/namespaces"
+	"github.com/benfradjselim/ruptura/internal/notify"
 	pipelinelogs "github.com/benfradjselim/ruptura/internal/pipeline/logs"
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
-	"github.com/benfradjselim/ruptura/internal/notify"
 	"github.com/benfradjselim/ruptura/internal/sim"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
@@ -52,14 +52,14 @@ const version = "8.7.9"
 
 // Config holds all runtime configuration parsed from CLI flags.
 type Config struct {
-	Port        int
+	Port         int
 	OTLPGRPCPort int
 	OTLPHTTPPort int
-	StoragePath string
-	APIKey      string
-	Edition     string // "community" (default) or "autopilot"
-	ShowVersion bool
-	DemoMode    bool // --demo / RUPTURA_DEMO_MODE=true: seed synthetic data, no cluster required
+	StoragePath  string
+	APIKey       string
+	Edition      string // "community" (default) or "autopilot"
+	ShowVersion  bool
+	DemoMode     bool // --demo / RUPTURA_DEMO_MODE=true: seed synthetic data, no cluster required
 }
 
 func parseFlags(args []string) (Config, error) {

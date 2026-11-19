@@ -59,7 +59,9 @@ var otlpServices = []grpc.ServiceDesc{
 		}),
 	otlpService("opentelemetry.proto.collector.logs.v1.LogsService",
 		func() proto.Message { return &logspb.LogsData{} },
-		func(e *Engine, m proto.Message) { e.ingestLogs(*receiver.LogsFromProto(m.(*logspb.LogsData).ResourceLogs)) }),
+		func(e *Engine, m proto.Message) {
+			e.ingestLogs(*receiver.LogsFromProto(m.(*logspb.LogsData).ResourceLogs))
+		}),
 	otlpService("opentelemetry.proto.collector.trace.v1.TraceService",
 		func() proto.Message { return &tracepb.TracesData{} },
 		func(e *Engine, m proto.Message) {

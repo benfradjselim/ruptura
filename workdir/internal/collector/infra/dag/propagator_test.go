@@ -13,10 +13,10 @@ func TestPropagator_Tick(t *testing.T) {
 	_ = now
 
 	tests := []struct {
-		name          string
-		ns            string
-		snapshots     []infra.GroupSnapshot
-		wantWorkload  float64 // expected WorkloadPressure ±0.001
+		name            string
+		ns              string
+		snapshots       []infra.GroupSnapshot
+		wantWorkload    float64 // expected WorkloadPressure ±0.001
 		wantWorkloadMin float64
 	}{
 		{
@@ -46,9 +46,9 @@ func TestPropagator_Tick(t *testing.T) {
 			name: "cluster-scoped and namespace-scoped combined",
 			ns:   "payments",
 			snapshots: []infra.GroupSnapshot{
-				snap(infra.GroupControlPlane, "", 0.8, 0.0),      // activation=0.2
-				snap(infra.GroupNetwork, "payments", 0.6, 0.0),   // activation=0.4
-				snap(infra.GroupStorage, "other-ns", 0.0, 0.0),   // wrong ns — excluded
+				snap(infra.GroupControlPlane, "", 0.8, 0.0),    // activation=0.2
+				snap(infra.GroupNetwork, "payments", 0.6, 0.0), // activation=0.4
+				snap(infra.GroupStorage, "other-ns", 0.0, 0.0), // wrong ns — excluded
 			},
 			// controlplane→workload: 0.2*1.0=0.2
 			// network→workload: 0.4*0.9=0.36

@@ -51,8 +51,9 @@ func TestEmergencyStop(t *testing.T) {
 }
 
 type mockProvider struct{}
+
 func (m *mockProvider) Execute(ctx context.Context, a engine.ActionRecommendation) error { return nil }
-func (m *mockProvider) Name() string { return "mock" }
+func (m *mockProvider) Name() string                                                     { return "mock" }
 
 func TestShadowMode(t *testing.T) {
 	p := &mockProvider{}

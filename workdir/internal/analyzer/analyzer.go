@@ -826,7 +826,7 @@ func (a *Analyzer) CalibrationInfo(ref models.WorkloadRef) (status string, progr
 	defer a.mu.RUnlock()
 	ws, ok := a.workloads[ref.Key()]
 	if !ok {
-		return "calibrating", 0, 24*60
+		return "calibrating", 0, 24 * 60
 	}
 	const required = 96
 	if ws.baselineReady {

@@ -94,12 +94,16 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 	e.mu.RUnlock()
 
 	// Use local data for computations
-	
+
 	// Lag check
 	latest := data.metricTs
-	if data.logTs.After(latest) { latest = data.logTs }
-	if data.traceTs.After(latest) { latest = data.traceTs }
-	
+	if data.logTs.After(latest) {
+		latest = data.logTs
+	}
+	if data.traceTs.After(latest) {
+		latest = data.traceTs
+	}
+
 	if !data.metricTs.IsZero() && latest.Sub(data.metricTs) > 30*time.Second {
 		return 0, time.Time{}, fmt.Errorf("fusion: signal lag too large for host %s", host)
 	}
@@ -132,10 +136,18 @@ func (e *Engine) FusedR(host string) (float64, time.Time, error) {
 
 	// Count active signals across all four pipelines.
 	count := 0
-	if !data.metricTs.IsZero() { count++ }
-	if !data.logTs.IsZero() { count++ }
-	if !data.traceTs.IsZero() { count++ }
-	if !data.infraTs.IsZero() { count++ }
+	if !data.metricTs.IsZero() {
+		count++
+	}
+	if !data.logTs.IsZero() {
+		count++
+	}
+	if !data.traceTs.IsZero() {
+		count++
+	}
+	if !data.infraTs.IsZero() {
+		count++
+	}
 
 	if count == 0 {
 		return 0, time.Time{}, fmt.Errorf("fusion: insufficient signals for host %s", host)
@@ -186,9 +198,15 @@ func (e *Engine) fusedR(data *hostData) (float64, bool) {
 	// so the 0.30 base weight is never left dangling over an absent signal.
 	if d.infraTs.IsZero() {
 		count := 0
-		if !d.metricTs.IsZero() { count++ }
-		if !d.logTs.IsZero() { count++ }
-		if !d.traceTs.IsZero() { count++ }
+		if !d.metricTs.IsZero() {
+			count++
+		}
+		if !d.logTs.IsZero() {
+			count++
+		}
+		if !d.traceTs.IsZero() {
+			count++
+		}
 		if count == 0 {
 			return 0, false
 		}
@@ -214,16 +232,31 @@ func (e *Engine) fusedR(data *hostData) (float64, bool) {
 	// Base weights: metric=0.42, log=0.14, trace=0.14, infra=0.30.
 	activeW := 0.30 // infra is active
 	activeCount := 1
-	if !d.metricTs.IsZero() { activeW += 0.42; activeCount++ }
-	if !d.logTs.IsZero()    { activeW += 0.14; activeCount++ }
-	if !d.traceTs.IsZero()  { activeW += 0.14; activeCount++ }
+	if !d.metricTs.IsZero() {
+		activeW += 0.42
+		activeCount++
+	}
+	if !d.logTs.IsZero() {
+		activeW += 0.14
+		activeCount++
+	}
+	if !d.traceTs.IsZero() {
+		activeW += 0.14
+		activeCount++
+	}
 	if activeCount < 2 {
 		return 0, false
 	}
 	val := (0.30 / activeW) * d.infraVal
-	if !d.metricTs.IsZero() { val += (0.42 / activeW) * d.metricVal }
-	if !d.logTs.IsZero()    { val += (0.14 / activeW) * d.logVal }
-	if !d.traceTs.IsZero()  { val += (0.14 / activeW) * d.traceVal }
+	if !d.metricTs.IsZero() {
+		val += (0.42 / activeW) * d.metricVal
+	}
+	if !d.logTs.IsZero() {
+		val += (0.14 / activeW) * d.logVal
+	}
+	if !d.traceTs.IsZero() {
+		val += (0.14 / activeW) * d.traceVal
+	}
 	return val, true
 }
 
@@ -243,10 +276,21 @@ type WorkloadState struct {
 func dominantPipeline(d hostData) string {
 	best := ""
 	var bestVal float64
-	if !d.metricTs.IsZero() && d.metricVal > bestVal { bestVal = d.metricVal; best = "metrics" }
-	if !d.logTs.IsZero() && d.logVal > bestVal        { bestVal = d.logVal;    best = "logs"    }
-	if !d.traceTs.IsZero() && d.traceVal > bestVal    { bestVal = d.traceVal;  best = "traces"  }
-	if !d.infraTs.IsZero() && d.infraVal > bestVal    {                         best = "infra"   }
+	if !d.metricTs.IsZero() && d.metricVal > bestVal {
+		bestVal = d.metricVal
+		best = "metrics"
+	}
+	if !d.logTs.IsZero() && d.logVal > bestVal {
+		bestVal = d.logVal
+		best = "logs"
+	}
+	if !d.traceTs.IsZero() && d.traceVal > bestVal {
+		bestVal = d.traceVal
+		best = "traces"
+	}
+	if !d.infraTs.IsZero() && d.infraVal > bestVal {
+		best = "infra"
+	}
 	return best
 }
 
@@ -268,8 +312,12 @@ func (e *Engine) StateByWorkload(key string) (WorkloadState, error) {
 	}
 
 	latest := d.metricTs
-	if d.logTs.After(latest)   { latest = d.logTs   }
-	if d.traceTs.After(latest) { latest = d.traceTs }
+	if d.logTs.After(latest) {
+		latest = d.logTs
+	}
+	if d.traceTs.After(latest) {
+		latest = d.traceTs
+	}
 
 	return WorkloadState{
 		Workload:         key,

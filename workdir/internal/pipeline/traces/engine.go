@@ -21,8 +21,8 @@ type TracePipeline interface {
 }
 
 type Engine struct {
-	pipeline  metrics.MetricPipeline
-	
+	pipeline metrics.MetricPipeline
+
 	mu        sync.RWMutex
 	edges     map[string]map[string]*edgeData
 	services  map[string]*serviceData

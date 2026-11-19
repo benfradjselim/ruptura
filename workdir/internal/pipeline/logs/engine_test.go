@@ -25,14 +25,14 @@ func (m *mockPipeline) Ingest(host, metric string, value float64, ts time.Time) 
 func TestErrorRate_basicCounting(t *testing.T) {
 	mp := &mockPipeline{}
 	e := NewEngine(mp, WithBucketSize(15*time.Second))
-	
+
 	now := time.Now()
 	e.IngestLine("svc1", []byte("ERROR"), now)
 	e.IngestLine("svc1", []byte("ERROR"), now)
 	e.IngestLine("svc1", []byte("ERROR"), now)
-	
+
 	e.Flush()
-	
+
 	found := false
 	for _, m := range mp.ingested {
 		if m.name == "log_error_rate" && m.value == 3.0/15.0 {
@@ -48,14 +48,14 @@ func TestErrorRate_basicCounting(t *testing.T) {
 func TestErrorRate_caseSensitivity(t *testing.T) {
 	mp := &mockPipeline{}
 	e := NewEngine(mp, WithBucketSize(15*time.Second))
-	
+
 	now := time.Now()
 	e.IngestLine("svc1", []byte("fatal"), now)
 	e.IngestLine("svc1", []byte("CRITICAL"), now)
 	e.IngestLine("svc1", []byte("[ERROR]"), now)
-	
+
 	e.Flush()
-	
+
 	found := false
 	for _, m := range mp.ingested {
 		if m.name == "log_error_rate" && m.value == 3.0/15.0 {
@@ -71,14 +71,14 @@ func TestErrorRate_caseSensitivity(t *testing.T) {
 func TestKeywordCounter_match(t *testing.T) {
 	mp := &mockPipeline{}
 	e := NewEngine(mp, WithKeywordPatterns(map[string]string{"timeout": "timeout"}))
-	
+
 	now := time.Now()
 	e.IngestLine("svc1", []byte("timeout"), now)
 	e.IngestLine("svc1", []byte("no match"), now)
 	e.IngestLine("svc1", []byte("timeout here"), now)
-	
+
 	e.Flush()
-	
+
 	found := false
 	for _, m := range mp.ingested {
 		if m.name == "log_keyword_timeout" && m.value == 2.0 {

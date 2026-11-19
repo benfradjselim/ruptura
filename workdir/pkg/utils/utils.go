@@ -147,8 +147,8 @@ type CircularBuffer struct {
 	mu   sync.RWMutex
 	data []float64
 	size int
-	head int  // next write position
-	n    int  // number of valid entries (≤ size)
+	head int // next write position
+	n    int // number of valid entries (≤ size)
 }
 
 // NewCircularBuffer creates a buffer of given capacity

@@ -19,8 +19,11 @@ func TestEBITracker_Norm(t *testing.T) {
 	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		name        string
-		events      []struct{ reason string; offset time.Duration }
+		name   string
+		events []struct {
+			reason string
+			offset time.Duration
+		}
 		queryReason string
 		wantMin     float64 // norm must be >= wantMin
 		wantMax     float64 // norm must be <= wantMax
@@ -36,7 +39,10 @@ func TestEBITracker_Norm(t *testing.T) {
 			// EBI = 1/0.1 = 10 → norm = clamp((10-1)/9, 0, 1) = 1.0.
 			// Spec intent: ε ensures even the first event in a quiet tracker is detected.
 			name: "single event in fresh tracker — baseline=epsilon, norm=1.0",
-			events: []struct{ reason string; offset time.Duration }{
+			events: []struct {
+				reason string
+				offset time.Duration
+			}{
 				{"FailedCreate", -1 * time.Minute},
 			},
 			queryReason: "FailedCreate",
@@ -44,10 +50,19 @@ func TestEBITracker_Norm(t *testing.T) {
 		},
 		{
 			name: "burst: 10 events in window, baseline=1 → EBI=10 → norm=1",
-			events: func() []struct{ reason string; offset time.Duration } {
-				out := make([]struct{ reason string; offset time.Duration }, 10)
+			events: func() []struct {
+				reason string
+				offset time.Duration
+			} {
+				out := make([]struct {
+					reason string
+					offset time.Duration
+				}, 10)
 				for i := range out {
-					out[i] = struct{ reason string; offset time.Duration }{"Burst", time.Duration(-i-1) * time.Minute}
+					out[i] = struct {
+						reason string
+						offset time.Duration
+					}{"Burst", time.Duration(-i-1) * time.Minute}
 				}
 				return out
 			}(),
@@ -56,7 +71,10 @@ func TestEBITracker_Norm(t *testing.T) {
 		},
 		{
 			name: "stale events outside window — not counted",
-			events: []struct{ reason string; offset time.Duration }{
+			events: []struct {
+				reason string
+				offset time.Duration
+			}{
 				{"Old", -10 * time.Minute},
 				{"Old", -15 * time.Minute},
 			},
@@ -65,7 +83,10 @@ func TestEBITracker_Norm(t *testing.T) {
 		},
 		{
 			name: "events for different reason not counted",
-			events: []struct{ reason string; offset time.Duration }{
+			events: []struct {
+				reason string
+				offset time.Duration
+			}{
 				{"OtherReason", -1 * time.Minute},
 				{"OtherReason", -2 * time.Minute},
 			},

@@ -121,9 +121,9 @@ func TestSDICondition_Contribution(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		name  string
-		cond  sdiCondition
-		want  float64
+		name string
+		cond sdiCondition
+		want float64
 	}{
 		{
 			name: "inactive (zero onset)",

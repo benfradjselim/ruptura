@@ -17,16 +17,16 @@ import (
 	"math"
 	"time"
 
-	"github.com/dgraph-io/badger/v3"
 	"github.com/benfradjselim/ruptura/pkg/logger"
+	"github.com/dgraph-io/badger/v3"
 )
 
 const (
-	Rollup5mTTL  = 35 * 24 * time.Hour
-	Rollup1hTTL  = 400 * 24 * time.Hour
+	Rollup5mTTL = 35 * 24 * time.Hour
+	Rollup1hTTL = 400 * 24 * time.Hour
 
-	CompactRawAfter = 2 * time.Hour   // compact raw data older than 2h into 5m buckets
-	Compact5mAfter  = 12 * time.Hour  // compact 5m data older than 12h into 1h buckets
+	CompactRawAfter = 2 * time.Hour  // compact raw data older than 2h into 5m buckets
+	Compact5mAfter  = 12 * time.Hour // compact 5m data older than 12h into 1h buckets
 )
 
 // GetMetricRangeTiered queries the best-fit tier for the requested window.
@@ -69,7 +69,7 @@ func (s *Store) getRollup(tierPrefix, host, name string, from, to time.Time) ([]
 func (s *Store) Compact() {
 	now := time.Now()
 	cutRaw := now.Add(-CompactRawAfter)
-	cut5m  := now.Add(-Compact5mAfter)
+	cut5m := now.Add(-Compact5mAfter)
 
 	// raw → 5m (metrics)
 	if err := s.compactTier("m:", "r5:", 5*time.Minute, cutRaw, Rollup5mTTL); err != nil {

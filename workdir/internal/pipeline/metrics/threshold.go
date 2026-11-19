@@ -57,9 +57,9 @@ func (dt *DynamicThreshold) UpperBound(sigma float64) float64 {
 
 // StormDetector triggers storm warnings when pressure is elevated
 type StormDetector struct {
-	mu            sync.RWMutex
+	mu             sync.RWMutex
 	pressureBuffer *utils.CircularBuffer
-	windowSeconds int
+	windowSeconds  int
 }
 
 // NewStormDetector watches pressure over the given rolling window in seconds

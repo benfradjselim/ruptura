@@ -12,14 +12,14 @@ import (
 // Stored under global key audit:{zero-padded-unix-ns}:{id} (not org-prefixed so
 // admins can see cross-org activity — access is guarded by RequireRole(admin)).
 type AuditEntry struct {
-	ID        string    `json:"id"`
-	Timestamp time.Time `json:"timestamp"`
-	Username  string    `json:"username"`
-	Action    string    `json:"action"`    // e.g. "create", "update", "delete", "login", "logout"
-	Resource  string    `json:"resource"`  // e.g. "dashboard", "datasource", "api_key", "user"
-	ResourceID string   `json:"resource_id,omitempty"`
-	Details   string    `json:"details,omitempty"` // short human-readable description
-	IPAddress string    `json:"ip,omitempty"`
+	ID         string    `json:"id"`
+	Timestamp  time.Time `json:"timestamp"`
+	Username   string    `json:"username"`
+	Action     string    `json:"action"`   // e.g. "create", "update", "delete", "login", "logout"
+	Resource   string    `json:"resource"` // e.g. "dashboard", "datasource", "api_key", "user"
+	ResourceID string    `json:"resource_id,omitempty"`
+	Details    string    `json:"details,omitempty"` // short human-readable description
+	IPAddress  string    `json:"ip,omitempty"`
 }
 
 // AppendAuditEntry writes an immutable audit entry.

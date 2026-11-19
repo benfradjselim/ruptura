@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/correlator"
-	"github.com/benfradjselim/ruptura/pkg/models"
 	"github.com/benfradjselim/ruptura/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // TraceFusionSink accepts trace-derived rupture signals.
@@ -82,10 +82,10 @@ type OTLPReceiver struct {
 	spans       SpanSink
 	logs        LogSink
 	hostname    string
-	fusion      TraceFusionSink               // optional; nil = disabled
-	topology    *correlator.TopologyBuilder   // optional; nil = disabled
-	spanWindows sync.Map                      // key: service name → *spanWindow
-	spanCache   sync.Map                      // key: spanID → spanCacheEntry
+	fusion      TraceFusionSink             // optional; nil = disabled
+	topology    *correlator.TopologyBuilder // optional; nil = disabled
+	spanWindows sync.Map                    // key: service name → *spanWindow
+	spanCache   sync.Map                    // key: spanID → spanCacheEntry
 }
 
 // NewOTLPReceiver creates a new OTLP HTTP receiver.

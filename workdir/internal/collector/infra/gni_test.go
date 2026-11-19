@@ -15,37 +15,37 @@ func TestShannonChurn(t *testing.T) {
 		epsilon float64
 	}{
 		{
-			name:    "empty — zero",
-			counts:  map[string]int{},
-			want:    0, epsilon: 0,
+			name:   "empty — zero",
+			counts: map[string]int{},
+			want:   0, epsilon: 0,
 		},
 		{
-			name:    "single type repeated — zero (no disorder)",
-			counts:  map[string]int{"Ready:True->False": 10},
-			want:    0, epsilon: 0,
+			name:   "single type repeated — zero (no disorder)",
+			counts: map[string]int{"Ready:True->False": 10},
+			want:   0, epsilon: 0,
 		},
 		{
 			name: "two types, uniform distribution — 1.0",
 			// H = 1 bit, log2(2)=1 → H/log2(N)=1.0
-			counts:  map[string]int{"A": 5, "B": 5},
-			want:    1.0, epsilon: 0.001,
+			counts: map[string]int{"A": 5, "B": 5},
+			want:   1.0, epsilon: 0.001,
 		},
 		{
-			name: "four types, uniform — 1.0",
-			counts:  map[string]int{"A": 4, "B": 4, "C": 4, "D": 4},
-			want:    1.0, epsilon: 0.001,
+			name:   "four types, uniform — 1.0",
+			counts: map[string]int{"A": 4, "B": 4, "C": 4, "D": 4},
+			want:   1.0, epsilon: 0.001,
 		},
 		{
 			name: "three types, skewed — between 0 and 1",
 			// One type dominates: lower entropy than uniform.
-			counts:  map[string]int{"A": 10, "B": 1, "C": 1},
-			want:    0.5, epsilon: 0.2, // rough bounds; exact: ~0.476
+			counts: map[string]int{"A": 10, "B": 1, "C": 1},
+			want:   0.5, epsilon: 0.2, // rough bounds; exact: ~0.476
 		},
 		{
 			name: "two types, heavily skewed — near 0",
 			// 99:1 split → nearly single type → churn near 0.
-			counts:  map[string]int{"A": 99, "B": 1},
-			want:    0, epsilon: 0.1,
+			counts: map[string]int{"A": 99, "B": 1},
+			want:   0, epsilon: 0.1,
 		},
 	}
 
@@ -67,10 +67,13 @@ func TestGroupNoise_GNI(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		transitions []struct{ kind string; offset time.Duration }
-		eventBurst  float64
-		wantMin     float64
-		wantMax     float64
+		transitions []struct {
+			kind   string
+			offset time.Duration
+		}
+		eventBurst float64
+		wantMin    float64
+		wantMax    float64
 	}{
 		{
 			name:       "no transitions, no burst — GNI=0",
@@ -79,7 +82,10 @@ func TestGroupNoise_GNI(t *testing.T) {
 		},
 		{
 			name: "single repeated transition — churn=0, burst=0 → GNI=0",
-			transitions: []struct{ kind string; offset time.Duration }{
+			transitions: []struct {
+				kind   string
+				offset time.Duration
+			}{
 				{"Ready:True->False", -1 * time.Minute},
 				{"Ready:True->False", -2 * time.Minute},
 			},
@@ -88,7 +94,10 @@ func TestGroupNoise_GNI(t *testing.T) {
 		},
 		{
 			name: "two uniform transition types — churn=1.0, burst=0 → GNI=0.5",
-			transitions: []struct{ kind string; offset time.Duration }{
+			transitions: []struct {
+				kind   string
+				offset time.Duration
+			}{
 				{"Ready:True->False", -1 * time.Minute},
 				{"Phase:Pending->Running", -2 * time.Minute},
 			},
@@ -102,7 +111,10 @@ func TestGroupNoise_GNI(t *testing.T) {
 		},
 		{
 			name: "uniform transitions + full burst — GNI=1.0",
-			transitions: []struct{ kind string; offset time.Duration }{
+			transitions: []struct {
+				kind   string
+				offset time.Duration
+			}{
 				{"A", -1 * time.Minute},
 				{"B", -2 * time.Minute},
 			},
@@ -111,7 +123,10 @@ func TestGroupNoise_GNI(t *testing.T) {
 		},
 		{
 			name: "stale transitions outside window not counted",
-			transitions: []struct{ kind string; offset time.Duration }{
+			transitions: []struct {
+				kind   string
+				offset time.Duration
+			}{
 				{"A", -10 * time.Minute}, // outside 5m window
 				{"B", -15 * time.Minute},
 			},
@@ -120,7 +135,10 @@ func TestGroupNoise_GNI(t *testing.T) {
 		},
 		{
 			name: "GNI always in [0,1]",
-			transitions: []struct{ kind string; offset time.Duration }{
+			transitions: []struct {
+				kind   string
+				offset time.Duration
+			}{
 				{"A", -1 * time.Minute},
 				{"B", -1 * time.Minute},
 				{"C", -2 * time.Minute},

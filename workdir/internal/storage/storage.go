@@ -24,9 +24,9 @@ const (
 
 // Store wraps Badger with typed key helpers
 type Store struct {
-	db            *badger.DB
-	snapshotsMu   sync.RWMutex
-	snapshots     map[string]models.KPISnapshot // host → latest snapshot (in-memory)
+	db          *badger.DB
+	snapshotsMu sync.RWMutex
+	snapshots   map[string]models.KPISnapshot // host → latest snapshot (in-memory)
 }
 
 // Open opens (or creates) the Badger database at path.
@@ -39,12 +39,12 @@ func Open(path string) (*Store, error) {
 		WithLogger(nil).
 		WithNumVersionsToKeep(1).
 		WithCompactL0OnClose(true).
-		WithMemTableSize(8 << 20).        // 8 MB (default 64 MB)
-		WithNumMemtables(2).              // 2 (default 5) → max 16 MB active
-		WithBlockCacheSize(32 << 20).     // 32 MB (default 256 MB)
-		WithIndexCacheSize(8 << 20).      // 8 MB (default 0, uses block cache)
-		WithValueLogFileSize(64 << 20).   // 64 MB per vlog (default 1 GB)
-		WithValueThreshold(1 << 10)       // 1 KB: inline small values, vlog only for large
+		WithMemTableSize(8 << 20).      // 8 MB (default 64 MB)
+		WithNumMemtables(2).            // 2 (default 5) → max 16 MB active
+		WithBlockCacheSize(32 << 20).   // 32 MB (default 256 MB)
+		WithIndexCacheSize(8 << 20).    // 8 MB (default 0, uses block cache)
+		WithValueLogFileSize(64 << 20). // 64 MB per vlog (default 1 GB)
+		WithValueThreshold(1 << 10)     // 1 KB: inline small values, vlog only for large
 
 	db, err := badger.Open(opts)
 	if err != nil {
@@ -333,7 +333,7 @@ func (s *Store) rangeQuery(prefix string, from, to time.Time, _ time.Duration) (
 			nanoStr := keyStr[len(prefix):]
 			nanos, _ := strconv.ParseInt(nanoStr, 10, 64)
 			ts := time.Unix(0, nanos)
-			
+
 			var v float64
 			item.Value(func(val []byte) error {
 				return json.Unmarshal(val, &v)
@@ -364,12 +364,12 @@ func (s *Store) rangeQueryMetrics(prefix string, from, to time.Time) ([]MetricSa
 			if string(k) > string(endKey) || !hasPrefix(k, pfxBytes) {
 				break
 			}
-			
+
 			keyStr := string(k)
 			nanoStr := keyStr[len(prefix):]
 			nanos, _ := strconv.ParseInt(nanoStr, 10, 64)
 			ts := time.Unix(0, nanos)
-			
+
 			var v float64
 			item.Value(func(val []byte) error {
 				return json.Unmarshal(val, &v)
@@ -434,7 +434,7 @@ func (s *Store) rangeQueryKPI(prefix string, from, to time.Time) ([]KPISample, e
 			nanoStr := keyStr[len(prefix):]
 			nanos, _ := strconv.ParseInt(nanoStr, 10, 64)
 			ts := time.Unix(0, nanos)
-			
+
 			var v float64
 			item.Value(func(val []byte) error {
 				return json.Unmarshal(val, &v)
@@ -643,7 +643,7 @@ func (s *Store) ListRuptureHistory(host string, from, to time.Time) ([][]byte, e
 	prefix := fmt.Sprintf("r:%s:history:", host)
 	seekKey := []byte(tsKey(prefix, from))
 	endKey := []byte(tsKey(prefix, to))
-	
+
 	var results [][]byte
 	err := s.listByPrefix(prefix, func(key, val []byte) error {
 		if string(key) < string(seekKey) || string(key) > string(endKey) {
@@ -866,14 +866,14 @@ type TraceHeader struct {
 // It scans the "sp:" prefix and groups spans by traceID.
 func (s *Store) QueryTraceList(service string, limit int) ([]TraceHeader, error) {
 	type spanMin struct {
-		TraceID   string  `json:"trace_id"`
-		SpanID    string  `json:"span_id"`
-		ParentID  string  `json:"parent_id"`
-		Service   string  `json:"service"`
-		Operation string  `json:"name"`
-		StartMs   int64   `json:"start_time_ms"`
+		TraceID    string  `json:"trace_id"`
+		SpanID     string  `json:"span_id"`
+		ParentID   string  `json:"parent_id"`
+		Service    string  `json:"service"`
+		Operation  string  `json:"name"`
+		StartMs    int64   `json:"start_time_ms"`
 		DurationMs float64 `json:"duration_ms"`
-		Status    string  `json:"status"`
+		Status     string  `json:"status"`
 	}
 
 	byTrace := make(map[string][]spanMin)
@@ -904,7 +904,7 @@ func (s *Store) QueryTraceList(service string, limit int) ([]TraceHeader, error)
 		}
 		// Find root span (no parent or earliest start)
 		var root spanMin
-		var minStart int64 = 1<<62
+		var minStart int64 = 1 << 62
 		hasError := false
 		for _, sp := range spans {
 			if sp.StartMs < minStart {
