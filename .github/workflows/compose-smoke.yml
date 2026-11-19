@@ -9,6 +9,7 @@ on:
   pull_request:
     paths:
       - "docker-compose.yml"
+      - ".github/workflows/compose-smoke.yml"
       - "workdir/Dockerfile"
       - "workdir/ui/Dockerfile"
       - "workdir/ui/**"
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - "docker-compose.yml"
+      - ".github/workflows/compose-smoke.yml"
       - "workdir/Dockerfile"
       - "workdir/ui/Dockerfile"
       - "workdir/ui/**"

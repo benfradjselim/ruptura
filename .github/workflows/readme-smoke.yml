@@ -13,11 +13,13 @@ on:
   pull_request:
     paths:
       - "README.md"
+      - ".github/workflows/readme-smoke.yml"
       - "helm/**"
   push:
     branches: [main]
     paths:
       - "README.md"
+      - ".github/workflows/readme-smoke.yml"
       - "helm/**"
   schedule:
     - cron: "17 4 * * *"
