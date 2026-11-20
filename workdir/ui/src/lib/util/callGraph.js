@@ -4,7 +4,7 @@
 export const PLATFORM_PREFIXES = ['openshift-', 'kube-']
 export const NODE_W = 190
 export const NODE_H = 54
-const COL_GAP = 110
+const COL_GAP = 80
 const ROW_GAP = 22
 const PAD = 24
 
@@ -23,6 +23,27 @@ export function filterGraph(graph, namespaces) {
   const edges = graph.edges.filter(e => namespaces.has(byId.get(e.from)?.namespace) && namespaces.has(byId.get(e.to)?.namespace))
   const ids = new Set(edges.flatMap(e => [e.from, e.to]))
   return { nodes: graph.nodes.filter(n => ids.has(n.id)), edges }
+}
+
+/**
+ * One edge per caller and callee, listing every source that knows the call:
+ * a call both declared and seen in traces is drawn once. An observed call
+ * carries its measured rate and error ratio.
+ * @param {{ nodes: any[], edges: { from: string, to: string, source: string, via?: string, callsPerMinute?: number, errorRatio?: number }[] }} graph
+ * @returns {{ nodes: any[], edges: any[] }}
+ */
+export function mergeEdges(graph) {
+  const byPair = new Map()
+  for (const e of graph.edges) {
+    const key = e.from + '|' + e.to
+    const prev = byPair.get(key) || { from: e.from, to: e.to, sources: [], observed: false }
+    const sources = [...prev.sources, { source: e.source, via: e.via || '' }]
+    const observed = prev.observed || e.source === 'traces'
+    const measured = e.source === 'traces' ? { callsPerMinute: e.callsPerMinute ?? 0, errorRatio: e.errorRatio ?? 0 } : {}
+    byPair.set(key, { ...prev, ...measured, sources, observed })
+  }
+  const edges = [...byPair.values()].map(e => ({ ...e, source: e.observed ? 'traces' : e.sources[0].source }))
+  return { nodes: graph.nodes, edges }
 }
 
 /**

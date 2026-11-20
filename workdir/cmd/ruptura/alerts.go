@@ -82,7 +82,7 @@ func sendAlerts(ctx context.Context, clients []*alertmanager.Client, failures []
 			Target:      failure.Target,
 			Kind:        failure.Kind,
 			Summary:     failure.RecommendedAction,
-			Impact:      api.ImpactText(failure.Affects),
+			Impact:      api.ImpactText(failure.Affects, nil),
 			Description: description,
 			TimeLeft:    timeLeft,
 			Window:      window,

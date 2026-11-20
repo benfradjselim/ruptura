@@ -66,7 +66,7 @@ func TestBuild(t *testing.T) {
 		{Kind: "Route", Namespace: "shop", Name: "front", Host: "shop.apps.example.com", Service: "shop-api"},
 		{Kind: "Ingress", Namespace: "shop", Name: "gone", Host: "x", Service: "missing"},
 	}
-	got := Build(workloads, services, entries)
+	got := Build(workloads, services, entries, nil)
 	want := []Edge{
 		{From: "pay/Deployment/checkout", To: "shop/Deployment/api", Source: SourceEnv, Via: "ORDERS"},
 		{From: "shop/Deployment/api", To: "shop/StatefulSet/db", Source: SourceEnv, Via: "DB_URL"},
@@ -86,7 +86,7 @@ func TestBuildIgnoresSelfAndDuplicates(t *testing.T) {
 		Env: []EnvVar{{"SELF", "http://w:80"}, {"X", "http://v:80"}, {"Y", "v:80"}}},
 		{Namespace: "a", Kind: "Deployment", Name: "v", Labels: map[string]string{"app": "v"}}}
 	services := []Service{{Namespace: "a", Name: "w", Selector: map[string]string{"app": "w"}}, {Namespace: "a", Name: "v", Selector: map[string]string{"app": "v"}}}
-	got := Build(workloads, services, nil)
+	got := Build(workloads, services, nil, nil)
 	if len(got.Edges) != 1 || got.Edges[0].To != "a/Deployment/v" {
 		t.Errorf("got %+v", got.Edges)
 	}
@@ -94,7 +94,7 @@ func TestBuildIgnoresSelfAndDuplicates(t *testing.T) {
 
 func TestCallers(t *testing.T) {
 	workloads, services := shop()
-	g := Build(workloads, services, []Entry{{Kind: "Route", Namespace: "shop", Name: "front", Service: "shop-api"}})
+	g := Build(workloads, services, []Entry{{Kind: "Route", Namespace: "shop", Name: "front", Service: "shop-api"}}, nil)
 	tests := []struct {
 		target string
 		want   []string

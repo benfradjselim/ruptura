@@ -61,12 +61,18 @@ type Edge struct {
 	To     string `json:"to"`
 	Source string `json:"source"`
 	Via    string `json:"via"`
+	// CallsPerMinute and ErrorRatio are measured, so only observed edges carry them.
+	CallsPerMinute float64  `json:"callsPerMinute,omitempty"`
+	ErrorRatio     *float64 `json:"errorRatio,omitempty"`
 }
 
 // Graph is the inferred call graph.
 type Graph struct {
 	Edges   []Edge  `json:"edges"`
 	Entries []Entry `json:"-"`
+	// UnresolvedCalls counts observed calls whose services match no single
+	// workload; they are left out rather than guessed.
+	UnresolvedCalls int `json:"-"`
 }
 
 // hostPattern finds a host after a scheme, or a host followed by a port.
@@ -116,9 +122,10 @@ func selects(selector, labels map[string]string) bool {
 	return true
 }
 
-// Build infers the call graph. Edges are unique per from, to and source, and
-// sorted so the output is stable.
-func Build(workloads []Workload, services []Service, entries []Entry) Graph {
+// Build infers the call graph from what workloads declare and from calls seen
+// in traces. Edges are unique per from, to and source, and sorted so the output
+// is stable.
+func Build(workloads []Workload, services []Service, entries []Entry, observed []Observed) Graph {
 	backends := map[string][]string{}
 	for _, svc := range services {
 		key := svc.Namespace + "/" + svc.Name
@@ -170,13 +177,50 @@ func Build(workloads []Workload, services []Service, entries []Entry) Graph {
 		}
 	}
 
+	unresolved := 0
+	for _, call := range observed {
+		from, okFrom := resolveService(call.ClientNamespace, call.Client, workloads, backends)
+		to, okTo := resolveService(call.ServerNamespace, call.Server, workloads, backends)
+		if !okFrom || !okTo {
+			unresolved++
+			continue
+		}
+		if call.PerMinute <= 0 {
+			continue
+		}
+		ratio := call.FailedPerMinute / call.PerMinute
+		add(Edge{From: from, To: to, Source: SourceTraces, Via: viaServiceGraph, CallsPerMinute: call.PerMinute, ErrorRatio: &ratio})
+	}
+
 	sort.Slice(edges, func(i, j int) bool {
 		if edges[i].From != edges[j].From {
 			return edges[i].From < edges[j].From
 		}
-		return edges[i].To < edges[j].To
+		if edges[i].To != edges[j].To {
+			return edges[i].To < edges[j].To
+		}
+		return edges[i].Source < edges[j].Source
 	})
-	return Graph{Edges: edges, Entries: kept}
+	return Graph{Edges: edges, Entries: kept, UnresolvedCalls: unresolved}
+}
+
+// resolveService maps a service name seen in traces to one workload: a
+// workload of that name in the namespace, else the single workload a Service
+// of that name selects. No match, or more than one, is not resolved.
+func resolveService(namespace, name string, workloads []Workload, backends map[string][]string) (string, bool) {
+	var found []string
+	for _, w := range workloads {
+		if w.Namespace == namespace && w.Name == name {
+			found = append(found, w.ID())
+		}
+	}
+	if len(found) == 0 {
+		found = backends[namespace+"/"+name]
+	}
+	if len(found) != 1 {
+		return "", false
+	}
+	return found[0], true
 }
 
 // Callers returns every workload that reaches target through the graph,
@@ -184,9 +228,12 @@ func Build(workloads []Workload, services []Service, entries []Entry) Graph {
 func (g Graph) Callers(target string) []string {
 	incoming := map[string][]string{}
 	for _, e := range g.Edges {
-		if e.Source == SourceEnv {
+		if e.Source == SourceEnv || e.Source == SourceTraces {
 			incoming[e.To] = append(incoming[e.To], e.From)
 		}
+	}
+	for to, from := range incoming {
+		incoming[to] = unique(from)
 	}
 	seen := map[string]bool{target: true}
 	queue, found := []string{target}, []string{}
@@ -204,4 +251,28 @@ func (g Graph) Callers(target string) []string {
 		}
 	}
 	return found
+}
+
+func unique(values []string) []string {
+	seen := map[string]bool{}
+	out := values[:0]
+	for _, v := range values {
+		if !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// ObservedCallers returns the calls per minute of each workload seen calling
+// target in traces.
+func (g Graph) ObservedCallers(target string) map[string]float64 {
+	rates := map[string]float64{}
+	for _, e := range g.Edges {
+		if e.To == target && e.Source == SourceTraces {
+			rates[e.From] += e.CallsPerMinute
+		}
+	}
+	return rates
 }

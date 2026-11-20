@@ -8,6 +8,7 @@ Ruptura names a failure only when a fixed rule, written down here, says so. Ther
 |---|---|
 | Prometheus or Thanos | `container_memory_working_set_bytes`, `kube_pod_container_resource_limits`, `container_cpu_cfs_throttled_periods_total` and `container_cpu_cfs_periods_total`, `kube_pod_container_status_restarts_total` |
 | Kubernetes API | Pods, ReplicaSets, Deployments, StatefulSets, DaemonSets, events (`BackOff`, `FailedMount`, image pull errors, `FailedScheduling`), Services, Routes and Ingresses for the call graph |
+| Prometheus, optional | trace service graph metrics (`traces_service_graph_request_total`, `..._failed_total`) from an OpenTelemetry Collector or Tempo, for calls observed between workloads |
 
 The engine polls every 30 seconds. Every failure it lists comes from one of these inputs; when an input is missing, `GET /api/v2/coverage` says so instead of reporting a healthy cluster.
 
@@ -48,4 +49,4 @@ Each change to these rules is measured by a test written before its run, against
 - On a release that leaks fast, `predict_linear` warns a few minutes earlier, at the cost of firing on many healthy pods.
 - Right after a rollback, the engine can still list the version being removed until its next poll, up to 30 seconds.
 - Throttling is detected, not predicted, and only CPU and memory are covered. Disk, network and node pressure are not yet.
-- Calls between workloads come from what the cluster declares (environment values naming a Service, Routes, Ingresses), not from traffic.
+- Calls between workloads come from what the cluster declares (environment values naming a Service, Routes, Ingresses) and, when trace service graph metrics exist, from traces. Without traces, a call configured another way is not seen; network flows are not read yet.

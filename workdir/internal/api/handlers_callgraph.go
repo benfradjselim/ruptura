@@ -22,8 +22,9 @@ func (h *Handlers) SetCallGraph(source CallGraphSource) { h.callGraph = source }
 
 func shortName(id string) string { return id[strings.LastIndex(id, "/")+1:] }
 
-// ImpactText names the callers a failure can hit, in plain words.
-func ImpactText(callers []string) string {
+// ImpactText names the callers a failure can hit, in plain words. observed
+// gives the calls per minute of callers seen in traces, shown next to them.
+func ImpactText(callers []string, observed map[string]float64) string {
 	if len(callers) == 0 {
 		return ""
 	}
@@ -32,13 +33,25 @@ func ImpactText(callers []string) string {
 		if len(names) == maxImpactNames {
 			break
 		}
-		names = append(names, shortName(c))
+		name := shortName(c)
+		if rate, ok := observed[c]; ok {
+			name += fmt.Sprintf(" (%s calls/min observed)", formatRate(rate))
+		}
+		names = append(names, name)
 	}
 	text := "Can hit its callers: " + strings.Join(names, ", ")
 	if extra := len(callers) - len(names); extra > 0 {
 		text += fmt.Sprintf(" and %d more", extra)
 	}
 	return text
+}
+
+// formatRate rounds a rate for a sentence: whole numbers from 10, one decimal below.
+func formatRate(rate float64) string {
+	if rate >= 10 {
+		return fmt.Sprintf("%.0f", rate)
+	}
+	return fmt.Sprintf("%.1f", rate)
 }
 
 type callGraphNode struct {

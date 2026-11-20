@@ -20,7 +20,12 @@ A predicted `saturation`, `release_regression` or `replica_divergence` also carr
 
 ## What a failure can take down
 
-The engine reads which workloads call which from what the cluster declares: a container environment value that names a Service, and Routes or Ingresses that send traffic to one. `GET /api/v2/callgraph` returns the graph. Each failure lists in `affects` the workloads that call it, directly or not, adds an evidence line, and sends an `impact` annotation to Alertmanager. These are declared calls; calls seen in traces or network flows come later.
+The engine reads which workloads call which from two sources:
+
+- **Declared:** a container environment value that names a Service, and Routes or Ingresses that send traffic to one (sources `env`, `route`, `ingress`).
+- **Observed in traces:** when Prometheus holds the service graph metrics of an OpenTelemetry Collector (`servicegraph` connector) or Tempo, `traces_service_graph_request_total` and `traces_service_graph_request_failed_total`, each call seen in the last 10 minutes becomes an edge with source `traces`, its calls per minute and its error ratio. Service names are matched to a workload of that name, else to the single workload a Service of that name selects; a name that matches nothing, or more than one workload, is left out. The contrib 0.100.0 connector counts each call twice: use a later version.
+
+`GET /api/v2/callgraph` returns the graph, one edge per source, so you can see which calls are declared, observed, or both. Each failure lists in `affects` the workloads that call it, directly or not, adds an evidence line with the observed call rate when there is one, and sends an `impact` annotation to Alertmanager. Calls seen in network flows come later.
 
 ## State
 

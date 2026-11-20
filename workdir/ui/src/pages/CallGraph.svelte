@@ -2,10 +2,12 @@
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
   import { formatEta } from '../lib/util/failures.js'
-  import { isPlatform, filterGraph, layout, blastRadius, hitEdges, NODE_W, NODE_H } from '../lib/util/callGraph.js'
+  import { isPlatform, filterGraph, mergeEdges, layout, blastRadius, hitEdges, NODE_W, NODE_H } from '../lib/util/callGraph.js'
 
   const REFRESH_MS = 30000
-  const SOURCE_LABEL = { env: 'declared in env', route: 'Route', ingress: 'Ingress' }
+  // The graph shrinks to fit its column, but never below this share of its size, so names stay readable.
+  const MIN_SCALE = 0.6
+  const SOURCE_LABEL = { env: 'declared in env', route: 'Route', ingress: 'Ingress', traces: 'observed in traces' }
 
   let graph = { nodes: [], edges: [] }, loading = true, error = '', timer
   let selected = null, showPlatform = false, chosen = null
@@ -22,10 +24,14 @@
   }
 
   const label = mode => (mode || '').replace(/_/g, ' ')
+  const rate = n => (n >= 10 ? Math.round(n) : n.toFixed(1))
+  const describe = e => e.sources.map(s => s.source === 'traces'
+    ? `observed: ${rate(e.callsPerMinute)} calls/min, ${(e.errorRatio * 100).toFixed(1)}% errors`
+    : `${SOURCE_LABEL[s.source] || s.source}${s.via ? `: ${s.via}` : ''}`).join(' · ')
 
   $: namespaces = [...new Set(graph.nodes.map(n => n.namespace))].sort()
   $: visibleNamespaces = chosen || new Set(namespaces.filter(ns => showPlatform || !isPlatform(ns)))
-  $: view = layout(filterGraph(graph, visibleNamespaces))
+  $: view = layout(mergeEdges(filterGraph(graph, visibleNamespaces)))
   $: failing = view.nodes.filter(n => n.state !== 'ok')
   $: focus = selected ? [selected.id] : failing.map(n => n.id)
   $: radius = new Set(focus.flatMap(id => [...blastRadius(view.edges, id)]))
@@ -50,7 +56,7 @@
     <div>
       <p class="eyebrow">Call graph</p>
       <h1>Who calls whom</h1>
-      <p class="lede">Read from what the cluster declares: services named in container environment, and Routes or Ingresses. A failure turns its callers red, they are what it can take down.</p>
+      <p class="lede">Read from what the cluster declares (services named in container environment, Routes, Ingresses) and from calls seen in traces, when trace service graph metrics exist. A failure turns its callers red, they are what it can take down.</p>
     </div>
     <dl class="tally">
       <div><dt>Workloads</dt><dd>{view.nodes.filter(n => n.type === 'workload').length}</dd></div>
@@ -73,13 +79,13 @@
   {:else if error}
     <p class="fault-note">{error}</p>
   {:else if view.nodes.length === 0}
-    <p class="quiet">No call found in these namespaces. Ruptura sees a call when a container names a Service in its environment, or a Route sends traffic to one. Observed calls from traces and network flows come later.</p>
+    <p class="quiet">No call found in these namespaces. Ruptura sees a call when a container names a Service in its environment, a Route sends traffic to one, or traces show it. Network flows come later.</p>
   {:else}
     <div class="canvas">
-      <svg width={view.width} height={view.height} role="img" aria-label="Call graph of {view.nodes.length} workloads">
+      <svg viewBox="0 0 {view.width} {view.height}" style="min-width: {Math.round(view.width * MIN_SCALE)}px; max-width: {view.width}px" role="img" aria-label="Call graph of {view.nodes.length} workloads">
         {#each view.edges as edge (edge.from + edge.to)}
           <path class="edge {edge.source}" class:hit={hot.has(edge.from + '|' + edge.to)} d={edge.d}>
-            <title>{byId.get(edge.from)?.name} calls {byId.get(edge.to)?.name}, {SOURCE_LABEL[edge.source]}{edge.via ? `: ${edge.via}` : ''}</title>
+            <title>{byId.get(edge.from)?.name} calls {byId.get(edge.to)?.name}, {describe(edge)}</title>
           </path>
         {/each}
         {#each view.nodes as n (n.id)}
@@ -95,7 +101,8 @@
       </svg>
     </div>
     <p class="legend">
-      <span class="key env"></span>declared in env
+      <span class="key traces"></span>observed in traces
+      <span class="key env"></span>declared in env only
       <span class="key route"></span>Route or Ingress
       <span class="key hit"></span>can be hit by a failure
       <span class="key box crit"></span>failing
@@ -113,11 +120,11 @@
         <p class="fact">{label(selected.failureMode)}, {selected.failureKind}{selected.etaSeconds ? ` in ${formatEta(selected.etaSeconds)}` : ''}</p>
       {/if}
       <h3>Calls</h3>
-      {#if calls.length === 0}<p class="scope">Nothing declared.</p>{/if}
-      {#each calls as e}<p class="fact">{byId.get(e.to)?.name} <span>{SOURCE_LABEL[e.source]}{e.via ? `: ${e.via}` : ''}</span></p>{/each}
+      {#if calls.length === 0}<p class="scope">No call found.</p>{/if}
+      {#each calls as e}<p class="fact">{byId.get(e.to)?.name} <span>{describe(e)}</span></p>{/each}
       <h3>Called by</h3>
       {#if calledBy.length === 0}<p class="scope">No caller found.</p>{/if}
-      {#each calledBy as e}<p class="fact">{byId.get(e.from)?.name} <span>{SOURCE_LABEL[e.source]}{e.via ? `: ${e.via}` : ''}</span></p>{/each}
+      {#each calledBy as e}<p class="fact">{byId.get(e.from)?.name} <span>{describe(e)}</span></p>{/each}
       <h3>If it fails, it can hit</h3>
       {#if selectedRadius.length === 0}
         <p class="scope">No caller depends on it.</p>
@@ -145,9 +152,11 @@
   .platform { margin-left: auto; font: 400 12px var(--font-mono); color: var(--text-3); display: flex; gap: 6px; align-items: center; }
 
   .canvas { margin-top: 20px; overflow: auto; background: var(--surface); border: 1px solid var(--border); max-height: 70vh; }
+  .canvas svg { display: block; width: 100%; height: auto; }
   svg { display: block; }
   .edge { fill: none; stroke: var(--text-3); stroke-width: 1.5; opacity: 0.7; stroke-dasharray: 6 6; animation: flow 1.2s linear infinite; }
   .edge.route, .edge.ingress { stroke: var(--accent); }
+  .edge.traces { stroke: var(--green); stroke-width: 3; opacity: 1; stroke-dasharray: none; animation: none; }
   .edge.hit { stroke: var(--red); stroke-width: 2.5; opacity: 1; animation-duration: 0.6s; }
   @keyframes flow { to { stroke-dashoffset: -12; } }
   @media (prefers-reduced-motion: reduce) { .edge { animation: none; } }
@@ -167,6 +176,7 @@
   .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; margin-top: 10px; font: 400 12px var(--font-mono); color: var(--text-3); }
   .key { display: inline-block; width: 18px; border-top: 2px dashed var(--text-3); margin-right: -10px; }
   .key.route { border-top-color: var(--accent); }
+  .key.traces { border-top: 3px solid var(--green); }
   .key.hit { border-top: 2px solid var(--red); }
   .key.box { width: 12px; height: 12px; border: 2px solid var(--red); background: var(--red-dim); }
 

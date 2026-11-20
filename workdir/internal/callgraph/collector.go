@@ -11,6 +11,7 @@ import (
 
 	"github.com/benfradjselim/ruptura/internal/discovery"
 	"github.com/benfradjselim/ruptura/pkg/logger"
+	"github.com/benfradjselim/ruptura/pkg/outage"
 )
 
 const (
@@ -90,8 +91,19 @@ type Collector struct {
 	apiBase string
 	token   string
 	client  *http.Client
+	traces  Querier
+	outage  *outage.Log
 	mu      sync.RWMutex
 	graph   Graph
+}
+
+// SetTraceSource adds the calls seen in traces, read from Prometheus, to every
+// refresh. Without it the graph holds declared calls only.
+func (c *Collector) SetTraceSource(q Querier) {
+	c.traces = q
+	c.outage = outage.New("call graph: trace metrics", func(format string, args ...interface{}) {
+		logger.Default.Warn(fmt.Sprintf(format, args...))
+	})
 }
 
 // New returns a collector with the pod's in-cluster credentials.
@@ -170,7 +182,17 @@ func (c *Collector) refresh(ctx context.Context) error {
 		return nil
 	})
 
-	graph := Build(workloads, services, entries)
+	var observed []Observed
+	if c.traces != nil {
+		calls, err := ObservedCalls(ctx, c.traces)
+		if err != nil {
+			c.outage.Failed("query", err)
+		} else {
+			c.outage.Succeeded()
+			observed = calls
+		}
+	}
+	graph := Build(workloads, services, entries, observed)
 	c.mu.Lock()
 	c.graph = graph
 	c.mu.Unlock()

@@ -41,6 +41,7 @@ import (
 	pipelinelogs "github.com/benfradjselim/ruptura/internal/pipeline/logs"
 	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/sim"
+	"github.com/benfradjselim/ruptura/internal/sources"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
 	"github.com/benfradjselim/ruptura/pkg/logger"
@@ -511,6 +512,13 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	handlers.SetInfraRegistry(infraRegistry)
 	if graph, err := callgraph.New(); err == nil {
+		if url := os.Getenv("RUPTURA_THANOS_URL"); url != "" {
+			if source, err := sources.NewPrometheus(prometheusConfig(url)); err == nil {
+				graph.SetTraceSource(source)
+			} else {
+				logger.Default.Warn("call graph: trace metrics disabled", "err", err)
+			}
+		}
 		go graph.Run(ctx)
 		handlers.SetCallGraph(graph)
 	} else {
