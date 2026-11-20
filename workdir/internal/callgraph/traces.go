@@ -16,14 +16,14 @@ const viaServiceGraph = "traces_service_graph"
 
 const serviceGraphGrouping = "client, server, client_k8s_namespace_name, server_k8s_namespace_name, namespace, connection_type"
 
-// Calls per minute over 10 minutes. Some connector versions emit each call
-// twice, once per value of a "failed" label that does not mark failed calls;
-// taking the largest of those series counts each call once and leaves series
-// without the label unchanged. Failed calls come from the failed counter, which
-// every connector version and Tempo emit.
+// Calls and failed calls per minute over 10 minutes. Current connectors split
+// the request counter by a "failed" label and count failures in a separate
+// counter; summing across the label counts each call once. Tempo has no such
+// label. The contrib 0.100.0 connector emits each call twice, which doubles
+// both counts and leaves the error ratio right.
 var (
-	serviceGraphTotal  = "max by (" + serviceGraphGrouping + ") (sum by (" + serviceGraphGrouping + ", failed) (rate(traces_service_graph_request_total[10m]))) * 60"
-	serviceGraphFailed = "max by (" + serviceGraphGrouping + ") (sum by (" + serviceGraphGrouping + ", failed) (rate(traces_service_graph_request_failed_total[10m]))) * 60"
+	serviceGraphTotal  = "sum by (" + serviceGraphGrouping + ") (rate(traces_service_graph_request_total[10m])) * 60"
+	serviceGraphFailed = "sum by (" + serviceGraphGrouping + ") (rate(traces_service_graph_request_failed_total[10m])) * 60"
 )
 
 // Querier runs a Prometheus instant query.

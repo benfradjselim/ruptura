@@ -214,11 +214,9 @@ func TestCallersFollowObservedEdges(t *testing.T) {
 	}
 }
 
-func TestServiceGraphQueriesCountEachCallOnce(t *testing.T) {
-	for _, q := range []string{serviceGraphTotal, serviceGraphFailed} {
-		if !strings.HasPrefix(q, "max by (") || !strings.Contains(q, ", failed) (rate(") {
-			t.Errorf("query must take the largest series across the failed label: %s", q)
-		}
+func TestServiceGraphQueries(t *testing.T) {
+	if !strings.Contains(serviceGraphTotal, "traces_service_graph_request_total") || strings.Contains(serviceGraphTotal, "failed=") {
+		t.Errorf("calls must sum the request counter across the failed label: %s", serviceGraphTotal)
 	}
 	if !strings.Contains(serviceGraphFailed, "traces_service_graph_request_failed_total") {
 		t.Errorf("failures must come from the failed counter: %s", serviceGraphFailed)
