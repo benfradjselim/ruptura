@@ -16,14 +16,14 @@ const viaServiceGraph = "traces_service_graph"
 
 const serviceGraphGrouping = "client, server, client_k8s_namespace_name, server_k8s_namespace_name, namespace, connection_type"
 
-// Calls per minute over 10 minutes. Failed calls are counted either with a
-// failed="true" label on the request counter (recent OpenTelemetry connectors)
-// or by a separate failed counter without that label (Tempo, older connectors);
-// the label filters keep the two styles from counting the same calls twice.
+// Calls per minute over 10 minutes. Some connector versions emit each call
+// twice, once per value of a "failed" label that does not mark failed calls;
+// taking the largest of those series counts each call once and leaves series
+// without the label unchanged. Failed calls come from the failed counter, which
+// every connector version and Tempo emit.
 var (
-	serviceGraphTotal     = "sum by (" + serviceGraphGrouping + ") (rate(traces_service_graph_request_total[10m])) * 60"
-	serviceGraphFailed    = "sum by (" + serviceGraphGrouping + ") (rate(traces_service_graph_request_total{failed=\"true\"}[10m])) * 60"
-	serviceGraphFailedOld = "sum by (" + serviceGraphGrouping + ") (rate(traces_service_graph_request_failed_total{failed=\"\"}[10m])) * 60"
+	serviceGraphTotal  = "max by (" + serviceGraphGrouping + ") (sum by (" + serviceGraphGrouping + ", failed) (rate(traces_service_graph_request_total[10m]))) * 60"
+	serviceGraphFailed = "max by (" + serviceGraphGrouping + ") (sum by (" + serviceGraphGrouping + ", failed) (rate(traces_service_graph_request_failed_total[10m]))) * 60"
 )
 
 // Querier runs a Prometheus instant query.
@@ -80,13 +80,11 @@ func ObservedCalls(ctx context.Context, q Querier) ([]Observed, error) {
 		}
 	}
 	add(total, false)
-	for _, query := range []string{serviceGraphFailed, serviceGraphFailedOld} {
-		failed, err := q.QueryVector(ctx, query)
-		if err != nil {
-			return nil, fmt.Errorf("callgraph: service graph failures: %w", err)
-		}
-		add(failed, true)
+	failed, err := q.QueryVector(ctx, serviceGraphFailed)
+	if err != nil {
+		return nil, fmt.Errorf("callgraph: service graph failures: %w", err)
 	}
+	add(failed, true)
 	out := make([]Observed, 0, len(order))
 	for _, key := range order {
 		out = append(out, *calls[key])

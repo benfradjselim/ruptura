@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/benfradjselim/ruptura/internal/sources"
@@ -45,7 +46,7 @@ func TestObservedCalls(t *testing.T) {
 			want:    nil,
 		},
 		{
-			name: "failed label style, unknown peers left out",
+			name: "unknown peers left out",
 			querier: fakeQuerier{
 				serviceGraphTotal: {
 					series(35, "client", "checkout", "server", "payments", "client_k8s_namespace_name", "shop", "server_k8s_namespace_name", "shop", "namespace", "shop"),
@@ -59,10 +60,10 @@ func TestObservedCalls(t *testing.T) {
 			want: []Observed{{ClientNamespace: "shop", Client: "checkout", ServerNamespace: "shop", Server: "payments", PerMinute: 35, FailedPerMinute: 1.4}},
 		},
 		{
-			name: "separate failed counter style",
+			name: "calls and failures without namespace labels",
 			querier: fakeQuerier{
-				serviceGraphTotal:     {series(10, "client", "web", "server", "api", "namespace", "shop")},
-				serviceGraphFailedOld: {series(0.5, "client", "web", "server", "api", "namespace", "shop")},
+				serviceGraphTotal:  {series(10, "client", "web", "server", "api", "namespace", "shop")},
+				serviceGraphFailed: {series(0.5, "client", "web", "server", "api", "namespace", "shop")},
 			},
 			want: []Observed{{ClientNamespace: "shop", Client: "web", ServerNamespace: "shop", Server: "api", PerMinute: 10, FailedPerMinute: 0.5}},
 		},
@@ -210,5 +211,16 @@ func TestCallersFollowObservedEdges(t *testing.T) {
 	}
 	if got := g.Callers("td/Deployment/checkout"); !reflect.DeepEqual(got, []string{"td/Deployment/frontend", "td/Deployment/loadgen"}) {
 		t.Errorf("a caller both declared and observed must be listed once, got %v", got)
+	}
+}
+
+func TestServiceGraphQueriesCountEachCallOnce(t *testing.T) {
+	for _, q := range []string{serviceGraphTotal, serviceGraphFailed} {
+		if !strings.HasPrefix(q, "max by (") || !strings.Contains(q, ", failed) (rate(") {
+			t.Errorf("query must take the largest series across the failed label: %s", q)
+		}
+	}
+	if !strings.Contains(serviceGraphFailed, "traces_service_graph_request_failed_total") {
+		t.Errorf("failures must come from the failed counter: %s", serviceGraphFailed)
 	}
 }
