@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isPlatform, filterGraph, layout, blastRadius, hitEdges, NODE_W } from './callGraph.js'
+import { isPlatform, filterGraph, mergeEdges, layout, blastRadius, hitEdges, NODE_W } from './callGraph.js'
 
 const node = (id, namespace = id.split('/')[0]) => ({ id, namespace, name: id.split('/').pop() })
 const shop = {
@@ -64,5 +64,38 @@ describe('blastRadius', () => {
     expect(hit.has('shop/Deployment/api|shop/StatefulSet/db')).toBe(true)
     expect(hit.has('shop/Deployment/load|shop/Deployment/api')).toBe(true)
     expect(hit.has('openshift-x/Deployment/op|openshift-x/Deployment/dep')).toBe(false)
+  })
+})
+
+describe('mergeEdges', () => {
+  const nodes = [node('td/D/checkout'), node('td/D/payments'), node('td/D/inventory'), node('td/D/fraud')]
+  const graph = {
+    nodes,
+    edges: [
+      { from: 'td/D/checkout', to: 'td/D/payments', source: 'env', via: 'PAYMENTS_URL' },
+      { from: 'td/D/checkout', to: 'td/D/payments', source: 'traces', via: 'traces_service_graph', callsPerMinute: 114.5, errorRatio: 0.0386 },
+      { from: 'td/D/checkout', to: 'td/D/inventory', source: 'traces', via: 'traces_service_graph', callsPerMinute: 109.5, errorRatio: 0 },
+      { from: 'td/D/payments', to: 'td/D/fraud', source: 'env', via: 'FRAUD_URL' },
+    ],
+  }
+  it('draws a call declared and observed once, as observed, with both sources', () => {
+    const got = mergeEdges(graph).edges
+    expect(got).toHaveLength(3)
+    const pay = got.find(e => e.to === 'td/D/payments')
+    expect(pay.source).toBe('traces')
+    expect(pay.observed).toBe(true)
+    expect(pay.sources.map(s => s.source)).toEqual(['env', 'traces'])
+    expect(pay.callsPerMinute).toBe(114.5)
+    expect(pay.errorRatio).toBe(0.0386)
+  })
+  it('keeps a declared-only call declared and unmeasured', () => {
+    const fraud = mergeEdges(graph).edges.find(e => e.to === 'td/D/fraud')
+    expect(fraud.source).toBe('env')
+    expect(fraud.observed).toBe(false)
+    expect(fraud.callsPerMinute).toBeUndefined()
+  })
+  it('leaves each pair unique for keyed rendering', () => {
+    const keys = mergeEdges(graph).edges.map(e => e.from + e.to)
+    expect(new Set(keys).size).toBe(keys.length)
   })
 })
