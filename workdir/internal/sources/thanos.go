@@ -253,45 +253,82 @@ func (t *Thanos) CollectRole(ctx context.Context, role Role) (map[string]float64
 	return out, nil
 }
 
-func (t *Thanos) queryBy(ctx context.Context, q, targetLabel string) (map[string]sample, map[string][2]string, error) {
+// Series is one result of an instant query with all its labels.
+type Series struct {
+	Labels map[string]string
+	Value  float64
+}
+
+// QueryVector runs an instant query and returns every series with its labels.
+func (t *Thanos) QueryVector(ctx context.Context, q string) ([]Series, error) {
+	results, err := t.instant(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Series, 0, len(results))
+	for _, r := range results {
+		out = append(out, Series{Labels: r.labels, Value: r.v})
+	}
+	return out, nil
+}
+
+type result struct {
+	labels map[string]string
+	v      float64
+	at     time.Time
+}
+
+func (t *Thanos) instant(ctx context.Context, q string) ([]result, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		t.baseURL+"/api/v1/query?query="+url.QueryEscape(q), nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("sources: build request: %w", err)
+		return nil, fmt.Errorf("sources: build request: %w", err)
 	}
 	if err := t.authorize(req); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	resp, err := t.client.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("sources: query failed: %w", err)
+		return nil, fmt.Errorf("sources: query failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("sources: unexpected HTTP status %d", resp.StatusCode)
+		return nil, fmt.Errorf("sources: unexpected HTTP status %d", resp.StatusCode)
 	}
 	var pr promResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&pr); err != nil {
-		return nil, nil, fmt.Errorf("sources: decode response: %w", err)
+		return nil, fmt.Errorf("sources: decode response: %w", err)
 	}
 	if pr.Status != "success" {
-		return nil, nil, fmt.Errorf("sources: prometheus error: %s", pr.Error)
+		return nil, fmt.Errorf("sources: prometheus error: %s", pr.Error)
 	}
-	out := make(map[string]sample, len(pr.Data.Result))
-	ids := make(map[string][2]string, len(pr.Data.Result))
+	out := make([]result, 0, len(pr.Data.Result))
 	for _, r := range pr.Data.Result {
 		ts, ok1 := r.Value[0].(float64)
 		s, ok2 := r.Value[1].(string)
 		if !ok1 || !ok2 {
-			return nil, nil, errors.New("sources: malformed sample")
+			return nil, errors.New("sources: malformed sample")
 		}
 		v, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			return nil, nil, fmt.Errorf("sources: parse value: %w", err)
+			return nil, fmt.Errorf("sources: parse value: %w", err)
 		}
-		ns, pod := r.Metric["namespace"], r.Metric[targetLabel]
+		out = append(out, result{labels: r.Metric, v: v, at: time.Unix(int64(ts), 0)})
+	}
+	return out, nil
+}
+
+func (t *Thanos) queryBy(ctx context.Context, q, targetLabel string) (map[string]sample, map[string][2]string, error) {
+	results, err := t.instant(ctx, q)
+	if err != nil {
+		return nil, nil, err
+	}
+	out := make(map[string]sample, len(results))
+	ids := make(map[string][2]string, len(results))
+	for _, r := range results {
+		ns, pod := r.labels["namespace"], r.labels[targetLabel]
 		key := ns + "/" + pod
-		out[key] = sample{v: v, at: time.Unix(int64(ts), 0)}
+		out[key] = sample{v: r.v, at: r.at}
 		ids[key] = [2]string{ns, pod}
 	}
 	return out, ids, nil

@@ -262,9 +262,10 @@ func (h *Handlers) Failures() []*FailureResult {
 			copied.Evidence = append(append([]string{}, result.Evidence...), evidence)
 		}
 		if h.callGraph != nil {
-			if callers := h.callGraph.Graph().Callers(result.Workload); len(callers) > 0 {
+			graph := h.callGraph.Graph()
+			if callers := graph.Callers(result.Workload); len(callers) > 0 {
 				copied.Affects = callers
-				copied.Evidence = append(append([]string{}, copied.Evidence...), ImpactText(callers))
+				copied.Evidence = append(append([]string{}, copied.Evidence...), ImpactText(callers, graph.ObservedCallers(result.Workload)))
 			}
 		}
 		copied = scopeResult(copied, h.levelScope)

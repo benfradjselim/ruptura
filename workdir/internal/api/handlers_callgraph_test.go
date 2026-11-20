@@ -8,15 +8,18 @@ import (
 
 func TestImpactText(t *testing.T) {
 	tests := []struct {
-		callers []string
-		want    string
+		callers  []string
+		observed map[string]float64
+		want     string
 	}{
-		{nil, ""},
-		{[]string{"shop/Deployment/api"}, "Can hit its callers: api"},
-		{[]string{"a/Deployment/w", "a/Deployment/x", "a/Deployment/y", "a/Deployment/z", "b/Deployment/v"}, "Can hit its callers: w, x, y and 2 more"},
+		{nil, nil, ""},
+		{[]string{"shop/Deployment/api"}, nil, "Can hit its callers: api"},
+		{[]string{"a/Deployment/w", "a/Deployment/x", "a/Deployment/y", "a/Deployment/z", "b/Deployment/v"}, nil, "Can hit its callers: w, x, y and 2 more"},
+		{[]string{"shop/Deployment/checkout", "shop/Deployment/frontend"}, map[string]float64{"shop/Deployment/checkout": 36.6}, "Can hit its callers: checkout (37 calls/min observed), frontend"},
+		{[]string{"shop/Deployment/batch"}, map[string]float64{"shop/Deployment/batch": 0.44}, "Can hit its callers: batch (0.4 calls/min observed)"},
 	}
 	for _, tc := range tests {
-		if got := ImpactText(tc.callers); got != tc.want {
+		if got := ImpactText(tc.callers, tc.observed); got != tc.want {
 			t.Errorf("ImpactText(%v) = %q, want %q", tc.callers, got, tc.want)
 		}
 	}
