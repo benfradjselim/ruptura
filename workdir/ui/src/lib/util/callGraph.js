@@ -4,7 +4,7 @@
 export const PLATFORM_PREFIXES = ['openshift-', 'kube-']
 export const NODE_W = 190
 export const NODE_H = 54
-const COL_GAP = 110
+const COL_GAP = 80
 const ROW_GAP = 22
 const PAD = 24
 

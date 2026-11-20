@@ -5,6 +5,8 @@
   import { isPlatform, filterGraph, mergeEdges, layout, blastRadius, hitEdges, NODE_W, NODE_H } from '../lib/util/callGraph.js'
 
   const REFRESH_MS = 30000
+  // The graph shrinks to fit its column, but never below this share of its size, so names stay readable.
+  const MIN_SCALE = 0.6
   const SOURCE_LABEL = { env: 'declared in env', route: 'Route', ingress: 'Ingress', traces: 'observed in traces' }
 
   let graph = { nodes: [], edges: [] }, loading = true, error = '', timer
@@ -80,7 +82,7 @@
     <p class="quiet">No call found in these namespaces. Ruptura sees a call when a container names a Service in its environment, a Route sends traffic to one, or traces show it. Network flows come later.</p>
   {:else}
     <div class="canvas">
-      <svg width={view.width} height={view.height} role="img" aria-label="Call graph of {view.nodes.length} workloads">
+      <svg viewBox="0 0 {view.width} {view.height}" style="min-width: {Math.round(view.width * MIN_SCALE)}px; max-width: {view.width}px" role="img" aria-label="Call graph of {view.nodes.length} workloads">
         {#each view.edges as edge (edge.from + edge.to)}
           <path class="edge {edge.source}" class:hit={hot.has(edge.from + '|' + edge.to)} d={edge.d}>
             <title>{byId.get(edge.from)?.name} calls {byId.get(edge.to)?.name}, {describe(edge)}</title>
@@ -150,10 +152,11 @@
   .platform { margin-left: auto; font: 400 12px var(--font-mono); color: var(--text-3); display: flex; gap: 6px; align-items: center; }
 
   .canvas { margin-top: 20px; overflow: auto; background: var(--surface); border: 1px solid var(--border); max-height: 70vh; }
+  .canvas svg { display: block; width: 100%; height: auto; }
   svg { display: block; }
   .edge { fill: none; stroke: var(--text-3); stroke-width: 1.5; opacity: 0.7; stroke-dasharray: 6 6; animation: flow 1.2s linear infinite; }
   .edge.route, .edge.ingress { stroke: var(--accent); }
-  .edge.traces { stroke: var(--green); stroke-width: 2.5; opacity: 0.9; }
+  .edge.traces { stroke: var(--green); stroke-width: 3; opacity: 1; stroke-dasharray: none; animation: none; }
   .edge.hit { stroke: var(--red); stroke-width: 2.5; opacity: 1; animation-duration: 0.6s; }
   @keyframes flow { to { stroke-dashoffset: -12; } }
   @media (prefers-reduced-motion: reduce) { .edge { animation: none; } }
@@ -173,7 +176,7 @@
   .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; margin-top: 10px; font: 400 12px var(--font-mono); color: var(--text-3); }
   .key { display: inline-block; width: 18px; border-top: 2px dashed var(--text-3); margin-right: -10px; }
   .key.route { border-top-color: var(--accent); }
-  .key.traces { border-top: 3px dashed var(--green); }
+  .key.traces { border-top: 3px solid var(--green); }
   .key.hit { border-top: 2px solid var(--red); }
   .key.box { width: 12px; height: 12px; border: 2px solid var(--red); background: var(--red-dim); }
 
