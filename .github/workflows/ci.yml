@@ -105,6 +105,11 @@ jobs:
 
       - uses: azure/setup-helm@v4
 
+      - name: Lint the OLM bundle as OperatorHub does
+        run: |
+          pip install --quiet yamllint==1.35.1
+          yamllint -d "{extends: default, rules: {line-length: {max: 180, level: warning}, indentation: {indent-sequences: whatever}}}" bundle/
+
       - name: Lint chart
         run: helm lint helm/
 

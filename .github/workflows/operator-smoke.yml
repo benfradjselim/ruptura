@@ -87,27 +87,30 @@ jobs:
             --select-optional name=community
 
       # ── Build and push bundle image to local registry ───────────────────────
-      - name: Build & push bundle image
+      - name: Build & push operator and engine images from this commit
         run: |
           # Docker only allows plain HTTP to localhost, so push through localhost:5000;
           # the cluster pulls the same registry as k3d-registry.localhost:5000.
+          docker build -t localhost:5000/ruptura-operator:smoke ./workdir/operator
+          docker push localhost:5000/ruptura-operator:smoke
+          docker build -t localhost:5000/ruptura:smoke ./workdir
+          docker push localhost:5000/ruptura:smoke
+          # Point the CSV at the images just built, so the test runs this commit's code
+          # and works before a release's images are published.
+          CSV=bundle/manifests/ruptura-operator.clusterserviceversion.yaml
+          sed -i "s|ghcr.io/benfradjselim/ruptura-operator:[^\" ]*|k3d-registry.localhost:5000/ruptura-operator:smoke|g" "$CSV"
+          sed -i "s|docker.io/selimbf/ruptura:[^\" ]*|k3d-registry.localhost:5000/ruptura:smoke|g" "$CSV"
+          # Remove replaces: field — fresh cluster has no prior version, OLM would block
+          sed -i '/^  replaces:/d' "$CSV"
+          grep -n "k3d-registry" "$CSV"
+
+      # ── Build the bundle once the CSV points at the local images ─────────────
+      - name: Build & push bundle image
+        run: |
           BUNDLE_IMG="k3d-registry.localhost:5000/ruptura-operator-bundle:smoke"
           docker build -t localhost:5000/ruptura-operator-bundle:smoke ./bundle
           docker push localhost:5000/ruptura-operator-bundle:smoke
           echo "bundle_img=${BUNDLE_IMG}" >> "$GITHUB_ENV"
-
-      # ── Build and push operator image to local registry ──────────────────────
-      - name: Build & push operator image
-        run: |
-          OP_IMG="k3d-registry.localhost:5000/ruptura-operator:smoke"
-          docker build -t localhost:5000/ruptura-operator:smoke ./workdir/operator
-          docker push localhost:5000/ruptura-operator:smoke
-          # Patch CSV to reference the local operator image
-          sed -i "s|ghcr.io/benfradjselim/ruptura-operator:[^\"]*|${OP_IMG}|g" \
-            bundle/manifests/ruptura-operator.clusterserviceversion.yaml
-          # Remove replaces: field — fresh cluster has no prior version, OLM would block
-          sed -i '/^  replaces:/d' \
-            bundle/manifests/ruptura-operator.clusterserviceversion.yaml
 
       # ── Deploy operator via OLM ───────────────────────────────────────────────
       - name: Deploy operator

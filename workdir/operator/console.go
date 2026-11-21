@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	defaultConsoleImage = "ghcr.io/benfradjselim/ruptura-ui:ui-v8.7.9"
+	defaultConsoleImage = "ghcr.io/benfradjselim/ruptura-ui:ui-v8.7.10"
 	// relatedConsoleImageEnv is set by OLM from the CSV, so a disconnected
 	// mirror can rewrite the console image by digest.
 	relatedConsoleImageEnv = "RELATED_IMAGE_RUPTURA_UI"
