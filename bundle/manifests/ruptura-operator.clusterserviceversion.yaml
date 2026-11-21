@@ -148,10 +148,10 @@ spec:
           - path: output.ui.enabled
             displayName: Web Console
             description: Deploy the Ruptura web console with its Route.
+            x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:booleanSwitch"]
           - path: output.consolePlugin.enabled
             displayName: OpenShift Console Plugin
             description: Show the failures in the OpenShift console, under Observe > Ruptures and on workload details.
-            x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:booleanSwitch"]
             x-descriptors: ["urn:alm:descriptor:com.tectonic.ui:booleanSwitch"]
           - path: apiKeyRef
             displayName: API Key Secret
