@@ -31,12 +31,11 @@ LABEL name="ruptura-ui" \
 ENV RUPTURA_BACKEND_URL=http://ruptura:8080
 
 USER 0
-RUN rm -rf /etc/nginx/conf.d/* /usr/share/nginx/html/*
 COPY LICENSE /licenses/LICENSE
 COPY ui/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ui/nginx/default.conf.template /etc/nginx/ruptura/default.conf.template
 COPY --chmod=0755 ui/nginx/entrypoint.sh /usr/local/bin/ruptura-ui
-COPY --from=build /src/web /usr/share/nginx/html
+COPY --from=build --chown=1001:0 /src/web /opt/app-root/src
 USER 1001
 
 EXPOSE 8080
