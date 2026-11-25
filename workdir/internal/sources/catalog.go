@@ -54,6 +54,10 @@ type Card struct {
 	Usage       string   `yaml:"usage"`
 	Capacity    string   `yaml:"capacity"`
 	Value       string   `yaml:"value"`
+	// Sampled, when set, returns per target the Unix time of the source
+	// sample behind Usage or Value, so that a source scraped minutes apart is
+	// dated by its sample, not by the time the engine read it.
+	Sampled string `yaml:"sampled"`
 	// ModeLabel, when set, names a label whose value becomes the failure mode
 	// through Modes, for a card that covers several related failures.
 	ModeLabel  string            `yaml:"modeLabel"`

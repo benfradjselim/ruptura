@@ -53,6 +53,10 @@ func pollPredictedCard(ctx context.Context, source vectorSource, card sources.Ca
 	if err != nil {
 		return err
 	}
+	sampled, err := sampleTimes(ctx, source, card)
+	if err != nil {
+		return err
+	}
 	capacities := make(map[string]float64, len(capacity))
 	for _, series := range capacity {
 		if target, ok := cardTarget(card, series.Labels); ok {
@@ -65,7 +69,7 @@ func pollPredictedCard(ctx context.Context, source vectorSource, card sources.Ca
 		if !ok || !known || limit <= 0 {
 			continue
 		}
-		objects.ObserveTrend(card.ID, card.Level, target, failuremodes.Mode(card.FailureMode), card.Horizon, card.Unit, now, series.Value, limit)
+		objects.ObserveTrend(card.ID, card.Level, target, failuremodes.Mode(card.FailureMode), card.Horizon, card.Unit, now, sampled[target], series.Value, limit)
 	}
 	return nil
 }
@@ -75,15 +79,39 @@ func pollDetectedCard(ctx context.Context, source vectorSource, card sources.Car
 	if err != nil {
 		return err
 	}
+	sampled, err := sampleTimes(ctx, source, card)
+	if err != nil {
+		return err
+	}
 	for _, series := range values {
 		target, ok := cardTarget(card, series.Labels)
 		mode, known := cardMode(card, series.Labels)
 		if !ok || !known {
 			continue
 		}
-		objects.ObserveDetected(card.ID, card.Level, target, mode, card.RaiseAfter, card.ClearAfter, now, series.Value)
+		objects.ObserveDetected(card.ID, card.Level, target, mode, card.RaiseAfter, card.ClearAfter, now, sampled[target], series.Value)
 	}
 	return nil
+}
+
+// sampleTimes reads the card's Sampled query: the time of the source sample
+// behind each target. A card without one, or a target missing from it, is
+// dated by the poll.
+func sampleTimes(ctx context.Context, source vectorSource, card sources.Card) (map[string]time.Time, error) {
+	if card.Sampled == "" {
+		return nil, nil
+	}
+	series, err := source.QueryVector(ctx, card.Sampled)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]time.Time, len(series))
+	for _, s := range series {
+		if target, ok := cardTarget(card, s.Labels); ok && s.Value > 0 {
+			out[target] = time.Unix(0, int64(s.Value*float64(time.Second))).UTC()
+		}
+	}
+	return out, nil
 }
 
 // cardTarget joins the card's target labels with "/". A series missing one of

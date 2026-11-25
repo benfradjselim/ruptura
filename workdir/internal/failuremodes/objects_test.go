@@ -13,7 +13,7 @@ func TestObjectsTrendForecastsFillingFilesystem(t *testing.T) {
 	var now time.Time
 	for i := 0; i <= 40; i++ {
 		now = objectsStart.Add(time.Duration(i) * 30 * time.Second)
-		o.ObserveTrend("node-filesystem-filling", "node", "n1//dev/loop0", "node_filesystem_filling", 6*time.Hour, "bytes", now, 100+4*float64(i), size)
+		o.ObserveTrend("node-filesystem-filling", "node", "n1//dev/loop0", "node_filesystem_filling", 6*time.Hour, "bytes", now, time.Time{}, 100+4*float64(i), size)
 		o.Polled("node-filesystem-filling", now)
 	}
 	got := o.Findings(now)
@@ -47,7 +47,7 @@ func TestObjectsTrendQuietCases(t *testing.T) {
 			var now time.Time
 			for i := 0; i <= 40; i++ {
 				now = objectsStart.Add(time.Duration(i) * 30 * time.Second)
-				o.ObserveTrend("c", "node", "n1", "m", tt.horizon, "bytes", now, tt.usage(i), 512)
+				o.ObserveTrend("c", "node", "n1", "m", tt.horizon, "bytes", now, time.Time{}, tt.usage(i), 512)
 				o.Polled("c", now)
 			}
 			if got := o.Findings(now); len(got) != 0 {
@@ -75,7 +75,7 @@ func TestObjectsDetectedRaiseAndClear(t *testing.T) {
 			raisedAt := -1
 			for i := 0; i < tt.on; i++ {
 				now := objectsStart.Add(time.Duration(i) * 30 * time.Second)
-				o.ObserveDetected("c", "workload", "ns/x", "m", tt.raise, tt.clear, now, 1)
+				o.ObserveDetected("c", "workload", "ns/x", "m", tt.raise, tt.clear, now, time.Time{}, 1)
 				o.Polled("c", now)
 				if raisedAt < 0 && len(o.Findings(now)) == 1 {
 					raisedAt = i
@@ -94,7 +94,7 @@ func TestObjectsDetectedClearsAfterDelay(t *testing.T) {
 	poll := func(v float64) []ObjectFinding {
 		now := objectsStart.Add(time.Duration(i) * 30 * time.Second)
 		i++
-		o.ObserveDetected("c", "workload", "ns/x", "m", 0, 2*time.Minute, now, v)
+		o.ObserveDetected("c", "workload", "ns/x", "m", 0, 2*time.Minute, now, time.Time{}, v)
 		o.Polled("c", now)
 		return o.Findings(now)
 	}
@@ -113,7 +113,7 @@ func TestObjectsDetectedClearsAfterDelay(t *testing.T) {
 
 func TestObjectsGoneWhenMissingFromPoll(t *testing.T) {
 	o := NewObjects()
-	o.ObserveDetected("job-failed", "workload", "ns/job", "job_failed", 0, 0, objectsStart, 1)
+	o.ObserveDetected("job-failed", "workload", "ns/job", "job_failed", 0, 0, objectsStart, time.Time{}, 1)
 	o.Polled("job-failed", objectsStart)
 	if len(o.Findings(objectsStart)) != 1 {
 		t.Fatal("not raised")
@@ -127,7 +127,7 @@ func TestObjectsGoneWhenMissingFromPoll(t *testing.T) {
 
 func TestObjectsStaleWithoutPoll(t *testing.T) {
 	o := NewObjects()
-	o.ObserveDetected("c", "node", "n1/Ready", "node_not_ready", 0, 0, objectsStart, 1)
+	o.ObserveDetected("c", "node", "n1/Ready", "node_not_ready", 0, 0, objectsStart, time.Time{}, 1)
 	if len(o.Findings(objectsStart.Add(2*time.Minute))) != 1 {
 		t.Fatal("dropped too early while queries fail")
 	}
@@ -138,10 +138,140 @@ func TestObjectsStaleWithoutPoll(t *testing.T) {
 
 func TestObjectsPrune(t *testing.T) {
 	o := NewObjects()
-	o.ObserveDetected("c", "node", "old", "m", 0, 0, objectsStart, 1)
-	o.ObserveTrend("t", "node", "old", "m", time.Hour, "bytes", objectsStart, 1, 2)
+	o.ObserveDetected("c", "node", "old", "m", 0, 0, objectsStart, time.Time{}, 1)
+	o.ObserveTrend("t", "node", "old", "m", time.Hour, "bytes", objectsStart, time.Time{}, 1, 2)
 	o.Prune(objectsStart.Add(time.Minute))
 	if len(o.conditions) != 0 || len(o.trends) != 0 {
 		t.Fatalf("prune kept %d conditions and %d trends", len(o.conditions), len(o.trends))
+	}
+}
+
+// ksmPolls feeds a detected card polled every 30 s from a source sampled every
+// 2 minutes, true from condStart on, and returns the first poll time at which
+// the finding is listed.
+func ksmPolls(t *testing.T, raise time.Duration, condStart time.Time, end time.Time) time.Time {
+	t.Helper()
+	o := NewObjects()
+	for now := objectsStart; !now.After(end); now = now.Add(30 * time.Second) {
+		sampled := objectsStart.Add(now.Sub(objectsStart).Truncate(2 * time.Minute))
+		if sampled.Before(condStart) {
+			o.Polled("c", now)
+			continue
+		}
+		o.ObserveDetected("c", "workload", "ns/x", "m", raise, time.Minute, now, sampled, 1)
+		o.Polled("c", now)
+		if len(o.Findings(now)) == 1 {
+			return now
+		}
+	}
+	return time.Time{}
+}
+
+func TestObjectsSampledConditionDatesNewObjectBetweenSamples(t *testing.T) {
+	o := NewObjects()
+	// A first sample of another target sets the card's previous sample time.
+	o.ObserveDetected("c", "workload", "ns/other", "m", 9*time.Minute, time.Minute, objectsStart, objectsStart, 0)
+	raisedAt := time.Time{}
+	for now := objectsStart.Add(30 * time.Second); now.Before(objectsStart.Add(20 * time.Minute)); now = now.Add(30 * time.Second) {
+		sampled := objectsStart.Add(now.Sub(objectsStart).Truncate(2 * time.Minute))
+		if sampled.After(objectsStart) {
+			o.ObserveDetected("c", "workload", "ns/x", "m", 9*time.Minute, time.Minute, now, sampled, 1)
+		}
+		o.Polled("c", now)
+		if raisedAt.IsZero() && len(o.Findings(now)) == 1 {
+			raisedAt = now
+		}
+	}
+	// First seen in the sample at 2 min, dated at 1 min: a 9 min run is reached by
+	// the sample at 10 min, not 12 min as it would be from its first sample.
+	if want := objectsStart.Add(10 * time.Minute); !raisedAt.Equal(want) {
+		t.Fatalf("raised at %v, want %v", raisedAt.Sub(objectsStart), want.Sub(objectsStart))
+	}
+}
+
+func TestObjectsSampledConditionCountsRepeatedSampleOnce(t *testing.T) {
+	o := NewObjects()
+	for i := 0; i < 4; i++ {
+		now := objectsStart.Add(time.Duration(i) * 30 * time.Second)
+		o.ObserveDetected("c", "workload", "ns/x", "m", 0, 2*time.Minute, now, objectsStart, 1)
+	}
+	// Dated at 1 min, one sample read four times does not make the 2 min run below.
+	later := objectsStart.Add(2 * time.Minute)
+	for i := 0; i < 4; i++ {
+		o.ObserveDetected("c", "workload", "ns/x", "m", 0, 2*time.Minute, later.Add(time.Duration(i)*30*time.Second), later, 0)
+		o.Polled("c", later.Add(time.Duration(i)*30*time.Second))
+	}
+	if len(o.Findings(later.Add(90*time.Second))) != 1 {
+		t.Fatal("cleared on one sample read several times")
+	}
+}
+
+func TestObjectsSampledConditionKeepsTwoMinuteSamplesContinuous(t *testing.T) {
+	if got := ksmPolls(t, 10*time.Minute, objectsStart, objectsStart.Add(20*time.Minute)); got.IsZero() {
+		t.Fatal("never raised: samples 2 minutes apart broke the run")
+	}
+}
+
+func TestObjectsTrendCountsDownFromSampleTime(t *testing.T) {
+	o := NewObjects()
+	var now, sampled time.Time
+	for i := 0; i <= 20; i++ {
+		sampled = objectsStart.Add(time.Duration(i) * 2 * time.Minute)
+		now = sampled.Add(90 * time.Second)
+		o.ObserveTrend("q", "namespace", "ns/q/configmaps", "quota_exhaustion", 6*time.Hour, "count", now, sampled, float64(4*i), 120)
+		o.Polled("q", now)
+	}
+	got := o.Findings(now)
+	if len(got) != 1 {
+		t.Fatalf("findings = %d, want 1", len(got))
+	}
+	// 80 of 120 at the last sample, 2 per minute: 20 min after the sample, 18.5 min after now.
+	want := 18*time.Minute + 30*time.Second
+	if diff := got[0].Estimate.ETF - want; diff < -15*time.Second || diff > 15*time.Second {
+		t.Fatalf("ETF = %v, want about %v", got[0].Estimate.ETF, want)
+	}
+}
+
+func TestObjectsTrendWithdrawnWhenFillStops(t *testing.T) {
+	o := NewObjects()
+	usage := 100.0
+	listed := func(i int) bool {
+		now := objectsStart.Add(time.Duration(i) * 30 * time.Second)
+		o.ObserveTrend("c", "node", "n1", "m", 6*time.Hour, "bytes", now, now, usage, 1024)
+		o.Polled("c", now)
+		return len(o.Findings(now)) == 1
+	}
+	i := 0
+	for ; i <= 40; i++ {
+		usage += 4
+		listed(i)
+	}
+	if !listed(i) {
+		t.Fatal("no forecast while filling")
+	}
+	i++
+	stoppedAt := i
+	for ; i < stoppedAt+10; i++ {
+		if !listed(i) {
+			break
+		}
+	}
+	if flat := i - stoppedAt; flat > 2 {
+		t.Fatalf("forecast kept for %d flat samples, want at most 2", flat)
+	}
+}
+
+func TestStalledKeepsStepLeak(t *testing.T) {
+	var points []point
+	usage := 0.1
+	for i := 0; i < 60; i++ {
+		// One step every 5 samples: pauses of 4 samples are the trend's own rhythm.
+		if i%5 == 0 {
+			usage += 0.01
+		}
+		points = append(points, point{objectsStart.Add(time.Duration(i) * 30 * time.Second), usage})
+		if i > 20 && stalled(points) {
+			t.Fatalf("step leak withdrawn at sample %d", i)
+		}
 	}
 }

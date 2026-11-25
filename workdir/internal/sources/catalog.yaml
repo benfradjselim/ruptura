@@ -41,6 +41,7 @@ cards:
     kind: detected
     target: [namespace, horizontalpodautoscaler]
     value: 'max by (namespace,horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas) >= bool max by (namespace,horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas)'
+    sampled: 'max by (namespace,horizontalpodautoscaler) (timestamp(kube_horizontalpodautoscaler_status_current_replicas))'
     raiseAfter: 10m
     clearAfter: 5m
     severity: warning
@@ -52,6 +53,7 @@ cards:
     kind: detected
     target: [namespace, poddisruptionbudget]
     value: '(max by (namespace,poddisruptionbudget) (kube_poddisruptionbudget_status_pod_disruptions_allowed) == bool 0) * (max by (namespace,poddisruptionbudget) (kube_poddisruptionbudget_status_expected_pods) > bool 0)'
+    sampled: 'max by (namespace,poddisruptionbudget) (timestamp(kube_poddisruptionbudget_status_pod_disruptions_allowed))'
     raiseAfter: 10m
     clearAfter: 2m
     severity: warning
@@ -63,6 +65,7 @@ cards:
     kind: detected
     target: [namespace, job_name]
     value: 'max by (namespace,job_name) (kube_job_failed{condition="true"})'
+    sampled: 'max by (namespace,job_name) (timestamp(kube_job_failed{condition="true"}))'
     raiseAfter: 0s
     clearAfter: 0s
     severity: warning
@@ -75,6 +78,7 @@ cards:
     target: [instance, device]
     usage: 'max by (instance,device) (node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"} - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"})'
     capacity: 'max by (instance,device) (node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"})'
+    sampled: 'max by (instance,device) (timestamp(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"}))'
     horizon: 6h
     severity: critical
     profile: standard
@@ -87,6 +91,7 @@ cards:
     target: [instance]
     usage: 'max by (instance) (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)'
     capacity: 'max by (instance) (node_memory_MemTotal_bytes)'
+    sampled: 'max by (instance) (timestamp(node_memory_MemAvailable_bytes))'
     horizon: 1h
     severity: critical
     profile: standard
@@ -97,6 +102,7 @@ cards:
     kind: detected
     target: [node, condition]
     value: 'max by (node,condition) (kube_node_status_condition{condition="Ready",status="false"} or kube_node_status_condition{condition=~"MemoryPressure|DiskPressure|PIDPressure",status="true"})'
+    sampled: 'max by (node,condition) (timestamp(kube_node_status_condition))'
     modeLabel: condition
     modes:
       Ready: node_not_ready
@@ -115,6 +121,7 @@ cards:
     target: [namespace, resourcequota, resource]
     usage: 'max by (namespace,resourcequota,resource) (kube_resourcequota{type="used"})'
     capacity: 'max by (namespace,resourcequota,resource) (kube_resourcequota{type="hard"})'
+    sampled: 'max by (namespace,resourcequota,resource) (timestamp(kube_resourcequota{type="used"}))'
     horizon: 6h
     severity: warning
     profile: minimal
