@@ -1,6 +1,6 @@
 # The UI is built by Vite in the first stage; the build context is ./workdir.
-# nginx-unprivileged listens on 8080 and runs with any UID in group 0, as the
-# OpenShift restricted-v2 SCC assigns.
+# The UBI nginx listens on 8080 and runs with any UID, as the OpenShift
+# restricted-v2 SCC assigns.
 FROM --platform=$BUILDPLATFORM docker.io/library/node:22-alpine AS build
 WORKDIR /src/ui
 COPY ui/package.json ui/package-lock.json ./
@@ -8,7 +8,7 @@ RUN npm ci --no-audit --no-fund
 COPY ui/ ./
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.28-alpine
+FROM registry.access.redhat.com/ubi9/nginx-124
 
 ARG VERSION=dev
 
@@ -30,9 +30,14 @@ LABEL name="ruptura-ui" \
 # read-only, as the Helm chart does, is used as is.
 ENV RUPTURA_BACKEND_URL=http://ruptura:8080
 
+USER 0
+RUN rm -rf /etc/nginx/conf.d/* /usr/share/nginx/html/*
 COPY LICENSE /licenses/LICENSE
+COPY ui/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ui/nginx/default.conf.template /etc/nginx/ruptura/default.conf.template
-COPY --chmod=0755 ui/nginx/30-ruptura-config.sh /docker-entrypoint.d/30-ruptura-config.sh
+COPY --chmod=0755 ui/nginx/entrypoint.sh /usr/local/bin/ruptura-ui
 COPY --from=build /src/web /usr/share/nginx/html
+USER 1001
 
 EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/ruptura-ui"]
