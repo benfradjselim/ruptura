@@ -26,4 +26,4 @@ Ruptura runs in your Kubernetes or OpenShift cluster, on top of the monitoring s
 
 Start with the [installation](install.md). The [failure catalog](https://github.com/benfradjselim/ruptura/tree/main/failures) lists 66 Kubernetes and OpenShift failures and where Ruptura stands on each.
 
-Ruptura is in active development and not yet recommended for production.
+Ruptura only reads your cluster and never changes your workloads, so you can run it next to production. It covers 21 of the 66 failures in the [open failure catalog](https://getruptura.dev/failures/) today, 8 of them tested on a lab cluster, and each release adds more.
