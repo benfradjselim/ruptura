@@ -6,12 +6,20 @@ import (
 	"time"
 )
 
-// objectStale is how long an object may go without a reading before its
-// finding is no longer reported.
-const objectStale = 3 * time.Minute
-
-// stallMinRises is how many rises a trend needs before a pause can end it.
-const stallMinRises = 3
+const (
+	// objectStale is how long an object may go without a reading before its
+	// finding is no longer reported.
+	objectStale = 3 * time.Minute
+	// staleScrapes is how many source intervals a sample may age before its
+	// source counts as stopped, even while Prometheus still serves it.
+	staleScrapes = 2
+	// gapScrapes is how many source intervals may pass between two samples of
+	// a detected card before its pending run restarts: one missed scrape is
+	// tolerated.
+	gapScrapes = 3
+	// stallMinRises is how many rises a trend needs before a pause can end it.
+	stallMinRises = 3
+)
 
 // ObjectFinding is a failure of an object other than a pod, read from a
 // catalog card: a node, a namespace quota, an autoscaler, a disruption budget.
@@ -28,7 +36,51 @@ type ObjectFinding struct {
 	Unit     string
 }
 
+// sampling follows when one object was read and which source sample it saw.
+type sampling struct {
+	last time.Time // poll time of the last reading
+	at   time.Time // time of the reading fed to the detector
+	// dated is true for a card whose readings carry their sample time;
+	// interval is then the gap between its last two distinct samples.
+	dated    bool
+	interval time.Duration
+}
+
+// next records a reading and returns the time to feed the detector, and
+// whether the reading is new. A sample read twice is not new.
+func (s *sampling) next(polled, sampled time.Time) (time.Time, bool) {
+	s.last = polled
+	if sampled.IsZero() {
+		s.at = polled
+		return polled, true
+	}
+	s.dated = true
+	if !sampled.After(s.at) {
+		return sampled, false
+	}
+	if !s.at.IsZero() {
+		s.interval = sampled.Sub(s.at)
+	}
+	s.at = sampled
+	return sampled, true
+}
+
+// stopped reports whether a dated object's newest sample is older than its
+// source should allow, which happens when the source stops being scraped
+// while Prometheus still serves its last sample.
+func (s *sampling) stopped(now time.Time) bool {
+	if !s.dated {
+		return false
+	}
+	limit := objectStale
+	if l := staleScrapes * s.interval; l > limit {
+		limit = l
+	}
+	return now.Sub(s.at) > limit
+}
+
 type objectTrend struct {
+	sampling
 	level, unit string
 	mode        Mode
 	horizon     time.Duration
@@ -36,18 +88,15 @@ type objectTrend struct {
 	estimate    Estimate
 	active      bool
 	value, cap  float64
-	last        time.Time
-	// sampled is the time of the source sample behind the estimate.
-	sampled time.Time
 }
 
 type objectCondition struct {
+	sampling
 	level    string
 	detector *Condition
 	estimate Estimate
 	active   bool
 	value    float64
-	last     time.Time
 }
 
 // Objects follows catalog cards per object. It is safe for concurrent use.
@@ -58,15 +107,15 @@ type Objects struct {
 	// polled is the time of the last successful query of each card. An object
 	// missing from that poll is gone: a deleted Job, a removed node.
 	polled map[string]time.Time
-	// samples holds the latest and the previous sample time of each card, so
-	// that an object first seen at one sample can be dated from the one before.
-	samples map[string][2]time.Time
+	// intervals is the latest sample interval seen on each card, so that an
+	// object first seen at one sample can be dated from the source's rhythm.
+	intervals map[string]time.Duration
 }
 
 // NewObjects returns an empty object tracker.
 func NewObjects() *Objects {
-	return &Objects{trends: map[string]*objectTrend{}, conditions: map[string]*objectCondition{}, polled: map[string]time.Time{},
-		samples: map[string][2]time.Time{}}
+	return &Objects{trends: map[string]*objectTrend{}, conditions: map[string]*objectCondition{},
+		polled: map[string]time.Time{}, intervals: map[string]time.Duration{}}
 }
 
 func objectKey(card, target string) string { return card + "\x00" + target }
@@ -81,28 +130,27 @@ func splitObjectKey(key string) (string, string) {
 }
 
 // ObserveTrend records usage against capacity for a predicted card, read at
-// polled from a source sample taken at sampled (zero means polled). The
-// saturation detector decides whether the trend is real; a forecast further
-// than horizon is kept but not reported, and a trend that pauses for longer
-// than any pause it showed while rising is withdrawn.
+// polled from a source sample taken at sampled, or zero for a card whose
+// readings carry no sample time. The saturation detector decides whether the
+// trend is real; a forecast further than horizon is kept but not reported,
+// and a trend that pauses for longer than any pause it showed while rising is
+// withdrawn.
 func (o *Objects) ObserveTrend(card, level, target string, mode Mode, horizon time.Duration, unit string, polled, sampled time.Time, usage, capacity float64) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if sampled.IsZero() {
-		sampled = polled
-	}
 	key := objectKey(card, target)
 	state, ok := o.trends[key]
 	if !ok {
 		state = &objectTrend{level: level, unit: unit, mode: mode, horizon: horizon, detector: NewSaturation()}
 		o.trends[key] = state
 	}
-	state.last = polled
-	if !sampled.After(state.sampled) {
+	at, fresh := state.next(polled, sampled)
+	if !fresh {
 		return
 	}
-	state.value, state.cap, state.sampled = usage, capacity, sampled
-	est, active := state.detector.Observe(sampled, usage, capacity, 0)
+	o.noteInterval(card, state.interval)
+	state.value, state.cap = usage, capacity
+	est, active := state.detector.Observe(at, usage, capacity, 0)
 	if active && usage < capacity && stalled(state.detector.points) {
 		est, active = Estimate{}, false
 	}
@@ -112,36 +160,55 @@ func (o *Objects) ObserveTrend(card, level, target string, mode Mode, horizon ti
 
 // ObserveDetected records the value of a detected card's query, 1 while the
 // failure holds and 0 otherwise, read at polled from a source sample taken at
-// sampled (zero means polled).
+// sampled, or zero for a card whose readings carry no sample time. A dated
+// change is placed halfway between samples, and one missed scrape does not
+// restart a pending run.
 func (o *Objects) ObserveDetected(card, level, target string, mode Mode, raiseAfter, clearAfter time.Duration, polled, sampled time.Time, value float64) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if sampled.IsZero() {
-		sampled = polled
-	}
-	prior := o.sample(card, sampled)
 	key := objectKey(card, target)
 	state, ok := o.conditions[key]
 	if !ok {
-		state = &objectCondition{level: level, detector: NewSampledCondition(mode, 1, raiseAfter, clearAfter, objectStale, prior)}
+		state = &objectCondition{level: level, detector: NewConditionFor(mode, 1, raiseAfter, clearAfter)}
+		if !sampled.IsZero() {
+			var prior time.Time
+			if interval := o.intervals[card]; interval > 0 {
+				prior = sampled.Add(-interval)
+			}
+			state.detector = NewSampledCondition(mode, 1, raiseAfter, clearAfter, objectStale, prior)
+		}
 		o.conditions[key] = state
 	}
-	state.value, state.last = value, polled
-	state.estimate, state.active = state.detector.Observe(sampled, value)
+	at, fresh := state.next(polled, sampled)
+	state.value = value
+	if !fresh {
+		return
+	}
+	o.noteInterval(card, state.interval)
+	if gap := gapScrapes * state.interval; state.dated && gap > objectStale {
+		state.detector.maxGap = gap
+	}
+	state.estimate, state.active = state.detector.Observe(at, value)
 }
 
-// sample records a sample time of card and returns the card's sample before
-// it, or zero when none is known.
-func (o *Objects) sample(card string, at time.Time) time.Time {
-	times := o.samples[card]
-	if at.After(times[0]) {
-		times = [2]time.Time{at, times[0]}
-		o.samples[card] = times
+// Seen keeps an object of a dated card alive when a poll returned its value
+// but not its sample time, without feeding a reading.
+func (o *Objects) Seen(card, target string, polled time.Time) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	key := objectKey(card, target)
+	if state, ok := o.trends[key]; ok {
+		state.last = polled
 	}
-	if at.Equal(times[0]) {
-		return times[1]
+	if state, ok := o.conditions[key]; ok {
+		state.last = polled
 	}
-	return time.Time{}
+}
+
+func (o *Objects) noteInterval(card string, interval time.Duration) {
+	if interval > 0 {
+		o.intervals[card] = interval
+	}
 }
 
 // stalled reports whether usage has not risen for longer than the longest
@@ -171,6 +238,9 @@ func stalled(points []point) bool {
 
 // aged returns est counted down by the age of its sample at now.
 func aged(est Estimate, age time.Duration) Estimate {
+	if age < 0 {
+		age = 0
+	}
 	down := func(d time.Duration) time.Duration {
 		if d == 0 {
 			return 0
@@ -193,12 +263,12 @@ func (o *Objects) Polled(card string, at time.Time) {
 }
 
 // gone reports whether an object missed the last successful poll of its card,
-// or has had no reading for objectStale.
-func (o *Objects) gone(card string, last, now time.Time) bool {
-	if polled, ok := o.polled[card]; ok && last.Before(polled) {
+// has had no reading for objectStale, or its source stopped.
+func (o *Objects) gone(card string, s sampling, now time.Time) bool {
+	if polled, ok := o.polled[card]; ok && s.last.Before(polled) {
 		return true
 	}
-	return now.Sub(last) > objectStale
+	return now.Sub(s.last) > objectStale || s.stopped(now)
 }
 
 // Findings returns the active findings with a recent reading, most urgent
@@ -209,8 +279,8 @@ func (o *Objects) Findings(now time.Time) []ObjectFinding {
 	var out []ObjectFinding
 	for key, state := range o.trends {
 		card, target := splitObjectKey(key)
-		est := aged(state.estimate, now.Sub(state.sampled))
-		if !state.active || o.gone(card, state.last, now) || est.ETF > state.horizon {
+		est := aged(state.estimate, now.Sub(state.at))
+		if !state.active || o.gone(card, state.sampling, now) || est.ETF > state.horizon {
 			continue
 		}
 		out = append(out, ObjectFinding{Card: card, Level: state.level, Target: target, Predicted: true,
@@ -218,7 +288,7 @@ func (o *Objects) Findings(now time.Time) []ObjectFinding {
 	}
 	for key, state := range o.conditions {
 		card, target := splitObjectKey(key)
-		if !state.active || o.gone(card, state.last, now) {
+		if !state.active || o.gone(card, state.sampling, now) {
 			continue
 		}
 		out = append(out, ObjectFinding{Card: card, Level: state.level, Target: target,

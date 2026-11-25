@@ -70,3 +70,17 @@ func TestPollCards(t *testing.T) {
 		t.Fatalf("findings = %+v", got)
 	}
 }
+
+func TestPollCardsDatedCardMissingSampleTime(t *testing.T) {
+	card := sources.Card{ID: "pdb", Kind: sources.CardDetected, Level: "workload", FailureMode: "pdb_blocks_drain",
+		Target: []string{"namespace"}, Value: "v", Sampled: "s"}
+	objects := failuremodes.NewObjects()
+	start := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	values := []sources.Series{{Labels: map[string]string{"namespace": "a"}, Value: 1}, {Labels: map[string]string{"namespace": "b"}, Value: 1}}
+	stamped := []sources.Series{{Labels: map[string]string{"namespace": "a"}, Value: float64(start.Unix())}}
+	pollCards(context.Background(), fakeVectors{"v": values, "s": stamped}, []sources.Card{card}, objects, start)
+	got := objects.Findings(start)
+	if len(got) != 1 || got[0].Target != "a" {
+		t.Fatalf("findings = %+v, want only the dated object", got)
+	}
+}

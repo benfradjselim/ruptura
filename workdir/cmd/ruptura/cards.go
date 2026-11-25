@@ -69,7 +69,12 @@ func pollPredictedCard(ctx context.Context, source vectorSource, card sources.Ca
 		if !ok || !known || limit <= 0 {
 			continue
 		}
-		objects.ObserveTrend(card.ID, card.Level, target, failuremodes.Mode(card.FailureMode), card.Horizon, card.Unit, now, sampled[target], series.Value, limit)
+		at, dated := sampleOf(card, sampled, target)
+		if !dated {
+			objects.Seen(card.ID, target, now)
+			continue
+		}
+		objects.ObserveTrend(card.ID, card.Level, target, failuremodes.Mode(card.FailureMode), card.Horizon, card.Unit, now, at, series.Value, limit)
 	}
 	return nil
 }
@@ -89,14 +94,29 @@ func pollDetectedCard(ctx context.Context, source vectorSource, card sources.Car
 		if !ok || !known {
 			continue
 		}
-		objects.ObserveDetected(card.ID, card.Level, target, mode, card.RaiseAfter, card.ClearAfter, now, sampled[target], series.Value)
+		at, dated := sampleOf(card, sampled, target)
+		if !dated {
+			objects.Seen(card.ID, target, now)
+			continue
+		}
+		objects.ObserveDetected(card.ID, card.Level, target, mode, card.RaiseAfter, card.ClearAfter, now, at, series.Value)
 	}
 	return nil
 }
 
+// sampleOf returns the sample time of target, zero for a card without a
+// Sampled query, and false when the card has one but it missed this target: that
+// reading is not dated by the poll, which would be later than its sample.
+func sampleOf(card sources.Card, sampled map[string]time.Time, target string) (time.Time, bool) {
+	if card.Sampled == "" {
+		return time.Time{}, true
+	}
+	at, ok := sampled[target]
+	return at, ok
+}
+
 // sampleTimes reads the card's Sampled query: the time of the source sample
-// behind each target. A card without one, or a target missing from it, is
-// dated by the poll.
+// behind each target. A card without one is dated by the poll.
 func sampleTimes(ctx context.Context, source vectorSource, card sources.Card) (map[string]time.Time, error) {
 	if card.Sampled == "" {
 		return nil, nil

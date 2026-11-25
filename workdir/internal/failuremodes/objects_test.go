@@ -167,13 +167,13 @@ func ksmPolls(t *testing.T, raise time.Duration, condStart time.Time, end time.T
 	return time.Time{}
 }
 
-func TestObjectsSampledConditionDatesNewObjectBetweenSamples(t *testing.T) {
+func TestObjectsSampledConditionDatesNewObjectFromSourceInterval(t *testing.T) {
 	o := NewObjects()
-	// A first sample of another target sets the card's previous sample time.
-	o.ObserveDetected("c", "workload", "ns/other", "m", 9*time.Minute, time.Minute, objectsStart, objectsStart, 0)
 	raisedAt := time.Time{}
-	for now := objectsStart.Add(30 * time.Second); now.Before(objectsStart.Add(20 * time.Minute)); now = now.Add(30 * time.Second) {
+	for now := objectsStart; now.Before(objectsStart.Add(20 * time.Minute)); now = now.Add(30 * time.Second) {
 		sampled := objectsStart.Add(now.Sub(objectsStart).Truncate(2 * time.Minute))
+		// Another object of the card shows the source's 2 minute rhythm.
+		o.ObserveDetected("c", "workload", "ns/other", "m", 9*time.Minute, time.Minute, now, sampled, 0)
 		if sampled.After(objectsStart) {
 			o.ObserveDetected("c", "workload", "ns/x", "m", 9*time.Minute, time.Minute, now, sampled, 1)
 		}
@@ -186,6 +186,77 @@ func TestObjectsSampledConditionDatesNewObjectBetweenSamples(t *testing.T) {
 	// the sample at 10 min, not 12 min as it would be from its first sample.
 	if want := objectsStart.Add(10 * time.Minute); !raisedAt.Equal(want) {
 		t.Fatalf("raised at %v, want %v", raisedAt.Sub(objectsStart), want.Sub(objectsStart))
+	}
+}
+
+func TestObjectsSampledConditionSurvivesOneMissedScrape(t *testing.T) {
+	o := NewObjects()
+	raised := false
+	for now := objectsStart; now.Before(objectsStart.Add(16 * time.Minute)); now = now.Add(30 * time.Second) {
+		sampled := objectsStart.Add(now.Sub(objectsStart).Truncate(2 * time.Minute))
+		if sampled.Equal(objectsStart.Add(6 * time.Minute)) {
+			sampled = objectsStart.Add(4 * time.Minute) // the 6 min scrape is missed
+		}
+		o.ObserveDetected("c", "workload", "ns/x", "m", 10*time.Minute, time.Minute, now, sampled, 1)
+		o.Polled("c", now)
+		raised = raised || len(o.Findings(now)) == 1
+	}
+	if !raised {
+		t.Fatal("a missed 2 minute scrape restarted the 10 minute run")
+	}
+}
+
+func TestObjectsDatedTrendGoneWhenSourceStops(t *testing.T) {
+	o := NewObjects()
+	var sampled time.Time
+	poll := func(now time.Time) []ObjectFinding {
+		o.ObserveTrend("q", "namespace", "ns/q/configmaps", "quota_exhaustion", 6*time.Hour, "count", now, sampled, float64(4*now.Sub(objectsStart)/(2*time.Minute)), 400)
+		o.Polled("q", now)
+		return o.Findings(now)
+	}
+	now := objectsStart
+	for ; now.Before(objectsStart.Add(40 * time.Minute)); now = now.Add(30 * time.Second) {
+		sampled = objectsStart.Add(now.Sub(objectsStart).Truncate(2 * time.Minute))
+		poll(now)
+	}
+	if len(poll(now)) != 1 {
+		t.Fatal("no forecast while the source runs")
+	}
+	// The source stops: Prometheus keeps serving the last sample.
+	stoppedAt := now
+	for ; now.Before(stoppedAt.Add(6 * time.Minute)); now = now.Add(30 * time.Second) {
+		if got := poll(now); len(got) == 0 {
+			if age := now.Sub(sampled); age <= 4*time.Minute {
+				t.Fatalf("dropped at sample age %v, want after 2 intervals", age)
+			}
+			return
+		}
+	}
+	t.Fatal("forecast kept on a sample more than 5 minutes old")
+}
+
+func TestObjectsSeenKeepsObjectWithoutFeedingIt(t *testing.T) {
+	o := NewObjects()
+	o.ObserveDetected("c", "workload", "ns/x", "m", 0, 0, objectsStart, objectsStart, 1)
+	o.Polled("c", objectsStart)
+	next := objectsStart.Add(30 * time.Second)
+	o.Seen("c", "ns/x", next)
+	o.Polled("c", next)
+	if len(o.Findings(next)) != 1 {
+		t.Fatal("an object seen without a sample time was dropped")
+	}
+	if got := o.conditions[objectKey("c", "ns/x")].at; !got.Equal(objectsStart) {
+		t.Fatalf("sample time moved to %v, want the last real sample", got)
+	}
+}
+
+func TestAgedIgnoresSampleAheadOfClock(t *testing.T) {
+	est := Estimate{ETF: 10 * time.Minute, ETFEarly: 8 * time.Minute, ETFLate: 12 * time.Minute}
+	if got := aged(est, -30*time.Second); got != est {
+		t.Fatalf("aged = %+v, want unchanged", got)
+	}
+	if got := aged(est, 9*time.Minute); got.ETF != time.Minute || got.ETFEarly != 0 || got.ETFLate != 3*time.Minute {
+		t.Fatalf("aged = %+v", got)
 	}
 }
 
