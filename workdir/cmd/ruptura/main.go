@@ -30,6 +30,7 @@ import (
 	apicontext "github.com/benfradjselim/ruptura/internal/context"
 	"github.com/benfradjselim/ruptura/internal/correlator"
 	"github.com/benfradjselim/ruptura/internal/discovery"
+	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/internal/eventbus"
 	"github.com/benfradjselim/ruptura/internal/events"
 	"github.com/benfradjselim/ruptura/internal/explain"
@@ -525,9 +526,11 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		logger.Default.Info("call graph disabled", "reason", err.Error())
 	}
 	limits := newCeilings(os.Getenv("RUPTURA_DEFAULT_MEMORY_LIMITS"))
-	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store, limits)
+	objects := failuremodes.NewObjects()
+	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store, limits, objects)
 	if tracker != nil {
 		handlers.SetFailureModes(tracker)
+		handlers.SetObjectFindings(objects, cardInfo())
 	}
 	if inputs := startInputs(ctx, os.Getenv("RUPTURA_THANOS_URL"), tracker, inf, limits); inputs != nil {
 		handlers.SetInputs(inputs)

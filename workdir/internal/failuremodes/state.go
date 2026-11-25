@@ -160,7 +160,9 @@ func (t *Tracker) Restore(state State, now time.Time) {
 			s.detector = &Saturation{points: points, restarts: snap.Restarts, seen: true, history: history}
 		}
 		if snap.CondLast != 0 {
-			s.condition = &Condition{runStart: fromUnixSeconds(snap.CondRun), belowSince: fromUnixSeconds(snap.CondBelow), last: fromUnixSeconds(snap.CondLast), active: snap.CondOn}
+			s.condition = NewCondition()
+			s.condition.runStart, s.condition.belowSince = fromUnixSeconds(snap.CondRun), fromUnixSeconds(snap.CondBelow)
+			s.condition.last, s.condition.active = fromUnixSeconds(snap.CondLast), snap.CondOn
 			s.condSeen = s.seen
 		}
 	}

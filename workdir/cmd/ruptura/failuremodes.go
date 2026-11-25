@@ -24,7 +24,7 @@ const (
 
 // startFailureModes polls the configured Thanos endpoint and feeds the tracker.
 // It returns nil when no endpoint is configured, and reports every failure.
-func startFailureModes(ctx context.Context, url string, inf *discovery.Informer, store *storage.Store, limits *ceilings) *failuremodes.Tracker {
+func startFailureModes(ctx context.Context, url string, inf *discovery.Informer, store *storage.Store, limits *ceilings, objects *failuremodes.Objects) *failuremodes.Tracker {
 	if url == "" {
 		return nil
 	}
@@ -46,12 +46,14 @@ func startFailureModes(ctx context.Context, url string, inf *discovery.Informer,
 	restoreFailureHistory(tracker, store)
 	restoreTrackerState(tracker, store, time.Now())
 	startCeilings(ctx, limits, source, inf, os.Getenv("RUPTURA_INFERRED_CEILINGS") == "false")
+	cards := catalog.CardsFor(inputProfile())
 	go func() {
 		ticker := time.NewTicker(failureModePollInterval)
 		defer ticker.Stop()
 		var saved time.Time
 		for {
 			pollFailureModes(ctx, source, catalog, inf, tracker, limits)
+			pollCards(ctx, source, cards, objects, time.Now())
 			if now := time.Now(); now.Sub(saved) >= failureModeSaveInterval {
 				saveTrackerState(tracker, store, now)
 				saved = now
@@ -63,7 +65,7 @@ func startFailureModes(ctx context.Context, url string, inf *discovery.Informer,
 			}
 		}
 	}()
-	logger.Default.Info("failure modes active", "signals", len(catalog.Signals))
+	logger.Default.Info("failure modes active", "signals", len(catalog.Signals), "cards", len(cards))
 	return tracker
 }
 

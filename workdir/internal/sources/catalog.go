@@ -4,6 +4,7 @@ package sources
 import (
 	_ "embed"
 	"fmt"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -35,10 +36,69 @@ type Role struct {
 	Query   string `yaml:"query"`
 }
 
-// Catalog is the set of known signals and roles.
+// Card kinds.
+const (
+	CardPredicted = "predicted"
+	CardDetected  = "detected"
+)
+
+// Card is one failure of the catalog that the engine reads as data: a trend
+// toward a capacity (predicted) or a query that returns 1 while the failure
+// holds (detected).
+type Card struct {
+	ID          string   `yaml:"id"`
+	FailureMode string   `yaml:"failureMode"`
+	Level       string   `yaml:"level"`
+	Kind        string   `yaml:"kind"`
+	Target      []string `yaml:"target"`
+	Usage       string   `yaml:"usage"`
+	Capacity    string   `yaml:"capacity"`
+	Value       string   `yaml:"value"`
+	// ModeLabel, when set, names a label whose value becomes the failure mode
+	// through Modes, for a card that covers several related failures.
+	ModeLabel  string            `yaml:"modeLabel"`
+	Modes      map[string]string `yaml:"modes"`
+	RaiseAfter time.Duration     `yaml:"raiseAfter"`
+	ClearAfter time.Duration     `yaml:"clearAfter"`
+	Horizon    time.Duration     `yaml:"horizon"`
+	Severity   string            `yaml:"severity"`
+	Profile    string            `yaml:"profile"`
+	Action     string            `yaml:"action"`
+	Unit       string            `yaml:"unit"`
+}
+
+// Catalog is the set of known signals, roles and failure cards.
 type Catalog struct {
 	Signals []Signal `yaml:"signals"`
 	Roles   []Role   `yaml:"roles"`
+	Cards   []Card   `yaml:"cards"`
+}
+
+// Validate reports the first card that the engine cannot run.
+func (c Catalog) Validate() error {
+	seen := map[string]bool{}
+	for _, card := range c.Cards {
+		if card.ID == "" || seen[card.ID] {
+			return fmt.Errorf("sources: card %q: missing or duplicate id", card.ID)
+		}
+		seen[card.ID] = true
+		if len(card.Target) == 0 || card.Level == "" || (card.FailureMode == "" && card.ModeLabel == "") {
+			return fmt.Errorf("sources: card %q: level, target and failure mode are required", card.ID)
+		}
+		switch card.Kind {
+		case CardPredicted:
+			if card.Usage == "" || card.Capacity == "" || card.Horizon <= 0 {
+				return fmt.Errorf("sources: card %q: predicted needs usage, capacity and horizon", card.ID)
+			}
+		case CardDetected:
+			if card.Value == "" {
+				return fmt.Errorf("sources: card %q: detected needs value", card.ID)
+			}
+		default:
+			return fmt.Errorf("sources: card %q: unknown kind %q", card.ID, card.Kind)
+		}
+	}
+	return nil
 }
 
 // RolesFor returns the roles of a level included in a profile. A wider profile
@@ -55,11 +115,27 @@ func (c Catalog) RolesFor(level, profile string) []Role {
 	return out
 }
 
+// CardsFor returns the cards whose minimum profile is within profile.
+func (c Catalog) CardsFor(profile string) []Card {
+	rank := map[string]int{ProfileMinimal: 1, ProfileStandard: 2}
+	selected := rank[profile]
+	var out []Card
+	for _, card := range c.Cards {
+		if rank[card.Profile] > 0 && rank[card.Profile] <= selected {
+			out = append(out, card)
+		}
+	}
+	return out
+}
+
 // LoadCatalog parses the embedded catalog.yaml.
 func LoadCatalog() (Catalog, error) {
 	var c Catalog
 	if err := yaml.Unmarshal(catalogYAML, &c); err != nil {
 		return Catalog{}, fmt.Errorf("sources: parse catalog: %w", err)
+	}
+	if err := c.Validate(); err != nil {
+		return Catalog{}, err
 	}
 	return c, nil
 }

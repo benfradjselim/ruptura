@@ -55,6 +55,8 @@ type Handlers struct {
 	failureModes      FailureEstimates
 	callGraph         CallGraphSource
 	namespaceSelector map[string]string
+	objectFindings    ObjectFindings
+	cardInfo          map[string]CardInfo
 	namespaceLabels   NamespaceLabels
 	inputs            InputCoverage
 	horizon           time.Duration

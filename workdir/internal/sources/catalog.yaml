@@ -31,3 +31,92 @@ roles:
   - {name: container.oom, level: pod, profile: minimal, target: pod, query: 'sum by (namespace,pod) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"})'}
   - {name: replicas.unavailable.statefulset, level: workload, profile: minimal, target: statefulset, query: 'sum by (namespace,statefulset) (kube_statefulset_replicas - kube_statefulset_status_replicas_ready)'}
   - {name: replicas.unavailable.daemonset, level: workload, profile: minimal, target: daemonset, query: 'sum by (namespace,daemonset) (kube_daemonset_status_number_unavailable)'}
+
+# Failure cards read as data by the engine. Each id matches a card in the
+# repository failures/ catalog. Severities are proposals until measured.
+cards:
+  - id: hpa-maxed-out
+    failureMode: hpa_maxed_out
+    level: workload
+    kind: detected
+    target: [namespace, horizontalpodautoscaler]
+    value: 'max by (namespace,horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas) >= bool max by (namespace,horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas)'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    action: Raise the autoscaler maximum, or add capacity before load grows further
+  - id: pdb-blocks-drain
+    failureMode: pdb_blocks_drain
+    level: workload
+    kind: detected
+    target: [namespace, poddisruptionbudget]
+    value: '(max by (namespace,poddisruptionbudget) (kube_poddisruptionbudget_status_pod_disruptions_allowed) == bool 0) * (max by (namespace,poddisruptionbudget) (kube_poddisruptionbudget_status_expected_pods) > bool 0)'
+    raiseAfter: 10m
+    clearAfter: 2m
+    severity: warning
+    profile: minimal
+    action: Add replicas or relax the disruption budget, or the next node drain and cluster update will block
+  - id: job-failed
+    failureMode: job_failed
+    level: workload
+    kind: detected
+    target: [namespace, job_name]
+    value: 'max by (namespace,job_name) (kube_job_failed{condition="true"})'
+    raiseAfter: 0s
+    clearAfter: 0s
+    severity: warning
+    profile: minimal
+    action: Read the logs of the failed pod, fix the cause and run the Job again
+  - id: node-filesystem-filling
+    failureMode: node_filesystem_filling
+    level: node
+    kind: predicted
+    target: [instance, device]
+    usage: 'max by (instance,device) (node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"} - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"})'
+    capacity: 'max by (instance,device) (node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"})'
+    horizon: 6h
+    severity: critical
+    profile: standard
+    unit: bytes
+    action: Find what writes to this filesystem and clean it, or grow it, before the node reports disk pressure
+  - id: node-memory-exhaustion
+    failureMode: node_memory_exhaustion
+    level: node
+    kind: predicted
+    target: [instance]
+    usage: 'max by (instance) (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)'
+    capacity: 'max by (instance) (node_memory_MemTotal_bytes)'
+    horizon: 1h
+    severity: critical
+    profile: standard
+    unit: bytes
+    action: Find the pods that grow on this node and set their requests and limits, or add memory, before the kubelet evicts
+  - id: node-condition
+    level: node
+    kind: detected
+    target: [node, condition]
+    value: 'max by (node,condition) (kube_node_status_condition{condition="Ready",status="false"} or kube_node_status_condition{condition=~"MemoryPressure|DiskPressure|PIDPressure",status="true"})'
+    modeLabel: condition
+    modes:
+      Ready: node_not_ready
+      MemoryPressure: node_memory_pressure
+      DiskPressure: node_disk_pressure
+      PIDPressure: node_pid_pressure
+    raiseAfter: 2m
+    clearAfter: 2m
+    severity: critical
+    profile: minimal
+    action: Check the kubelet and the node resources; pods on this node are or will be evicted
+  - id: resource-quota-exhausted
+    failureMode: quota_exhaustion
+    level: namespace
+    kind: predicted
+    target: [namespace, resourcequota, resource]
+    usage: 'max by (namespace,resourcequota,resource) (kube_resourcequota{type="used"})'
+    capacity: 'max by (namespace,resourcequota,resource) (kube_resourcequota{type="hard"})'
+    horizon: 6h
+    severity: warning
+    profile: minimal
+    unit: count
+    action: Raise the quota or remove unused objects, or new objects in this namespace will be refused

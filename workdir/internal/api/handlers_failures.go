@@ -253,8 +253,9 @@ func (h *Handlers) Failures() []*FailureResult {
 	}
 	selected := selectFailures(results, h.levelSelector, h.workloadLabels)
 	selected = selectNamespaces(selected, h.namespaceSelector, h.namespaceLabels)
-	scoped := make([]*FailureResult, 0, len(selected))
 	now := time.Now()
+	objects := h.objectFailures(now)
+	scoped := make([]*FailureResult, 0, len(selected)+len(objects))
 	changes := h.discovery.RecentChanges(now.Add(-changeWindow))
 	for _, result := range selected {
 		copied := *result
@@ -271,7 +272,7 @@ func (h *Handlers) Failures() []*FailureResult {
 		copied = scopeResult(copied, h.levelScope)
 		scoped = append(scoped, &copied)
 	}
-	return scoped
+	return append(scoped, objects...)
 }
 
 func (h *Handlers) handleFailures(w http.ResponseWriter, _ *http.Request) {
