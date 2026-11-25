@@ -65,7 +65,7 @@ On OpenShift or Kubernetes, follow the [installation guide](../install.md): one 
 
 ## Help shape it
 
-Ruptura is open source (Apache 2.0) and still early: it is not yet recommended for production. I am looking for teams running Kubernetes or OpenShift with Prometheus who will try it on a test cluster and tell me what is missing.
+Ruptura is open source (Apache 2.0) and read-only: it never changes your workloads, so it can run next to production. I am looking for teams running Kubernetes or OpenShift with Prometheus who will try it and tell me what is missing.
 
 - Tell me which failure pages you most often in [Discussions](https://github.com/benfradjselim/ruptura/discussions)
 - Report bugs in [Issues](https://github.com/benfradjselim/ruptura/issues)

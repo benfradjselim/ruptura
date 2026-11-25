@@ -138,7 +138,7 @@ Then open <http://localhost:8081> and sign in with password `ruptura-local-dev`.
 | **Next** | Node level, pods without a memory limit, failure propagation along the call graph, logs |
 | **Later** | Namespace and cluster levels, traces, eBPF, OpenShift Console plugin |
 
-Ruptura is in active development and not yet recommended for production. Early adopters are welcome.
+Ruptura only reads your cluster and never changes your workloads, so you can run it next to production. It covers 21 of the 66 failures in the [open failure catalog](https://getruptura.dev/failures/) today, 8 of them tested on a lab cluster, and each release adds more. Early adopters are welcome.
 
 ## Community
 
