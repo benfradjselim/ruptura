@@ -12,7 +12,7 @@
   propagates_to: [every workload of the namespace]
   action: Raise the quota or reduce requests
   sources: [kubernetes-mixin KubeQuotaExceeded, kubernetes-mixin KubeQuotaFullyUsed]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: quota_exhaustion}
 
 - id: admission-refused
   title: Pods refused at creation

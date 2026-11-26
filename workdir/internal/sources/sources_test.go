@@ -202,3 +202,43 @@ func TestCollect_ConditionSignalRunsOnlyUsageQuery(t *testing.T) {
 		t.Fatalf("queries = %d readings = %+v", queries, got)
 	}
 }
+
+func TestCatalogCardsValid(t *testing.T) {
+	c, err := LoadCatalog()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(c.Cards) == 0 {
+		t.Fatal("no cards")
+	}
+	if got := len(c.CardsFor(ProfileMinimal)); got == 0 || got >= len(c.Cards) {
+		t.Fatalf("minimal profile selects %d of %d cards", got, len(c.Cards))
+	}
+	if got := len(c.CardsFor(ProfileStandard)); got != len(c.Cards) {
+		t.Fatalf("standard profile selects %d of %d cards", got, len(c.Cards))
+	}
+}
+
+func TestCatalogValidateRejects(t *testing.T) {
+	ok := Card{ID: "a", Level: "node", Kind: CardDetected, FailureMode: "m", Target: []string{"node"}, Value: "q"}
+	tests := []struct {
+		name  string
+		cards []Card
+	}{
+		{"duplicate id", []Card{ok, ok}},
+		{"no target", []Card{{ID: "a", Level: "node", Kind: CardDetected, FailureMode: "m", Value: "q"}}},
+		{"predicted without horizon", []Card{{ID: "a", Level: "node", Kind: CardPredicted, FailureMode: "m", Target: []string{"n"}, Usage: "u", Capacity: "c"}}},
+		{"detected without value", []Card{{ID: "a", Level: "node", Kind: CardDetected, FailureMode: "m", Target: []string{"n"}}}},
+		{"unknown kind", []Card{{ID: "a", Level: "node", Kind: "maybe", FailureMode: "m", Target: []string{"n"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := (Catalog{Cards: tt.cards}).Validate(); err == nil {
+				t.Fatal("accepted an invalid card")
+			}
+		})
+	}
+	if err := (Catalog{Cards: []Card{ok}}).Validate(); err != nil {
+		t.Fatalf("rejected a valid card: %v", err)
+	}
+}

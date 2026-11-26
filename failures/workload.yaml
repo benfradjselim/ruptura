@@ -92,7 +92,7 @@
   propagates_to: [callers of the workload]
   action: Raise the maximum, add capacity, or reduce load per request
   sources: [kubernetes-mixin KubeHpaMaxedOut]
-  ruptura: {status: not-covered}
+  ruptura: {status: tested, mode: hpa_maxed_out}
 
 - id: job-failed
   title: Job fails
@@ -108,7 +108,7 @@
   propagates_to: [consumers of the job's output]
   action: Read the failed pod logs and fix the cause
   sources: [kubernetes-mixin KubeJobFailed]
-  ruptura: {status: not-covered}
+  ruptura: {status: tested, mode: job_failed}
 
 - id: cronjob-not-running
   title: CronJob misses its schedule
@@ -140,4 +140,4 @@
   propagates_to: [cluster upgrade]
   action: Add replicas or relax the budget
   sources: [Kubernetes PodDisruptionBudget]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: pdb_blocks_drain}

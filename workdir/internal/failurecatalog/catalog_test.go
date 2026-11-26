@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
+	"github.com/benfradjselim/ruptura/internal/sources"
 )
 
 const catalogDir = "../../../failures"
@@ -43,12 +44,29 @@ var (
 	levels    = set("container", "pod", "workload", "namespace", "node", "network", "storage", "control-plane", "cluster", "application")
 	possible  = set("yes", "partial", "no")
 	statuses  = set("tested", "implemented", "planned", "not-covered")
-	// engineModes are the failure modes the engine reports; crash_loop is set
-	// by the API from restarts and back-off events.
-	engineModes = set(string(failuremodes.ModeSaturation), string(failuremodes.ModeCPUThrottling), string(failuremodes.ModeStartupStuck),
+	// engineModes are the failure modes the engine reports: the detectors'
+	// modes, crash_loop set by the API from restarts and back-off events, and
+	// every mode of the engine's catalog cards.
+	engineModes = withCardModes(set(string(failuremodes.ModeSaturation), string(failuremodes.ModeCPUThrottling), string(failuremodes.ModeStartupStuck),
 		string(failuremodes.ModeReplicasUnavailable), string(failuremodes.ModeRecurrentFailure), string(failuremodes.ModeRolloutStuck),
-		string(failuremodes.ModeReplicaDivergence), string(failuremodes.ModeReleaseRegression), string(failuremodes.ModeOOMKilled), "crash_loop")
+		string(failuremodes.ModeReplicaDivergence), string(failuremodes.ModeReleaseRegression), string(failuremodes.ModeOOMKilled), "crash_loop"))
 )
+
+func withCardModes(modes map[string]bool) map[string]bool {
+	catalog, err := sources.LoadCatalog()
+	if err != nil {
+		panic("engine catalog: " + err.Error())
+	}
+	for _, c := range catalog.Cards {
+		if c.FailureMode != "" {
+			modes[c.FailureMode] = true
+		}
+		for _, mode := range c.Modes {
+			modes[mode] = true
+		}
+	}
+	return modes
+}
 
 func set(values ...string) map[string]bool {
 	m := map[string]bool{}
