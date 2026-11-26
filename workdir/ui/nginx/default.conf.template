@@ -1,7 +1,7 @@
 server {
     listen 8080;
     server_name _;
-    root /usr/share/nginx/html;
+    root /opt/app-root/src;
 
     location /api/ {
         proxy_pass ${RUPTURA_BACKEND_URL}/api/;
@@ -13,7 +13,7 @@ server {
     }
 
     location ^~ /ui/ {
-        alias /usr/share/nginx/html/;
+        alias /opt/app-root/src/;
     }
 
     location / {
