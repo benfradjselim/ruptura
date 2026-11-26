@@ -103,8 +103,8 @@ func TestOnMatchesWholeNames(t *testing.T) {
 	if len(got) != 2 || got[0].FailureMode != "saturation" || got[1].FailureMode != "oom_killed" {
 		t.Fatalf("On(web) = %+v", got)
 	}
-	if got := On(failures, "shop/web"); len(got) != 2 {
-		t.Fatalf("On(shop/web) = %d failures, want 2", len(got))
+	if got := On(failures, "Deployment/web"); len(got) != 2 {
+		t.Fatalf("On(Deployment/web) = %d failures, want 2", len(got))
 	}
 }
 

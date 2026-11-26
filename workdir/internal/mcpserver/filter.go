@@ -82,25 +82,16 @@ func About(failures []Failure, name string) []Failure {
 }
 
 // On returns the failures whose workload or target is name, matched like the
-// nodes of the call graph, so impact_of reports the same object on both sides.
+// nodes of the call graph (namespace/Kind/name), so impact_of reports the same
+// object on both sides.
 func On(failures []Failure, name string) []Failure {
 	out := []Failure{}
 	for _, failure := range failures {
-		if sameNode(failure.Workload, name) || sameNode(failure.Target, name) || sameNode(workloadName(failure.Workload), name) {
+		if sameNode(failure.Workload, name) || sameNode(failure.Target, name) {
 			out = append(out, failure)
 		}
 	}
 	return out
-}
-
-// workloadName turns namespace/Kind/name into namespace/name, the form call
-// graph nodes use.
-func workloadName(workload string) string {
-	parts := strings.Split(workload, "/")
-	if len(parts) == 3 {
-		return parts[0] + "/" + parts[2]
-	}
-	return workload
 }
 
 // Neighbours splits the edges that touch name into its callers and callees.
