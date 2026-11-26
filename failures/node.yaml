@@ -46,6 +46,22 @@
   sources: [Kubernetes node condition MemoryPressure]
   ruptura: {status: implemented, mode: node_memory_pressure}
 
+- id: node-memory-exhaustion
+  title: Node memory running out
+  level: node
+  symptom: Memory in use on the node climbs steadily toward the node total
+  impact: The kubelet reaches its eviction threshold, then the kernel OOM killer picks processes, system daemons included
+  detect:
+    inputs: [node_memory_MemTotal_bytes, node_memory_MemAvailable_bytes]
+    rule: MemAvailable near zero
+  predict:
+    possible: yes
+    precursor: Sustained growth of memory in use (MemTotal minus MemAvailable) toward MemTotal
+  propagates_to: [pods of the node, node daemons]
+  action: Find the pods that grow on this node and set their requests and limits, or add memory
+  sources: [node-exporter meminfo, kubernetes-mixin NodeMemoryHighUtilization]
+  ruptura: {status: implemented, mode: node_memory_exhaustion}
+
 - id: node-disk-pressure
   title: Node under disk pressure
   level: node
