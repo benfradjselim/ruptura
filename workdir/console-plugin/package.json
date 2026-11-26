@@ -1,6 +1,6 @@
 {
   "name": "ruptura-console-plugin",
-  "version": "8.7.10",
+  "version": "8.7.11",
   "private": true,
   "description": "OpenShift console plugin showing the failures the Ruptura engine names",
   "license": "Apache-2.0",
@@ -33,7 +33,7 @@
   },
   "consolePlugin": {
     "name": "ruptura",
-    "version": "8.7.10",
+    "version": "8.7.11",
     "displayName": "Ruptura",
     "description": "Failures the Ruptura engine names, predicted and detected, in the OpenShift console.",
     "exposedModules": {
