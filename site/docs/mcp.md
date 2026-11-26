@@ -76,7 +76,7 @@ spec:
 
 Use the name of your instance in `--engine` and in the API key secret: an instance named `ruptura` serves on `http://ruptura:8080` and keeps its key in the `ruptura-api-key` secret.
 
-Clients connect to `http://ruptura-mcp.ruptura-system:8090/mcp` (streamable HTTP) and send `Authorization: Bearer <token>`. Behind an MCP gateway, register that address and let the gateway hold the token.
+Clients connect to `http://ruptura-mcp.ruptura-system:8090/mcp` (streamable HTTP) and send `Authorization: Bearer <token>`. Behind an MCP gateway, register that address and let the gateway hold the token. The server speaks plain HTTP: keep it inside the cluster, or put TLS in front with a route or the gateway, so the token never travels in clear.
 
 ## Run it on your desktop
 

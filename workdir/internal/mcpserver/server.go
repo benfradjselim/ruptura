@@ -98,7 +98,7 @@ func New(engine *Engine, version string) *mcp.Server {
 				return nil, ImpactOutput{}, err
 			}
 			callers, callees := Neighbours(edges, in.Name)
-			return nil, ImpactOutput{Callers: callers, Callees: callees, Failures: About(failures, in.Name)}, nil
+			return nil, ImpactOutput{Callers: callers, Callees: callees, Failures: On(failures, in.Name)}, nil
 		})
 
 	mcp.AddTool(server, &mcp.Tool{Name: "coverage", Title: "Coverage", Annotations: readOnly,

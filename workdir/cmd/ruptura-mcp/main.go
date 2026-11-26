@@ -55,16 +55,19 @@ func run() error {
 	mux.Handle("/mcp", requireToken(token, mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	srv := &http.Server{Addr: *listen, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	drained := make(chan struct{})
 	go func() {
+		defer close(drained)
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdown)
 	}()
-	log.Printf("ruptura-mcp %s: streamable HTTP on %s/mcp, engine %s", version, *listen, *engineURL)
+	log.Printf("ruptura-mcp %s: streamable HTTP on %s/mcp, engine %s", version, *listen, mcpserver.Redact(*engineURL))
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+	<-drained
 	return nil
 }
 

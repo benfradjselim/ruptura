@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -127,5 +128,23 @@ func TestEngineErrorIsAToolError(t *testing.T) {
 	res := call(t, session, "list_failures", nil, nil)
 	if !res.IsError {
 		t.Fatal("an engine refusal was not reported as a tool error")
+	}
+}
+
+func TestEngineTooLarge(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("["))
+		chunk := make([]byte, 1<<20)
+		for i := range chunk {
+			chunk[i] = ' '
+		}
+		for i := 0; i < 17; i++ {
+			_, _ = w.Write(chunk)
+		}
+	}))
+	defer srv.Close()
+	_, err := NewEngine(srv.URL, "k").Failures(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "larger than") {
+		t.Fatalf("err = %v, want a size error", err)
 	}
 }

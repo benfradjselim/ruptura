@@ -92,3 +92,31 @@ func TestNeighbours(t *testing.T) {
 		t.Fatal("an empty name matched edges")
 	}
 }
+
+func TestOnMatchesWholeNames(t *testing.T) {
+	failures := []Failure{
+		{Target: "shop/Deployment/web", Workload: "shop/Deployment/web", FailureMode: "saturation"},
+		{Target: "shop/Deployment/webhook", Workload: "shop/Deployment/webhook", FailureMode: "crash_loop"},
+		{Target: "shop/web-7d9-x", Workload: "shop/Deployment/web", Pod: "web-7d9-x", FailureMode: "oom_killed"},
+	}
+	got := On(failures, "web")
+	if len(got) != 2 || got[0].FailureMode != "saturation" || got[1].FailureMode != "oom_killed" {
+		t.Fatalf("On(web) = %+v", got)
+	}
+	if got := On(failures, "shop/web"); len(got) != 2 {
+		t.Fatalf("On(shop/web) = %d failures, want 2", len(got))
+	}
+}
+
+func TestRedact(t *testing.T) {
+	tests := map[string]string{
+		"http://user:pass@engine:8080": "http://engine:8080",
+		"http://ruptura:8080":          "http://ruptura:8080",
+		"::not a url":                  "::not a url",
+	}
+	for in, want := range tests {
+		if got := Redact(in); got != want {
+			t.Errorf("Redact(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

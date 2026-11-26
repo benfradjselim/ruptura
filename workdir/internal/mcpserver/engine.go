@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -108,14 +109,31 @@ func (e *Engine) get(ctx context.Context, path string, into any) error {
 	}
 	resp, err := e.Client.Do(req)
 	if err != nil {
-		return fmt.Errorf("engine unreachable at %s: %w", e.BaseURL, err)
+		return fmt.Errorf("engine unreachable at %s", Redact(e.BaseURL))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("engine answered HTTP %d on %s", resp.StatusCode, path)
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, maxEngineBody)).Decode(into); err != nil {
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxEngineBody+1))
+	if err != nil {
+		return fmt.Errorf("engine answer on %s: %w", path, err)
+	}
+	if len(body) > maxEngineBody {
+		return fmt.Errorf("engine answer on %s is larger than %d MiB", path, maxEngineBody>>20)
+	}
+	if err := json.Unmarshal(body, into); err != nil {
 		return fmt.Errorf("engine answer on %s: %w", path, err)
 	}
 	return nil
+}
+
+// Redact removes any user and password from a URL, for logs and errors.
+func Redact(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.User == nil {
+		return raw
+	}
+	u.User = nil
+	return u.String()
 }
