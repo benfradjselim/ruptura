@@ -18,6 +18,20 @@ A predicted `saturation`, `release_regression` or `replica_divergence` also carr
 | `rollout_stuck` | detected | A Deployment passed its progress deadline. |
 | `cpu_throttling` | detected | A container throttled at least 25% of the time for 10 minutes. Clears after 5 minutes below. |
 
+## Workload, node and namespace cards
+
+These failures come from catalog cards: each one is a Prometheus query in the engine catalog, read without card-specific code. Readings are dated by their Prometheus sample, since kube-state-metrics is often scraped only every one or two minutes. Node results are reported only by an instance that watches the whole cluster.
+
+| Failure mode | Level | Kind | Raised when | Input profile |
+|---|---|---|---|---|
+| `hpa_maxed_out` | workload | detected | An autoscaler runs at its maximum replicas for 10 minutes. Clears after 5 minutes below. | minimal |
+| `pdb_blocks_drain` | workload | detected | A PodDisruptionBudget allows no disruption while it expects pods, for 10 minutes: the next node drain or cluster update will block. Clears after 2 minutes. | minimal |
+| `job_failed` | workload | detected | A Job has its `Failed` condition. Clears when the Job is deleted. | minimal |
+| `quota_exhaustion` | namespace | predicted | A ResourceQuota is on course to be used up, within 6 hours. | minimal |
+| `node_filesystem_filling` | node | predicted | A node filesystem is on course to run out of free space, within 6 hours. Withdrawn when writes stop. | standard |
+| `node_memory_exhaustion` | node | predicted | Node memory in use is on course to reach the node total, within 1 hour. | standard |
+| `node_not_ready`, `node_memory_pressure`, `node_disk_pressure`, `node_pid_pressure` | node | detected | A node is not `Ready`, or reports a pressure condition, for 2 minutes. Clears after 2 minutes. | minimal |
+
 ## What a failure can take down
 
 The engine reads which workloads call which from two sources:

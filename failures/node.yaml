@@ -12,7 +12,7 @@
   propagates_to: [every pod of the node]
   action: Check the kubelet, the runtime and the node's resources
   sources: [kubernetes-mixin KubeNodeNotReady, kubernetes-mixin KubeNodeUnreachable]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: node_not_ready}
 
 - id: node-readiness-flapping
   title: Node flaps between Ready and NotReady
@@ -44,7 +44,7 @@
   propagates_to: [pods of the node above their requests]
   action: Set requests and limits, or add memory
   sources: [Kubernetes node condition MemoryPressure]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: node_memory_pressure}
 
 - id: node-disk-pressure
   title: Node under disk pressure
@@ -60,7 +60,7 @@
   propagates_to: [every pod of the node]
   action: Clean images and logs, or grow the disk
   sources: [Kubernetes node condition DiskPressure]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: node_disk_pressure}
 
 - id: node-pid-pressure
   title: Node under PID pressure
@@ -76,7 +76,7 @@
   propagates_to: [every pod of the node]
   action: Find the pod that leaks processes and set PID limits
   sources: [Kubernetes node condition PIDPressure]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: node_pid_pressure}
 
 - id: node-filesystem-filling
   title: Node filesystem filling up
@@ -92,7 +92,7 @@
   propagates_to: [every pod of the node]
   action: Find what writes, clean it, or grow the filesystem
   sources: [node-exporter NodeFilesystemSpaceFillingUp, node-exporter NodeFilesystemAlmostOutOfSpace]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: node_filesystem_filling}
 
 - id: inode-exhaustion
   title: Node runs out of inodes
