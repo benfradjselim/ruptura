@@ -12,7 +12,7 @@ data:
     server {
         listen {{ .Values.ui.port }};
         server_name _;
-        root /usr/share/nginx/html;
+        root /opt/app-root/src;
 
         # Proxy all API calls to the core ruptura engine.
         location /api/ {
@@ -28,7 +28,7 @@ data:
         # /ui/assets/…  but the Dockerfile copies them to the nginx root.
         # Alias strips the /ui prefix so assets resolve correctly.
         location ^~ /ui/ {
-            alias /usr/share/nginx/html/;
+            alias /opt/app-root/src/;
         }
 
         # SPA catch-all: serve index.html for any path not found on disk.

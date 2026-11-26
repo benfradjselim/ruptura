@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/benfradjselim/ruptura/releases"><img alt="Release" src="https://img.shields.io/github/v/release/benfradjselim/ruptura"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
-  <img alt="Go" src="https://img.shields.io/badge/Go-1.18-00ADD8?logo=go">
+  <img alt="Go" src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go">
   <a href="https://codecov.io/gh/benfradjselim/ruptura"><img alt="Coverage" src="https://codecov.io/gh/benfradjselim/ruptura/branch/main/graph/badge.svg"></a>
   <a href="https://github.com/benfradjselim/ruptura/discussions"><img alt="Discussions" src="https://img.shields.io/github/discussions/benfradjselim/ruptura"></a>
 </p>

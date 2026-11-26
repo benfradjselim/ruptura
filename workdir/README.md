@@ -15,7 +15,7 @@ Source of the Ruptura engine, command line tool, operator and web UI. For an ove
 
 ## Build and test
 
-Requires Go 1.18 or later.
+Requires Go 1.26 or later.
 
 ```bash
 go build ./...
