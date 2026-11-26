@@ -29,7 +29,7 @@ go tool cover -func=coverage.out | grep total
 golangci-lint run --timeout=5m
 ```
 
-Requires: **Go 1.18+**
+Requires: **Go 1.26+**
 
 ## Pull request checklist
 
@@ -71,7 +71,7 @@ Large features (new input source, new failure mode, new output) benefit from a s
 
 ## Code style
 
-- **Go 1.18** — no generics (`any`, `~`, type parameters), no `log/slog`, no `errors.Join`
+- **Go 1.26**, the version in `go.mod`
 - Immutable data patterns — never mutate a struct in-place, return new copies
 - No comments explaining *what* the code does — only *why* (non-obvious constraints)
 - Files ≤ 800 lines, functions ≤ 50 lines
