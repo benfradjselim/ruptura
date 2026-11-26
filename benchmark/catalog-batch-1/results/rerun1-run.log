@@ -1,0 +1,16 @@
+Error from server (NotFound): error when creating "STDIN": namespaces "ruptura-batch1" not found
+Error from server (NotFound): error when creating "STDIN": namespaces "ruptura-batch1" not found
+Flag --cpu-percent has been deprecated, Use --cpu with percentage or resource quantity format (e.g., '70%' for utilization or '500m' for milliCPU).
+Error from server (NotFound): namespaces "ruptura-batch1" not found
+Flag --cpu-percent has been deprecated, Use --cpu with percentage or resource quantity format (e.g., '70%' for utilization or '500m' for milliCPU).
+Error from server (NotFound): namespaces "ruptura-batch1" not found
+Error from server (NotFound): error when creating "STDIN": namespaces "ruptura-batch1" not found
+Error from server (NotFound): error when creating "STDIN": namespaces "ruptura-batch1" not found
+error: failed to create poddisruptionbudgets: namespaces "ruptura-batch1" not found
+error: failed to create poddisruptionbudgets: namespaces "ruptura-batch1" not found
+Error from server (NotFound): error when creating "STDIN": namespaces "ruptura-batch1" not found
+Error from server (NotFound): error when creating "STDIN": namespaces "ruptura-batch1" not found
+Error from server (NotFound): jobs.batch "t3-fail" not found
+Error from server (NotFound): jobs.batch "t3-ok" not found
+Error from server (NotFound): poddisruptionbudgets.policy "t2-one" not found
+Error from server (NotFound): namespaces "ruptura-batch1" not found

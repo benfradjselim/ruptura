@@ -1,0 +1,18 @@
+FAIL  T1 raise 10-11 min after max  max at None, raised at None, delay None min
+FAIL  T1 clear within 6 min of drop below max  below max at None, cleared at None
+PASS  T1 control silent  
+FAIL  T2 raise 10-11 min after creation  raised at None, delay None min
+PASS  T2 clear within 3 min of deletion  deleted 2026-11-25 14:35:20, cleared 2026-11-25 14:35:33
+PASS  T2 control silent  
+FAIL  T3 raise within 2 min of Failed  Failed at None, raised None, delay None min
+PASS  T3 clear within 2 min of deletion  deleted 2026-11-25 14:30:15, cleared 2026-11-25 14:30:23
+PASS  T3 control silent  
+PASS  T4 first forecast >= 15 min before full  first 2026-11-25 14:26:47, full 2026-11-25 15:16:26.906621, lead 49.7 min
+FAIL  T4 accuracy from 20 min before full  15:11:00 eta 245s true 326s; 15:11:32 eta 213s true 294s; 15:12:03 eta 182s true 263s; 15:12:34 eta 166s true 232s
+PASS  T4 stop: forecast withdrawn within 2 min of the fill stop  stop 2026-11-25 15:11:53, still listed at []
+PASS  T4 control silent  
+PASS  T5 first forecast >= 10 min before full  first 2026-11-25 14:26:15, full 2026-11-25 14:44:50, lead 18.6 min
+FAIL  T5 accuracy from 15 min before full  14:44:49 eta 0s true 1s
+PASS  T5 control silent  
+
+10/16 checks passed

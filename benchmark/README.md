@@ -42,6 +42,10 @@ healthy control and all scoring scripts are unchanged. Previous version of the f
 
 Results: [RESULTS.md](RESULTS.md), raw outputs in [results/](results/).
 
+## Later tests
+
+- [Catalog batch 1](catalog-batch-1/README.md), 25 November 2026: workload, node and namespace cards (HPA, PDB, Job, node filesystem, quota), 13 of 16 checks on the last run.
+
 ## Running it on your cluster
 
 The scripts are written for an OpenShift node shell (in our lab, `/root/lab.sh` sends a script

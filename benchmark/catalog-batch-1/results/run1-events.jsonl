@@ -1,0 +1,11 @@
+{"t":"2026-11-25T04:58:03Z","event":"start"}
+{"t":"2026-11-25T04:58:04Z","event":"t1 created"}
+{"t":"2026-11-25T04:58:04Z","event":"t2 created"}
+{"t":"2026-11-25T04:58:04Z","event":"t3 created"}
+{"t":"2026-11-25T04:58:04Z","event":"t4 mounted"}
+{"t":"2026-11-25T04:58:05Z","event":"t5 created"}
+{"t":"2026-11-25T05:12:47Z","event":"t3 jobs deleted"}
+{"t":"2026-11-25T05:17:52Z","event":"t2 pdb deleted"}
+{"t":"2026-11-25T05:27:59Z","event":"t1 load stopped"}
+{"t":"2026-11-25T05:54:29Z","event":"t4 fill stopped at 95%"}
+{"t":"2026-11-25T06:18:18Z","event":"end"}
