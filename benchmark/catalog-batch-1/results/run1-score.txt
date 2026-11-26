@@ -1,0 +1,17 @@
+FAIL  T1 raise 10-11 min after max  max at 2026-11-25 04:59:05, raised at 2026-11-25 05:10:23, delay 11.3 min
+FAIL  T1 clear within 6 min of drop below max  below max at 2026-11-25 05:33:34, cleared at 2026-11-25 05:39:42
+PASS  T1 control silent  
+FAIL  T2 raise 10-11 min after creation  raised at 2026-11-25 05:10:23, delay 12.3 min
+PASS  T2 clear within 3 min of deletion  deleted 2026-11-25 05:17:52, cleared 2026-11-25 05:20:11
+PASS  T2 control silent  
+PASS  T3 raise within 2 min of Failed  Failed at 2026-11-25 04:58:09, raised 2026-11-25 05:00:06, delay 1.9 min
+PASS  T3 clear within 2 min of deletion  deleted 2026-11-25 05:12:47, cleared 2026-11-25 05:13:58
+PASS  T3 control silent  
+PASS  T4 first forecast >= 15 min before full  first 2026-11-25 05:09:52, full 2026-11-25 05:59:02.342289, lead 49.2 min
+FAIL  T4 accuracy from 20 min before full  05:56:39 eta 202s true 143s; 05:57:10 eta 202s true 112s; 05:57:41 eta 202s true 81s; 05:58:11 eta 202s true 51s; 05:58:42 eta 202s true 20s
+PASS  T4 control silent  
+PASS  T5 first forecast >= 10 min before full  first 2026-11-25 05:10:23, full 2026-11-25 05:27:22, lead 17.0 min
+FAIL  T5 accuracy from 15 min before full  05:19:41 eta 587s true 461s; 05:21:44 eta 464s true 338s; 05:23:16 eta 339s true 246s; 05:23:47 eta 340s true 215s; 05:24:48 eta 215s true 154s
+PASS  T5 control silent  
+
+10/15 checks passed
