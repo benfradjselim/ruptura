@@ -39,6 +39,7 @@ nav:
   - How Ruptura decides: design.md
   - Alerting: alerting.md
   - Console plugin: console-plugin.md
+  - MCP server: mcp.md
   - API: reference/api.md
   - Blog:
     - Predict an OOM kill before it happens: blog/predict-an-oom-before-it-happens.md

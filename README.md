@@ -81,6 +81,8 @@ Each failure is one structured result, from `GET /api/v2/failures`:
 
 Failures covered today: memory saturation, a replica that diverges from its siblings, a release that leaks, OOM kill, crash loop, pod stuck at startup, unavailable replicas, stuck rollout, CPU throttling, failures recurring on a regular rhythm, an autoscaler stuck at its maximum, a disruption budget that blocks node drains, a failed Job, a node filesystem or node memory running out, a node not ready or under pressure, and a namespace quota running out. The [failure catalog](failures/) lists 67 Kubernetes and OpenShift failures and where Ruptura stands on each.
 
+AI assistants can ask the same questions through the read-only [MCP server](https://docs.getruptura.dev/mcp/): what fails soon, why, and which services it can take down.
+
 ## Getting started
 
 ### OpenShift and Kubernetes, with the operator

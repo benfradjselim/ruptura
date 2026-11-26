@@ -94,6 +94,9 @@ func cleanup(c *k8sClient, inst RupturaInstance, isOCP bool) error {
 			return fmt.Errorf("delete console plugin: %w", err)
 		}
 	}
+	if err := deleteMCP(c, ns, name); err != nil {
+		return fmt.Errorf("delete MCP server: %w", err)
+	}
 	if err := c.delete(readerBindingPath(ns, name)); err != nil {
 		return fmt.Errorf("delete reader ClusterRoleBinding: %w", err)
 	}
@@ -223,6 +226,9 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	note, err := reconcileConsolePlugin(c, ns, name, isOCP, inst.Spec, apiKeyRef, labels)
 	if err != nil {
 		return fmt.Errorf("console plugin: %w", err)
+	}
+	if err := reconcileMCP(c, ns, name, image, apiKeyRef, inst.Spec, labels); err != nil {
+		return fmt.Errorf("MCP server: %w", err)
 	}
 
 	return updateStatus(c, inst, note)
@@ -636,6 +642,12 @@ func generateAPIKey() (string, error) {
 // An existing Secret is never overwritten, so the key is stable across
 // reconciles. The key value is never logged.
 func ensureAPIKeySecret(c *k8sClient, ns, secretName string, labels map[string]string) error {
+	return ensureGeneratedSecret(c, ns, secretName, apiKeySecretKey, labels)
+}
+
+// ensureGeneratedSecret creates a Secret holding a random value under dataKey,
+// unless it already exists.
+func ensureGeneratedSecret(c *k8sClient, ns, secretName, dataKey string, labels map[string]string) error {
 	path := fmt.Sprintf("/api/v1/namespaces/%s/secrets/%s", ns, secretName)
 	var existing map[string]interface{}
 	err := c.get(path, &existing)
@@ -658,7 +670,7 @@ func ensureAPIKeySecret(c *k8sClient, ns, secretName string, labels map[string]s
 			"namespace": ns,
 			"labels":    labels,
 		},
-		"stringData": map[string]string{apiKeySecretKey: key},
+		"stringData": map[string]string{dataKey: key},
 	}
 	return c.apply(path, secret)
 }
