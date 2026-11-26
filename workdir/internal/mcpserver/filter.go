@@ -71,7 +71,7 @@ func About(failures []Failure, name string) []Failure {
 		return out
 	}
 	for _, failure := range failures {
-		for _, field := range []string{failure.Target, failure.Workload, failure.Pod} {
+		for _, field := range []string{failure.Target, failure.Workload, shortName(failure.Workload), failure.Pod} {
 			if field != "" && strings.Contains(strings.ToLower(field), needle) {
 				out = append(out, failure)
 				break
@@ -111,5 +111,18 @@ func Neighbours(edges []Edge, name string) (callers, callees []Edge) {
 
 func sameNode(node, name string) bool {
 	node, name = strings.ToLower(node), strings.ToLower(strings.TrimSpace(name))
-	return name != "" && (node == name || strings.HasSuffix(node, "/"+name))
+	if name == "" {
+		return false
+	}
+	return node == name || strings.HasSuffix(node, "/"+name) || shortName(node) == name
+}
+
+// shortName turns namespace/Kind/name, as Ruptura writes workloads, into
+// namespace/name, as people usually write them.
+func shortName(workload string) string {
+	parts := strings.Split(workload, "/")
+	if len(parts) == 3 {
+		return parts[0] + "/" + parts[2]
+	}
+	return workload
 }

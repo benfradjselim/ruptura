@@ -120,3 +120,23 @@ func TestRedact(t *testing.T) {
 		}
 	}
 }
+
+func TestNamespaceSlashName(t *testing.T) {
+	failures := []Failure{
+		{Target: "boutique/Deployment/checkout", Workload: "boutique/Deployment/checkout", FailureMode: "saturation"},
+		{Target: "trace-demo/Deployment/checkout", Workload: "trace-demo/Deployment/checkout", FailureMode: "crash_loop"},
+	}
+	if got := About(failures, "boutique/checkout"); len(got) != 1 || got[0].FailureMode != "saturation" {
+		t.Fatalf("About(boutique/checkout) = %+v", got)
+	}
+	if got := On(failures, "boutique/checkout"); len(got) != 1 {
+		t.Fatalf("On(boutique/checkout) = %d failures, want 1", len(got))
+	}
+	edges := []Edge{{From: "boutique/Deployment/frontend", To: "boutique/Deployment/checkout"}, {From: "trace-demo/Deployment/frontend", To: "trace-demo/Deployment/checkout"}}
+	if callers, _ := Neighbours(edges, "boutique/checkout"); len(callers) != 1 || callers[0].From != "boutique/Deployment/frontend" {
+		t.Fatalf("callers = %+v", callers)
+	}
+	if callers, _ := Neighbours(edges, "checkout"); len(callers) != 2 {
+		t.Fatalf("a bare name should match every namespace, got %d", len(callers))
+	}
+}

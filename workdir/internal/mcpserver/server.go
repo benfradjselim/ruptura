@@ -35,7 +35,7 @@ type ListOutput struct {
 
 // TargetInput names a workload, pod or node.
 type TargetInput struct {
-	Name string `json:"name" jsonschema:"workload, pod or node name, or namespace/name; matched as a substring, ignoring case"`
+	Name string `json:"name" jsonschema:"workload, pod or node name, namespace/name or namespace/Kind/name; ignoring case"`
 }
 
 // TargetOutput lists the failures about one target.
