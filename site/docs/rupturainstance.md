@@ -50,6 +50,7 @@ spec:
 | `output.ui.image` | image reference | console of the operator release | Console image. |
 | `output.consolePlugin.enabled` | `true`, `false` | `false` | On OpenShift, show the failures in the OpenShift console, see [Console plugin](console-plugin.md). |
 | `output.consolePlugin.image` | image reference | plugin of the operator release | Console plugin image. |
+| `output.mcp.enabled` | `true`, `false` | `false` | Deploy the read-only [MCP server](mcp.md) for AI assistants as `<name>-mcp`, with a generated client token in the Secret `<name>-mcp-token`. |
 | `apiKeyRef` | Secret name | generated | Secret holding the API key under `api-key`. |
 | `resources` | requests and limits | 100m and 128Mi, 1 CPU and 512Mi | Engine resources. |
 

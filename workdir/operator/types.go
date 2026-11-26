@@ -73,6 +73,15 @@ type OutputConfig struct {
 	UI UIOutput `json:"ui,omitempty"`
 	// ConsolePlugin is the OpenShift console plugin.
 	ConsolePlugin ConsolePluginOutput `json:"consolePlugin,omitempty"`
+	// MCP is the read-only MCP server for AI assistants.
+	MCP MCPOutput `json:"mcp,omitempty"`
+}
+
+// MCPOutput controls the read-only MCP server the operator deploys from the
+// engine image. It is off unless enabled.
+type MCPOutput struct {
+	// Enabled deploys the server; nil means false.
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // ConsolePluginOutput controls the OpenShift console plugin the operator

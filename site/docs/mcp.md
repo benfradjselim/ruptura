@@ -18,9 +18,31 @@ Every tool is marked read-only. Each result carries the engine's own fields: `ta
 
 Acting on failures (restart, scale, roll back), compound failures that combine several signals, and failures spreading across levels are part of Ruptura Autopilot, not this server.
 
-## Run it in the cluster
+## Turn it on with the operator
 
-The server reads the engine with its API key and asks its own clients for a separate bearer token. In HTTP mode it does not start without one.
+```yaml
+apiVersion: ruptura.io/v1alpha1
+kind: RupturaInstance
+metadata:
+  name: ruptura
+  namespace: ruptura-system
+spec:
+  output:
+    mcp:
+      enabled: true
+```
+
+The operator deploys `ruptura-mcp` from the engine image, with its Service on port 8090, and generates the token clients send in the Secret `ruptura-mcp-token`:
+
+```bash
+oc -n ruptura-system get secret ruptura-mcp-token -o jsonpath='{.data.token}' | base64 -d
+```
+
+Setting `enabled: false` removes the server, its Service and its token.
+
+## Run it in the cluster without the operator
+
+With the Helm chart or `install/ruptura.yaml`, deploy it yourself. The server reads the engine with its API key and asks its own clients for a separate bearer token. In HTTP mode it does not start without one.
 
 ```bash
 oc -n ruptura-system create secret generic ruptura-mcp-token \

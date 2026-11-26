@@ -381,6 +381,13 @@ spec:
                         image:
                           type: string
                           description: "Plugin image. Defaults to the plugin of the operator release."
+                    mcp:
+                      type: object
+                      description: "Read-only MCP server for AI assistants, deployed from the engine image as <name>-mcp with its Service on port 8090 and a generated client token in the Secret <name>-mcp-token. No Route. Off unless enabled."
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: false
             status:
               type: object
               properties:
