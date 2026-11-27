@@ -1,9 +1,6 @@
 package api
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -45,25 +42,6 @@ func TestApplyEstimate(t *testing.T) {
 	}
 }
 
-func TestSummary_AnnouncesTimeToFailure(t *testing.T) {
-	h := New(nil, nil, nil, nil, nil, nil, nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
-	h.SetFailureModes(fixedEstimates{
-		"demo/Deployment/orders": {Mode: failuremodes.ModeSaturation, ETF: 18 * time.Minute, Confidence: 0.9, Usage: 0.7},
-	})
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/workloads/demo/Deployment/orders/summary", nil)
-	req.Header.Set("Authorization", "Bearer key")
-	rec := httptest.NewRecorder()
-	h.NewRouter().ServeHTTP(rec, req)
-	var body WorkloadSummary
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v, body %s", err, rec.Body.String())
-	}
-	want := "orders is projected to reach its memory limit in 18 minutes."
-	if body.Headline != want {
-		t.Fatalf("headline = %q, want %q", body.Headline, want)
-	}
-}
-
 func (f fixedEstimates) RecentRestarts(workload string, _ time.Time, _ time.Duration) int {
 	if workload == "demo/Deployment/looping" {
 		return 3
@@ -72,7 +50,7 @@ func (f fixedEstimates) RecentRestarts(workload string, _ time.Time, _ time.Dura
 }
 
 func TestStateRestarts_PrefersRecentCount(t *testing.T) {
-	h := New(nil, nil, nil, nil, nil, nil, nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
+	h := New(nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
 	if got := h.stateRestarts("demo/Deployment/orders", 9); got != 9 {
 		t.Fatalf("without tracking = %d, want the lifetime count", got)
 	}
@@ -105,35 +83,6 @@ func TestApplyEstimate_ThrottlingIsDegradedNeverCritical(t *testing.T) {
 				t.Errorf("risk = %v, want alerting", risk)
 			}
 		})
-	}
-}
-
-func TestSummary_AnnouncesCPUThrottling(t *testing.T) {
-	h := New(nil, nil, nil, nil, nil, nil, nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
-	h.SetFailureModes(fixedEstimates{
-		"demo/Deployment/orders": {Mode: failuremodes.ModeCPUThrottling, Confidence: 1, Usage: 0.4},
-	})
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/workloads/demo/Deployment/orders/summary", nil)
-	req.Header.Set("Authorization", "Bearer key")
-	rec := httptest.NewRecorder()
-	h.NewRouter().ServeHTTP(rec, req)
-	var body WorkloadSummary
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if want := "orders is CPU throttled 40 percent of the time."; body.Headline != want {
-		t.Fatalf("headline = %q, want %q", body.Headline, want)
-	}
-}
-
-func TestTrackedRisk_IgnoresRawRuptureIndex(t *testing.T) {
-	h := New(nil, nil, nil, nil, nil, nil, nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
-	if got := h.baseRisk(7); got != 7 {
-		t.Fatalf("without tracking = %v, want 7", got)
-	}
-	h.SetFailureModes(fixedEstimates{})
-	if got := h.baseRisk(7); got != 0 {
-		t.Fatalf("with tracking = %v, want 0", got)
 	}
 }
 

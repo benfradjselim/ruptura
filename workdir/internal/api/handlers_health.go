@@ -10,6 +10,7 @@ func (h *Handlers) handleHealth(w http.ResponseWriter, r *http.Request) {
 	resp := h.health.Check(time.Now())
 	resp.Version = h.version
 	resp.Edition = h.edition
+	resp.DemoMode = h.demoMode
 	if resp.Edition == "" {
 		resp.Edition = "community"
 	}
@@ -33,9 +34,4 @@ func (h *Handlers) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if h.store != nil {
 		w.Write([]byte(failureMetrics(h.Failures())))
 	}
-}
-
-func (h *Handlers) handleTimeline(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte("<html><body>Timeline</body></html>"))
 }

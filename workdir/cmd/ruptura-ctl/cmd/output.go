@@ -7,8 +7,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
 // ANSI color codes
@@ -44,39 +42,7 @@ func cyan(s string) string    { return color(colorCyan, s) }
 func magenta(s string) string { return color(colorMagenta, s) }
 func blue(s string) string    { return color(colorBlue, s) }
 
-func healthColor(score float64) string {
-	switch {
-	case score >= 80:
-		return green(fmt.Sprintf("%.0f", score))
-	case score >= 40:
-		return yellow(fmt.Sprintf("%.0f", score))
-	default:
-		return red(fmt.Sprintf("%.0f", score))
-	}
-}
-
-// kpiHealth renders a health score, or a dimmed n/a when its inputs are not
 // measured, so an unmeasured workload never looks like a failing one.
-func kpiHealth(k models.KPI) string {
-	if k.Unavailable {
-		return dim("n/a")
-	}
-	return healthColor(k.Value)
-}
-
-func fusedRColor(r float64) string {
-	s := fmt.Sprintf("%.2f", r)
-	switch {
-	case r >= 5.0:
-		return red(bold(s + " !!!"))
-	case r >= 3.0:
-		return red(s + " ⚠")
-	case r >= 1.5:
-		return yellow(s + " ·")
-	default:
-		return green(s)
-	}
-}
 
 func stateIcon(state string) string {
 	switch state {
@@ -91,13 +57,6 @@ func stateIcon(state string) string {
 	default:
 		return dim("○")
 	}
-}
-
-func calibBar(pct int) string {
-	if pct >= 100 {
-		return green("100%")
-	}
-	return yellow(fmt.Sprintf("%3d%%", pct))
 }
 
 func etaStr(minutes int) string {
@@ -248,7 +207,6 @@ func pad(s string, width, align int) string {
 	return s + spaces
 }
 
-// mini progress bar [████░░░░] for 0-100
 func progressBar(pct int, width int) string {
 	filled := int(math.Round(float64(pct) / 100.0 * float64(width)))
 	if filled > width {

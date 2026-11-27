@@ -24,7 +24,7 @@ func TestHandleInfraGroupHistory_ReturnsPersistedPoints(t *testing.T) {
 
 	met := telemetry.NewRegistry("test")
 	hc := telemetry.NewHealthChecker()
-	h := New(store, nil, nil, nil, nil, nil, nil, nil, met, hc, "test-key")
+	h := New(store, nil, met, hc, "test-key")
 	router := h.NewRouter()
 
 	req, _ := http.NewRequest("GET", "/api/v2/infra/groups/grp.network/history?ns=prod", nil)
@@ -59,7 +59,7 @@ func TestHandleInfraGroupHistory_EmptyGroup_ReturnsEmptyTimeline(t *testing.T) {
 
 	met := telemetry.NewRegistry("test")
 	hc := telemetry.NewHealthChecker()
-	h := New(store, nil, nil, nil, nil, nil, nil, nil, met, hc, "test-key")
+	h := New(store, nil, met, hc, "test-key")
 	router := h.NewRouter()
 
 	req, _ := http.NewRequest("GET", "/api/v2/infra/groups/grp.storage/history?ns=staging", nil)
@@ -95,7 +95,7 @@ func TestHandleInfraGroupHistory_RespectsFromToWindow(t *testing.T) {
 
 	met := telemetry.NewRegistry("test")
 	hc := telemetry.NewHealthChecker()
-	h := New(store, nil, nil, nil, nil, nil, nil, nil, met, hc, "test-key")
+	h := New(store, nil, met, hc, "test-key")
 	router := h.NewRouter()
 
 	// Default window is last 24h — the 48h-old point must be excluded.
@@ -131,7 +131,7 @@ func TestHandleEngineStorage_IncludesRetentionStats(t *testing.T) {
 
 	met := telemetry.NewRegistry("test")
 	hc := telemetry.NewHealthChecker()
-	h := New(store, nil, nil, nil, nil, nil, nil, nil, met, hc, "test-key")
+	h := New(store, nil, met, hc, "test-key")
 	router := h.NewRouter()
 
 	req, _ := http.NewRequest("GET", "/api/v2/engine/storage", nil)

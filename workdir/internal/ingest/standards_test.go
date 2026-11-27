@@ -47,7 +47,7 @@ func gaugeExport(value float64) *metricspb.MetricsData {
 
 func TestOTLPHTTP_StandardPathsAndResponses(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil, nil, nil)
+	e := New(mp, nil)
 	mux := http.NewServeMux()
 	RegisterHandlers(mux, e)
 	pb, _ := proto.Marshal(gaugeExport(7))
@@ -98,7 +98,7 @@ func TestOTLPGRPC_ExportOverTLSWithGzip(t *testing.T) {
 		t.Fatal(err)
 	}
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil, nil, nil)
+	e := New(mp, nil)
 	e.SetTLS(config)
 	addr := freeAddr(t)
 	if err := e.StartOTLPGRPC(addr); err != nil {
@@ -124,7 +124,7 @@ func TestOTLPGRPC_ExportOverTLSWithGzip(t *testing.T) {
 
 func TestOTLPGRPC_RateLimit(t *testing.T) {
 	t.Setenv("RUPTURA_INGEST_RPS", "1")
-	e := New(&mockPipeline{}, nil, nil, nil, nil)
+	e := New(&mockPipeline{}, nil)
 	addr := freeAddr(t)
 	if err := e.StartOTLPGRPC(addr); err != nil {
 		t.Fatal(err)
@@ -165,7 +165,7 @@ func writeRequest(name string, value float64, ms int64) []byte {
 
 func TestPrometheusRemoteWrite(t *testing.T) {
 	mp := &mockPipeline{}
-	e := New(mp, nil, nil, nil, nil)
+	e := New(mp, nil)
 	mux := http.NewServeMux()
 	RegisterHandlers(mux, e)
 	cases := []struct {

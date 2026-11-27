@@ -3,37 +3,22 @@ package telemetry
 import (
 	"strings"
 	"testing"
-	"time"
 )
 
-func TestTelemetry(t *testing.T) {
-	reg := NewRegistry("6.0.0")
-	reg.SetRuptureIndex("h1", "cpu", "crit", 1.0)
-	reg.IncActionsTotal("act", "t1", "success")
-	reg.IncIngestTotal("prom")
-
+func TestRegistryRender(t *testing.T) {
+	reg := NewRegistry("8.7.12")
+	reg.IncIngestTotal("traces")
+	reg.IncIngestTotal("traces")
+	reg.IncIngestTotal("logs")
 	rendered := reg.Render()
-	if !strings.Contains(rendered, "rpt_rupture_index") {
-		t.Errorf("missing rupture_index. Got:\n%s", rendered)
+	for _, want := range []string{
+		`rpt_ingest_samples_total{source="logs"} 1`,
+		`rpt_ingest_samples_total{source="traces"} 2`,
+		`rpt_version_info{version="8.7.12"} 1`,
+		"rpt_uptime_seconds",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Errorf("render is missing %q:\n%s", want, rendered)
+		}
 	}
-
-	hc := NewHealthChecker()
-	res := hc.Check(time.Now().Add(61 * time.Minute))
-	if res.Status != "ready" {
-		t.Errorf("expected ready, got %s", res.Status)
-	}
-	_, err := hc.CheckJSON(time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	reg.SetTimeToFailure("h", "m", 1.0)
-	reg.SetPredictedValue("h", "m", "5m", 1.0)
-	reg.SetConfidence("h", 1.0)
-	reg.SetFusedProbability("h", 1.0)
-	reg.SetKPIStress("h", 1.0)
-	reg.SetKPIFatigue("h", 1.0)
-	reg.SetKPIHealthscore("h", 1.0)
-	reg.SetTrackerCount("t", "active", 1)
-	reg.SetMemoryBytes(100)
-	reg.Render()
 }

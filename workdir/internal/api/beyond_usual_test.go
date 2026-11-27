@@ -34,8 +34,8 @@ func TestMemoryBeyondUsual_NeverCriticalNorOOM(t *testing.T) {
 	if result.FailureMode != "memory_beyond_usual" || result.Kind != failureKindPredicted || result.ETASeconds != 180 {
 		t.Fatalf("result = %+v", result)
 	}
-	text := strings.Join(append(result.Evidence, result.RecommendedAction, estimateHeadline("cache", est)), " | ")
-	for _, want := range []string{"No memory limit set", "600 MiB", "7-day P99 + 20%", "Set a memory limit", "usual level"} {
+	text := strings.Join(append(result.Evidence, result.RecommendedAction), " | ")
+	for _, want := range []string{"No memory limit set", "600 MiB", "7-day P99 + 20%", "Set a memory limit"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("missing %q in %q", want, text)
 		}

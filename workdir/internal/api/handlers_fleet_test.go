@@ -2,220 +2,79 @@ package api
 
 import (
 	"encoding/json"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
-	"github.com/gorilla/mux"
-
-	"github.com/benfradjselim/ruptura/internal/analyzer"
-	"github.com/benfradjselim/ruptura/pkg/models"
+	"github.com/benfradjselim/ruptura/internal/failuremodes"
+	"github.com/benfradjselim/ruptura/internal/telemetry"
 )
 
-// TestSnapshotState is FBL-V1's core regression test: a workload with a
-// realistic, healthy HealthScore (the [0,1] scale it's actually stored on)
-// must never be classified "critical" just because calibration finished.
-// Before the fix, snapshotState compared hs against 70/40 as if it were a
-// [0,100] value, so every real health score (typically 0.7-0.9) fell
-// straight through to "critical" — the exact "37/37 critical, health
-// 75-90, risk 0.0" contradiction observed on the lab cluster.
-func TestSnapshotState(t *testing.T) {
-	tests := []struct {
-		name                string
-		calibrationProgress int
-		healthScore         float64
-		restarts            int
-		want                string
-	}{
-		{"still calibrating, no health score yet", 40, 0, 0, "calibrating"},
-		{"still calibrating despite a high-looking score", 99, 0.9, 0, "calibrating"},
-		{"calibrated, healthy — the regression case: 0.8 must never be critical", 100, 0.8, 0, "healthy"},
-		{"calibrated, healthy at the boundary", 100, 0.70, 0, "healthy"},
-		{"calibrated, degraded", 100, 0.55, 0, "degraded"},
-		{"calibrated, degraded at the boundary", 100, 0.40, 0, "degraded"},
-		{"calibrated, genuinely critical", 100, 0.10, 0, "critical"},
-		{"calibrated, health score never computed (NaN) must not read as critical", 100, math.NaN(), 0, "calibrating"},
-		{"calibrated, exactly zero health is genuinely critical, not NaN", 100, 0, 0, "critical"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			snap := models.KPISnapshot{
-				CalibrationProgress: tt.calibrationProgress,
-				HealthScore:         models.KPI{Value: tt.healthScore},
-			}
-			if got := snapshotState(snap, tt.restarts); got != tt.want {
-				t.Errorf("snapshotState(calibration=%d, health=%v, restarts=%d) = %q, want %q",
-					tt.calibrationProgress, tt.healthScore, tt.restarts, got, tt.want)
-			}
-		})
-	}
+// fakeSource is a failure source with a fixed list of workloads.
+type fakeSource struct {
+	workloads []string
+	worst     map[string]failuremodes.Estimate
+	restarts  map[string]int
 }
 
-// TestSnapshotState_CrashLoopOverride is FBL-V6's regression test: a
-// workload with a genuinely healthy resource-usage-derived score (or one
-// still calibrating) must still read "critical" once its container restart
-// count crosses crashLoopRestartThreshold — this is the fix for the live
-// finding that demo-crashloop/demo-oom's actually crash-looping pods
-// (thousands of real restarts) read "healthy" because no other signal in
-// the composite model is sourced from restart counts at all.
-func TestSnapshotState_CrashLoopOverride(t *testing.T) {
-	tests := []struct {
-		name                string
-		calibrationProgress int
-		healthScore         float64
-		restarts            int
-		want                string
-	}{
-		{"below threshold, healthy score: normal computation applies", 100, 0.9, crashLoopRestartThreshold - 1, "healthy"},
-		{"at threshold: critical overrides a healthy score", 100, 0.9, crashLoopRestartThreshold, "critical"},
-		{"above threshold: critical overrides a healthy score", 100, 1.0, crashLoopRestartThreshold + 100, "critical"},
-		{"above threshold: critical overrides even mid-calibration", 40, 0, crashLoopRestartThreshold, "critical"},
-		{"above threshold: critical overrides a NaN health score too", 100, math.NaN(), crashLoopRestartThreshold, "critical"},
-		{"zero restarts: no override, normal calibrating path", 0, 0, 0, "calibrating"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			snap := models.KPISnapshot{
-				CalibrationProgress: tt.calibrationProgress,
-				HealthScore:         models.KPI{Value: tt.healthScore},
-			}
-			if got := snapshotState(snap, tt.restarts); got != tt.want {
-				t.Errorf("snapshotState(calibration=%d, health=%v, restarts=%d) = %q, want %q",
-					tt.calibrationProgress, tt.healthScore, tt.restarts, got, tt.want)
-			}
-		})
-	}
+func (f fakeSource) Workloads(time.Time) []string { return f.workloads }
+func (f fakeSource) Worst(w string, _ time.Time) (failuremodes.Estimate, bool) {
+	est, ok := f.worst[w]
+	return est, ok
 }
+func (f fakeSource) RecentRestarts(w string, _ time.Time, _ time.Duration) int { return f.restarts[w] }
 
-// TestWorkloadRestartCount_NoDiscovery confirms the nil-informer path (bare-
-// metal/VM/demo mode, or tests that don't wire discovery up) fails closed to
-// 0 restarts rather than panicking — matching every other discovery-optional
-// path in this file.
-func TestWorkloadRestartCount_NoDiscovery(t *testing.T) {
-	h := &Handlers{}
-	if got := h.workloadRestartCount("prod", "Deployment", "api"); got != 0 {
-		t.Errorf("workloadRestartCount with nil discovery = %d, want 0", got)
-	}
-}
-
-// TestHandleFleet_PendingTelemetryWithNoDiscovery_StaysPending covers the
-// other real-world shape the crash-loop override needs to handle: a
-// workload that's been discovered via k8s (RegisterWorkload) but has never
-// received a single telemetry snapshot — a pod that spends nearly all its
-// time in CrashLoopBackOff (not Running) is rarely alive at the moment
-// resource-usage telemetry gets scraped, so it may sit in
-// "pending_telemetry" indefinitely (the exact live shape observed for
-// demo-crashloop/crash-app on the lab). With no discovery informer
-// wired up (the common case in tests, and for non-k8s/demo-mode
-// deployments), workloadRestartCount fails closed to 0, so this must stay
-// "pending_telemetry" rather than panicking or misreporting critical.
-func TestHandleFleet_PendingTelemetryWithNoDiscovery_StaysPending(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-	a := analyzer.NewAnalyzer()
-
-	ref := models.WorkloadRef{Namespace: "demo-crashloop", Kind: "Deployment", Name: "crash-app"}
-	a.RegisterWorkload(ref) // known via k8s discovery, but never Update()'d
-
-	h := &Handlers{store: store, analyzer: a}
-	r := mux.NewRouter()
-	r.HandleFunc("/api/v2/fleet", h.handleFleet).Methods("GET")
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/fleet", nil)
+func fleetOf(t *testing.T, h *Handlers) fleetResponse {
+	t.Helper()
 	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	var resp fleetResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
+	h.handleFleet(rec, httptest.NewRequest(http.MethodGet, "/api/v2/fleet", nil))
+	var out fleetResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
 	}
-	if len(resp.Hosts) != 1 {
-		t.Fatalf("Hosts = %d, want 1", len(resp.Hosts))
-	}
-	if resp.Hosts[0].State != "pending_telemetry" {
-		t.Errorf("state = %q, want pending_telemetry (no discovery informer wired up)", resp.Hosts[0].State)
-	}
-	if resp.CriticalHosts != 0 {
-		t.Errorf("CriticalHosts = %d, want 0", resp.CriticalHosts)
-	}
+	return out
 }
 
-// TestHandleFleet_CalibratingWorkloadsNeverCountAsCritical is the AC's
-// literal requirement in fleet-aggregate form: a fleet that's still warming
-// up must never show those workloads as critical. Before the fix,
-// handleFleet's count switch used "default: CriticalHosts++", so every
-// "calibrating" state (a real, distinct case — see snapshotState) fell into
-// that default and was tallied as critical alongside genuinely critical
-// hosts, matching the "37/37 critical" contradiction observed on the lab
-// cluster. Uses a real *analyzer.Analyzer (not a hand-built snapshot) so the
-// test goes through handleFleet's actual enrichSnapshot->CalibrationInfo
-// path exactly as production does — enrichSnapshot overwrites
-// CalibrationProgress from the analyzer's real state, so a hand-set field
-// on the stored snapshot wouldn't survive to snapshotState untouched.
-func TestHandleFleet_CalibratingWorkloadsNeverCountAsCritical(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-	a := analyzer.NewAnalyzer()
-
-	// One Update() call is far short of the 96-observation baseline —
-	// analyzer.CalibrationInfo reports "calibrating" for this ref.
-	freshRef := models.WorkloadRef{Namespace: "prod", Kind: "Deployment", Name: "fresh-svc"}
-	store.StoreSnapshot(a.Update(freshRef, map[string]float64{"cpu_percent": 0.2}))
-
-	// 100 idle-metric cycles crosses the baseline (matches
-	// TestAdaptiveBaseline_IdleWorkload in the analyzer package, which
-	// asserts this settles the health score above 0.80 — i.e. "healthy").
-	idleRef := models.WorkloadRef{Namespace: "prod", Kind: "Deployment", Name: "web-stable"}
-	var lastSnap models.KPISnapshot
-	for i := 0; i < 100; i++ {
-		lastSnap = a.Update(idleRef, map[string]float64{"cpu_percent": 0, "memory_percent": 0})
+func TestFleet_StatesFromFailures(t *testing.T) {
+	h := New(nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
+	h.SetFailureModes(fakeSource{
+		workloads: []string{"shop/Deployment/api", "shop/Deployment/db", "shop/Deployment/web", "shop/Deployment/cache"},
+		worst: map[string]failuremodes.Estimate{
+			"shop/Deployment/api":   {Mode: failuremodes.ModeSaturation, ETF: 3 * time.Minute},
+			"shop/Deployment/cache": {Mode: failuremodes.ModeCPUThrottling},
+		},
+		restarts: map[string]int{"shop/Deployment/db": 10},
+	})
+	got := fleetOf(t, h)
+	states := map[string]string{}
+	for _, w := range got.Hosts {
+		states[w.Host] = w.State
 	}
-	store.StoreSnapshot(lastSnap)
-
-	h := &Handlers{store: store, analyzer: a}
-	r := mux.NewRouter()
-	r.HandleFunc("/api/v2/fleet", h.handleFleet).Methods("GET")
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/fleet", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
-	}
-
-	var resp fleetResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-
-	if resp.TotalHosts != 2 {
-		t.Errorf("TotalHosts = %d, want 2", resp.TotalHosts)
-	}
-	if resp.HealthyHosts != 1 {
-		t.Errorf("HealthyHosts = %d, want 1 (the idle, fully-calibrated workload)", resp.HealthyHosts)
-	}
-	if resp.CriticalHosts != 0 {
-		t.Errorf("CriticalHosts = %d, want 0 (the still-calibrating workload must not be counted as critical)", resp.CriticalHosts)
-	}
-	if resp.DegradedHosts != 0 {
-		t.Errorf("DegradedHosts = %d, want 0", resp.DegradedHosts)
-	}
-
-	var freshState, idleState string
-	for _, host := range resp.Hosts {
-		switch host.Host {
-		case "prod/Deployment/fresh-svc":
-			freshState = host.State
-		case "prod/Deployment/web-stable":
-			idleState = host.State
+	want := map[string]string{"shop/Deployment/api": "critical", "shop/Deployment/db": "critical", "shop/Deployment/cache": "degraded", "shop/Deployment/web": "healthy"}
+	for w, s := range want {
+		if states[w] != s {
+			t.Errorf("%s = %q, want %q", w, states[w], s)
 		}
 	}
-	if freshState != "calibrating" {
-		t.Errorf("fresh-svc per-host state = %q, want calibrating", freshState)
+	if got.TotalHosts != 4 || got.CriticalHosts != 2 || got.DegradedHosts != 1 || got.HealthyHosts != 1 {
+		t.Fatalf("counts = %+v", got)
 	}
-	if idleState != "healthy" {
-		t.Errorf("web-stable per-host state = %q, want healthy", idleState)
+	if got.Hosts[len(got.Hosts)-1].State != "healthy" {
+		t.Fatal("critical and degraded workloads must sort before healthy ones")
+	}
+}
+
+func TestFleet_EmptyWithoutSources(t *testing.T) {
+	h := New(nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
+	if got := fleetOf(t, h); got.TotalHosts != 0 || len(got.Hosts) != 0 {
+		t.Fatalf("fleet = %+v, want empty", got)
+	}
+}
+
+func TestWorkloadRestartCount_NoDiscovery(t *testing.T) {
+	h := New(nil, nil, telemetry.NewRegistry("test"), telemetry.NewHealthChecker(), "key")
+	if got := h.workloadRestartCount("shop/Deployment/api"); got != 0 {
+		t.Fatalf("restarts = %d, want 0 without an informer", got)
 	}
 }
