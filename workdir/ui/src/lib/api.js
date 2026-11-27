@@ -33,38 +33,32 @@ export const api = {
 
   // ── Health ─────────────────────────────────────────────────────────────────
   health: () => req('GET', '/health'),
-  engineStatus: () => req('GET', '/engine/status'),
 
-  // ── KPIs ───────────────────────────────────────────────────────────────────
-  kpis:      (host)       => req('GET', '/kpis' + (host ? '?host=' + encodeURIComponent(host) : '')),
-  kpi:       (name, host) => req('GET', `/kpis/${name}` + (host ? '?host=' + encodeURIComponent(host) : '')),
-  kpisMulti: (hosts)      => { const q = hosts.map(h => 'host=' + encodeURIComponent(h)).join('&'); return req('GET', '/kpis/multi' + (q ? '?' + q : '')) },
+  // ── Failures ───────────────────────────────────────────────────────────────
+  fleet:          () => req('GET', '/fleet'),
+  failures:       () => req('GET', '/failures'),
+  failureClosest: () => req('GET', '/failures/closest'),
+  failureSeries:  (workload) => req('GET', `/failures/series?workload=${encodeURIComponent(workload)}`),
+  callGraph:      () => req('GET', '/callgraph'),
+  inputs:         () => req('GET', '/inputs'),
+  trackRecord:    () => req('GET', '/track-record'),
+  coverage:       () => req('GET', '/coverage'),
+  eventHistory:   () => req('GET', '/event-history'),
 
-  // ── Metrics ────────────────────────────────────────────────────────────────
-  metrics:     (host)              => req('GET', '/metrics' + (host ? '?host=' + encodeURIComponent(host) : '')),
-  metricRange: (name, host, from)  =>
-    req('GET', `/metrics/${name}?host=${encodeURIComponent(host)}&from=${encodeURIComponent(from)}`),
-  // Full time-range version: from/to are ISO strings or relative offset
-  metricRangeFull: (name, host, from, to) => {
-    let path = `/metrics/${name}?host=${encodeURIComponent(host)}&from=${encodeURIComponent(from)}`
-    if (to) path += `&to=${encodeURIComponent(to)}`
-    return req('GET', path)
-  },
-
-  // ── Alerts ─────────────────────────────────────────────────────────────────
-  alerts:      ()    => req('GET', '/alerts'),
-  alertGet:    (id)  => req('GET', `/alerts/${id}`),
-  alertDelete: (id)  => req('DELETE', `/alerts/${id}`),
-  alertAck:    (id)  => req('POST', `/alerts/${id}/acknowledge`),
-  alertSilence:(id)  => req('POST', `/alerts/${id}/silence`),
-
-  // ── Alert Rules ────────────────────────────────────────────────────────────
+  // ── Alert rules ────────────────────────────────────────────────────────────
   alertRules:       ()             => req('GET', '/alert-rules'),
   alertRuleCreate:  (rule)         => req('POST', '/alert-rules', rule),
   alertRuleUpdate:  (name, rule)   => req('PUT', `/alert-rules/${encodeURIComponent(name)}`, rule),
   alertRuleDelete:  (name)         => req('DELETE', `/alert-rules/${encodeURIComponent(name)}`),
 
-  // ── Orgs ────────────────────────────────────────────────────────────────────
+  // ── Notifications ──────────────────────────────────────────────────────────
+  notifications:        ()         => req('GET', '/notifications'),
+  notificationCreate:   (ch)       => req('POST', '/notifications', ch),
+  notificationUpdate:   (id, ch)   => req('PUT', `/notifications/${id}`, ch),
+  notificationDelete:   (id)       => req('DELETE', `/notifications/${id}`),
+  notificationTest:     (id)       => req('POST', `/notifications/${id}/test`),
+
+  // ── Orgs ───────────────────────────────────────────────────────────────────
   orgs:       ()         => req('GET', '/orgs'),
   orgCreate:  (o)        => req('POST', '/orgs', o),
   orgGet:     (id)       => req('GET', `/orgs/${id}`),
@@ -75,59 +69,6 @@ export const api = {
   users:      ()         => req('GET', '/auth/users'),
   userCreate: (u)        => req('POST', '/auth/users', u),
   userDelete: (username) => req('DELETE', `/auth/users/${username}`),
-
-  // ── Predict ────────────────────────────────────────────────────────────────
-  predict: (host, metric, horizon) => {
-    let path = `/predict?host=${encodeURIComponent(host)}&horizon=${horizon}`
-    if (metric) path += `&metric=${encodeURIComponent(metric)}`
-    return req('GET', path)
-  },
-
-  // ── Fleet ──────────────────────────────────────────────────────────────────
-  fleet: () => req('GET', '/fleet'),
-  failures: () => req('GET', '/failures'),
-  callGraph: () => req('GET', '/callgraph'),
-  failureClosest: () => req('GET', '/failures/closest'),
-  failureSeries: (workload) => req('GET', `/failures/series?workload=${encodeURIComponent(workload)}`),
-  inputs: () => req('GET', '/inputs'),
-  trackRecord: () => req('GET', '/track-record'),
-  coverage: () => req('GET', '/coverage'),
-  eventHistory: () => req('GET', '/event-history'),
-
-  // ── History ────────────────────────────────────────────────────────────────
-  history: (workload, from, to) => {
-    let path = workload ? `/history/${encodeURIComponent(workload)}` : '/history'
-    const params = new URLSearchParams()
-    if (from) params.set('from', from)
-    if (to)   params.set('to', to)
-    const qs = params.toString()
-    return req('GET', path + (qs ? '?' + qs : ''))
-  },
-
-  // ── Ruptures ───────────────────────────────────────────────────────────────
-  ruptures:        ()       => req('GET', '/ruptures'),
-  rupture:         (host)   => req('GET', `/rupture/${encodeURIComponent(host)}`),
-  ruptureHistory:  (host)   => req('GET', `/rupture/${encodeURIComponent(host)}/history`),
-  ruptureProfile:  (host)   => req('GET', `/rupture/${encodeURIComponent(host)}/profile`),
-
-  // ── Forecast ───────────────────────────────────────────────────────────────
-  forecastWorkload: (metric, host) =>
-    req('GET', `/forecast/${encodeURIComponent(metric)}/${encodeURIComponent(host)}`),
-
-  // ── Workload summary (forecast-as-hero headline) ────────────────────────────
-  workloadSummary: (ns, kind, name) =>
-    req('GET', `/workloads/${encodeURIComponent(ns)}/${encodeURIComponent(kind)}/${encodeURIComponent(name)}/summary`),
-
-  // ── Notifications ──────────────────────────────────────────────────────────
-  notifications:        ()         => req('GET', '/notifications'),
-  notificationCreate:   (ch)       => req('POST', '/notifications', ch),
-  notificationUpdate:   (id, ch)   => req('PUT', `/notifications/${id}`, ch),
-  notificationDelete:   (id)       => req('DELETE', `/notifications/${id}`),
-  notificationTest:     (id)       => req('POST', `/notifications/${id}/test`),
-
-  // ── Topology ───────────────────────────────────────────────────────────────
-  topology: () => req('GET', '/topology'),
-  dataflow: () => req('GET', '/dataflow'),
 
   // ── Infra ──────────────────────────────────────────────────────────────────
   infraGroups:    () => req('GET', '/infra/groups'),

@@ -17,16 +17,6 @@ export function missingRoles(inputs) {
   return inputs.filter(input => !input.available).map(input => input.role)
 }
 
-const RECENT_MS = 15 * 60 * 1000
-
-export function recentAnomalies(anomalies, now) {
-  return anomalies.filter(a => !a.acknowledged && now - Date.parse(a.timestamp) <= RECENT_MS)
-}
-
-export function measuredSignal(workload, key, value) {
-  return (workload.unavailable_signals || []).includes(key) ? null : value
-}
-
 export function horizonPlacement(failure, horizonSeconds) {
   const seconds = failure.etaSeconds || 0
   return { position: 50 + Math.min(50, (seconds / horizonSeconds) * 50), beyond: seconds > horizonSeconds }

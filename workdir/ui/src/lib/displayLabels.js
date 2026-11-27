@@ -31,23 +31,6 @@ export function displayLabel(key) {
   return SIGNAL_LABELS[k]?.display ?? key
 }
 
-/**
- * Returns the display value for a raw API value.
- * Applies the multiply factor and rounds to 1 decimal.
- */
-export function displayValue(key, rawValue) {
-  if (rawValue == null || isNaN(rawValue)) return '—'
-  const m = SIGNAL_LABELS[resolveAlias(key)]?.multiply ?? 1
-  return (rawValue * m).toFixed(1)
-}
-
-/**
- * Returns the unit string for a signal key.
- */
-export function displayUnit(key) {
-  return SIGNAL_LABELS[resolveAlias(key)]?.unit ?? ''
-}
-
 // FBL-A2-2: SRE-vocabulary aliases. `slo_probability` and `error_budget_burn`
 // are not separate API fields — they're SRE-native synonyms for existing
 // internal keys (health_score, fused_rupture_index), used where the reader
@@ -77,64 +60,4 @@ export function resolveAlias(key) {
 export function alertMetricLabel(key) {
   if (key === 'fused_rupture_index' || key === 'fused_r') return 'Error Budget Burn Rate'
   return displayLabel(key)
-}
-
-const INCIDENT_PROBABILITY_BANDS = [
-  { max: 1.5, label: 'Low incident probability' },
-  { max: 3.0, label: 'Elevated incident probability' },
-  { max: 5.0, label: 'High incident probability' },
-  { max: Infinity, label: 'Critical incident probability' },
-]
-
-/**
- * Bands a Fused Rupture Index value into the SRE-native "incident
- * probability" vocabulary REFERENCE.md's B1 reposition calls for, reusing
- * the same thresholds signalClass() already applies for Risk Score coloring.
- */
-export function incidentProbabilityBand(fusedR) {
-  if (fusedR == null || isNaN(fusedR)) return 'Unknown'
-  return INCIDENT_PROBABILITY_BANDS.find((b) => fusedR <= b.max).label
-}
-
-/**
- * Returns a CSS class based on signal value and key.
- * Used to color-code signals in the UI.
- */
-export function signalClass(key, rawValue) {
-  if (rawValue == null) return 'muted'
-  key = resolveAlias(key)
-  // Reliability/HealthScore: higher is better
-  if (key === 'health_score') {
-    if (rawValue >= 0.9) return 'healthy'
-    if (rawValue >= 0.7) return 'degraded'
-    if (rawValue >= 0.5) return 'at-risk'
-    return 'critical'
-  }
-  // Risk Score: lower is better
-  if (key === 'fused_rupture_index' || key === 'fused_r') {
-    if (rawValue <= 1.5) return 'healthy'
-    if (rawValue <= 3.0) return 'degraded'
-    if (rawValue <= 5.0) return 'at-risk'
-    return 'critical'
-  }
-  // FBL-V4: Mood ("Trend") is normalized so 1.0 = happy/positive — higher is
-  // better, the opposite of every other composite signal. Fleet.svelte's
-  // always-visible signal-bars render mood through this same function
-  // (SIGNAL_KEYS includes 'mood'); without this branch a genuinely happy
-  // workload (mood=0.9) fell into the generic "lower is better" bucket
-  // below and rendered as "critical" (red) — a real, live color inversion,
-  // not just the illustrative Fatigue example in the bug report. The old,
-  // otherwise-superseded kpiColor() in store.js already special-cased this
-  // correctly; signalClass() lost it when it replaced that function.
-  if (key === 'mood') {
-    if (rawValue >= 0.8) return 'healthy'
-    if (rawValue >= 0.5) return 'degraded'
-    if (rawValue >= 0.3) return 'at-risk'
-    return 'critical'
-  }
-  // All other signals: lower is better
-  if (rawValue <= 0.3) return 'healthy'
-  if (rawValue <= 0.6) return 'degraded'
-  if (rawValue <= 0.8) return 'at-risk'
-  return 'critical'
 }
