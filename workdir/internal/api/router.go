@@ -86,17 +86,6 @@ func (h *Handlers) NewRouter() http.Handler {
 		_, _ = w.Write([]byte("data: {}\n\n"))
 	}).Methods("GET")
 
-	// Alert rules (AlertRules.svelte — stub)
-	api.HandleFunc("/alert-rules", stubList).Methods("GET")
-	api.HandleFunc("/alert-rules", stubCreate).Methods("POST")
-	api.HandleFunc("/alert-rules/{name:.+}", stubWithID).Methods("PUT", "DELETE")
-
-	// Notifications (Notifications.svelte — stub)
-	api.HandleFunc("/notifications", stubList).Methods("GET")
-	api.HandleFunc("/notifications", stubCreate).Methods("POST")
-	api.HandleFunc("/notifications/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
-	api.HandleFunc("/notifications/{id}/test", stubWithID).Methods("POST")
-
 	// Orgs (Orgs.svelte — stub)
 	api.HandleFunc("/orgs", stubList).Methods("GET")
 	api.HandleFunc("/orgs", stubCreate).Methods("POST")

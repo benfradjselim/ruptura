@@ -6,8 +6,6 @@
   import Failures     from './pages/Failures.svelte'
   import CallGraph    from './pages/CallGraph.svelte'
   import Infra        from './pages/Infra.svelte'
-  import Notifications from './pages/Notifications.svelte'
-  import AlertRules   from './pages/AlertRules.svelte'
   import Orgs         from './pages/Orgs.svelte'
   import { api }      from './lib/api.js'
   import DemoBanner   from './lib/components/DemoBanner.svelte'
@@ -50,8 +48,6 @@
     failures:        'M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
     fleet:           'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
     infra:           'M5 12H3m4-7l-2-2m10 2 2-2M5 19l-2 2m14-2 2 2M12 3v2m0 14v2M7 7l10 10M17 7 7 17',
-    'alert-rules':   'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
-    notifications:   'M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0',
     settings:        'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z',
   }
 
@@ -59,8 +55,6 @@
     {
       label: 'Configure',
       items: [
-        { id: 'alert-rules', label: 'Alert rules' },
-        { id: 'notifications', label: 'Channels' },
         { id: 'settings', label: 'Settings' },
       ],
     },
@@ -129,12 +123,8 @@
         <Fleet />
       {:else if $currentPage === 'infra'}
         <Infra />
-      {:else if $currentPage === 'notifications'}
-        <Notifications />
       {:else if $currentPage === 'settings'}
         <Settings />
-      {:else if $currentPage === 'alert-rules'}
-        <AlertRules />
       {:else if $currentPage === 'orgs'}
         <Orgs />
       {/if}

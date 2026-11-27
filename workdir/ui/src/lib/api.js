@@ -45,19 +45,6 @@ export const api = {
   coverage:       () => req('GET', '/coverage'),
   eventHistory:   () => req('GET', '/event-history'),
 
-  // ── Alert rules ────────────────────────────────────────────────────────────
-  alertRules:       ()             => req('GET', '/alert-rules'),
-  alertRuleCreate:  (rule)         => req('POST', '/alert-rules', rule),
-  alertRuleUpdate:  (name, rule)   => req('PUT', `/alert-rules/${encodeURIComponent(name)}`, rule),
-  alertRuleDelete:  (name)         => req('DELETE', `/alert-rules/${encodeURIComponent(name)}`),
-
-  // ── Notifications ──────────────────────────────────────────────────────────
-  notifications:        ()         => req('GET', '/notifications'),
-  notificationCreate:   (ch)       => req('POST', '/notifications', ch),
-  notificationUpdate:   (id, ch)   => req('PUT', `/notifications/${id}`, ch),
-  notificationDelete:   (id)       => req('DELETE', `/notifications/${id}`),
-  notificationTest:     (id)       => req('POST', `/notifications/${id}/test`),
-
   // ── Orgs ───────────────────────────────────────────────────────────────────
   orgs:       ()         => req('GET', '/orgs'),
   orgCreate:  (o)        => req('POST', '/orgs', o),

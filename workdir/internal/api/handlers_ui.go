@@ -225,7 +225,7 @@ func (h *Handlers) handleAuthUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 // ── Stub CRUD handlers ────────────────────────────────────────────────────────
-// Dashboards, SLOs, alert rules, notifications, datasources, orgs.
+// Orgs (multi-tenancy placeholder) and user management.
 // These return valid empty responses so Svelte pages render a clean empty state.
 // Persistent storage for these resources will be added in a later release.
 
