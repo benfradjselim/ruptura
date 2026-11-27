@@ -17,14 +17,14 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/receiver"
 	"github.com/benfradjselim/ruptura/pkg/logger"
 	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
-type LogSink interface {
-	IngestLine(service string, line []byte, ts time.Time)
+// MetricStore keeps ingested metric samples.
+type MetricStore interface {
+	SaveMetric(host, name string, value float64, ts time.Time) error
 }
 
 // LogStoreSink persists structured log entries to durable storage.
@@ -33,17 +33,9 @@ type LogStoreSink interface {
 	SaveLog(service string, entry interface{}, ts time.Time) error
 }
 
-type SpanSink interface {
-	IngestSpan(span models.Span) error
-}
-
-// TraceRSink receives per-workload rupture indices derived from trace error rates.
-type TraceRSink interface {
-	SetTraceR(key string, r float64, ts time.Time)
-}
-
-type SentimentSink interface {
-	UpdateSentiment(service string, positive, negative int)
+// SpanStore keeps ingested trace spans.
+type SpanStore interface {
+	SaveSpan(span interface{}, traceID, spanID string) error
 }
 
 type Ingestor interface {
@@ -54,14 +46,10 @@ type Ingestor interface {
 }
 
 type Engine struct {
-	pipeline    metrics.MetricPipeline
-	logs        LogSink
-	logPipeline LogSink // log metrics pipeline — emits log_error_rate / log_burst_index into metric pipeline
-	logStore    LogStoreSink
-	spans       SpanSink
-	sentiment   SentimentSink
-	traceR      TraceRSink
-	ingestHook  func(source string) // optional; called once per ingested item
+	metrics    MetricStore
+	logStore   LogStoreSink
+	spans      SpanStore
+	ingestHook func(source string) // optional; called once per ingested item
 
 	// ownerResolver looks up the owning Deployment/StatefulSet/DaemonSet for
 	// a pod (namespace + pod name). Backed by the discovery informer's
@@ -85,23 +73,28 @@ type Engine struct {
 	grpcSamples chan *GRPCMetricPoint
 }
 
-func New(pipeline metrics.MetricPipeline, logs LogSink, spans SpanSink, sentiment SentimentSink, traceR TraceRSink) *Engine {
+// New returns an ingest engine that keeps metrics and spans in the given
+// stores. Either may be nil, in which case that signal is counted and dropped.
+func New(metrics MetricStore, spans SpanStore) *Engine {
 	return &Engine{
-		pipeline:    pipeline,
-		logs:        logs,
+		metrics:     metrics,
 		spans:       spans,
-		sentiment:   sentiment,
-		traceR:      traceR,
 		grpcSamples: make(chan *GRPCMetricPoint, 1024),
+	}
+}
+
+// saveMetric keeps one sample when a metric store is wired.
+func (e *Engine) saveMetric(host, name string, value float64, ts time.Time) {
+	if e.metrics == nil {
+		return
+	}
+	if err := e.metrics.SaveMetric(host, name, value, ts); err != nil {
+		logger.Default.Warn("metric save failed", "host", host, "metric", name, "err", err)
 	}
 }
 
 // SetLogStore wires a durable storage backend for OTLP log persistence.
 func (e *Engine) SetLogStore(s LogStoreSink) { e.logStore = s }
-
-// SetLogPipeline wires a log-metrics pipeline that converts raw log lines into
-// log_error_rate and log_burst_index signals fed into the metric pipeline.
-func (e *Engine) SetLogPipeline(sink LogSink) { e.logPipeline = sink }
 
 // SetIngestHook registers a callback invoked once per ingested log or trace item.
 // Used to forward counts to the telemetry registry for Prometheus export.
@@ -322,7 +315,7 @@ func inferWorkloadKind(r models.OTLPResource) string {
 
 // resolveFleetWorkloadRef is extractWorkloadRef's fleet-registration-aware
 // counterpart (FBL-V2). Used only by handleOTLPMetrics — the one path whose
-// output (via e.pipeline.Ingest) actually becomes a fleet entry — so its
+// output is stored under a workload key — so its
 // two behavior changes are scoped to exactly where the observed bug was:
 //
 //  1. A resource carrying a pod name (k8s.pod.name) but no explicit
@@ -470,7 +463,7 @@ func (e *Engine) ingestMetrics(req models.OTLPMetricsRequest) {
 						nanos, _ := strconv.ParseInt(dp.TimeUnixNano, 10, 64)
 						ts = time.Unix(0, nanos)
 						if e.checkCardinality(host, name) {
-							e.pipeline.Ingest(host, name, value, ts)
+							e.saveMetric(host, name, value, ts)
 							atomic.AddInt64(&e.metricsCount, 1)
 						}
 					}
@@ -485,7 +478,7 @@ func (e *Engine) ingestMetrics(req models.OTLPMetricsRequest) {
 						nanos, _ := strconv.ParseInt(dp.TimeUnixNano, 10, 64)
 						ts = time.Unix(0, nanos)
 						if e.checkCardinality(host, name) {
-							e.pipeline.Ingest(host, name, value, ts)
+							e.saveMetric(host, name, value, ts)
 							atomic.AddInt64(&e.metricsCount, 1)
 						}
 					}
@@ -516,14 +509,6 @@ func (e *Engine) ingestLogs(req models.OTLPLogsRequest) {
 		if service == "" {
 			service = "unknown"
 		}
-		// Use the workload key (namespace/kind/name) so log metrics align with
-		// the metric pipeline's host namespace — falls back to service name when
-		// there is no k8s resource context (e.g. bare-metal, non-k8s services).
-		workloadKey := ref.Key()
-		if workloadKey == "" {
-			workloadKey = service
-		}
-		var pos, neg int
 		for _, sl := range rl.ScopeLogs {
 			for _, lr := range sl.LogRecords {
 				nanos, _ := strconv.ParseInt(lr.TimeUnixNano, 10, 64)
@@ -532,13 +517,6 @@ func (e *Engine) ingestLogs(req models.OTLPLogsRequest) {
 					ts = time.Now()
 				}
 				body := lr.Body.GetString()
-
-				if e.logs != nil {
-					e.logs.IngestLine(service, []byte(body), ts)
-				}
-				if e.logPipeline != nil {
-					e.logPipeline.IngestLine(workloadKey, []byte(body), ts)
-				}
 
 				if e.logStore != nil {
 					entry := map[string]interface{}{
@@ -554,20 +532,11 @@ func (e *Engine) ingestLogs(req models.OTLPLogsRequest) {
 					_ = e.logStore.SaveLog(service, entry, ts)
 				}
 
-				lower := strings.ToLower(body)
-				if strings.Contains(lower, "error") || strings.Contains(lower, "warn") {
-					neg++
-				} else {
-					pos++
-				}
 				atomic.AddInt64(&e.logsCount, 1)
 				if e.ingestHook != nil {
 					e.ingestHook("logs")
 				}
 			}
-		}
-		if e.sentiment != nil && (pos > 0 || neg > 0) {
-			e.sentiment.UpdateSentiment(service, pos, neg)
 		}
 	}
 }
@@ -584,40 +553,40 @@ func (e *Engine) handleOTLPTraces(w http.ResponseWriter, r *http.Request) {
 
 // ingestTraces processes one OTLP traces request, from HTTP or gRPC.
 func (e *Engine) ingestTraces(req models.OTLPTraceRequest) {
-	now := time.Now()
 	for _, rs := range req.ResourceSpans {
 		ref := extractWorkloadRef(rs.Resource)
-		var total, errors int
+		service := models.FirstNonEmpty(rs.Resource.GetAttr("service.name"), ref.Name)
 		for _, ss := range rs.ScopeSpans {
 			for _, span := range ss.Spans {
-				total++
+				start, _ := strconv.ParseInt(span.StartTimeUnixNano, 10, 64)
+				end, _ := strconv.ParseInt(span.EndTimeUnixNano, 10, 64)
 				s := models.Span{
-					TraceID:   span.TraceID,
-					SpanID:    span.SpanID,
-					Operation: span.Name,
+					TraceID:    span.TraceID,
+					SpanID:     span.SpanID,
+					ParentID:   span.ParentSpanID,
+					Service:    service,
+					Operation:  span.Name,
+					StartTime:  time.Unix(0, start),
+					DurationNS: end - start,
+					Host:       ref.Key(),
 				}
 				if span.Status.Code == 2 {
 					s.Status = "error"
-					errors++
 				} else if span.Status.Code == 1 {
 					s.Status = "ok"
 				} else {
 					s.Status = "unset"
 				}
 				if e.spans != nil {
-					e.spans.IngestSpan(s)
+					if err := e.spans.SaveSpan(s, s.TraceID, s.SpanID); err != nil {
+						logger.Default.Warn("span save failed", "trace_id", s.TraceID, "err", err)
+					}
 				}
 				atomic.AddInt64(&e.tracesCount, 1)
 				if e.ingestHook != nil {
 					e.ingestHook("traces")
 				}
 			}
-		}
-		// Derive traceR from span error rate: 100% error rate → R≈5, 20% → R≈1.
-		if e.traceR != nil && total > 0 {
-			errRate := float64(errors) / float64(total)
-			traceR := errRate * 5.0
-			e.traceR.SetTraceR(ref.Key(), traceR, now)
 		}
 	}
 }
@@ -650,7 +619,7 @@ func (e *Engine) parseDogStatsDLine(line string) {
 	}
 
 	if e.checkCardinality(host, name) {
-		e.pipeline.Ingest(host, name, value, time.Now())
+		e.saveMetric(host, name, value, time.Now())
 	}
 }
 

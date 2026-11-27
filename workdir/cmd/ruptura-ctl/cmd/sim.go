@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/benfradjselim/ruptura/internal/sim"
 	"github.com/spf13/cobra"
@@ -10,27 +9,28 @@ import (
 
 var (
 	simWorkload string
-	simDuration int
 )
 
 var simCmd = &cobra.Command{
 	Use:   "sim",
 	Short: "Control ruptura-sim synthetic load injection",
 	Example: `  ruptura-ctl sim inject cascade-failure
-  ruptura-ctl sim inject memory-leak --workload production/Deployment/payment-api --duration 120
+  ruptura-ctl sim inject memory-leak --workload demo/Deployment/payment-api
   ruptura-ctl sim patterns`,
 }
 
 var simInjectCmd = &cobra.Command{
 	Use:   "inject <pattern>",
-	Short: "Inject a synthetic load pattern",
-	Long: `Inject a synthetic load pattern into Ruptura to test alerting and action pipelines.
+	Short: "Report a synthetic failure on a demo engine",
+	Long: `Ask a Ruptura engine running with --demo to report a synthetic failure on a
+workload, to try the console, alerts or the MCP server without a real incident.
+Engines connected to a cluster refuse injections.
 
 Available patterns:
-  memory-leak       Slowly increasing memory pressure
-  cascade-failure   Error propagation across service dependencies
-  traffic-surge     Sudden spike in throughput and latency
-  slow-burn         Gradual multi-signal degradation over time`,
+  memory-leak       Memory heading to its limit, out of memory in about 22 minutes
+  cascade-failure   Crash loop
+  traffic-surge     CPU throttled by its limit
+  slow-burn         Memory heading to its limit, in about 50 minutes`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pattern := args[0]
@@ -49,29 +49,21 @@ Available patterns:
 			workload = "demo/Deployment/api"
 		}
 
-		dur := time.Duration(simDuration) * time.Second
-		if dur == 0 {
-			dur = 60 * time.Second
-		}
-
 		fmt.Println()
-		fmt.Printf("  Injecting %s into %s for %s\n", cyan(pattern), cyan(workload), dim(dur.String()))
-		fmt.Printf("  %s\n\n", dim("Ticking every 5s — Ctrl+C to stop early"))
+		fmt.Printf("  Reporting %s on %s\n\n", cyan(pattern), cyan(workload))
 
 		cfg := sim.Config{
 			Target:   cfgURL,
 			APIKey:   cfgAPIKey,
 			Workload: workload,
 			Pattern:  pattern,
-			Duration: dur,
-			Verbose:  true,
 		}
 		if err := sim.Run(cfg); err != nil {
 			return fmt.Errorf("sim inject: %w", err)
 		}
 
 		fmt.Println()
-		successLine(fmt.Sprintf("Pattern %s complete", cyan(pattern)))
+		successLine(fmt.Sprintf("Pattern %s reported", cyan(pattern)))
 		infoLine("Watch the effect: " + cyan("ruptura-ctl status"))
 		fmt.Println()
 		return nil
@@ -104,5 +96,4 @@ func init() {
 	rootCmd.AddCommand(simCmd)
 
 	simInjectCmd.Flags().StringVar(&simWorkload, "workload", "", "Target workload ref (namespace/Kind/name). Omit for auto-select.")
-	simInjectCmd.Flags().IntVar(&simDuration, "duration", 0, "Duration in seconds (default: pattern default)")
 }
