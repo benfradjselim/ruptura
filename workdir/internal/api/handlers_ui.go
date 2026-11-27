@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -147,12 +148,40 @@ func (h *Handlers) buildFleet() fleetResponse {
 	return resp
 }
 
+// handleTraceSearch lists stored traces, newest first, optionally for one service.
 func (h *Handlers) handleTraceSearch(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]interface{}{"traces": []interface{}{}})
+	if h.store == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"traces": []interface{}{}})
+		return
+	}
+	limit := 50
+	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 500 {
+		limit = v
+	}
+	traces, err := h.store.QueryTraceList(r.URL.Query().Get("service"), limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"traces": traces})
 }
 
+// handleTraceGet returns the spans of one trace.
 func (h *Handlers) handleTraceGet(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotFound, map[string]string{"error": "trace not found"})
+	if h.store == nil {
+		writeError(w, http.StatusNotFound, "trace not found")
+		return
+	}
+	spans, err := h.store.QuerySpansByTrace(mux.Vars(r)["id"])
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if len(spans) == 0 {
+		writeError(w, http.StatusNotFound, "trace not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"spans": spans})
 }
 
 // ── /api/v2/auth/* ────────────────────────────────────────────────────────────
