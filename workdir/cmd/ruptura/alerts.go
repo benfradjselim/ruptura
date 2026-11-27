@@ -9,6 +9,7 @@ import (
 
 	"github.com/benfradjselim/ruptura/internal/alertmanager"
 	"github.com/benfradjselim/ruptura/internal/api"
+	"github.com/benfradjselim/ruptura/internal/notify"
 	"github.com/benfradjselim/ruptura/pkg/logger"
 )
 
@@ -57,6 +58,11 @@ func alertClients() []*alertmanager.Client {
 // record, and repeats them to each configured Alertmanager.
 func startAlerts(ctx context.Context, handlers *api.Handlers) {
 	clients := alertClients()
+	notifier := notify.New(notify.Config{
+		SlackWebhookURL:   os.Getenv("RUPTURA_SLACK_URL"),
+		GenericWebhookURL: os.Getenv("RUPTURA_WEBHOOK_URL"),
+	})
+	notified := map[string]bool{}
 	go func() {
 		ticker := time.NewTicker(alertInterval)
 		defer ticker.Stop()
@@ -65,7 +71,11 @@ func startAlerts(ctx context.Context, handlers *api.Handlers) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				sendAlerts(ctx, clients, handlers.Failures())
+				failures := handlers.Failures()
+				sendAlerts(ctx, clients, failures)
+				if notifier.Configured() {
+					notified = notifyNew(ctx, notifier, notified, failures, time.Now())
+				}
 			}
 		}
 	}()
@@ -93,4 +103,39 @@ func sendAlerts(ctx context.Context, clients []*alertmanager.Client, failures []
 			logger.Default.Warn("alert delivery failed", "err", err)
 		}
 	}
+}
+
+// eventSender sends one notification; *notify.Notifier implements it.
+type eventSender interface {
+	Notify(ctx context.Context, ev notify.Event) error
+}
+
+// notifyNew sends a webhook or Slack notification for each failure not
+// notified yet, and returns the failures notified so far: a failure that
+// clears and comes back is notified again.
+func notifyNew(ctx context.Context, sender eventSender, notified map[string]bool, failures []*api.FailureResult, now time.Time) map[string]bool {
+	current := make(map[string]bool, len(failures))
+	for _, failure := range failures {
+		key := failure.Target + "|" + failure.FailureMode
+		current[key] = true
+		if notified[key] {
+			continue
+		}
+		description, timeLeft, _ := api.AlertDetails(failure)
+		reason := description
+		if timeLeft != "" {
+			reason += " Time left: " + timeLeft + "."
+		}
+		reason += " " + failure.RecommendedAction
+		tier := notify.Tier2
+		if failure.State == "critical" {
+			tier = notify.Tier1
+		}
+		ev := notify.Event{ID: key, Host: failure.Target, ActionType: failure.FailureMode, Tier: tier, Reason: reason, Timestamp: now}
+		if err := sender.Notify(ctx, ev); err != nil {
+			logger.Default.Warn("notify failed", "err", err)
+			continue
+		}
+	}
+	return current
 }

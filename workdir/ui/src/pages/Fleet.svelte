@@ -1,24 +1,16 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { api } from '../lib/api.js'
-  import { measuredSignal, cardSummary } from '../lib/util/failures.js'
-  import { displayLabel, displayValue, displayUnit, signalClass, incidentProbabilityBand } from '../lib/displayLabels.js'
+  import { cardSummary } from '../lib/util/failures.js'
 
   let fleet = null
   let error = null
   let loading = true
   let interval
   let expandedWorkload = null
-  let activeTab = {}   // { workloadKey: 'signals'|'history'|'forecast' }
-  let historyData = {} // { workloadKey: [] }
-  let forecastData = {} // { workloadKey: {} }
-  let summaryData = {} // { workloadKey: { headline, confidence, recommended_action, warming_up } }
-  let loadingDetail = {}
 
-  // Infra context: keyed by namespace; matched on namespace only (v8.1 key normalization gap)
+  // Infra context, keyed by namespace.
   let infraByNs = {} // { [namespace]: [{ group, health, spread, objectCount }] }
-
-  const SIGNAL_KEYS = ['stress', 'fatigue', 'mood', 'contagion', 'pressure', 'resilience']
 
   async function load() {
     try {
@@ -44,105 +36,33 @@
     }
   }
 
-  function hostKey(workload) {
-    return workload.host || workload.key || workload.name || ''
-  }
-
   function parseHost(workload) {
-    const raw = hostKey(workload)
-    const parts = raw.split('/')
+    const parts = (workload.host || '').split('/')
     if (parts.length >= 3) return { ns: parts[0], kind: parts[1], name: parts.slice(2).join('/') }
-    return { ns: '', kind: 'host', name: raw }
+    return { ns: '', kind: 'host', name: workload.host || '' }
   }
 
-  async function expand(workload) {
-    const key = hostKey(workload)
-    if (expandedWorkload === key) {
-      expandedWorkload = null
-      return
-    }
-    expandedWorkload = key
-    if (!activeTab[key]) activeTab[key] = 'signals'
-    loadTab(workload, activeTab[key])
-    loadSummary(workload)
-  }
-
-  // FBL-A2-1: forecast-as-hero — the summary sentence is the first thing
-  // shown on expand, before the chart/signal tabs.
-  async function loadSummary(workload) {
-    const key = hostKey(workload)
-    if (summaryData[key]) return
-    const { ns, kind, name } = parseHost(workload)
-    try {
-      summaryData[key] = await api.workloadSummary(ns, kind, name)
-    } catch {
-      summaryData[key] = null
-    }
-    summaryData = { ...summaryData }
-  }
-
-  async function loadTab(workload, tab) {
-    const key = hostKey(workload)
-    activeTab[key] = tab
-    if (tab === 'history' && !historyData[key]) {
-      loadingDetail[key] = true
-      try {
-        const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-        const res = await api.history(key, from)
-        historyData[key] = Array.isArray(res) ? res : (res.snapshots || [])
-      } catch { historyData[key] = [] }
-      loadingDetail[key] = false
-    }
-    if (tab === 'forecast' && !forecastData[key]) {
-      loadingDetail[key] = true
-      try {
-        const res = await api.forecastWorkload('health_score', key)
-        forecastData[key] = res
-      } catch { forecastData[key] = { error: true } }
-      loadingDetail[key] = false
-    }
-    activeTab = { ...activeTab }
+  function expand(workload) {
+    expandedWorkload = expandedWorkload === workload.host ? null : workload.host
   }
 
   function stateClass(state) {
     if (!state) return 'unknown'
     const s = state.toLowerCase()
-    if (s === 'healthy' || s === 'excellent' || s === 'good') return 'healthy'
-    if (s === 'degraded' || s === 'fair') return 'degraded'
-    if (s === 'at-risk' || s === 'warning' || s === 'poor') return 'at-risk'
-    if (s === 'critical' || s === 'emergency' || s === 'rupture') return 'critical'
-    if (s === 'calibrating' || s === 'warming') return 'calibrating'
+    if (s === 'healthy') return 'healthy'
+    if (s === 'degraded') return 'degraded'
+    if (s === 'critical') return 'critical'
     return 'unknown'
-  }
-
-  function healthPct(w) {
-    const v = w.health_score ?? w.kpis?.health_score ?? null
-    if (v == null) return null
-    return (v * 100).toFixed(0)
-  }
-
-  function riskScore(w) {
-    const r = w.fused_rupture_index ?? w.fused_r ?? null
-    if (r == null) return null
-    return (r * 10).toFixed(1)
   }
 
   function workloadLabel(w) {
     const { ns, name } = parseHost(w)
-    if (ns) return `${ns}/${name}`
-    return w.host || 'unknown'
-  }
-
-  function getSignal(w, key) {
-    const value = w.signals ? w.signals[key] : w.kpis ? w.kpis[key] : w[key]
-    return measuredSignal(w, key, value)
+    return ns ? `${ns}/${name}` : (w.host || 'unknown')
   }
 
   function infraGroups(w) {
     const ns = parseHost(w).ns || ''
-    const nsGroups = infraByNs[ns] || []
-    const clusterGroups = infraByNs[''] || []
-    return [...nsGroups, ...clusterGroups]
+    return [...(infraByNs[ns] || []), ...(infraByNs[''] || [])]
   }
 
   function infraHealthColor(h) {
@@ -187,19 +107,13 @@
   {:else if !fleet?.hosts?.length}
     <!-- ITEM-017: Empty state -->
     <div class="empty-state">
-      <div class="empty-icon">⏱</div>
-      <h2>Calibrating baselines</h2>
+      <h2>No workloads yet</h2>
       <p>
-        Ruptura is learning your workloads' normal behavior.
-        This typically takes <strong>5–15 minutes</strong> once telemetry is flowing.
-      </p>
-      <p class="empty-hint">
-        Send metrics via OTLP on port 4317 or Prometheus remote-write on <code>/api/v2/write</code>.
+        Ruptura lists the Deployments, StatefulSets and DaemonSets it finds through the Kubernetes API,
+        and the failures it reads from Prometheus.
       </p>
       <div class="empty-actions">
-        <a href="https://benfradjselim.github.io/ruptura/getting-started/ingest/" target="_blank" rel="noopener">
-          Setup guide →
-        </a>
+        <a href="https://docs.getruptura.dev/install/" target="_blank" rel="noopener">Installation guide →</a>
         <button on:click={load}>Check again</button>
       </div>
     </div>
@@ -208,8 +122,6 @@
     <div class="workload-grid">
       {#each fleet.hosts as w (w.host)}
         {@const key = w.host}
-        {@const pct = healthPct(w)}
-        {@const risk = riskScore(w)}
         {@const sc = stateClass(w.state)}
         {@const expanded = expandedWorkload === key}
         {@const summary = cardSummary(w)}
@@ -239,7 +151,7 @@
             {#if summary.facts.length}
               {#each summary.facts as fact}<p>{fact}</p>{/each}
             {:else if !summary.when}
-              <p class="muted-fact">{w.state === 'calibrating' ? 'Learning this workload' : 'No known failure'}</p>
+              <p class="muted-fact">{w.state === 'unknown' ? 'Not watched: no failure source' : 'No known failure'}</p>
             {/if}
           </div>
 
@@ -262,20 +174,12 @@
             {/if}
           {/if}
 
-          <!-- Expanded detail tabs -->
-          {#if expanded}
+          {#if expanded && w.failure}
             <div class="card-detail">
-              <!-- FBL-A2-1: forecast-as-hero — the sentence is the first thing
-                   shown, before the chart (forecast tab) or raw signals. -->
-              {#if summaryData[key]}
-                <div class="summary-hero" class:warming={summaryData[key].warming_up}>
-                  <p class="summary-headline">{summaryData[key].headline}</p>
-                  {#if !summaryData[key].warming_up}
-                    <p class="summary-action">{summaryData[key].recommended_action}</p>
-                  {/if}
-                </div>
+              <p class="summary-action">{w.failure.recommendedAction}</p>
+              {#if w.failure.affects?.length}
+                <p class="summary-affects">Can hit: {w.failure.affects.join(', ')}</p>
               {/if}
-
             </div>
           {/if}
         </div>
@@ -293,16 +197,12 @@
 /* Loading / error */
 .fleet-loading, .fleet-error { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 4rem; color: var(--text-secondary, var(--text-2)); }
 .spinner { width: 24px; height: 24px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 0; animation: spin 0.8s linear infinite; }
-.spinner.sm { width: 16px; height: 16px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Empty state */
 .empty-state { text-align: center; padding: 4rem 2rem; max-width: 480px; margin: 0 auto; }
-.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
 .empty-state h2 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.75rem; }
 .empty-state p { color: var(--text-secondary, var(--text-2)); margin: 0 0 0.5rem; line-height: 1.6; }
-.empty-hint { font-size: 0.875rem; }
-.empty-hint code { background: var(--surface, #1e2535); padding: 0.15em 0.4em; border-radius: 0; font-size: 0.8em; }
 .empty-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap; }
 .empty-actions a, .empty-actions button { padding: 0.5rem 1rem; border-radius: 0; font-size: 0.875rem; cursor: pointer; text-decoration: none; }
 .empty-actions a { background: var(--accent-cyan, #06b6d4); color: #000; font-weight: 600; }
@@ -319,9 +219,7 @@
 .workload-card { background: var(--surface, #141824); border: 1px solid var(--border, rgba(255,255,255,0.06)); border-radius: 0; overflow: hidden; transition: border-color 0.15s; }
 .workload-card.healthy { border-left: 3px solid var(--green); }
 .workload-card.degraded { border-left: 3px solid var(--amber); }
-.workload-card.at-risk { border-left: 3px solid #f97316; }
 .workload-card.critical { border-left: 3px solid var(--red); }
-.workload-card.calibrating { border-left: 3px solid var(--border-3); }
 .workload-card.expanded { grid-column: 1 / -1; }
 
 .card-header { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0.875rem 1rem; background: none; border: none; cursor: pointer; text-align: left; color: inherit; gap: 0.5rem; }
@@ -329,18 +227,13 @@
 .state-dot { width: 8px; height: 8px; border-radius: 0; flex-shrink: 0; }
 .state-dot.healthy { background: var(--green); }
 .state-dot.degraded { background: var(--amber); }
-.state-dot.at-risk { background: #f97316; }
 .state-dot.critical { background: var(--red); animation: pulse-red 1.5s ease-in-out infinite; }
-.state-dot.calibrating { background: #6366f1; animation: pulse-indigo 2s ease-in-out infinite; }
 @keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-@keyframes pulse-indigo { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 .workload-name { font-weight: 600; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .state-badge { font-size: 0.7rem; padding: 0.15em 0.5em; border-radius: 0; font-weight: 500; }
 .state-badge.healthy { background: rgba(34,197,94,0.15); color: var(--green); }
 .state-badge.degraded { background: rgba(245,158,11,0.15); color: var(--amber); }
-.state-badge.at-risk { background: rgba(249,115,22,0.15); color: #f97316; }
 .state-badge.critical { background: rgba(239,68,68,0.15); color: var(--red); }
-.state-badge.calibrating { background: rgba(99,102,241,0.15); color: #818cf8; }
 
 .card-scores { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
 .score-block { display: flex; flex-direction: column; align-items: flex-end; }
@@ -348,68 +241,17 @@
 .score-value { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .score-value.healthy { color: var(--green); }
 .score-value.degraded { color: var(--amber); }
-.score-value.at-risk { color: #f97316; }
 .score-value.critical { color: var(--red); }
-.calibrating-pill { font-size: 0.75rem; color: #818cf8; gap: 0.25rem; }
-.calib-bar-track { width: 60px; height: 4px; background: rgba(99,102,241,0.2); border-radius: 0; overflow: hidden; }
-.calib-bar-fill { height: 100%; background: #818cf8; border-radius: 0; transition: width 0.5s ease; }
-.calib-pct { font-size: 0.65rem; color: #818cf8; font-variant-numeric: tabular-nums; }
 .expand-icon { color: var(--text-secondary, var(--text-2)); font-size: 0.7rem; }
 
-/* Signal bars */
-.signal-bars { display: flex; flex-direction: column; gap: 0.3rem; padding: 0 1rem 0.75rem; }
-.signal-bar-item { display: grid; grid-template-columns: 90px 1fr 42px; align-items: center; gap: 0.5rem; }
-.signal-bar-label { font-size: 0.7rem; color: var(--text-secondary, var(--text-2)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.signal-bar-track { height: 4px; background: var(--surface-high, #1e2535); border-radius: 0; overflow: hidden; }
-.signal-bar-track.wide { height: 6px; }
-.signal-bar-fill { height: 100%; border-radius: 0; transition: width 0.4s ease; }
-.signal-bar-fill.healthy { background: var(--green); }
-.signal-bar-fill.degraded { background: var(--amber); }
-.signal-bar-fill.at-risk { background: #f97316; }
-.signal-bar-fill.critical { background: var(--red); }
-.signal-bar-fill.muted { background: var(--text-muted, #475569); }
-.signal-bar-val { font-size: 0.7rem; font-variant-numeric: tabular-nums; text-align: right; color: var(--text-secondary, var(--text-2)); }
 
 /* Expanded detail */
 .card-detail { border-top: 1px solid var(--border, rgba(255,255,255,0.06)); padding: 1rem; }
 
-/* FBL-A2-1: forecast-as-hero — the one sentence an SRE reads first */
-.summary-hero { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 0; background: var(--bg-2, rgba(255,255,255,0.03)); border-left: 3px solid var(--accent-cyan, #06b6d4); }
-.summary-hero.warming { border-left-color: var(--amber); }
-.summary-headline { margin: 0; font-size: 0.95rem; font-weight: 600; line-height: 1.4; }
-.summary-action { margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--text-secondary, var(--text-2)); }
-.tab-bar { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
-.tab-btn { padding: 0.35rem 0.75rem; border-radius: 0; border: 1px solid var(--border, rgba(255,255,255,0.06)); background: none; color: var(--text-secondary, var(--text-2)); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
-.tab-btn.active { background: var(--accent-cyan, #06b6d4); color: #000; border-color: transparent; font-weight: 600; }
+.summary-action, .summary-affects { margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--text-secondary, var(--text-2)); }
 
-.signals-detail { display: flex; flex-direction: column; gap: 0.5rem; }
-.signal-row { display: grid; grid-template-columns: 120px 1fr 60px; align-items: center; gap: 0.75rem; }
-.signal-name { font-size: 0.8rem; color: var(--text-secondary, var(--text-2)); }
-.signal-val { font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
-.signal-val.healthy { color: var(--green); }
-.signal-val.degraded { color: var(--amber); }
-.signal-val.at-risk { color: #f97316; }
-.signal-val.critical { color: var(--red); }
 
-.detail-loading { display: flex; align-items: center; gap: 0.75rem; padding: 1.5rem; color: var(--text-secondary, var(--text-2)); font-size: 0.875rem; }
-.detail-empty { padding: 1.5rem; color: var(--text-secondary, var(--text-2)); font-size: 0.875rem; }
-.detail-empty p { margin: 0 0 0.25rem; }
-.detail-empty .hint { font-size: 0.8rem; color: var(--text-muted, #475569); }
-.detail-calibrating { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2rem; text-align: center; color: var(--text-secondary, var(--text-2)); }
-.detail-calibrating p { margin: 0; font-size: 0.875rem; }
-.detail-calibrating .hint { font-size: 0.8rem; color: var(--text-muted, #475569); }
 
-.history-list, .forecast-list { display: flex; flex-direction: column; gap: 0.35rem; }
-.history-row, .forecast-row { display: grid; align-items: center; gap: 0.75rem; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
-.history-row { grid-template-columns: 70px 50px 60px; }
-.history-time { color: var(--text-secondary, var(--text-2)); }
-.history-score, .history-fri { font-weight: 600; }
-.history-score.healthy { color: var(--green); }
-.history-score.degraded { color: var(--amber); }
-.history-score.critical { color: var(--red); }
-.forecast-row { grid-template-columns: 50px 1fr 50px; }
-.forecast-offset { color: var(--text-secondary, var(--text-2)); }
-.forecast-val { font-weight: 600; text-align: right; }
 
 /* Infra context bar */
 .infra-bar {

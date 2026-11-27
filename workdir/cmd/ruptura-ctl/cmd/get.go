@@ -2,292 +2,97 @@ package cmd
 
 import (
 	"fmt"
-	"time"
+	"strings"
 
+	"github.com/benfradjselim/ruptura/pkg/client"
 	"github.com/spf13/cobra"
 )
 
 var getCmd = &cobra.Command{
-	Use:   "get <resource>",
-	Short: "List resources (workloads, ruptures, actions, suppressions, anomalies)",
-	Example: `  ruptura-ctl get workloads
-  ruptura-ctl get workloads -n production
-  ruptura-ctl get ruptures
-  ruptura-ctl get actions
-  ruptura-ctl get suppressions
-  ruptura-ctl get anomalies`,
+	Use:   "get",
+	Short: "List workloads, failures or actions",
 }
-
-// --- get workloads ---
 
 var getWorkloadsCmd = &cobra.Command{
 	Use:     "workloads",
-	Aliases: []string{"workload", "wl"},
-	Short:   "List all monitored workloads",
+	Aliases: []string{"fleet", "wl"},
+	Short:   "List workloads with their state",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := newClient()
-		snaps, err := c.Snapshots(ctx())
+		fleet, err := newClient().Fleet(ctx())
 		if err != nil {
 			return err
 		}
 		if cfgOutput == "json" {
-			return printJSON(snaps)
+			return printJSON(fleet)
 		}
-		if len(snaps) == 0 {
-			fmt.Println(dim("\n  No workloads found.\n"))
+		t := newTable("WORKLOAD", "STATE", "FAILURE", "WHEN")
+		for _, w := range fleet.Hosts {
+			mode, when := "-", "-"
+			if w.Failure != nil {
+				mode, when = w.Failure.FailureMode, failureWhen(*w.Failure)
+			}
+			t.add(w.Host, stateIcon(w.State)+" "+w.State, mode, when)
+		}
+		t.print()
+		fmt.Printf("\n%d workloads: %d critical, %d degraded, %d healthy\n", fleet.TotalHosts, fleet.CriticalHosts, fleet.DegradedHosts, fleet.HealthyHosts)
+		return nil
+	},
+}
+
+var getFailuresCmd = &cobra.Command{
+	Use:     "failures",
+	Aliases: []string{"failure", "f"},
+	Short:   "List the failures Ruptura names now, most urgent first",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		failures, err := newClient().Failures(ctx())
+		if err != nil {
+			return err
+		}
+		if cfgOutput == "json" {
+			return printJSON(failures)
+		}
+		if len(failures) == 0 {
+			successLine("No failure predicted or happening")
 			return nil
 		}
-
-		headers := []string{"WORKLOAD", "HEALTH", "STATE", "FUSEDR", "CALIB", "STRESS", "FATIGUE", "MOOD", "CONTAGION"}
-		if cfgOutput == "wide" {
-			headers = append(headers, "PRESSURE", "RESILIENCE", "ENTROPY", "VELOCITY")
-		}
-		t := newTable(headers...)
-		t.alignRight(1)
-		t.alignRight(3)
-
-		for _, s := range snaps {
-			if cfgNS != "" && s.Workload.Namespace != cfgNS {
-				continue
-			}
-			ref := s.Host
-			if s.Workload.Namespace != "" {
-				ref = s.Workload.Namespace + "/" + s.Workload.Kind + "/" + s.Workload.Name
-			}
-			state := s.WorkloadStatus
-			if state == "" {
-				if s.CalibrationProgress < 100 {
-					state = "calibrating"
-				} else {
-					state = "active"
-				}
-			}
-			row := []string{
-				ref,
-				kpiHealth(s.HealthScore),
-				stateIcon(state) + " " + state,
-				fusedRColor(s.FusedRuptureIndex),
-				calibBar(s.CalibrationProgress),
-				fmt.Sprintf("%.2f", s.Stress.Value),
-				fmt.Sprintf("%.2f", s.Fatigue.Value),
-				fmt.Sprintf("%.2f", s.Mood.Value),
-				fmt.Sprintf("%.2f", s.Contagion.Value),
-			}
-			if cfgOutput == "wide" {
-				row = append(row,
-					fmt.Sprintf("%.2f", s.Pressure.Value),
-					fmt.Sprintf("%.2f", s.Resilience.Value),
-					fmt.Sprintf("%.2f", s.Entropy.Value),
-					fmt.Sprintf("%.2f", s.Velocity.Value),
-				)
-			}
-			t.add(row...)
+		t := newTable("TARGET", "FAILURE", "KIND", "WHEN", "ACTION")
+		for _, f := range failures {
+			t.add(f.Target, f.FailureMode, f.Kind, failureWhen(f), f.RecommendedAction)
 		}
 		t.print()
 		return nil
 	},
 }
-
-// --- get ruptures ---
-
-var getRupturesCmd = &cobra.Command{
-	Use:     "ruptures",
-	Aliases: []string{"rupture"},
-	Short:   "List all active rupture events",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c := newClient()
-		// Use the dedicated /api/v2/ruptures endpoint — server-side filtered,
-		// much faster on large fleets than fetching all snapshots client-side.
-		active, err := c.Ruptures(ctx())
-		if err != nil {
-			return err
-		}
-		if cfgOutput == "json" {
-			return printJSON(active)
-		}
-		if len(active) == 0 {
-			fmt.Println(green("\n  ✓  No active ruptures.\n"))
-			return nil
-		}
-		t := newTable("WORKLOAD", "FUSEDR", "STATE", "HEALTH", "BLAST RADIUS", "PATTERN MATCH")
-		t.alignRight(1)
-		for _, s := range active {
-			ref := s.Host
-			if s.Workload.Namespace != "" {
-				ref = s.Workload.Namespace + "/" + s.Workload.Kind + "/" + s.Workload.Name
-			}
-			blast := dim("—")
-			if s.Business != nil {
-				blast = fmt.Sprintf("%d", s.Business.BlastRadius)
-			}
-			match := dim("—")
-			if s.PatternMatch != nil {
-				match = cyan(fmt.Sprintf("%.0f%% similarity", s.PatternMatch.Similarity*100))
-			}
-			state := "warning"
-			if s.FusedRuptureIndex >= 5 {
-				state = "emergency"
-			} else if s.FusedRuptureIndex >= 3 {
-				state = "critical"
-			}
-			t.add(ref, fusedRColor(s.FusedRuptureIndex), stateIcon(state)+" "+state,
-				kpiHealth(s.HealthScore), blast, match)
-		}
-		t.print()
-		return nil
-	},
-}
-
-// --- get actions ---
 
 var getActionsCmd = &cobra.Command{
-	Use:     "actions",
-	Aliases: []string{"action"},
-	Short:   "List pending and recent actions",
+	Use:   "actions",
+	Short: "List action recommendations",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := newClient()
-		actions, err := c.Actions(ctx())
+		actions, err := newClient().Actions(ctx())
 		if err != nil {
 			return err
 		}
 		if cfgOutput == "json" {
 			return printJSON(actions)
 		}
-		if len(actions) == 0 {
-			fmt.Println(dim("\n  No pending actions.\n"))
-			return nil
-		}
-		t := newTable("ID", "WORKLOAD", "TYPE", "TIER", "STATUS", "FUSEDR", "CREATED")
+		t := newTable("ID", "WORKLOAD", "TYPE", "TIER", "STATUS")
 		for _, a := range actions {
-			tierLabel := fmt.Sprintf("Tier-%d", a.Tier)
-			switch a.Tier {
-			case 1:
-				tierLabel = red(tierLabel)
-			case 2:
-				tierLabel = yellow(tierLabel)
-			default:
-				tierLabel = dim(tierLabel)
-			}
-			status := a.Status
-			switch status {
-			case "pending":
-				status = cyan(status)
-			case "executed":
-				status = green(status)
-			case "rejected":
-				status = dim(status)
-			}
-			t.add(
-				cyan(a.ID),
-				a.WorkloadID,
-				a.Type,
-				tierLabel,
-				status,
-				fusedRColor(a.FusedR),
-				dim(a.CreatedAt.Format(time.RFC3339)),
-			)
-		}
-		t.print()
-		fmt.Printf("  %s   %s   %s\n\n",
-			cyan("ruptura-ctl actions approve <id>"),
-			cyan("ruptura-ctl actions reject <id>"),
-			red("ruptura-ctl emergency-stop"),
-		)
-		return nil
-	},
-}
-
-// --- get suppressions ---
-
-var getSuppressionsCmd = &cobra.Command{
-	Use:     "suppressions",
-	Aliases: []string{"suppression", "supp"},
-	Short:   "List active maintenance windows",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c := newClient()
-		supps, err := c.Suppressions(ctx())
-		if err != nil {
-			return err
-		}
-		if cfgOutput == "json" {
-			return printJSON(supps)
-		}
-		if len(supps) == 0 {
-			fmt.Println(dim("\n  No active suppressions.\n"))
-			return nil
-		}
-		t := newTable("ID", "WORKLOAD", "START", "END", "REASON")
-		for _, s := range supps {
-			remaining := ""
-			if time.Now().Before(s.End) {
-				remaining = yellow("  (active)")
-			}
-			t.add(
-				cyan(s.ID),
-				s.Workload,
-				s.Start.Format("2006-01-02 15:04"),
-				s.End.Format("2006-01-02 15:04")+remaining,
-				dim(s.Reason),
-			)
+			t.add(a.ID, a.WorkloadID, a.Type, fmt.Sprintf("T%d", a.Tier), a.Status)
 		}
 		t.print()
 		return nil
 	},
 }
 
-// --- get anomalies ---
-
-var getAnomaliesCmd = &cobra.Command{
-	Use:   "anomalies",
-	Short: "List anomaly detection totals",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c := newClient()
-		anomalies, err := c.Anomalies(ctx())
-		if err != nil {
-			return err
-		}
-		if cfgOutput == "json" {
-			return printJSON(anomalies)
-		}
-		if len(anomalies) == 0 {
-			fmt.Println(dim("\n  No anomalies recorded.\n"))
-			return nil
-		}
-		t := newTable("HOST", "SEVERITY", "TOTAL")
-		t.alignRight(2)
-		for _, a := range anomalies {
-			sev := a.Severity
-			switch sev {
-			case "critical":
-				sev = red(sev)
-			case "warning":
-				sev = yellow(sev)
-			}
-			t.add(a.Host, sev, fmtNum(a.Total))
-		}
-		t.print()
-		return nil
-	},
+// failureWhen says when a failure happens: "now" or the time left.
+func failureWhen(f client.Failure) string {
+	if f.Kind != "predicted" || f.ETASeconds <= 0 {
+		return "now"
+	}
+	return "in " + strings.TrimSpace(etaStr((f.ETASeconds+59)/60))
 }
 
 func init() {
-	getCmd.AddCommand(getWorkloadsCmd)
-	getCmd.AddCommand(getRupturesCmd)
-	getCmd.AddCommand(getActionsCmd)
-	getCmd.AddCommand(getSuppressionsCmd)
-	getCmd.AddCommand(getAnomaliesCmd)
+	getCmd.AddCommand(getWorkloadsCmd, getFailuresCmd, getActionsCmd)
 	rootCmd.AddCommand(getCmd)
-
-	// shorthand aliases at root level
-	rootCmd.AddCommand(&cobra.Command{
-		Use:    "workloads",
-		Hidden: true,
-		RunE:   getWorkloadsCmd.RunE,
-	})
-	rootCmd.AddCommand(&cobra.Command{
-		Use:    "ruptures",
-		Hidden: true,
-		RunE:   getRupturesCmd.RunE,
-	})
-
 }

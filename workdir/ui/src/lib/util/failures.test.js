@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatEta, sortFailures, missingRoles, recentAnomalies, measuredSignal, horizonPlacement, pastPlacement, relatedEvents, cardSummary, horizonClusters } from './failures.js'
+import { formatEta, sortFailures, missingRoles, horizonPlacement, pastPlacement, relatedEvents, cardSummary, horizonClusters } from './failures.js'
 
 describe('formatEta', () => {
   it.each([
@@ -34,34 +34,6 @@ describe('sortFailures', () => {
 describe('missingRoles', () => {
   it('lists roles with no data', () => {
     expect(missingRoles([{ role: 'a', available: true }, { role: 'b', available: false }])).toEqual(['b'])
-  })
-})
-
-describe('recentAnomalies', () => {
-  const now = Date.parse('2026-11-02T02:00:00Z')
-  const at = (minutes) => new Date(now - minutes * 60000).toISOString()
-
-  it('keeps unacknowledged anomalies of the last 15 minutes', () => {
-    const got = recentAnomalies([
-      { host: 'a', timestamp: at(5) },
-      { host: 'b', timestamp: at(30) },
-      { host: 'c', timestamp: at(1), acknowledged: true },
-    ], now)
-    expect(got.map(a => a.host)).toEqual(['a'])
-  })
-})
-
-describe('measuredSignal', () => {
-  it('turns an unavailable signal into no value', () => {
-    expect(measuredSignal({ unavailable_signals: ['mood'] }, 'mood', 0)).toBeNull()
-  })
-
-  it('keeps a measured zero', () => {
-    expect(measuredSignal({ unavailable_signals: ['mood'] }, 'stress', 0)).toBe(0)
-  })
-
-  it('accepts a workload without the list', () => {
-    expect(measuredSignal({}, 'stress', 0.4)).toBe(0.4)
   })
 })
 

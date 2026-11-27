@@ -3,55 +3,26 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
+	"time"
 
-	"github.com/benfradjselim/ruptura/pkg/models"
+	"github.com/benfradjselim/ruptura/internal/sim"
 )
 
-// handleSimInject accepts a synthetic metric payload from ruptura-sim and feeds it
-// directly into the analyzer + store pipeline. Intended for demos and local testing.
-//
-//	POST /api/v2/sim/inject
-//	{"workload": "demo/deployment/api", "metrics": {"cpu_percent": 0.7, ...}}
+// handleSimInject reports a synthetic failure on a workload. Only an engine in
+// demo mode accepts it, so a real cluster never sends fake alerts.
 func (h *Handlers) handleSimInject(w http.ResponseWriter, r *http.Request) {
-	if h.analyzer == nil || h.store == nil {
-		writeError(w, http.StatusServiceUnavailable, "analyzer not ready")
+	if h.injector == nil {
+		writeError(w, http.StatusConflict, "synthetic failures are only accepted in demo mode")
 		return
 	}
-
-	var req struct {
-		Workload string             `json:"workload"`
-		Metrics  map[string]float64 `json:"metrics"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var req sim.InjectRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	if req.Workload == "" || req.Metrics == nil {
-		writeError(w, http.StatusBadRequest, "workload and metrics are required")
+	if err := h.injector.Inject(req.Workload, req.Pattern, time.Now()); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	ref := workloadRefFromSimKey(req.Workload)
-	snap := h.analyzer.Update(ref, req.Metrics)
-	h.store.StoreSnapshot(snap)
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"workload":     ref.Key(),
-		"health_score": snap.HealthScore.Value,
-		"status":       snap.HealthScore.State,
-	})
-}
-
-// workloadRefFromSimKey parses "namespace/kind/name" or "namespace/name" into a WorkloadRef.
-func workloadRefFromSimKey(key string) models.WorkloadRef {
-	parts := strings.SplitN(key, "/", 3)
-	switch len(parts) {
-	case 3:
-		return models.WorkloadRef{Namespace: parts[0], Kind: parts[1], Name: parts[2]}
-	case 2:
-		return models.WorkloadRef{Namespace: parts[0], Kind: "Deployment", Name: parts[1]}
-	default:
-		return models.WorkloadRef{Namespace: "default", Kind: "Deployment", Name: key}
-	}
+	writeJSON(w, http.StatusOK, req)
 }

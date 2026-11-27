@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
@@ -14,8 +12,6 @@ import (
 
 	"github.com/benfradjselim/ruptura/internal/actions/engine"
 	"github.com/benfradjselim/ruptura/internal/actions/providers"
-	"github.com/benfradjselim/ruptura/internal/alerter"
-	"github.com/benfradjselim/ruptura/internal/analyzer"
 	"github.com/benfradjselim/ruptura/internal/api"
 	"github.com/benfradjselim/ruptura/internal/callgraph"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/admission"
@@ -27,27 +23,17 @@ import (
 	infraoperator "github.com/benfradjselim/ruptura/internal/collector/infra/operator"
 	infrastorage "github.com/benfradjselim/ruptura/internal/collector/infra/storage"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/tenancy"
-	apicontext "github.com/benfradjselim/ruptura/internal/context"
-	"github.com/benfradjselim/ruptura/internal/correlator"
 	"github.com/benfradjselim/ruptura/internal/discovery"
 	"github.com/benfradjselim/ruptura/internal/eventbus"
-	"github.com/benfradjselim/ruptura/internal/events"
-	"github.com/benfradjselim/ruptura/internal/explain"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
-	"github.com/benfradjselim/ruptura/internal/fusion"
-	"github.com/benfradjselim/ruptura/internal/history"
 	"github.com/benfradjselim/ruptura/internal/ingest"
 	"github.com/benfradjselim/ruptura/internal/namespaces"
-	"github.com/benfradjselim/ruptura/internal/notify"
-	pipelinelogs "github.com/benfradjselim/ruptura/internal/pipeline/logs"
-	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/sim"
 	"github.com/benfradjselim/ruptura/internal/sources"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
 	"github.com/benfradjselim/ruptura/pkg/logger"
 	"github.com/benfradjselim/ruptura/pkg/models"
-	"github.com/benfradjselim/ruptura/pkg/utils"
 )
 
 const version = "8.7.12"
@@ -119,37 +105,6 @@ func run(cfg Config) error {
 	return runWithContext(ctx, cfg)
 }
 
-// burstLogSink wraps a BurstDetector to satisfy the ingest.LogSink interface.
-// It classifies log lines by scanning for "error" or "warn" level keywords.
-type burstLogSink struct {
-	detector *correlator.BurstDetector
-}
-
-func (b *burstLogSink) IngestLine(service string, line []byte, ts time.Time) {
-	lower := bytes.ToLower(line)
-	switch {
-	case bytes.Contains(lower, []byte("error")):
-		b.detector.Observe(service, "error", ts)
-	case bytes.Contains(lower, []byte("warn")):
-		b.detector.Observe(service, "warn", ts)
-	}
-}
-
-// busSentimentSink publishes sentiment log counts to the event bus.
-// Downstream subscribers can use these counts to compute the Sentiment KPI.
-type busSentimentSink struct {
-	bus eventbus.Bus
-	ctx context.Context
-}
-
-func (s *busSentimentSink) UpdateSentiment(service string, positive, negative int) {
-	_ = s.bus.Publish(s.ctx, "ruptura.sentiment.update", "", map[string]interface{}{
-		"service":  service,
-		"positive": positive,
-		"negative": negative,
-	})
-}
-
 // runWithContext is the testable entrypoint — it uses the provided context for shutdown.
 func runWithContext(ctx context.Context, cfg Config) error {
 	logger.Default.Info("ruptura starting", "version", version, "port", cfg.Port)
@@ -159,16 +114,12 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("open storage failed: %w", err)
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	// IMPORTANT: cancel() must be deferred BEFORE store.Close() so the GC goroutine
-	// stops (via ctx.Done()) before the BadgerDB handle is closed. Go defers execute
-	// in LIFO order, so cancel() runs first, then store.Close().
+	// cancel must run before store.Close so the GC goroutine stops first.
 	defer cancel()
 	defer store.Close()
 	startProfiling(ctx, os.Getenv(profilingEnv))
 
-	// Periodic BadgerDB value-log GC — prevents vlog files from accumulating and
-	// reclaims space from TTL-expired entries. Runs every 10 minutes; each pass
-	// discards at most one vlog file with ≥50% garbage.
+	// Periodic BadgerDB value-log GC reclaims space from TTL-expired entries.
 	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
 		defer ticker.Stop()
@@ -178,7 +129,6 @@ func runWithContext(ctx context.Context, cfg Config) error {
 				return
 			case <-ticker.C:
 				for store.RunGC() == nil {
-					// keep GC-ing until no more garbage remains
 				}
 			}
 		}
@@ -187,93 +137,23 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	bus := eventbus.NewWithKafka(ctx, os.Getenv("KAFKA_BROKERS"), "ruptura")
 	defer bus.Close()
 
-	// --- core pipeline ---
-	engineConfig := pipelinemetrics.DefaultEngineConfig()
-	engineConfig.AnomalySigma = pipelinemetrics.SensitivitySigma(os.Getenv("RUPTURA_SENSITIVITY"))
-	pipelineEngine := pipelinemetrics.NewEngineWithConfig(engineConfig)
-	burstDet := correlator.NewBurstDetector(256)
-	topoBuilder := correlator.NewTopologyBuilder()
-	logSink := &burstLogSink{detector: burstDet}
-	fusionEngine := fusion.NewEngine()
-	predictorEngine := pipelinemetrics.NewPredictor()
-	sentSink := &busSentimentSink{bus: bus, ctx: ctx}
-	ingestEngine := ingest.New(pipelineEngine, logSink, nil, sentSink, fusionEngine)
+	// OTLP and Prometheus remote write: metrics, logs and spans are stored.
+	ingestEngine := ingest.New(store, store)
 	ingestEngine.SetLogStore(store)
-	logPipelineEng := pipelinelogs.NewEngine(pipelineEngine)
-	ingestEngine.SetLogPipeline(logPipelineEng)
-	failureModesEnabled := os.Getenv("RUPTURA_THANOS_URL") != ""
-	analyzerEngine := analyzer.NewAnalyzer()
-	analyzerEngine.SetTopology(topoBuilder)
-	if raw := os.Getenv("RUPTURA_WORKLOAD_WEIGHTS"); raw != "" {
-		var cfgs []models.SignalWeights
-		if err := json.Unmarshal([]byte(raw), &cfgs); err == nil {
-			analyzerEngine.SetWeightConfigs(cfgs)
-			logger.Default.Info("loaded workload weight overrides", "count", len(cfgs))
-		} else {
-			logger.Default.Warn("RUPTURA_WORKLOAD_WEIGHTS parse error — using defaults", "err", err)
-		}
-	}
 
-	// --demo / RUPTURA_DEMO_MODE=true: seed 7 days of synthetic baseline data
-	// (12 workloads, 3 namespaces) so the dashboard is fully populated within
-	// seconds, no cluster and no calibration wait. One workload is put on a
-	// live degradation trajectory that breaches within ~10 minutes.
-	var demoStats sim.SeedStats
-	if cfg.DemoMode {
-		seedStart := time.Now()
-		demoStats = sim.Seed(analyzerEngine, store, sim.DefaultSeedConfig())
-		logger.Default.Info("demo mode: seeded synthetic baseline",
-			"workloads", demoStats.Workloads, "ticks", demoStats.Ticks,
-			"degrading_workload", demoStats.DegradingWorkload,
-			"elapsed", time.Since(seedStart).String())
-		degradingRef := models.WorkloadRefFromKey(demoStats.DegradingWorkload)
-		go sim.DegradeLive(ctx, analyzerEngine, store, degradingRef, 10*time.Minute)
-	}
-
-	// k8s workload auto-discovery — no-op when not running inside a cluster.
 	var inf *discovery.Informer
 	if disc, err := discovery.NewInformer(); err == nil {
 		logger.Default.Info("k8s auto-discovery active — watching Deployments/StatefulSets/DaemonSets")
 		inf = disc
-		// FBL-V2: let the ingest path resolve pod-scoped telemetry to its
-		// owning Deployment/StatefulSet/DaemonSet via the informer's
-		// already-known ownerReferences, instead of registering the pod
-		// itself (an unstable, ReplicaSet-hash-suffixed name) as a fleet
-		// workload.
 		ingestEngine.SetOwnerResolver(disc.ResolvePodOwner)
-		// FBL-A3-4 / REFERENCE.md A8: the informer is the single source of
-		// truth for k8s workload registration. Once its first LIST sync
-		// completes across all watched kinds, prune any Deployment/
-		// StatefulSet/DaemonSet the analyzer has registered that k8s didn't
-		// actually confirm — this is the fix for the historical "23 vs 17"
-		// fleet-count drift (a stale/renamed workload lingering after a
-		// Prometheus/OTLP scrape re-registered it post-deletion). Telemetry-
-		// only, non-k8s hosts (Kind="host", bare-metal/VM/demo mode) are
-		// never touched — they were never k8s-known to begin with.
-		k8sManagedKinds := map[string]bool{"Deployment": true, "StatefulSet": true, "DaemonSet": true}
-		go disc.Run(ctx, analyzerEngine.RegisterWorkload, analyzerEngine.UnregisterWorkload, func() {
-			known := make(map[string]bool)
-			for _, ref := range disc.KnownRefs() {
-				known[ref.Key()] = true
-			}
-			pruned := 0
-			for _, ref := range analyzerEngine.AllWorkloadRefs() {
-				if !k8sManagedKinds[ref.Kind] {
-					continue
-				}
-				if !known[ref.Key()] {
-					analyzerEngine.UnregisterWorkload(ref)
-					pruned++
-				}
-			}
-			logger.Default.Info("discovery: first sync complete", "known_workloads", len(known), "pruned_stale", pruned)
+		go disc.Run(ctx, func(models.WorkloadRef) {}, func(models.WorkloadRef) {}, func() {
+			logger.Default.Info("discovery: first sync complete", "known_workloads", len(disc.KnownRefs()))
 		})
 	} else {
 		logger.Default.Info("k8s auto-discovery skipped (not in-cluster)", "reason", err.Error())
 	}
 
-	// Infra collector registry — probes and starts in-cluster collectors.
-	// Falls back to empty registry (safe, returns healthy defaults) when not in-cluster.
+	// Infra collectors probe in-cluster objects; empty out of cluster.
 	infraRegistry := dag.NewRegistry()
 	if nodeCol, err := node.New(); err == nil {
 		infraRegistry.Add(nodeCol)
@@ -299,33 +179,9 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if tenancyCol, err := tenancy.New(); err == nil {
 		infraRegistry.Add(tenancyCol)
 	}
-	// FBL-A3-1: persist infra signal history (is:/gh:/gni:/prop: prefixes) —
-	// store already satisfies dag.Persister; nil (unset) would silently skip
-	// persistence, so this must run before Run() starts ticking.
 	infraRegistry.SetPersister(store)
 	go infraRegistry.Run(ctx)
-	analyzerEngine.SetInfraRegistry(infraRegistry)
 
-	// Flush log pipeline buckets every 15 s so signals are emitted even when
-	// log volume is low and no new lines arrive to trigger auto-flush.
-	go func() {
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				logPipelineEng.Flush()
-				return
-			case <-ticker.C:
-				logPipelineEng.Flush()
-			}
-		}
-	}()
-
-	// Pipe burst events into fusion as logR
-	go fusionEngine.StartLogWatcher(ctx, burstDet.Events())
-
-	// Start OTLP ingest listener
 	otlpAddr := fmt.Sprintf(":%d", cfg.OTLPHTTPPort)
 	if certFile := os.Getenv("RUPTURA_OTLP_TLS_CERT_FILE"); certFile != "" {
 		tlsConfig, err := ingest.ServerTLS(certFile, os.Getenv("RUPTURA_OTLP_TLS_KEY_FILE"), os.Getenv("RUPTURA_OTLP_TLS_CLIENT_CA_FILE"))
@@ -342,100 +198,20 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	defer ingestEngine.Stop(context.Background()) //nolint:errcheck
 
-	al := alerter.NewAlerter(256)
 	metricsReg := telemetry.NewRegistry(version)
 	ingestEngine.SetIngestHook(metricsReg.IncIngestTotal)
-	explainer := explain.NewEngine()
 
-	// 15-second analyzer ticker: pipeline → analyzer → store → fusion → predictor → explain
-	go func() {
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case now := <-ticker.C:
-				for _, host := range pipelineEngine.AllHosts() {
-					rawMetrics := pipelineEngine.LatestByHost(host)
-					if len(rawMetrics) == 0 {
-						continue
-					}
-					ref := models.WorkloadRefFromKey(host)
-					snap := analyzerEngine.Update(ref, mapToAnalyzerSignals(rawMetrics))
-
-					// Feed metricR into fusion BEFORE storing snapshot so FusedR is current.
-					metricName := pickPrimaryMetric(rawMetrics)
-					var metricR float64
-					if metricName != "" {
-						if r, err := pipelineEngine.RuptureIndex(host, metricName); err == nil {
-							metricR = r
-							fusionEngine.SetMetricR(host, r, now)
-						}
-					}
-					// Annotate snapshot with current FusedR before persisting.
-					var fusedR float64
-					if fr, _, err := fusionEngine.FusedR(host); err == nil {
-						fusedR = publishedRuptureIndex(fr, failureModesEnabled)
-						snap.FusedRuptureIndex = fusedR
-					}
-
-					store.StoreSnapshot(snap)
-					metricsReg.RecordKPISnapshot(snap)
-					metricsReg.IncIngestTotal("metrics")
-
-					// v6.4: near-miss tracking + fingerprint recording (requires FusedR).
-					analyzerEngine.UpdateFusedR(ref, fusedR)
-					analyzerEngine.MaybeRecordFingerprint(snap, fusedR)
-
-					// Feed each raw metric into the predictor ensemble.
-					for metric, val := range rawMetrics {
-						predictorEngine.Feed(host, metric, val, now)
-					}
-					// Also feed the composite KPI signals.
-					for name, kpi := range map[string]models.KPI{
-						"health_score": snap.HealthScore,
-						"stress":       snap.Stress,
-						"fatigue":      snap.Fatigue,
-					} {
-						if !kpi.Unavailable {
-							predictorEngine.Feed(host, name, kpi.Value, now)
-						}
-					}
-
-					// Record an explain entry for any workload in warning or worse state.
-					if fusedR >= 1.5 {
-						rec := buildExplainRecord(host, snap, fusedR, metricR, fusionEngine, topoBuilder, now)
-						explainer.Record(rec)
-					}
-
-					// Forward recent critical anomalies to the alerter for rule evaluation.
-					for _, anom := range pipelineEngine.RecentAnomalies(host, now.Add(-15*time.Second)) {
-						if anom.Severity == models.SeverityCritical {
-							al.Evaluate(host, map[string]float64{anom.Metric: anom.Value})
-						}
-					}
-				}
-			}
-		}
-	}()
-
-	// Try to build a real Kubernetes actuator (only works inside a K8s pod).
-	// If not in-cluster, the provider silently no-ops instead of failing startup.
+	// The action engine stays dormant in community: its endpoints answer,
+	// approving or rolling back returns 402, and nothing triggers it yet.
 	var k8sActuator *providers.KubernetesActuator
 	if a, err := providers.NewKubernetesActuator(); err == nil {
 		k8sActuator = a
-		logger.Default.Info("kubernetes actuator initialised — scale/restart/cordon actions enabled")
-	} else {
-		logger.Default.Info("kubernetes actuator unavailable (not in-cluster) — K8s actions will be queued only", "reason", err.Error())
 	}
-	_ = providers.NewKubernetesProviderWithActuator(k8sActuator) // registered; used by action dispatcher
-
+	_ = providers.NewKubernetesProviderWithActuator(k8sActuator)
 	var rulesYAML []byte
 	if p := os.Getenv("RUPTURA_ACTION_RULES_PATH"); p != "" {
 		if data, err := os.ReadFile(p); err == nil {
 			rulesYAML = data
-			logger.Default.Info("loaded custom action rules", "path", p)
 		} else {
 			logger.Default.Warn("RUPTURA_ACTION_RULES_PATH: failed to read file", "path", p, "err", err)
 		}
@@ -445,69 +221,8 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("init action engine failed: %w", err)
 	}
 
-	// FBL-A2-3: native alert webhooks (community: Slack + generic webhook
-	// only; PagerDuty/OpsGenie routing stays in the paid autopilot edition).
-	notifier := notify.New(notify.Config{
-		SlackWebhookURL:   os.Getenv("RUPTURA_SLACK_URL"),
-		GenericWebhookURL: os.Getenv("RUPTURA_WEBHOOK_URL"),
-		MinTier:           notify.Tier2,
-	})
-	if notifier.Configured() {
-		logger.Default.Info("notify: outbound webhook(s) configured",
-			"slack", os.Getenv("RUPTURA_SLACK_URL") != "",
-			"webhook", os.Getenv("RUPTURA_WEBHOOK_URL") != "")
-	}
-
-	// Forward critical anomaly events from the alerter channel to the action engine.
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case alert := <-al.Alerts():
-				if alert.Severity == models.SeverityCritical {
-					ev := models.AnomalyEvent{
-						Host:      alert.Host,
-						Metric:    alert.Metric,
-						Value:     alert.Value,
-						Score:     alert.Value / (alert.Threshold + 1e-9),
-						Severity:  models.SeverityCritical,
-						Timestamp: alert.CreatedAt,
-					}
-					recs, err := actionEngine.RecommendFromAnomaly(ev)
-					if err != nil {
-						logger.Default.Warn("action recommend failed", "err", err)
-						continue
-					}
-					for _, rec := range recs {
-						nev := notify.Event{
-							ID:         rec.ID,
-							Host:       rec.Host,
-							ActionType: rec.ActionType,
-							Tier:       notify.TierLevel(rec.Tier),
-							Reason:     fmt.Sprintf("%s = %.3f (threshold %.3f)", alert.Metric, alert.Value, alert.Threshold),
-							Timestamp:  rec.Timestamp,
-						}
-						if notifyErr := notifier.Notify(ctx, nev); notifyErr != nil {
-							// notify.Notify() never embeds destination URLs/secrets in its
-							// error strings (see redactURLError) — safe to log verbatim.
-							logger.Default.Warn("notify failed", "err", notifyErr)
-						}
-					}
-				}
-			}
-		}
-	}()
-
-	ctxStore := apicontext.NewManualContextStore()
-	detector := apicontext.NewDeploymentDetector()
-	healthCheck := telemetry.NewHealthChecker()
-
-	handlers := api.New(store, actionEngine, explainer, al, predictorEngine, pipelineEngine, ctxStore, detector, metricsReg, healthCheck, cfg.APIKey)
-	handlers.SetAnalyzer(analyzerEngine)
+	handlers := api.New(store, actionEngine, metricsReg, telemetry.NewHealthChecker(), cfg.APIKey)
 	handlers.SetIngest(ingestEngine)
-	handlers.SetFusion(fusionEngine)
-	handlers.SetTopology(topoBuilder)
 	if inf != nil {
 		handlers.SetDiscovery(inf)
 	}
@@ -528,7 +243,14 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	limits := newCeilings(os.Getenv("RUPTURA_DEFAULT_MEMORY_LIMITS"))
 	objects := failuremodes.NewObjects()
 	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store, limits, objects)
-	if tracker != nil {
+	switch {
+	case cfg.DemoMode:
+		// --demo: synthetic failures, no cluster required.
+		demo := sim.NewDemo(time.Now())
+		handlers.SetFailureModes(demo)
+		handlers.SetInjector(demo)
+		logger.Default.Info("demo mode: synthetic failures on 12 workloads")
+	case tracker != nil:
 		handlers.SetFailureModes(tracker)
 		handlers.SetObjectFindings(objects, cardInfo())
 	}
@@ -559,23 +281,16 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	handlers.SetEdition(cfg.Edition)
 	handlers.SetVersion(version)
 	handlers.SetDemoMode(cfg.DemoMode)
-	histMgr := history.New()
-	evBus := events.New()
-	handlers.SetHistoryMgr(histMgr)
-	handlers.SetEventBus(evBus)
 	handlers.SetReady(true)
-
-	router := handlers.NewRouter()
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           router,
+		Handler:           handlers.NewRouter(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	logger.Default.Info("listening", "addr", srv.Addr, "otlp_grpc", cfg.OTLPGRPCPort, "otlp_http", cfg.OTLPHTTPPort)
@@ -589,10 +304,6 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		}
 		// Save the failure mode readings so the next start resumes its forecasts.
 		saveTrackerState(tracker, store, time.Now())
-		// NFR-05: flush all in-memory snapshots to BadgerDB before exit.
-		if err := store.FlushSnapshots(); err != nil {
-			logger.Default.Error("snapshot flush failed", "err", err)
-		}
 		logger.Default.Info("shutdown complete")
 		return nil
 	case err := <-errCh:
@@ -600,121 +311,5 @@ func runWithContext(ctx context.Context, cfg Config) error {
 			return fmt.Errorf("server error: %w", err)
 		}
 		return nil
-	}
-}
-
-// mapToAnalyzerSignals translates OTel/kubeletstats metric names to the canonical
-// names expected by the analyzer (cpu_percent, memory_percent, etc.).
-// Original entries are preserved so the rupture index engine still sees raw series.
-func mapToAnalyzerSignals(raw map[string]float64) map[string]float64 {
-	out := make(map[string]float64, len(raw)+4)
-	for k, v := range raw {
-		out[k] = v
-	}
-
-	// kubeletstats CPU utilization [0,1] → cpu_percent
-	for _, key := range []string{
-		"k8s.pod.cpu_limit_utilization",
-		"k8s.pod.cpu.node.utilization",
-		"k8s.pod.cpu.utilization",
-		"k8s.container.cpu.utilization",
-		"k8s.node.cpu.utilization",
-	} {
-		if v, ok := raw[key]; ok {
-			out["cpu_percent"] = v
-			break
-		}
-	}
-
-	// kubeletstats memory utilization [0,1] → memory_percent
-	for _, key := range []string{
-		"k8s.pod.memory_limit_utilization",
-		"k8s.pod.memory.working_set.utilization",
-		"k8s.pod.memory.utilization",
-		"k8s.container.memory.working_set.utilization",
-		"k8s.container.memory.utilization",
-		"k8s.node.memory.working_set.utilization",
-	} {
-		if v, ok := raw[key]; ok {
-			out["memory_percent"] = v
-			break
-		}
-	}
-
-	return out
-}
-
-// pickPrimaryMetric returns the best available metric name for RuptureIndex computation.
-func pickPrimaryMetric(metrics map[string]float64) string {
-	preferred := []string{
-		"cpu_percent", "memory_percent",
-		"k8s.pod.cpu.node.utilization", "k8s.pod.memory.working_set.utilization",
-		"latency_p99", "error_rate", "request_rate",
-	}
-	for _, name := range preferred {
-		if _, ok := metrics[name]; ok {
-			return name
-		}
-	}
-	// fallback: any metric
-	for name := range metrics {
-		return name
-	}
-	return ""
-}
-
-// publishedRuptureIndex drops the raw index when failure modes are active. On flat
-// series the raw ratio saturates, and risk then comes from failure modes only.
-func publishedRuptureIndex(raw float64, failureModes bool) float64 {
-	if failureModes {
-		return 0
-	}
-	return raw
-}
-
-// buildExplainRecord constructs a RuptureRecord from live pipeline state.
-// Called from the 15-second ticker when FusedR >= 1.5.
-func buildExplainRecord(
-	host string,
-	snap models.KPISnapshot,
-	fusedR, metricR float64,
-	fe *fusion.Engine,
-	topo interface{ Edges() []models.ServiceEdge },
-	now time.Time,
-) explain.RuptureRecord {
-	// Use workload key as ID so the UI can look up explain by workload reference.
-	// Using a random ID made records unreachable since the UI always queries by key.
-	id := host
-	if id == "" {
-		id = utils.GenerateID(8)
-	}
-
-	// Collect contagion sources: upstream services with error rate > 10%.
-	var contagionSources []string
-	if snap.Contagion.Value >= 0.3 {
-		for _, edge := range topo.Edges() {
-			if edge.To == host && edge.Calls > 0 {
-				errRate := float64(edge.Errors) / float64(edge.Calls)
-				if errRate > 0.1 {
-					contagionSources = append(contagionSources, edge.From)
-				}
-			}
-		}
-	}
-
-	// Pull logR and traceR from fusion engine internals via Snapshot.
-	fusionSnap := fe.Snapshot()
-	_ = fusionSnap // FusedR already computed; we use snap.FusedRuptureIndex
-
-	return explain.RuptureRecord{
-		ID:               id,
-		Host:             host,
-		R:                fusedR,
-		Confidence:       0.75,
-		Timestamp:        now,
-		FusedR:           fusedR,
-		MetricR:          metricR,
-		KPISnapshot:      snap,
-		ContagionSources: contagionSources,
 	}
 }

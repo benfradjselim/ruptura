@@ -7,17 +7,8 @@ import (
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/actions/engine"
-	"github.com/benfradjselim/ruptura/internal/alerter"
-	"github.com/benfradjselim/ruptura/internal/analyzer"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/dag"
-	apicontext "github.com/benfradjselim/ruptura/internal/context"
-	"github.com/benfradjselim/ruptura/internal/correlator"
 	"github.com/benfradjselim/ruptura/internal/discovery"
-	"github.com/benfradjselim/ruptura/internal/events"
-	"github.com/benfradjselim/ruptura/internal/explain"
-	"github.com/benfradjselim/ruptura/internal/fusion"
-	"github.com/benfradjselim/ruptura/internal/history"
-	pipelinemetrics "github.com/benfradjselim/ruptura/internal/pipeline/metrics"
 	"github.com/benfradjselim/ruptura/internal/storage"
 	"github.com/benfradjselim/ruptura/internal/telemetry"
 )
@@ -27,15 +18,15 @@ type IngestCounter interface {
 	IngestCounts() (metrics, logs, traces int64)
 }
 
+// Injector reports a synthetic failure on a workload, in demo mode.
+type Injector interface {
+	Inject(workload, pattern string, now time.Time) error
+}
+
+// Handlers serves the Ruptura REST API.
 type Handlers struct {
 	store             *storage.Store
 	engine            *engine.Engine
-	explainer         *explain.Engine
-	alerter           *alerter.Alerter
-	predictor         *pipelinemetrics.Predictor
-	pipeline          pipelinemetrics.MetricPipeline
-	ctxStore          *apicontext.ManualContextStore
-	detector          *apicontext.DeploymentDetector
 	metrics           *telemetry.Registry
 	health            *telemetry.HealthChecker
 	startTime         time.Time
@@ -43,15 +34,11 @@ type Handlers struct {
 	apiKey            string // expected bearer token; "" disables auth
 	edition           string // "community" (default) or "autopilot"
 	version           string
-	analyzer          *analyzer.Analyzer
-	historyMgr        *history.Manager
-	eventBus          *events.Bus
 	ingest            IngestCounter
-	fusionEng         *fusion.Engine
-	topoBuilder       *correlator.TopologyBuilder
 	discovery         *discovery.Informer
 	infraRegistry     *dag.Registry
 	demoMode          bool
+	injector          Injector
 	failureModes      FailureEstimates
 	callGraph         CallGraphSource
 	namespaceSelector map[string]string
@@ -64,19 +51,19 @@ type Handlers struct {
 	levelSelector     map[string]string
 }
 
-// SetDemoMode marks the server as running with synthetic demo data
-// (--demo / RUPTURA_DEMO_MODE=true), surfaced via /api/v2/engine/status so
-// the UI can render the "Demo mode" banner.
+// SetDemoMode marks the server as running on synthetic failures
+// (--demo / RUPTURA_DEMO_MODE=true), reported in /api/v2/health so the console
+// shows its demo banner.
 func (h *Handlers) SetDemoMode(v bool) { h.demoMode = v }
 
-func (h *Handlers) SetIngest(c IngestCounter)                 { h.ingest = c }
-func (h *Handlers) SetFusion(f *fusion.Engine)                { h.fusionEng = f }
-func (h *Handlers) SetTopology(t *correlator.TopologyBuilder) { h.topoBuilder = t }
-func (h *Handlers) SetDiscovery(d *discovery.Informer)        { h.discovery = d }
+// SetInjector wires the demo failure source behind POST /api/v2/sim/inject.
+func (h *Handlers) SetInjector(i Injector) { h.injector = i }
 
-func (h *Handlers) SetAnalyzer(a *analyzer.Analyzer) { h.analyzer = a }
-func (h *Handlers) SetHistoryMgr(m *history.Manager) { h.historyMgr = m }
-func (h *Handlers) SetEventBus(b *events.Bus)        { h.eventBus = b }
+// SetIngest wires the ingest counters.
+func (h *Handlers) SetIngest(c IngestCounter) { h.ingest = c }
+
+// SetDiscovery wires the Kubernetes informer.
+func (h *Handlers) SetDiscovery(d *discovery.Informer) { h.discovery = d }
 
 // SetEdition sets the product edition: "community" (default) or "autopilot".
 func (h *Handlers) SetEdition(e string) { h.edition = e }
@@ -84,41 +71,9 @@ func (h *Handlers) SetEdition(e string) { h.edition = e }
 // SetVersion sets the server version string returned in /api/v2/health.
 func (h *Handlers) SetVersion(v string) { h.version = v }
 
-func NewHandlers(
-	store *storage.Store,
-	eng *engine.Engine,
-	exp *explain.Engine,
-	al *alerter.Alerter,
-	pred *pipelinemetrics.Predictor,
-	pipe pipelinemetrics.MetricPipeline,
-	ctx *apicontext.ManualContextStore,
-	det *apicontext.DeploymentDetector,
-	met *telemetry.Registry,
-	hc *telemetry.HealthChecker,
-	apiKey string,
-) *Handlers {
-	return &Handlers{
-		store: store, engine: eng, explainer: exp, alerter: al,
-		predictor: pred, pipeline: pipe, ctxStore: ctx, detector: det,
-		metrics: met, health: hc, startTime: time.Now(), apiKey: apiKey,
-	}
-}
-
-// New is an alias for NewHandlers.
-func New(
-	store *storage.Store,
-	eng *engine.Engine,
-	exp *explain.Engine,
-	al *alerter.Alerter,
-	pred *pipelinemetrics.Predictor,
-	pipe pipelinemetrics.MetricPipeline,
-	ctx *apicontext.ManualContextStore,
-	det *apicontext.DeploymentDetector,
-	met *telemetry.Registry,
-	hc *telemetry.HealthChecker,
-	apiKey string,
-) *Handlers {
-	return NewHandlers(store, eng, exp, al, pred, pipe, ctx, det, met, hc, apiKey)
+// New returns API handlers over the store and the action engine.
+func New(store *storage.Store, eng *engine.Engine, met *telemetry.Registry, hc *telemetry.HealthChecker, apiKey string) *Handlers {
+	return &Handlers{store: store, engine: eng, metrics: met, health: hc, startTime: time.Now(), apiKey: apiKey}
 }
 
 func (h *Handlers) SetReady(v bool) {

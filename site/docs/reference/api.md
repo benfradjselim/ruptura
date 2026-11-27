@@ -12,6 +12,7 @@ The engine serves HTTP on port 8080. Requests need the API key: `Authorization: 
 | `GET /api/v2/event-history` | Recent changes and failures, for the timeline |
 | `GET /api/v2/health`, `GET /api/v2/ready` | Probes, no API key |
 | `GET /api/v2/version` | Engine version |
+| `POST /api/v2/sim/inject` | Demo mode only: report a synthetic failure, body `{"workload": "ns/Kind/name", "pattern": "memory-leak"}` (also `cascade-failure`, `traffic-surge`, `slow-burn`) |
 
 The engine also serves older endpoints used by the UI. They are not part of this reference and may change.
 

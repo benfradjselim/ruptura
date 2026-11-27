@@ -88,7 +88,7 @@ func (e *Engine) ingestSeries(labels []promLabel, samples []promSample) {
 		if math.IsNaN(s.Value) {
 			continue
 		}
-		e.pipeline.Ingest(host, name, s.Value, time.UnixMilli(s.Timestamp))
+		e.saveMetric(host, name, s.Value, time.UnixMilli(s.Timestamp))
 		atomic.AddInt64(&e.metricsCount, 1)
 	}
 }

@@ -2,8 +2,9 @@
 #
 #   docker compose up --build
 #
-# Starts the engine in demo mode (7 days of synthetic data, no calibration
-# wait — see internal/sim/seed.go) and the dashboard, which proxies /api/ to
+# Starts the engine in demo mode (synthetic failures on 12 workloads: a memory
+# leak counting down to an OOM kill, a crash loop, CPU throttling and a slow
+# burn; see internal/sim/demo.go) and the dashboard, which proxies /api/ to
 # the ruptura service (the image's default RUPTURA_BACKEND_URL).
 #
 # Dashboard: http://localhost:8081/ — log in with any username and the

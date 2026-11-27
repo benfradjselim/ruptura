@@ -1,6 +1,7 @@
 package failuremodes
 
 import (
+	"sort"
 	"sync"
 	"time"
 )
@@ -350,4 +351,34 @@ func (t *Tracker) Prune(cutoff time.Time) {
 			delete(t.releases, workload)
 		}
 	}
+}
+
+// Workloads returns every workload the tracker has a recent reading for,
+// sorted, so a fleet view can list workloads that have no failure.
+func (t *Tracker) Workloads(now time.Time) []string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	seen := map[string]bool{}
+	for _, state := range t.pods {
+		if state.workload == "" {
+			continue
+		}
+		if now.Sub(state.seen) <= estimateMaxAge || now.Sub(state.condSeen) <= estimateMaxAge {
+			seen[state.workload] = true
+		}
+	}
+	for workload, state := range t.replicas {
+		if now.Sub(state.seen) <= estimateMaxAge {
+			seen[workload] = true
+		}
+	}
+	for workload := range t.releases {
+		seen[workload] = true
+	}
+	out := make([]string, 0, len(seen))
+	for workload := range seen {
+		out = append(out, workload)
+	}
+	sort.Strings(out)
+	return out
 }

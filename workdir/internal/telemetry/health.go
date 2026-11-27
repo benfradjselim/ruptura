@@ -18,6 +18,7 @@ type HealthResponse struct {
 	Trackers         map[string]TrackerStatus `json:"trackers"`
 	RuptureDetection string                   `json:"rupture_detection"` // "suppressed"|"degraded"|"active"
 	Message          string                   `json:"message"`
+	DemoMode         bool                     `json:"demo_mode,omitempty"`
 }
 
 // HealthChecker computes health state based on uptime.

@@ -46,8 +46,8 @@ var healthCmd = &cobra.Command{
 		fmt.Printf("  %-22s %s\n", dim("edition"), cyan(edition))
 		fmt.Printf("  %-22s %s\n", dim("uptime"), uptimeStr(health.UptimeSeconds))
 		fmt.Printf("  %-22s %s\n", dim("url"), cfgURL)
-		if health.RuptureDetection != "" {
-			fmt.Printf("  %-22s %s\n", dim("detection"), health.RuptureDetection)
+		if health.DemoMode {
+			fmt.Printf("  %-22s %s\n", dim("mode"), yellow("demo, synthetic failures"))
 		}
 		fmt.Printf("  %-22s %s\n", dim("ctl version"), CTLVersion)
 
@@ -85,24 +85,16 @@ var healthCmd = &cobra.Command{
 		fmt.Printf("  %-22s %s\n\n", bold("total samples"), bold(fmtNum(totalAll)))
 
 		// workload summary
-		snaps, snapsErr := c.Snapshots(ctx())
-		if snapsErr != nil {
-			fmt.Printf("  %s\n\n", dim("(workload data unavailable: "+snapsErr.Error()+")"))
+		fleet, fleetErr := c.Fleet(ctx())
+		if fleetErr != nil {
+			fmt.Printf("  %s\n\n", dim("(workload data unavailable: "+fleetErr.Error()+")"))
 			return nil
 		}
-		calibrating := 0
-		active := 0
-		for _, s := range snaps {
-			if s.CalibrationProgress < 100 {
-				calibrating++
-			} else {
-				active++
-			}
-		}
 		fmt.Printf("  %s\n\n", bold("Workload States"))
-		fmt.Printf("  %-22s %s\n", dim("total"), fmt.Sprintf("%d", len(snaps)))
-		fmt.Printf("  %-22s %s\n", dim("calibrating"), yellow(fmt.Sprintf("%d", calibrating)))
-		fmt.Printf("  %-22s %s\n\n", dim("active"), green(fmt.Sprintf("%d", active)))
+		fmt.Printf("  %-22s %d\n", dim("total"), fleet.TotalHosts)
+		fmt.Printf("  %-22s %s\n", dim("critical"), red(fmt.Sprint(fleet.CriticalHosts)))
+		fmt.Printf("  %-22s %s\n", dim("degraded"), yellow(fmt.Sprint(fleet.DegradedHosts)))
+		fmt.Printf("  %-22s %s\n\n", dim("healthy"), green(fmt.Sprint(fleet.HealthyHosts)))
 
 		return nil
 	},

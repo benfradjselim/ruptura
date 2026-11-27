@@ -88,16 +88,6 @@ type CrashBackOffSource interface {
 	CrashBackOff(workload string, now time.Time) bool
 }
 
-// baseRisk returns the risk before failure modes apply. A tracked workload
-// takes its risk from failure modes only, because the raw rupture ratio is
-// meaningless on flat series.
-func (h *Handlers) baseRisk(fused float64) float64 {
-	if h.failureModes != nil {
-		return 0
-	}
-	return fused
-}
-
 // crashLoopRisk is the risk reported for a workload in a detected crash loop.
 const crashLoopRisk = 9.0
 
@@ -162,37 +152,6 @@ func reportedEstimate(est failuremodes.Estimate, horizon time.Duration) *failure
 	return &est
 }
 
-func estimateHeadline(name string, est failuremodes.Estimate) string {
-	if est.Mode == failuremodes.ModeMemoryBeyondUsual {
-		return fmt.Sprintf("%s has no memory limit and is projected to pass its usual level of %d MiB in %d minutes.", name, mebibytes(est.Ceiling), int(math.Round(est.ETF.Minutes())))
-	}
-	if est.Mode == failuremodes.ModeReplicaDivergence {
-		return fmt.Sprintf("%s pod %s is projected to reach its memory limit in %d minutes, unlike its replicas.", name, podName(est.Pod), int(math.Round(est.ETF.Minutes())))
-	}
-	if est.Mode == failuremodes.ModeReleaseRegression {
-		return fmt.Sprintf("%s release %s is projected to reach its memory limit in %d minutes.", name, est.Version, int(math.Round(est.ETF.Minutes())))
-	}
-	if est.Mode == failuremodes.ModeRecurrentFailure {
-		return fmt.Sprintf("%s fails about every %d minutes.", name, int(math.Round(est.Interval.Minutes())))
-	}
-	if est.Mode == failuremodes.ModeRolloutStuck {
-		return fmt.Sprintf("%s rollout has stopped progressing.", name)
-	}
-	if est.Mode == failuremodes.ModeOOMKilled {
-		return fmt.Sprintf("%s was killed for exceeding its memory limit.", name)
-	}
-	if est.Mode == failuremodes.ModeReplicasUnavailable {
-		return fmt.Sprintf("%s is missing %s.", name, replicaCount(int(est.Usage)))
-	}
-	if est.Mode == failuremodes.ModeStartupStuck {
-		return fmt.Sprintf("%s cannot start: %s.", name, est.Reason)
-	}
-	if est.Mode == failuremodes.ModeCPUThrottling {
-		return fmt.Sprintf("%s is CPU throttled %d percent of the time.", name, int(math.Round(est.Usage*100)))
-	}
-	return fmt.Sprintf("%s is projected to reach its memory limit in %d minutes.", name, int(math.Round(est.ETF.Minutes())))
-}
-
 func estimateAction(est failuremodes.Estimate) string {
 	if est.Mode == failuremodes.ModeMemoryBeyondUsual {
 		return "Set a memory limit, or find why memory grows past its usual level"
@@ -241,4 +200,36 @@ func podName(pod string) string {
 		return pod[i+1:]
 	}
 	return pod
+}
+
+// estimateHeadline is the one-line description of a failure.
+func estimateHeadline(name string, est failuremodes.Estimate) string {
+	if est.Mode == failuremodes.ModeMemoryBeyondUsual {
+		return fmt.Sprintf("%s has no memory limit and is projected to pass its usual level of %d MiB in %d minutes.", name, mebibytes(est.Ceiling), int(math.Round(est.ETF.Minutes())))
+	}
+	if est.Mode == failuremodes.ModeReplicaDivergence {
+		return fmt.Sprintf("%s pod %s is projected to reach its memory limit in %d minutes, unlike its replicas.", name, podName(est.Pod), int(math.Round(est.ETF.Minutes())))
+	}
+	if est.Mode == failuremodes.ModeReleaseRegression {
+		return fmt.Sprintf("%s release %s is projected to reach its memory limit in %d minutes.", name, est.Version, int(math.Round(est.ETF.Minutes())))
+	}
+	if est.Mode == failuremodes.ModeRecurrentFailure {
+		return fmt.Sprintf("%s fails about every %d minutes.", name, int(math.Round(est.Interval.Minutes())))
+	}
+	if est.Mode == failuremodes.ModeRolloutStuck {
+		return fmt.Sprintf("%s rollout has stopped progressing.", name)
+	}
+	if est.Mode == failuremodes.ModeOOMKilled {
+		return fmt.Sprintf("%s was killed for exceeding its memory limit.", name)
+	}
+	if est.Mode == failuremodes.ModeReplicasUnavailable {
+		return fmt.Sprintf("%s is missing %s.", name, replicaCount(int(est.Usage)))
+	}
+	if est.Mode == failuremodes.ModeStartupStuck {
+		return fmt.Sprintf("%s cannot start: %s.", name, est.Reason)
+	}
+	if est.Mode == failuremodes.ModeCPUThrottling {
+		return fmt.Sprintf("%s is CPU throttled %d percent of the time.", name, int(math.Round(est.Usage*100)))
+	}
+	return fmt.Sprintf("%s is projected to reach its memory limit in %d minutes.", name, int(math.Round(est.ETF.Minutes())))
 }

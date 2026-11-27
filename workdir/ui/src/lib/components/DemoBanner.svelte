@@ -6,7 +6,7 @@
 
   onMount(async () => {
     try {
-      const status = await api.engineStatus()
+      const status = await api.health()
       demoMode = !!status.demo_mode
     } catch {}
   })
@@ -14,7 +14,7 @@
 
 {#if demoMode}
   <div class="demo-banner">
-    Demo mode — synthetic data; your real data replaces this within 24h
+    Demo mode: synthetic failures, no cluster connected
   </div>
 {/if}
 

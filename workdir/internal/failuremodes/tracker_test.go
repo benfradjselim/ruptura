@@ -61,3 +61,14 @@ func TestTracker_CountsRestartsWithoutUsage(t *testing.T) {
 		t.Fatalf("restarts = %d, want 3", got)
 	}
 }
+
+func TestTrackerWorkloads(t *testing.T) {
+	tr := NewTracker()
+	now := time.Date(2026, 11, 27, 10, 0, 0, 0, time.UTC)
+	tr.Observe("shop/Deployment/api", "api-1", now, 100, 512, 0)
+	tr.Observe("shop/Deployment/db", "db-1", now.Add(-2*estimateMaxAge), 100, 512, 0)
+	got := tr.Workloads(now)
+	if len(got) != 1 || got[0] != "shop/Deployment/api" {
+		t.Fatalf("Workloads() = %v, want only the recently read workload", got)
+	}
+}

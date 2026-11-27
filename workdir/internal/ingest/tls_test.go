@@ -100,7 +100,7 @@ func TestStartHTTP_TLS(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", tc.name, err)
 		}
-		e := New(nil, nil, nil, nil, nil)
+		e := New(nil, nil)
 		e.SetTLS(config)
 		addr := freeAddr(t)
 		if err := e.StartHTTP(addr); err != nil {

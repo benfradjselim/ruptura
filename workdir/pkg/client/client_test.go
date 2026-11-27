@@ -50,43 +50,6 @@ func TestHealth_ServerError(t *testing.T) {
 	}
 }
 
-func TestSnapshots_OK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `[]`)
-	}))
-	defer ts.Close()
-
-	c := New(Config{BaseURL: ts.URL})
-	res, err := c.Snapshots(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res) != 0 {
-		t.Errorf("want empty slice, got %v", res)
-	}
-}
-
-func TestSnapshot_OK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"host":"payment-api","fused_rupture_index":2.1}`)
-	}))
-	defer ts.Close()
-
-	c := New(Config{BaseURL: ts.URL})
-	res, err := c.Snapshot(context.Background(), "payment-api")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.Host != "payment-api" {
-		t.Errorf("want payment-api, got %s", res.Host)
-	}
-	if res.FusedRuptureIndex != 2.1 {
-		t.Errorf("want 2.1, got %f", res.FusedRuptureIndex)
-	}
-}
-
 func TestActions_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -128,41 +91,6 @@ func TestEmergencyStop_OK(t *testing.T) {
 	}
 }
 
-func TestWeights_OK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `[{"selector":"production/*","stress":0.4}]`)
-	}))
-	defer ts.Close()
-
-	c := New(Config{BaseURL: ts.URL})
-	res, err := c.Weights(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res) != 1 || res[0].Selector != "production/*" {
-		t.Errorf("unexpected: %+v", res)
-	}
-}
-
-func TestAddContext_OK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusCreated)
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"id":"ctx_1"}`)
-	}))
-	defer ts.Close()
-
-	c := New(Config{BaseURL: ts.URL})
-	res, err := c.AddContext(context.Background(), ContextEntry{ID: "ctx_1"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.ID != "ctx_1" {
-		t.Errorf("want ctx_1, got %s", res.ID)
-	}
-}
-
 func TestMetrics_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "rpt_uptime_seconds 120")
@@ -199,5 +127,28 @@ func TestClient_NetworkError(t *testing.T) {
 	_, err := c.Health(context.Background())
 	if err == nil {
 		t.Error("expected error for unreachable server")
+	}
+}
+
+func TestFailuresAndFleet_OK(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v2/failures":
+			_, _ = w.Write([]byte(`[{"target":"shop/Deployment/api","failureMode":"saturation","kind":"predicted","etaSeconds":600}]`))
+		case "/api/v2/fleet":
+			_, _ = w.Write([]byte(`{"total_hosts":1,"critical_hosts":1,"hosts":[{"host":"shop/Deployment/api","state":"critical","risk":8.5}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := New(Config{BaseURL: srv.URL})
+	failures, err := c.Failures(context.Background())
+	if err != nil || len(failures) != 1 || failures[0].ETASeconds != 600 {
+		t.Fatalf("Failures = %+v, %v", failures, err)
+	}
+	fleet, err := c.Fleet(context.Background())
+	if err != nil || fleet.CriticalHosts != 1 || fleet.Hosts[0].State != "critical" {
+		t.Fatalf("Fleet = %+v, %v", fleet, err)
 	}
 }
