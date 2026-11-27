@@ -3,22 +3,16 @@
   import Login        from './pages/Login.svelte'
   import Dashboard    from './pages/Dashboard.svelte'
   import Alerts       from './pages/Alerts.svelte'
-  import Dashboards   from './pages/Dashboards.svelte'
   import Settings     from './pages/Settings.svelte'
   import Fleet        from './pages/Fleet.svelte'
   import Failures     from './pages/Failures.svelte'
   import CallGraph    from './pages/CallGraph.svelte'
   import Infra        from './pages/Infra.svelte'
   import Notifications from './pages/Notifications.svelte'
-  import Logs         from './pages/Logs.svelte'
-  import Traces       from './pages/Traces.svelte'
   import AlertRules   from './pages/AlertRules.svelte'
-  import Datasources  from './pages/Datasources.svelte'
   import Orgs         from './pages/Orgs.svelte'
-  import SLOs         from './pages/SLOs.svelte'
   import { api }      from './lib/api.js'
   import DemoBanner   from './lib/components/DemoBanner.svelte'
-  import { SECURITY_TEMPLATE } from './lib/templates/security.js'
   import { onMount } from 'svelte'
   import Mark from './lib/components/Mark.svelte'
 
@@ -56,18 +50,13 @@
   // SVG icon paths (Lucide-style)
   const NAV_ICONS = {
     orgs:            'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
-    slos:            'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
     dashboard:       'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2zM9 22V12h6v10',
     callgraph:       'M5 6a2 2 0 100-4 2 2 0 000 4zM19 14a2 2 0 100-4 2 2 0 000 4zM5 22a2 2 0 100-4 2 2 0 000 4zM7 4h4a2 2 0 012 2v4a2 2 0 002 2h2M7 20h4a2 2 0 002-2v-4a2 2 0 012-2',
     failures:        'M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
     fleet:           'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
     infra:           'M5 12H3m4-7l-2-2m10 2 2-2M5 19l-2 2m14-2 2 2M12 3v2m0 14v2M7 7l10 10M17 7 7 17',
-    dashboards:      'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
-    logs:            'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
-    traces:          'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
     alerts:          'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
     'alert-rules':   'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
-    datasources:     'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 12c0 2.21 3.582 4 8 4s8-1.79 8-4',
     notifications:   'M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0',
     settings:        'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z',
   }
@@ -83,12 +72,6 @@
     },
   ]
 
-  async function applySecurityTemplate() {
-    try {
-      await api.dashboardCreate(SECURITY_TEMPLATE)
-      currentPage.set('dashboards')
-    } catch {}
-  }
 
   // Grid overlay toggle — G key or button
   function toggleGrid() {
@@ -156,24 +139,14 @@
         <Infra />
       {:else if $currentPage === 'alerts'}
         <Alerts />
-      {:else if $currentPage === 'dashboards'}
-        <Dashboards />
       {:else if $currentPage === 'notifications'}
         <Notifications />
       {:else if $currentPage === 'settings'}
         <Settings />
-      {:else if $currentPage === 'logs'}
-        <Logs />
-      {:else if $currentPage === 'traces'}
-        <Traces />
       {:else if $currentPage === 'alert-rules'}
         <AlertRules />
-      {:else if $currentPage === 'datasources'}
-        <Datasources />
       {:else if $currentPage === 'orgs'}
         <Orgs />
-      {:else if $currentPage === 'slos'}
-        <SLOs />
       {/if}
     </main>
   </div>

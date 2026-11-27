@@ -136,37 +136,11 @@ func (h *Handlers) NewRouter() http.Handler {
 	api.HandleFunc("/alert-rules", stubCreate).Methods("POST")
 	api.HandleFunc("/alert-rules/{name:.+}", stubWithID).Methods("PUT", "DELETE")
 
-	// Dashboards (Dashboards.svelte — stub)
-	api.HandleFunc("/dashboards", stubList).Methods("GET")
-	api.HandleFunc("/dashboards", stubCreate).Methods("POST")
-	api.HandleFunc("/dashboards/import", stubCreate).Methods("POST")
-	api.HandleFunc("/dashboards/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
-	api.HandleFunc("/dashboards/{id}/export", stubWithID).Methods("GET")
-
-	// Dashboard templates (Dashboards.svelte — stub)
-	api.HandleFunc("/templates", stubList).Methods("GET")
-	api.HandleFunc("/templates/{id}", stubWithID).Methods("GET")
-	api.HandleFunc("/templates/{id}/apply", stubWithID).Methods("POST")
-
-	// SLOs (SLOs.svelte — stub)
-	api.HandleFunc("/slos", stubList).Methods("GET")
-	api.HandleFunc("/slos", stubCreate).Methods("POST")
-	api.HandleFunc("/slos/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
-	api.HandleFunc("/slos/status", stubList).Methods("GET")
-	api.HandleFunc("/slos/{id}/status", stubWithID).Methods("GET")
-
 	// Notifications (Notifications.svelte — stub)
 	api.HandleFunc("/notifications", stubList).Methods("GET")
 	api.HandleFunc("/notifications", stubCreate).Methods("POST")
 	api.HandleFunc("/notifications/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
 	api.HandleFunc("/notifications/{id}/test", stubWithID).Methods("POST")
-
-	// Datasources (Datasources.svelte — stub)
-	api.HandleFunc("/datasources", stubList).Methods("GET")
-	api.HandleFunc("/datasources", stubCreate).Methods("POST")
-	api.HandleFunc("/datasources/{id}", stubWithID).Methods("GET", "PUT", "DELETE")
-	api.HandleFunc("/datasources/{id}/test", stubWithID).Methods("POST")
-	api.HandleFunc("/datasources/{id}/proxy", stubWithID).Methods("POST")
 
 	// Orgs (Orgs.svelte — stub)
 	api.HandleFunc("/orgs", stubList).Methods("GET")
