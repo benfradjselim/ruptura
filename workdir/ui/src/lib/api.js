@@ -64,44 +64,12 @@ export const api = {
   alertRuleUpdate:  (name, rule)   => req('PUT', `/alert-rules/${encodeURIComponent(name)}`, rule),
   alertRuleDelete:  (name)         => req('DELETE', `/alert-rules/${encodeURIComponent(name)}`),
 
-  // ── Dashboards ─────────────────────────────────────────────────────────────
-  dashboards:      ()       => req('GET', '/dashboards'),
-  dashboardCreate: (d)      => req('POST', '/dashboards', d),
-  dashboardGet:    (id)     => req('GET', `/dashboards/${id}`),
-  dashboardUpdate: (id, d)  => req('PUT', `/dashboards/${id}`, d),
-  dashboardDelete: (id)     => req('DELETE', `/dashboards/${id}`),
-  dashboardExport: (id)     => req('GET', `/dashboards/${id}/export`),
-  dashboardImport: (json)   => req('POST', '/dashboards/import', json),
-
-  // ── Templates ──────────────────────────────────────────────────────────────
-  templates:       ()                    => req('GET', '/templates'),
-  templateGet:     (id)                  => req('GET', `/templates/${id}`),
-  templateApply:   (id, name, mode)      => req('POST', `/templates/${id}/apply`, { name: name || undefined, mode: mode || 'current' }),
-
-  // ── DataSources ────────────────────────────────────────────────────────────
-  datasources:       ()         => req('GET', '/datasources'),
-  datasourceCreate:  (ds)       => req('POST', '/datasources', ds),
-  datasourceGet:     (id)       => req('GET', `/datasources/${id}`),
-  datasourceUpdate:  (id, ds)   => req('PUT', `/datasources/${id}`, ds),
-  datasourceDelete:  (id)       => req('DELETE', `/datasources/${id}`),
-  datasourceTest:    (id)       => req('POST', `/datasources/${id}/test`),
-  datasourceProxy:   (id, body) => req('POST', `/datasources/${id}/proxy`, body),
-
   // ── Orgs ────────────────────────────────────────────────────────────────────
   orgs:       ()         => req('GET', '/orgs'),
   orgCreate:  (o)        => req('POST', '/orgs', o),
   orgGet:     (id)       => req('GET', `/orgs/${id}`),
   orgUpdate:  (id, o)    => req('PUT', `/orgs/${id}`, o),
   orgDelete:  (id)       => req('DELETE', `/orgs/${id}`),
-
-  // ── SLOs ────────────────────────────────────────────────────────────────────
-  slos:          ()         => req('GET', '/slos'),
-  sloCreate:     (s)        => req('POST', '/slos', s),
-  sloGet:        (id)       => req('GET', `/slos/${id}`),
-  sloUpdate:     (id, s)    => req('PUT', `/slos/${id}`, s),
-  sloDelete:     (id)       => req('DELETE', `/slos/${id}`),
-  sloStatus:     (id)       => req('GET', `/slos/${id}/status`),
-  slosStatus:    ()         => req('GET', '/slos/status'),
 
   // ── Users (admin) ──────────────────────────────────────────────────────────
   users:      ()         => req('GET', '/auth/users'),
@@ -160,39 +128,6 @@ export const api = {
   // ── Topology ───────────────────────────────────────────────────────────────
   topology: () => req('GET', '/topology'),
   dataflow: () => req('GET', '/dataflow'),
-
-  // ── Logs ───────────────────────────────────────────────────────────────────
-  logs: ({ service = '', severity = '', q = '', from = '', to = '', limit = 200 } = {}) => {
-    const params = new URLSearchParams()
-    if (service)  params.set('service', service)
-    if (severity) params.set('severity', severity)
-    if (q)        params.set('q', q)
-    if (from)     params.set('from', from)
-    if (to)       params.set('to', to)
-    params.set('limit', String(limit))
-    return req('GET', '/logs?' + params.toString())
-  },
-
-  /** Returns an EventSource for live log streaming */
-  logStream: ({ service = '', severity = '', q = '' } = {}) => {
-    const params = new URLSearchParams()
-    if (service)  params.set('service', service)
-    if (severity) params.set('severity', severity)
-    if (q)        params.set('q', q)
-    const url = BASE + '/logs/stream?' + params.toString()
-    // Append auth token as query param since EventSource doesn't support headers
-    const full = _token ? url + '&token=' + encodeURIComponent(_token) : url
-    return new EventSource(full)
-  },
-
-  // ── Traces ─────────────────────────────────────────────────────────────────
-  traceSearch: ({ service = '', limit = 50 } = {}) => {
-    const params = new URLSearchParams()
-    if (service) params.set('service', service)
-    params.set('limit', String(limit))
-    return req('GET', '/traces?' + params.toString())
-  },
-  traceGet: (traceID) => req('GET', `/traces/${encodeURIComponent(traceID)}`),
 
   // ── Infra ──────────────────────────────────────────────────────────────────
   infraGroups:    () => req('GET', '/infra/groups'),
