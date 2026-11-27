@@ -69,6 +69,8 @@ type Card struct {
 	Profile    string            `yaml:"profile"`
 	Action     string            `yaml:"action"`
 	Unit       string            `yaml:"unit"`
+	// Evidence, when set, states the reading behind a detected finding.
+	Evidence string `yaml:"evidence"`
 }
 
 // Catalog is the set of known signals, roles and failure cards.

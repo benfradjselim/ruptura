@@ -127,3 +127,107 @@ cards:
     profile: minimal
     unit: count
     action: Raise the quota or remove unused objects, or new objects in this namespace will be refused
+  - id: inode-exhaustion
+    failureMode: inode_exhaustion
+    level: node
+    kind: predicted
+    target: [instance, device]
+    usage: 'max by (instance,device) (node_filesystem_files{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"} - node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"})'
+    capacity: 'max by (instance,device) (node_filesystem_files{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"})'
+    sampled: 'max by (instance,device) (timestamp(node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs|iso9660|ramfs|nsfs"}))'
+    horizon: 6h
+    severity: critical
+    profile: standard
+    unit: count
+    action: Find what creates many small files on this filesystem and clean them, before writes fail with no space left
+  - id: too-many-pods
+    failureMode: too_many_pods
+    level: node
+    kind: predicted
+    target: [node]
+    usage: 'max by (node) (kubelet_running_pods)'
+    capacity: 'max by (node) (kube_node_status_capacity{resource="pods"})'
+    sampled: 'max by (node) (timestamp(kubelet_running_pods))'
+    horizon: 6h
+    severity: warning
+    profile: minimal
+    unit: count
+    action: Spread the pods over more nodes or raise maxPods, before new pods on this node stay Pending
+  - id: conntrack-table-full
+    failureMode: conntrack_table_full
+    level: node
+    kind: predicted
+    target: [instance]
+    usage: 'max by (instance) (node_nf_conntrack_entries)'
+    capacity: 'max by (instance) (node_nf_conntrack_entries_limit)'
+    sampled: 'max by (instance) (timestamp(node_nf_conntrack_entries))'
+    horizon: 1h
+    severity: critical
+    profile: standard
+    unit: count
+    action: Find the pods that open many short connections, or raise nf_conntrack_max, before the kernel drops new connections
+  - id: node-capacity-cpu
+    failureMode: node_capacity_exhausted
+    level: node
+    kind: predicted
+    target: [node]
+    usage: 'sum by (node) (kube_pod_container_resource_requests{resource="cpu",node!=""} * on (namespace,pod) group_left() (max by (namespace,pod) (kube_pod_status_phase{phase=~"Pending|Running"}) == 1))'
+    capacity: 'max by (node) (kube_node_status_allocatable{resource="cpu"})'
+    sampled: 'max by (node) (timestamp(kube_node_status_allocatable{resource="cpu"}))'
+    horizon: 24h
+    severity: warning
+    profile: minimal
+    unit: cores
+    action: Add nodes or lower CPU requests, before new pods cannot be scheduled
+  - id: node-capacity-memory
+    failureMode: node_capacity_exhausted
+    level: node
+    kind: predicted
+    target: [node]
+    usage: 'sum by (node) (kube_pod_container_resource_requests{resource="memory",node!=""} * on (namespace,pod) group_left() (max by (namespace,pod) (kube_pod_status_phase{phase=~"Pending|Running"}) == 1))'
+    capacity: 'max by (node) (kube_node_status_allocatable{resource="memory"})'
+    sampled: 'max by (node) (timestamp(kube_node_status_allocatable{resource="memory"}))'
+    horizon: 24h
+    severity: warning
+    profile: minimal
+    unit: bytes
+    action: Add nodes or lower memory requests, before new pods cannot be scheduled
+  - id: clock-not-synchronised
+    failureMode: clock_not_synchronised
+    level: node
+    kind: detected
+    target: [instance]
+    value: 'clamp_max(max by (instance) (abs(node_timex_offset_seconds) > bool 0.05) + max by (instance) ((node_timex_sync_status == bool 0) * (node_timex_maxerror_seconds >= bool 16)), 1)'
+    sampled: 'max by (instance) (timestamp(node_timex_offset_seconds))'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: warning
+    profile: standard
+    evidence: Clock offset over 50 ms, or time sync lost, reported by node-exporter
+    action: Check chronyd or NTP on this node; certificates, leases and etcd depend on a correct clock
+  - id: node-readiness-flapping
+    failureMode: node_readiness_flapping
+    level: node
+    kind: detected
+    target: [node]
+    value: 'sum by (node) (changes(kube_node_status_condition{condition="Ready",status="true"}[15m])) > bool 2'
+    sampled: 'max by (node) (timestamp(kube_node_status_condition{condition="Ready",status="true"}))'
+    raiseAfter: 15m
+    clearAfter: 15m
+    severity: warning
+    profile: minimal
+    evidence: Ready condition changed more than twice in 15 minutes, reported by kube-state-metrics
+    action: Check the kubelet, container runtime and network of this node; its pods are being disrupted
+  - id: tcp-retransmits
+    failureMode: tcp_retransmits
+    level: node
+    kind: detected
+    target: [instance]
+    value: '(max by (instance) (rate(node_netstat_Tcp_RetransSegs[5m]) / rate(node_netstat_Tcp_OutSegs[5m])) > bool 0.01) * (max by (instance) (rate(node_netstat_Tcp_OutSegs[5m])) > bool 100)'
+    sampled: 'max by (instance) (timestamp(node_netstat_Tcp_RetransSegs))'
+    raiseAfter: 15m
+    clearAfter: 5m
+    severity: warning
+    profile: standard
+    evidence: Over 1% of TCP segments sent by this node are retransmissions, reported by node-exporter
+    action: Check the node's interfaces for errors and drops, and the network path to its peers

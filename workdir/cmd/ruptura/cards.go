@@ -166,7 +166,7 @@ func cardInfo() map[string]api.CardInfo {
 	}
 	info := make(map[string]api.CardInfo, len(catalog.Cards))
 	for _, card := range catalog.Cards {
-		info[card.ID] = api.CardInfo{Action: card.Action, Severity: card.Severity}
+		info[card.ID] = api.CardInfo{Action: card.Action, Severity: card.Severity, Evidence: card.Evidence}
 	}
 	return info
 }

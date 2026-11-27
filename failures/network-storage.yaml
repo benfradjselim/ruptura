@@ -60,7 +60,7 @@
   propagates_to: [pods of the node]
   action: Check the interface, the MTU and the network fabric
   sources: [node-exporter NodeNetworkReceiveErrs, node-exporter NodeNetworkTransmitErrs]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: tcp_retransmits}
 
 - id: network-policy-blocks-traffic
   title: NetworkPolicy blocks a needed call

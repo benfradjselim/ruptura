@@ -48,12 +48,19 @@ func TestObjectResult(t *testing.T) {
 
 func TestObjectEvidence(t *testing.T) {
 	f := failuremodes.ObjectFinding{Predicted: true, Unit: "count", Value: 45, Capacity: 60}
-	if got, want := objectEvidence(f), "45 used of 60 (75%) and growing"; got != want {
+	if got, want := objectEvidence(f, CardInfo{}), "45 used of 60 (75%) and growing"; got != want {
 		t.Fatalf("evidence = %q, want %q", got, want)
 	}
 	f = failuremodes.ObjectFinding{Predicted: true, Unit: "bytes", Value: 256 << 20, Capacity: 512 << 20}
-	if got, want := objectEvidence(f), "256 MiB used of 512 MiB (50%) and growing"; got != want {
+	if got, want := objectEvidence(f, CardInfo{}), "256 MiB used of 512 MiB (50%) and growing"; got != want {
 		t.Fatalf("evidence = %q, want %q", got, want)
+	}
+	detected := failuremodes.ObjectFinding{Value: 1}
+	if got := objectEvidence(detected, CardInfo{}); got != "Reported by kube-state-metrics at the last reading" {
+		t.Fatalf("default detected evidence = %q", got)
+	}
+	if got, want := objectEvidence(detected, CardInfo{Evidence: "Clock offset over 50 ms"}), "Clock offset over 50 ms"; got != want {
+		t.Fatalf("card evidence = %q, want %q", got, want)
 	}
 }
 

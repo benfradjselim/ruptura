@@ -19,6 +19,8 @@ type ObjectFindings interface {
 type CardInfo struct {
 	Action   string
 	Severity string
+	// Evidence states the reading behind a detected finding; empty keeps the default.
+	Evidence string
 }
 
 // SetObjectFindings adds the findings of catalog cards to the failure list.
@@ -57,7 +59,7 @@ func objectResult(f failuremodes.ObjectFinding, info CardInfo) *FailureResult {
 		Kind:              failureKindDetected,
 		State:             "degraded",
 		RecommendedAction: info.Action,
-		Evidence:          []string{objectEvidence(f)},
+		Evidence:          []string{objectEvidence(f, info)},
 	}
 	if f.Level != failureLevelNode {
 		result.Workload = f.Target
@@ -80,8 +82,11 @@ func objectResult(f failuremodes.ObjectFinding, info CardInfo) *FailureResult {
 }
 
 // objectEvidence states the reading behind a finding.
-func objectEvidence(f failuremodes.ObjectFinding) string {
+func objectEvidence(f failuremodes.ObjectFinding, info CardInfo) string {
 	if !f.Predicted {
+		if info.Evidence != "" {
+			return info.Evidence
+		}
 		return "Reported by kube-state-metrics at the last reading"
 	}
 	percent := 0.0
