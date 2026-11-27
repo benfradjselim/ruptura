@@ -54,18 +54,20 @@ jobs:
           docker compose logs ruptura
           exit 1
 
-      - name: Assert demo mode seeded workloads (no calibration wait)
+      - name: Assert demo mode reports workloads and failures
         run: |
           status=$(curl -s -X POST http://localhost:8080/api/v2/auth/login \
             -H "Content-Type: application/json" \
             -d '{"username":"admin","password":"ruptura-local-dev"}')
           token=$(echo "$status" | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 
-          active=$(curl -s -H "Authorization: Bearer ${token}" http://localhost:8080/api/v2/engine/status \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['analyzer']['active_workloads'])")
-          echo "active_workloads=${active}"
-          if [ "${active}" -lt 12 ]; then
-            echo "::error::expected 12 active demo workloads with no calibration wait, got ${active}"
+          total=$(curl -s -H "Authorization: Bearer ${token}" http://localhost:8080/api/v2/fleet \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['total_hosts'])")
+          failures=$(curl -s -H "Authorization: Bearer ${token}" http://localhost:8080/api/v2/failures \
+            | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
+          echo "workloads=${total} failures=${failures}"
+          if [ "${total}" -lt 12 ] || [ "${failures}" -lt 4 ]; then
+            echo "::error::expected 12 demo workloads and at least 4 failures, got ${total} and ${failures}"
             docker compose logs ruptura
             exit 1
           fi
