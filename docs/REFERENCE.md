@@ -11,6 +11,7 @@ The operator sets these from a `RupturaInstance`. Set them yourself only when yo
 | `RUPTURA_INPUT_PROFILE` | `minimal` or `standard`: how much telemetry is collected. |
 | `RUPTURA_SENSITIVITY` | `conservative`, `balanced` or `aggressive`. |
 | `RUPTURA_HORIZON` | Forecast horizon, for example `30m`. |
+| `RUPTURA_SLO_TARGET` | Availability objective in percent that error budget burn is read against, default `99.9`. |
 | `RUPTURA_PROMETHEUS_AUTH` | `serviceAccount` (default), `bearer`, `basic` or `none`. |
 | `RUPTURA_PROMETHEUS_CA_FILE`, `RUPTURA_PROMETHEUS_CERT_FILE`, `RUPTURA_PROMETHEUS_KEY_FILE` | Extra CA and client certificate for Prometheus. |
 | `RUPTURA_PROMETHEUS_SERVER_NAME` | Name checked in the Prometheus certificate. |

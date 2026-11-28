@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"math"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -282,6 +284,49 @@ func logReadings(c *logburst.Counter) objectSource {
 		for _, b := range bursts {
 			out = append(out, objectReading{Target: b.Workload, Value: b.Ratio})
 		}
+		return out
+	}
+}
+
+// defaultSLOTarget is the availability objective, in percent, used when the
+// instance declares none.
+const defaultSLOTarget = 99.9
+
+// sloTarget reads the availability objective from RUPTURA_SLO_TARGET.
+func sloTarget(raw string) float64 {
+	if raw == "" {
+		return defaultSLOTarget
+	}
+	target, err := strconv.ParseFloat(raw, 64)
+	if err != nil || target <= 0 || target >= 100 {
+		warnf("invalid RUPTURA_SLO_TARGET %q, using %v", raw, defaultSLOTarget)
+		return defaultSLOTarget
+	}
+	return target
+}
+
+// burnReadings reads how fast each workload spends its error budget: the
+// share of failed calls it receives, over the share the objective allows.
+// A burn of 1 spends the budget exactly over the objective's period.
+func burnReadings(graph func() callgraph.Graph, target float64) objectSource {
+	budget := 1 - target/100
+	return func() []objectReading {
+		calls, failed := map[string]float64{}, map[string]float64{}
+		for _, e := range graph().Edges {
+			if e.ErrorRatio == nil {
+				continue
+			}
+			calls[e.To] += e.CallsPerMinute
+			failed[e.To] += e.CallsPerMinute * *e.ErrorRatio
+		}
+		out := make([]objectReading, 0, len(calls))
+		for workload, n := range calls {
+			if n < minEdgeCallsPerMinute {
+				continue
+			}
+			out = append(out, objectReading{Target: workload, Value: failed[workload] / n / budget})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Target < out[j].Target })
 		return out
 	}
 }

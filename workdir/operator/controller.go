@@ -576,6 +576,7 @@ func configEnv(spec RupturaInstanceSpec) []EnvVar {
 		{Name: "RUPTURA_INPUT_PROFILE", Value: spec.Input.Profile},
 		{Name: "RUPTURA_SENSITIVITY", Value: spec.Analysis.Sensitivity},
 		{Name: "RUPTURA_HORIZON", Value: spec.Analysis.Horizon},
+		{Name: "RUPTURA_SLO_TARGET", Value: spec.Analysis.SLOTarget},
 		{Name: "RUPTURA_DEFAULT_MEMORY_LIMITS", Value: selectorString(spec.Analysis.DefaultMemoryLimits)},
 		{Name: "RUPTURA_INFERRED_CEILINGS", Value: inferCeilingsValue(spec.Analysis.InferMemoryCeilings)},
 		{Name: "LOG_LEVEL", Value: spec.Logging.Level},

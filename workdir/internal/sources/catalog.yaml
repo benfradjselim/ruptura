@@ -603,3 +603,16 @@ cards:
     profile: minimal
     evidence: This workload logs errors at over 5 times its usual rate (at least 10 a minute), from OTLP logs
     action: Read the new error messages of this workload; a burst usually comes just before or with a failure
+  - id: error-budget-burn
+    failureMode: error_budget_burn
+    level: workload
+    kind: detected
+    target: [workload]
+    source: slo
+    above: 14.4
+    raiseAfter: 5m
+    clearAfter: 10m
+    severity: critical
+    profile: minimal
+    evidence: This workload spends its error budget over 14 times faster than its objective allows, from failed calls measured in traces
+    action: Find what fails in this workload's answers; at this rate a 30-day error budget is gone in about 2 days

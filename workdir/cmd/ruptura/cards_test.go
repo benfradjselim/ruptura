@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -134,5 +135,27 @@ func TestEdgeReadings(t *testing.T) {
 	got := edgeReadings(func() callgraph.Graph { return graph })()
 	if len(got) != 2 || got[0].Target != "shop/Deployment/web -> shop/Deployment/db" || got[0].Value != 0.3 || got[1].Value != 0 {
 		t.Fatalf("readings = %+v, want the two measured edges with enough calls", got)
+	}
+}
+
+func TestBurnReadings(t *testing.T) {
+	failing, healthy := 0.02, 0.0
+	graph := callgraph.Graph{Edges: []callgraph.Edge{
+		{From: "shop/Deployment/web", To: "shop/Deployment/api", CallsPerMinute: 60, ErrorRatio: &failing},
+		{From: "shop/Deployment/cron", To: "shop/Deployment/api", CallsPerMinute: 60, ErrorRatio: &healthy},
+		{From: "shop/Deployment/web", To: "shop/Deployment/rare", CallsPerMinute: 0.5, ErrorRatio: &failing},
+	}}
+	got := burnReadings(func() callgraph.Graph { return graph }, 99.9)()
+	// 1% of the api's calls fail against a budget of 0.1%: burn 10.
+	if len(got) != 1 || got[0].Target != "shop/Deployment/api" || math.Abs(got[0].Value-10) > 1e-9 {
+		t.Fatalf("readings = %+v, want the api burning at 10", got)
+	}
+}
+
+func TestSLOTarget(t *testing.T) {
+	for raw, want := range map[string]float64{"": 99.9, "99.5": 99.5, "100": 99.9, "nines": 99.9} {
+		if got := sloTarget(raw); got != want {
+			t.Errorf("sloTarget(%q) = %v, want %v", raw, got, want)
+		}
 	}
 }

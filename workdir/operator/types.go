@@ -141,6 +141,9 @@ type PrometheusSource struct {
 type AnalysisConfig struct {
 	Sensitivity string `json:"sensitivity,omitempty"`
 	Horizon     string `json:"horizon,omitempty"`
+	// SLOTarget is the availability objective in percent, such as 99.9, that
+	// error budget burn is read against.
+	SLOTarget string `json:"sloTarget,omitempty"`
 	// DefaultMemoryLimits gives, per namespace, the usual memory level of
 	// pods that set no memory limit, such as 512Mi. Without one, the engine
 	// uses the 7-day 99th percentile of the workload plus 20 percent.

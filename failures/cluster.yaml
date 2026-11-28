@@ -220,7 +220,7 @@
   propagates_to: [users]
   action: Find the component that fails or slows
   sources: [Google SRE multiwindow burn rate alerts]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: error_budget_burn}
 
 - id: log-exception-burst
   title: Burst of errors in logs

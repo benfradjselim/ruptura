@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -81,6 +82,11 @@ func validateSpec(spec RupturaInstanceSpec) error {
 	if horizon := spec.Analysis.Horizon; horizon != "" {
 		if parsed, err := time.ParseDuration(horizon); err != nil || parsed <= 0 {
 			problems = append(problems, fmt.Sprintf("analysis.horizon: invalid duration %q", horizon))
+		}
+	}
+	if target := spec.Analysis.SLOTarget; target != "" {
+		if parsed, err := strconv.ParseFloat(target, 64); err != nil || parsed <= 0 || parsed >= 100 {
+			problems = append(problems, fmt.Sprintf("analysis.sloTarget: %q is not a percent between 0 and 100, such as 99.9", target))
 		}
 	}
 	for _, ns := range sortedKeys(spec.Analysis.DefaultMemoryLimits) {

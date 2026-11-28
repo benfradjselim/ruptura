@@ -323,6 +323,11 @@ spec:
                     horizon:
                       type: string
                       default: 30m
+                    sloTarget:
+                      type: string
+                      description: Availability objective in percent that error budget burn is read against, such as 99.9.
+                      pattern: '^[0-9]{1,2}(\.[0-9]+)?$'
+                      default: "99.9"
                     defaultMemoryLimits:
                       type: object
                       description: Usual memory level per namespace for pods that set no memory limit, such as 512Mi. Without one, the 7-day 99th percentile plus 20 percent is used.
