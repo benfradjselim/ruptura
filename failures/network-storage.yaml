@@ -12,7 +12,7 @@
   propagates_to: [callers of the Service]
   action: Fix the selector or the pods behind it
   sources: [Kubernetes Endpoints]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: service_without_endpoints}
 
 - id: dependency-call-failures
   title: Calls to a dependency fail
@@ -92,7 +92,7 @@
   propagates_to: [users]
   action: Fix the backend pods or the Route target
   sources: [OpenShift Route, Kubernetes Ingress]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: route_without_backend}
 
 - id: pvc-pending
   title: PersistentVolumeClaim stays Pending
@@ -108,7 +108,7 @@
   propagates_to: [pods using the claim]
   action: Check the storage class, its provisioner and capacity
   sources: [Kubernetes PersistentVolumeClaim phase]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: pvc_pending}
 
 - id: persistent-volume-filling
   title: Persistent volume filling up
@@ -124,7 +124,7 @@
   propagates_to: [pods using the volume, their callers]
   action: Grow the volume or clean old data
   sources: [kubernetes-mixin KubePersistentVolumeFillingUp]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: persistent_volume_filling}
 
 - id: persistent-volume-errors
   title: Persistent volume in error
@@ -140,4 +140,4 @@
   propagates_to: [pods using the volume]
   action: Check the storage backend and the volume events
   sources: [kubernetes-mixin KubePersistentVolumeErrors]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: persistent_volume_errors}

@@ -49,11 +49,12 @@ func runCard(card sources.Card, steps int, usage func(i int) float64, capacity, 
 	return objects.Findings(now)
 }
 
-// TestCatalogCardsFire runs the coverage 67 cards, batch 1 (node) and batch 2
-// (cluster), on a failing and a healthy object.
+// TestCatalogCardsFire runs the coverage 67 cards, batch 1 (node), batch 2
+// (cluster) and batch 3 (pod, workload, storage, network), on a failing and a
+// healthy object.
 func TestCatalogCardsFire(t *testing.T) {
 	predicted := []string{"inode-exhaustion", "too-many-pods", "conntrack-table-full", "node-capacity-cpu", "node-capacity-memory",
-		"etcd-database-quota"}
+		"etcd-database-quota", "persistent-volume-filling", "ephemeral-storage-eviction"}
 	for _, id := range predicted {
 		t.Run(id, func(t *testing.T) {
 			card := catalogCard(t, id)
@@ -72,7 +73,10 @@ func TestCatalogCardsFire(t *testing.T) {
 	}
 	detected := []string{"clock-not-synchronised", "node-readiness-flapping", "tcp-retransmits",
 		"webhook-failing", "apiserver-errors-latency", "etcd-slow-disk", "etcd-member-down", "cluster-operator-degraded",
-		"cluster-operator-down", "operator-install-failed", "monitoring-target-down", "dns-resolution-failures"}
+		"cluster-operator-down", "operator-install-failed", "monitoring-target-down", "dns-resolution-failures",
+		"liveness-probe-restarts", "readiness-probe-failing", "config-error-at-start", "init-container-failing",
+		"service-without-endpoints", "route-without-backend", "pvc-pending", "persistent-volume-errors",
+		"eviction-node-memory-pressure", "pod-stuck-terminating", "cronjob-not-running"}
 	for _, id := range detected {
 		t.Run(id, func(t *testing.T) {
 			card := catalogCard(t, id)

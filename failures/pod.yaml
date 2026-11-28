@@ -124,7 +124,7 @@
   propagates_to: [every pod of the node above its request]
   action: Set requests and limits, or add memory to the node pool
   sources: [Kubernetes node condition MemoryPressure, Kubernetes event reason Evicted]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: pod_evicted}
 
 - id: ephemeral-storage-eviction
   title: Pod evicted for using too much local disk
@@ -140,7 +140,7 @@
   propagates_to: [other pods of the node]
   action: Rotate logs, clean scratch space, or set an ephemeral storage limit
   sources: [Kubernetes event reason Evicted]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: ephemeral_storage_eviction}
 
 - id: pod-stuck-terminating
   title: Pod stuck in Terminating
@@ -156,4 +156,4 @@
   propagates_to: [StatefulSet ordering, volumes]
   action: Check finalizers and the node, force delete only when the node is gone
   sources: [Kubernetes pod deletion grace period]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: pod_stuck_terminating}

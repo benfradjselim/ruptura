@@ -361,3 +361,172 @@ cards:
     profile: minimal
     evidence: Over 3% of DNS answers are SERVFAIL
     action: Check the CoreDNS pods and their upstream resolvers; lookups that fail break calls between services
+  - id: liveness-probe-restarts
+    failureMode: liveness_probe_restarts
+    level: pod
+    kind: detected
+    target: [namespace, pod]
+    value: '(sum by (namespace,pod) (increase(prober_probe_total{probe_type="Liveness",result="failed"}[10m])) > bool 0) * (sum by (namespace,pod) (increase(kube_pod_container_status_restarts_total[10m])) > bool 0)'
+    sampled: 'max by (namespace,pod) (timestamp(kube_pod_container_status_restarts_total))'
+    raiseAfter: 0s
+    clearAfter: 10m
+    severity: warning
+    profile: minimal
+    evidence: The kubelet reports failed liveness probes and the container restarted in the last 10 minutes
+    action: Check what slows the probed endpoint (CPU throttling, a slow dependency) or relax the liveness probe; the kubelet keeps restarting the container
+  - id: readiness-probe-failing
+    failureMode: readiness_probe_failing
+    level: pod
+    kind: detected
+    target: [namespace, pod]
+    value: 'sum by (namespace,pod) (increase(prober_probe_total{probe_type="Readiness",result="failed"}[5m])) > bool 0'
+    sampled: 'max by (namespace,pod) (timestamp(prober_probe_total{probe_type="Readiness"}))'
+    raiseAfter: 5m
+    clearAfter: 2m
+    severity: warning
+    profile: minimal
+    evidence: The kubelet reports failed readiness probes for over 5 minutes
+    action: Check the readiness endpoint and what it depends on; the pod receives no traffic while it fails
+  - id: config-error-at-start
+    failureMode: config_error_at_start
+    level: pod
+    kind: detected
+    target: [namespace, pod]
+    value: 'max by (namespace,pod) (kube_pod_container_status_waiting_reason{reason=~"CreateContainerConfigError|CreateContainerError"})'
+    sampled: 'max by (namespace,pod) (timestamp(kube_pod_container_status_waiting_reason))'
+    raiseAfter: 2m
+    clearAfter: 0s
+    severity: critical
+    profile: minimal
+    evidence: A container waits with CreateContainerConfigError or CreateContainerError
+    action: Create the missing ConfigMap or Secret, or fix the key or the container command it names
+  - id: init-container-failing
+    failureMode: init_container_failing
+    level: pod
+    kind: detected
+    target: [namespace, pod]
+    value: 'max by (namespace,pod) (kube_pod_init_container_status_waiting_reason{reason=~"CrashLoopBackOff|CreateContainerConfigError|CreateContainerError|ErrImagePull|ImagePullBackOff"})'
+    sampled: 'max by (namespace,pod) (timestamp(kube_pod_init_container_status_waiting_reason))'
+    raiseAfter: 2m
+    clearAfter: 0s
+    severity: critical
+    profile: minimal
+    evidence: An init container waits in back-off or cannot be created
+    action: Read the logs of the init container and fix what it waits for; the main containers never start
+  - id: service-without-endpoints
+    failureMode: service_without_endpoints
+    level: workload
+    kind: detected
+    target: [namespace, service]
+    value: '(max by (namespace,service) (label_replace(label_replace(kube_endpointslice_info, "service", "$1", "endpointslice", "(.+)"), "service", "$1", "endpointslice", "(.+)-[a-z0-9]{5}")) unless on (namespace,service) max by (namespace,service) (label_replace(label_replace(kube_endpointslice_endpoints{ready="true"}, "service", "$1", "endpointslice", "(.+)"), "service", "$1", "endpointslice", "(.+)-[a-z0-9]{5}"))) or max by (namespace,service) (label_replace(label_replace(kube_endpointslice_info, "service", "$1", "endpointslice", "(.+)"), "service", "$1", "endpointslice", "(.+)-[a-z0-9]{5}")) * 0'
+    sampled: 'max by (namespace,service) (label_replace(label_replace(timestamp(kube_endpointslice_info), "service", "$1", "endpointslice", "(.+)"), "service", "$1", "endpointslice", "(.+)-[a-z0-9]{5}"))'
+    raiseAfter: 5m
+    clearAfter: 2m
+    severity: warning
+    profile: minimal
+    evidence: This Service has endpoint slices but no ready endpoint
+    action: Check that the selector of this Service matches ready pods; calls to it fail
+  - id: route-without-backend
+    failureMode: route_without_backend
+    level: workload
+    kind: detected
+    target: [exported_namespace, route]
+    value: 'max by (exported_namespace,route) (haproxy_backend_up == bool 0)'
+    sampled: 'max by (exported_namespace,route) (timestamp(haproxy_backend_up))'
+    raiseAfter: 2m
+    clearAfter: 2m
+    severity: critical
+    profile: minimal
+    evidence: The OpenShift router reports the backend of this Route down
+    action: Check the Service and the pods behind this Route; the router answers 503
+  - id: pvc-pending
+    failureMode: pvc_pending
+    level: workload
+    kind: detected
+    target: [namespace, persistentvolumeclaim]
+    value: 'max by (namespace,persistentvolumeclaim) (kube_persistentvolumeclaim_status_phase{phase="Pending"}) * on (namespace,persistentvolumeclaim) group_left() (max by (namespace,persistentvolumeclaim) (kube_pod_spec_volumes_persistentvolumeclaims_info) > bool 0)'
+    sampled: 'max by (namespace,persistentvolumeclaim) (timestamp(kube_persistentvolumeclaim_status_phase))'
+    raiseAfter: 5m
+    clearAfter: 2m
+    severity: warning
+    profile: minimal
+    evidence: A claim used by a pod has been Pending for over 5 minutes
+    action: Check the storage class and the provisioner; the pods that mount this claim cannot start
+  - id: persistent-volume-filling
+    failureMode: persistent_volume_filling
+    level: workload
+    kind: predicted
+    target: [namespace, persistentvolumeclaim]
+    usage: 'max by (namespace,persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes - kubelet_volume_stats_available_bytes)'
+    capacity: 'max by (namespace,persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes)'
+    sampled: 'max by (namespace,persistentvolumeclaim) (timestamp(kubelet_volume_stats_available_bytes))'
+    horizon: 6h
+    severity: critical
+    profile: minimal
+    unit: bytes
+    action: Grow the volume or clean what the application writes, before writes fail
+  - id: persistent-volume-errors
+    failureMode: persistent_volume_errors
+    level: cluster
+    kind: detected
+    target: [persistentvolume]
+    value: 'max by (persistentvolume) (kube_persistentvolume_status_phase{phase="Failed"})'
+    sampled: 'max by (persistentvolume) (timestamp(kube_persistentvolume_status_phase))'
+    raiseAfter: 2m
+    clearAfter: 2m
+    severity: warning
+    profile: minimal
+    evidence: This PersistentVolume is in phase Failed
+    action: Read the events of this PersistentVolume and check the storage backend
+  - id: eviction-node-memory-pressure
+    failureMode: pod_evicted
+    level: pod
+    kind: detected
+    target: [namespace, pod]
+    value: 'max by (namespace,pod) (kube_pod_status_reason{reason="Evicted"})'
+    sampled: 'max by (namespace,pod) (timestamp(kube_pod_status_reason))'
+    raiseAfter: 0s
+    clearAfter: 0s
+    severity: warning
+    profile: minimal
+    evidence: This pod was evicted by the kubelet
+    action: Set memory requests close to real use, and read the node failure that caused the eviction
+  - id: ephemeral-storage-eviction
+    failureMode: ephemeral_storage_eviction
+    level: pod
+    kind: predicted
+    target: [namespace, pod]
+    usage: 'sum by (namespace,pod) (container_fs_usage_bytes{container!=""})'
+    capacity: 'sum by (namespace,pod) (kube_pod_container_resource_limits{resource="ephemeral_storage"})'
+    sampled: 'max by (namespace,pod) (timestamp(container_fs_usage_bytes))'
+    horizon: 1h
+    severity: critical
+    profile: standard
+    unit: bytes
+    action: Find what the pod writes to its local disk and move it to a volume, or raise the ephemeral storage limit, before the kubelet evicts it
+  - id: pod-stuck-terminating
+    failureMode: pod_stuck_terminating
+    level: pod
+    kind: detected
+    target: [namespace, pod]
+    value: 'max by (namespace,pod) (time() - kube_pod_deletion_timestamp > bool 600)'
+    sampled: 'max by (namespace,pod) (timestamp(kube_pod_deletion_timestamp))'
+    raiseAfter: 0s
+    clearAfter: 0s
+    severity: warning
+    profile: minimal
+    evidence: This pod has been terminating for over 10 minutes
+    action: Check the finalizers of the pod and the node it ran on; force deletion only once the node is known to be down
+  - id: cronjob-not-running
+    failureMode: cronjob_not_running
+    level: workload
+    kind: detected
+    target: [namespace, cronjob]
+    value: '(max by (namespace,cronjob) (time() - kube_cronjob_next_schedule_time > bool 300)) * on (namespace,cronjob) (max by (namespace,cronjob) (kube_cronjob_spec_suspend) == bool 0)'
+    sampled: 'max by (namespace,cronjob) (timestamp(kube_cronjob_next_schedule_time))'
+    raiseAfter: 0s
+    clearAfter: 2m
+    severity: warning
+    profile: minimal
+    evidence: The scheduled time of this CronJob passed over 5 minutes ago and it is not suspended
+    action: Check the controller, the concurrency policy and the starting deadline of this CronJob; its scheduled run did not start
