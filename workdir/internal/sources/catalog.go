@@ -75,6 +75,9 @@ type Card struct {
 	// Source, when set, names a Kubernetes API reader that gives a detected
 	// card its value in place of a PromQL query, such as machineconfigpools.
 	Source string `yaml:"source"`
+	// Above, for a source card, turns the reader's raw value into the
+	// failure: 1 above it, 0 otherwise. Zero keeps the reader's 0 or 1.
+	Above float64 `yaml:"above"`
 	// Evidence, when set, states the reading behind a detected finding.
 	Evidence string `yaml:"evidence"`
 }

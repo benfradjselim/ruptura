@@ -577,3 +577,16 @@ cards:
     profile: minimal
     evidence: This MachineConfigPool reports Degraded or counts a degraded machine, read from the Kubernetes API
     action: Read the pool conditions (oc describe mcp) and the machine-config-daemon logs of the degraded node; updates of this pool are blocked
+  - id: dependency-call-failures
+    failureMode: dependency_call_failures
+    level: workload
+    kind: detected
+    target: [edge]
+    source: callgraph
+    above: 0.05
+    raiseAfter: 5m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    evidence: Over 5% of the calls from this workload to its dependency fail, measured from traces
+    action: Check the called workload and the network path between them; the caller's requests fail with it

@@ -239,6 +239,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 		}
 		go graph.Run(ctx)
 		handlers.SetCallGraph(graph)
+		readers["callgraph"] = edgeReadings(graph.Graph)
 	} else {
 		logger.Default.Info("call graph disabled", "reason", err.Error())
 	}

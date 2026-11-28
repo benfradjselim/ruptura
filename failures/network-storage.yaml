@@ -28,7 +28,7 @@
   propagates_to: [callers of the caller]
   action: Fix the dependency, add a timeout and a fallback
   sources: [OpenTelemetry span status, Istio request metrics]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: dependency_call_failures}
 
 - id: dns-resolution-failures
   title: DNS resolution fails

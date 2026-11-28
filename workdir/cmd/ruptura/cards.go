@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/api"
+	"github.com/benfradjselim/ruptura/internal/callgraph"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/mcp"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/internal/sources"
@@ -135,8 +136,8 @@ func pollDeadlineCard(ctx context.Context, source vectorSource, card sources.Car
 	return nil
 }
 
-// objectReading is one object's value read from the Kubernetes API, 1 while
-// the failure holds and 0 otherwise.
+// objectReading is one object's value read outside Prometheus: 1 while the
+// failure holds and 0 otherwise, or a raw value the card compares to Above.
 type objectReading struct {
 	Target string
 	Value  float64
@@ -155,7 +156,14 @@ func pollSourceCards(cards []sources.Card, readers map[string]objectSource, obje
 			continue
 		}
 		for _, r := range read() {
-			objects.ObserveDetected(card.ID, card.Level, r.Target, failuremodes.Mode(card.FailureMode), card.RaiseAfter, card.ClearAfter, now, time.Time{}, r.Value)
+			value := r.Value
+			if card.Above > 0 {
+				value = 0
+				if r.Value > card.Above {
+					value = 1
+				}
+			}
+			objects.ObserveDetected(card.ID, card.Level, r.Target, failuremodes.Mode(card.FailureMode), card.RaiseAfter, card.ClearAfter, now, time.Time{}, value)
 		}
 		objects.Polled(card.ID, now)
 	}
@@ -240,6 +248,25 @@ func poolReadings(c *mcp.Collector) objectSource {
 				value = 1
 			}
 			out = append(out, objectReading{Target: p.Name, Value: value})
+		}
+		return out
+	}
+}
+
+// minEdgeCallsPerMinute is the traffic below which an edge's error ratio is
+// too noisy to read: one failed call in two would read 50%.
+const minEdgeCallsPerMinute = 1
+
+// edgeReadings reads the measured edges of the call graph: the share of
+// failed calls from one workload to another.
+func edgeReadings(graph func() callgraph.Graph) objectSource {
+	return func() []objectReading {
+		var out []objectReading
+		for _, e := range graph().Edges {
+			if e.ErrorRatio == nil || e.CallsPerMinute < minEdgeCallsPerMinute {
+				continue
+			}
+			out = append(out, objectReading{Target: e.From + " -> " + e.To, Value: *e.ErrorRatio})
 		}
 		return out
 	}

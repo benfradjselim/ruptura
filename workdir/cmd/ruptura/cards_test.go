@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/callgraph"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/internal/sources"
 )
@@ -104,5 +105,34 @@ func TestPollSourceCards(t *testing.T) {
 	got := objects.Findings(now)
 	if len(got) != 1 || got[0].Target != "worker" || got[0].Estimate.Mode != "machine_config_pool_degraded" {
 		t.Fatalf("findings = %+v, want the degraded worker pool", got)
+	}
+}
+
+func TestPollSourceCardsAbove(t *testing.T) {
+	card := sources.Card{ID: "calls", Kind: sources.CardDetected, Level: "workload", FailureMode: "dependency_call_failures",
+		Target: []string{"edge"}, Source: "callgraph", Above: 0.05}
+	readers := map[string]objectSource{"callgraph": func() []objectReading {
+		return []objectReading{{Target: "shop/Deployment/web -> shop/Deployment/db", Value: 0.2}, {Target: "shop/Deployment/web -> shop/Deployment/cache", Value: 0.01}}
+	}}
+	objects := failuremodes.NewObjects()
+	now := time.Date(2026, 11, 28, 10, 0, 0, 0, time.UTC)
+	pollSourceCards([]sources.Card{card}, readers, objects, now)
+	got := objects.Findings(now)
+	if len(got) != 1 || got[0].Target != "shop/Deployment/web -> shop/Deployment/db" || got[0].Value != 1 {
+		t.Fatalf("findings = %+v, want only the failing edge", got)
+	}
+}
+
+func TestEdgeReadings(t *testing.T) {
+	high, low := 0.3, 0.0
+	graph := callgraph.Graph{Edges: []callgraph.Edge{
+		{From: "shop/Deployment/web", To: "shop/Deployment/db", CallsPerMinute: 60, ErrorRatio: &high},
+		{From: "shop/Deployment/web", To: "shop/Deployment/cache", CallsPerMinute: 60, ErrorRatio: &low},
+		{From: "shop/Deployment/web", To: "shop/Deployment/rare", CallsPerMinute: 0.2, ErrorRatio: &high},
+		{From: "shop/Deployment/web", To: "shop/Deployment/static"},
+	}}
+	got := edgeReadings(func() callgraph.Graph { return graph })()
+	if len(got) != 2 || got[0].Target != "shop/Deployment/web -> shop/Deployment/db" || got[0].Value != 0.3 || got[1].Value != 0 {
+		t.Fatalf("readings = %+v, want the two measured edges with enough calls", got)
 	}
 }
