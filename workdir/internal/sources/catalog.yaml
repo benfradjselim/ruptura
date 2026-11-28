@@ -642,3 +642,37 @@ cards:
     profile: minimal
     evidence: Calico denies packets under this policy
     action: Check whether this policy changed recently and the traffic it now denies; allow it if the calls are wanted
+  - id: pid-exhaustion-node
+    failureMode: pid_exhaustion
+    level: node
+    kind: predicted
+    target: [node]
+    source: agent-node-pids
+    horizon: 1h
+    severity: critical
+    profile: deep
+    unit: count
+    action: Find the pods that start many processes or threads on this node and set a PID limit, before new processes cannot start
+  - id: pid-exhaustion-pod
+    failureMode: pid_exhaustion
+    level: pod
+    kind: predicted
+    target: [namespace, pod]
+    source: agent-pod-pids
+    horizon: 1h
+    severity: critical
+    profile: deep
+    unit: count
+    action: Find the thread or process leak in this pod, or raise its PID limit, before it cannot start new threads
+  - id: network-policy-drops-ovn
+    failureMode: network_policy_blocks_traffic
+    level: namespace
+    kind: detected
+    target: [namespace]
+    source: agent-policy-drops
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: warning
+    profile: deep
+    evidence: OVN-Kubernetes logs packets dropped by a network policy of this namespace (ACL audit logging on)
+    action: Check the network policies changed recently and the traffic they now deny; allow it if the calls are wanted

@@ -17,6 +17,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/benfradjselim/ruptura/internal/agent"
 	"github.com/benfradjselim/ruptura/internal/logburst"
 	"github.com/benfradjselim/ruptura/internal/receiver"
 	"github.com/benfradjselim/ruptura/pkg/logger"
@@ -51,6 +52,7 @@ type Engine struct {
 	logStore LogStoreSink
 	// errorLogs counts error records per workload for the log burst card.
 	errorLogs  *logburst.Counter
+	agents     *agent.Store
 	spans      SpanStore
 	ingestHook func(source string) // optional; called once per ingested item
 
@@ -98,6 +100,9 @@ func (e *Engine) saveMetric(host, name string, value float64, ts time.Time) {
 
 // SetLogStore wires a durable storage backend for OTLP log persistence.
 func (e *Engine) SetLogStore(s LogStoreSink) { e.logStore = s }
+
+// SetAgentStore keeps the node agent's readings in s instead of the metric store.
+func (e *Engine) SetAgentStore(s *agent.Store) { e.agents = s }
 
 // SetErrorLogCounter counts error log records per workload in c.
 func (e *Engine) SetErrorLogCounter(c *logburst.Counter) { e.errorLogs = c }
@@ -442,6 +447,9 @@ func (e *Engine) handleOTLPMetrics(w http.ResponseWriter, r *http.Request) {
 // ingestMetrics processes one OTLP metrics request, from HTTP or gRPC.
 func (e *Engine) ingestMetrics(req models.OTLPMetricsRequest) {
 	for _, rm := range req.ResourceMetrics {
+		if e.agents != nil && e.agents.Accept(rm) {
+			continue
+		}
 		ref, skip := e.resolveFleetWorkloadRef(rm.Resource)
 		if skip {
 			// Node-scoped telemetry (FBL-V2) — never a fleet workload.

@@ -188,4 +188,4 @@
   propagates_to: [callers of the workload, other pods of the node]
   action: Fix the thread leak or raise the PID limit
   sources: [Kubernetes node condition PIDPressure]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: pid_exhaustion}

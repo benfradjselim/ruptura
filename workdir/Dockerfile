@@ -30,6 +30,12 @@ RUN CGO_ENABLED=0 GOOS=linux \
       -ldflags="-s -w -X main.version=${VERSION}" \
       -o /ruptura-mcp \
       ./cmd/ruptura-mcp
+RUN CGO_ENABLED=0 GOOS=linux \
+    go build \
+      -trimpath \
+      -ldflags="-s -w" \
+      -o /ruptura-agent \
+      ./cmd/ruptura-agent
 
 # Data directory owned by the runtime user, writable by group 0 (OpenShift UIDs),
 # so a fresh Docker volume mounted on it is writable too.
@@ -59,6 +65,8 @@ COPY LICENSE /licenses/LICENSE
 COPY --from=builder /ruptura /ruptura
 # MCP server for AI assistants, run with command /ruptura-mcp (read-only).
 COPY --from=builder /ruptura-mcp /ruptura-mcp
+# Node agent of the deep input profile, run with command /ruptura-agent.
+COPY --from=builder /ruptura-agent /ruptura-agent
 COPY --from=builder --chown=65532:0 --chmod=0775 /out/data /var/lib/ruptura/data
 
 # REST API + Prometheus remote_write

@@ -159,3 +159,23 @@ func TestSLOTarget(t *testing.T) {
 		}
 	}
 }
+
+func TestPollSourceCardsPredicted(t *testing.T) {
+	card := sources.Card{ID: "pids", Kind: sources.CardPredicted, Level: "pod", FailureMode: "pid_exhaustion",
+		Target: []string{"namespace", "pod"}, Source: "agent-pod-pids", Horizon: time.Hour, Unit: "count"}
+	objects := failuremodes.NewObjects()
+	start := time.Date(2026, 11, 28, 10, 0, 0, 0, time.UTC)
+	var now time.Time
+	for i := 0; i <= 60; i++ {
+		used := 2000 + 30*float64(i)
+		readers := map[string]objectSource{"agent-pod-pids": func() []objectReading {
+			return []objectReading{{Target: "shop/api-1", Value: used, Capacity: 4096}, {Target: "shop/no-limit", Value: used}}
+		}}
+		now = start.Add(time.Duration(i) * 30 * time.Second)
+		pollSourceCards([]sources.Card{card}, readers, objects, now)
+	}
+	got := objects.Findings(now)
+	if len(got) != 1 || got[0].Target != "shop/api-1" || !got[0].Predicted || got[0].Estimate.Mode != "pid_exhaustion" {
+		t.Fatalf("findings = %+v, want the pod growing toward its PID limit", got)
+	}
+}

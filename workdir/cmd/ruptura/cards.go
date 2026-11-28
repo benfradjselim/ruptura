@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/agent"
 	"github.com/benfradjselim/ruptura/internal/api"
 	"github.com/benfradjselim/ruptura/internal/callgraph"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/mcp"
@@ -144,13 +145,15 @@ func pollDeadlineCard(ctx context.Context, source vectorSource, card sources.Car
 type objectReading struct {
 	Target string
 	Value  float64
+	// Capacity is the limit Value grows toward, for a predicted card.
+	Capacity float64
 }
 
 // objectSource returns the current readings of a Kubernetes API reader.
 type objectSource func() []objectReading
 
-// pollSourceCards feeds the detected cards whose value comes from a
-// Kubernetes API reader instead of Prometheus. A card whose reader is absent,
+// pollSourceCards feeds the cards whose values come from a reader instead of
+// Prometheus. A card whose reader is absent,
 // such as machineconfigpools outside OpenShift, reports nothing.
 func pollSourceCards(cards []sources.Card, readers map[string]objectSource, objects *failuremodes.Objects, now time.Time) {
 	for _, card := range cards {
@@ -159,6 +162,12 @@ func pollSourceCards(cards []sources.Card, readers map[string]objectSource, obje
 			continue
 		}
 		for _, r := range read() {
+			if card.Kind == sources.CardPredicted {
+				if r.Capacity > 0 {
+					objects.ObserveTrend(card.ID, card.Level, r.Target, failuremodes.Mode(card.FailureMode), card.Horizon, card.Unit, now, time.Time{}, r.Value, r.Capacity)
+				}
+				continue
+			}
 			value := r.Value
 			if card.Above > 0 {
 				value = 0
@@ -327,6 +336,18 @@ func burnReadings(graph func() callgraph.Graph, target float64) objectSource {
 			out = append(out, objectReading{Target: workload, Value: failed[workload] / n / budget})
 		}
 		sort.Slice(out, func(i, j int) bool { return out[i].Target < out[j].Target })
+		return out
+	}
+}
+
+// agentReadings reads one kind of the node agent's latest readings.
+func agentReadings(store *agent.Store, kind string) objectSource {
+	return func() []objectReading {
+		latest := store.Readings(kind, time.Now())
+		out := make([]objectReading, 0, len(latest))
+		for _, r := range latest {
+			out = append(out, objectReading{Target: r.Target, Value: r.Value, Capacity: r.Capacity})
+		}
 		return out
 	}
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/benfradjselim/ruptura/internal/actions/engine"
 	"github.com/benfradjselim/ruptura/internal/actions/providers"
+	"github.com/benfradjselim/ruptura/internal/agent"
 	"github.com/benfradjselim/ruptura/internal/api"
 	"github.com/benfradjselim/ruptura/internal/callgraph"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/admission"
@@ -143,6 +144,8 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	ingestEngine.SetLogStore(store)
 	errorLogs := logburst.New()
 	ingestEngine.SetErrorLogCounter(errorLogs)
+	agents := agent.NewStore()
+	ingestEngine.SetAgentStore(agents)
 
 	var inf *discovery.Informer
 	if disc, err := discovery.NewInformer(); err == nil {
@@ -164,7 +167,12 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if coCol, err := co.New(); err == nil {
 		infraRegistry.Add(coCol)
 	}
-	readers := map[string]objectSource{"logs": logReadings(errorLogs)}
+	readers := map[string]objectSource{
+		"logs":               logReadings(errorLogs),
+		"agent-node-pids":    agentReadings(agents, agent.KindNodePIDs),
+		"agent-pod-pids":     agentReadings(agents, agent.KindPodPIDs),
+		"agent-policy-drops": agentReadings(agents, agent.KindPolicyDrops),
+	}
 	if mcpCol, err := mcp.New(); err == nil {
 		infraRegistry.Add(mcpCol)
 		readers["machineconfigpools"] = poolReadings(mcpCol)

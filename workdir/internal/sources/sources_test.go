@@ -215,8 +215,12 @@ func TestCatalogCardsValid(t *testing.T) {
 	if got := len(c.CardsFor(ProfileMinimal)); got == 0 || got >= len(c.Cards) {
 		t.Fatalf("minimal profile selects %d of %d cards", got, len(c.Cards))
 	}
-	if got := len(c.CardsFor(ProfileStandard)); got != len(c.Cards) {
-		t.Fatalf("standard profile selects %d of %d cards", got, len(c.Cards))
+	standard := len(c.CardsFor(ProfileStandard))
+	if standard == 0 || standard >= len(c.Cards) {
+		t.Fatalf("standard profile selects %d of %d cards", standard, len(c.Cards))
+	}
+	if got := len(c.CardsFor(ProfileDeep)); got != len(c.Cards) {
+		t.Fatalf("deep profile selects %d of %d cards", got, len(c.Cards))
 	}
 }
 

@@ -25,7 +25,12 @@ type Signal struct {
 const (
 	ProfileMinimal  = "minimal"
 	ProfileStandard = "standard"
+	// ProfileDeep adds the node agent's readings to the standard profile.
+	ProfileDeep = "deep"
 )
+
+// profileRank orders the profiles: a wider one keeps the narrower ones.
+var profileRank = map[string]int{ProfileMinimal: 1, ProfileStandard: 2, ProfileDeep: 3}
 
 // Role is one measure with a meaning, independent of the metric that provides it.
 type Role struct {
@@ -72,8 +77,9 @@ type Card struct {
 	Profile    string            `yaml:"profile"`
 	Action     string            `yaml:"action"`
 	Unit       string            `yaml:"unit"`
-	// Source, when set, names a Kubernetes API reader that gives a detected
-	// card its value in place of a PromQL query, such as machineconfigpools.
+	// Source, when set, names a reader outside Prometheus that gives the card
+	// its values in place of PromQL: the Kubernetes API, the call graph, OTLP
+	// logs or the node agent. A predicted source card reads usage and capacity.
 	Source string `yaml:"source"`
 	// Above, for a source card, turns the reader's raw value into the
 	// failure: 1 above it, 0 otherwise. Zero keeps the reader's 0 or 1.
@@ -102,8 +108,8 @@ func (c Catalog) Validate() error {
 		}
 		switch card.Kind {
 		case CardPredicted:
-			if card.Usage == "" || card.Capacity == "" || card.Horizon <= 0 {
-				return fmt.Errorf("sources: card %q: predicted needs usage, capacity and horizon", card.ID)
+			if card.Horizon <= 0 || (card.Source == "" && (card.Usage == "" || card.Capacity == "")) {
+				return fmt.Errorf("sources: card %q: predicted needs a horizon, and usage and capacity or a source", card.ID)
 			}
 		case CardDetected:
 			if (card.Value == "") == (card.Source == "") {
@@ -123,11 +129,10 @@ func (c Catalog) Validate() error {
 // RolesFor returns the roles of a level included in a profile. A wider profile
 // keeps the roles of the narrower ones.
 func (c Catalog) RolesFor(level, profile string) []Role {
-	rank := map[string]int{ProfileMinimal: 1, ProfileStandard: 2}
-	selected := rank[profile]
+	selected := profileRank[profile]
 	var out []Role
 	for _, role := range c.Roles {
-		if role.Level == level && rank[role.Profile] > 0 && rank[role.Profile] <= selected {
+		if role.Level == level && profileRank[role.Profile] > 0 && profileRank[role.Profile] <= selected {
 			out = append(out, role)
 		}
 	}
@@ -136,11 +141,10 @@ func (c Catalog) RolesFor(level, profile string) []Role {
 
 // CardsFor returns the cards whose minimum profile is within profile.
 func (c Catalog) CardsFor(profile string) []Card {
-	rank := map[string]int{ProfileMinimal: 1, ProfileStandard: 2}
-	selected := rank[profile]
+	selected := profileRank[profile]
 	var out []Card
 	for _, card := range c.Cards {
-		if rank[card.Profile] > 0 && rank[card.Profile] <= selected {
+		if profileRank[card.Profile] > 0 && profileRank[card.Profile] <= selected {
 			out = append(out, card)
 		}
 	}
