@@ -236,4 +236,4 @@
   propagates_to: [callers of the workload]
   action: Read the lines and fix the cause before the crash
   sources: [Kubernetes container logs]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: log_exception_burst}

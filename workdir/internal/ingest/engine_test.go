@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benfradjselim/ruptura/internal/logburst"
 	"github.com/benfradjselim/ruptura/pkg/models"
 )
 
@@ -396,5 +397,20 @@ func TestCardinality_limit(t *testing.T) {
 	// Should be 50000
 	if atomic.LoadInt32(&e.seriesCount) != 50000 {
 		t.Errorf("expected 50000, got %d", e.seriesCount)
+	}
+}
+
+func TestOTLPLogsCountsErrorsPerWorkload(t *testing.T) {
+	counter := logburst.New()
+	e := New(nil, nil)
+	e.SetErrorLogCounter(counter)
+	res := `{"attributes":[{"key":"k8s.namespace.name","value":{"stringValue":"shop"}},{"key":"k8s.deployment.name","value":{"stringValue":"api"}}]}`
+	body := `{"resourceLogs":[{"resource":` + res + `,"scopeLogs":[{"logRecords":[` +
+		`{"body":{"stringValue":"boom"},"severityNumber":17,"timeUnixNano":"1000000000"},` +
+		`{"body":{"stringValue":"ok"},"severityNumber":9,"timeUnixNano":"1000000000"},` +
+		`{"body":{"stringValue":"bad"},"severityText":"ERROR","timeUnixNano":"1000000000"}]}]}]}`
+	e.handleOTLPLogs(httptest.NewRecorder(), httptest.NewRequest("POST", "/v1/logs", strings.NewReader(body)))
+	if got := counter.Total("shop/Deployment/api"); got != 2 {
+		t.Fatalf("error records of shop/Deployment/api = %d, want 2", got)
 	}
 }

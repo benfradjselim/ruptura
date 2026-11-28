@@ -17,6 +17,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/benfradjselim/ruptura/internal/logburst"
 	"github.com/benfradjselim/ruptura/internal/receiver"
 	"github.com/benfradjselim/ruptura/pkg/logger"
 	"github.com/benfradjselim/ruptura/pkg/models"
@@ -46,8 +47,10 @@ type Ingestor interface {
 }
 
 type Engine struct {
-	metrics    MetricStore
-	logStore   LogStoreSink
+	metrics  MetricStore
+	logStore LogStoreSink
+	// errorLogs counts error records per workload for the log burst card.
+	errorLogs  *logburst.Counter
 	spans      SpanStore
 	ingestHook func(source string) // optional; called once per ingested item
 
@@ -95,6 +98,9 @@ func (e *Engine) saveMetric(host, name string, value float64, ts time.Time) {
 
 // SetLogStore wires a durable storage backend for OTLP log persistence.
 func (e *Engine) SetLogStore(s LogStoreSink) { e.logStore = s }
+
+// SetErrorLogCounter counts error log records per workload in c.
+func (e *Engine) SetErrorLogCounter(c *logburst.Counter) { e.errorLogs = c }
 
 // SetIngestHook registers a callback invoked once per ingested log or trace item.
 // Used to forward counts to the telemetry registry for Prometheus export.
@@ -532,6 +538,9 @@ func (e *Engine) ingestLogs(req models.OTLPLogsRequest) {
 					_ = e.logStore.SaveLog(service, entry, ts)
 				}
 
+				if e.errorLogs != nil && !ref.IsEmpty() && logburst.IsError(lr.SeverityNumber, lr.SeverityText) {
+					e.errorLogs.Add(ref.Key(), ts)
+				}
 				atomic.AddInt64(&e.logsCount, 1)
 				if e.ingestHook != nil {
 					e.ingestHook("logs")

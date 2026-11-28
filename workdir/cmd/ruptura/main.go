@@ -27,6 +27,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/eventbus"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/internal/ingest"
+	"github.com/benfradjselim/ruptura/internal/logburst"
 	"github.com/benfradjselim/ruptura/internal/namespaces"
 	"github.com/benfradjselim/ruptura/internal/sim"
 	"github.com/benfradjselim/ruptura/internal/sources"
@@ -140,6 +141,8 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	// OTLP and Prometheus remote write: metrics, logs and spans are stored.
 	ingestEngine := ingest.New(store, store)
 	ingestEngine.SetLogStore(store)
+	errorLogs := logburst.New()
+	ingestEngine.SetErrorLogCounter(errorLogs)
 
 	var inf *discovery.Informer
 	if disc, err := discovery.NewInformer(); err == nil {
@@ -161,7 +164,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if coCol, err := co.New(); err == nil {
 		infraRegistry.Add(coCol)
 	}
-	readers := map[string]objectSource{}
+	readers := map[string]objectSource{"logs": logReadings(errorLogs)}
 	if mcpCol, err := mcp.New(); err == nil {
 		infraRegistry.Add(mcpCol)
 		readers["machineconfigpools"] = poolReadings(mcpCol)

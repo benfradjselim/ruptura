@@ -10,6 +10,7 @@ import (
 	"github.com/benfradjselim/ruptura/internal/callgraph"
 	"github.com/benfradjselim/ruptura/internal/collector/infra/mcp"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
+	"github.com/benfradjselim/ruptura/internal/logburst"
 	"github.com/benfradjselim/ruptura/internal/sources"
 	"github.com/benfradjselim/ruptura/pkg/outage"
 )
@@ -267,6 +268,19 @@ func edgeReadings(graph func() callgraph.Graph) objectSource {
 				continue
 			}
 			out = append(out, objectReading{Target: e.From + " -> " + e.To, Value: *e.ErrorRatio})
+		}
+		return out
+	}
+}
+
+// logReadings reads the error log rate of each workload as a multiple of its
+// usual rate.
+func logReadings(c *logburst.Counter) objectSource {
+	return func() []objectReading {
+		bursts := c.Readings(time.Now())
+		out := make([]objectReading, 0, len(bursts))
+		for _, b := range bursts {
+			out = append(out, objectReading{Target: b.Workload, Value: b.Ratio})
 		}
 		return out
 	}

@@ -590,3 +590,16 @@ cards:
     profile: minimal
     evidence: Over 5% of the calls from this workload to its dependency fail, measured from traces
     action: Check the called workload and the network path between them; the caller's requests fail with it
+  - id: log-exception-burst
+    failureMode: log_exception_burst
+    level: workload
+    kind: detected
+    target: [workload]
+    source: logs
+    above: 5
+    raiseAfter: 0s
+    clearAfter: 10m
+    severity: warning
+    profile: minimal
+    evidence: This workload logs errors at over 5 times its usual rate (at least 10 a minute), from OTLP logs
+    action: Read the new error messages of this workload; a burst usually comes just before or with a failure
