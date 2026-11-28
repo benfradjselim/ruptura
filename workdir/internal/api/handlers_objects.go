@@ -8,7 +8,14 @@ import (
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 )
 
-const failureLevelNode = "node"
+const (
+	failureLevelNode    = "node"
+	failureLevelCluster = "cluster"
+)
+
+// clusterWide reports whether a finding belongs to no namespace: a node, or a
+// cluster component such as etcd, the API server or a cluster operator.
+func clusterWide(level string) bool { return level == failureLevelNode || level == failureLevelCluster }
 
 // ObjectFindings reports failures of objects read from catalog cards.
 type ObjectFindings interface {
@@ -28,16 +35,16 @@ func (h *Handlers) SetObjectFindings(findings ObjectFindings, cards map[string]C
 	h.objectFindings, h.cardInfo = findings, cards
 }
 
-// objectFailures returns the card findings this instance may show. Node
-// findings belong to no namespace, so an instance limited to some namespaces
-// does not show them.
+// objectFailures returns the card findings this instance may show. Node and
+// cluster findings belong to no namespace, so an instance limited to some
+// namespaces does not show them.
 func (h *Handlers) objectFailures(now time.Time) []*FailureResult {
 	if h.objectFindings == nil {
 		return nil
 	}
 	var out []*FailureResult
 	for _, finding := range h.objectFindings.Findings(now) {
-		if finding.Level == failureLevelNode {
+		if clusterWide(finding.Level) {
 			if len(h.namespaceSelector) > 0 {
 				continue
 			}
@@ -61,7 +68,7 @@ func objectResult(f failuremodes.ObjectFinding, info CardInfo) *FailureResult {
 		RecommendedAction: info.Action,
 		Evidence:          []string{objectEvidence(f, info)},
 	}
-	if f.Level != failureLevelNode {
+	if !clusterWide(f.Level) {
 		result.Workload = f.Target
 	}
 	if !f.Predicted {

@@ -49,8 +49,11 @@ func runCard(card sources.Card, steps int, usage func(i int) float64, capacity, 
 	return objects.Findings(now)
 }
 
-func TestCatalogCardsBatchNode(t *testing.T) {
-	predicted := []string{"inode-exhaustion", "too-many-pods", "conntrack-table-full", "node-capacity-cpu", "node-capacity-memory"}
+// TestCatalogCardsFire runs the coverage 67 cards, batch 1 (node) and batch 2
+// (cluster), on a failing and a healthy object.
+func TestCatalogCardsFire(t *testing.T) {
+	predicted := []string{"inode-exhaustion", "too-many-pods", "conntrack-table-full", "node-capacity-cpu", "node-capacity-memory",
+		"etcd-database-quota"}
 	for _, id := range predicted {
 		t.Run(id, func(t *testing.T) {
 			card := catalogCard(t, id)
@@ -67,7 +70,9 @@ func TestCatalogCardsBatchNode(t *testing.T) {
 			}
 		})
 	}
-	detected := []string{"clock-not-synchronised", "node-readiness-flapping", "tcp-retransmits"}
+	detected := []string{"clock-not-synchronised", "node-readiness-flapping", "tcp-retransmits",
+		"webhook-failing", "apiserver-errors-latency", "etcd-slow-disk", "etcd-member-down", "cluster-operator-degraded",
+		"cluster-operator-down", "operator-install-failed", "monitoring-target-down", "dns-resolution-failures"}
 	for _, id := range detected {
 		t.Run(id, func(t *testing.T) {
 			card := catalogCard(t, id)

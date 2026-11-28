@@ -231,3 +231,133 @@ cards:
     profile: standard
     evidence: Over 1% of TCP segments sent by this node are retransmissions, reported by node-exporter
     action: Check the node's interfaces for errors and drops, and the network path to its peers
+  - id: webhook-failing
+    failureMode: webhook_failing
+    level: cluster
+    kind: detected
+    target: [name]
+    value: 'clamp_max(((sum by (name) (rate(apiserver_admission_webhook_request_total{rejected="true",code!~"2..|4.."}[5m])) or sum by (name) (rate(apiserver_admission_webhook_request_total[5m])) * 0) > bool 0) + (histogram_quantile(0.99, sum by (name,le) (rate(apiserver_admission_webhook_admission_duration_seconds_bucket[5m]))) > bool 2), 1)'
+    sampled: 'max by (name) (timestamp(apiserver_admission_webhook_admission_duration_seconds_count))'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: critical
+    profile: minimal
+    evidence: The API server reports calls to this admission webhook failing, or a 99th percentile over 2 s
+    action: Check the pods and the Service behind this webhook; while it fails, object changes it covers are refused or slowed
+  - id: apiserver-errors-latency
+    failureMode: apiserver_errors_latency
+    level: cluster
+    kind: detected
+    target: [apiserver]
+    value: 'clamp_max((sum by (apiserver) (rate(apiserver_request_total{code=~"5.."}[5m])) / sum by (apiserver) (rate(apiserver_request_total[5m])) > bool 0.05) + (histogram_quantile(0.99, sum by (apiserver,le) (rate(apiserver_request_duration_seconds_bucket{verb!~"WATCH|CONNECT"}[5m]))) > bool 1), 1)'
+    sampled: 'max by (apiserver) (timestamp(apiserver_request_total))'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: critical
+    profile: minimal
+    evidence: Over 5% of API requests return 5xx, or the 99th percentile of non-watch requests is over 1 s
+    action: Check etcd latency and the API server logs, and look for a client flooding the API
+  - id: etcd-database-quota
+    failureMode: etcd_database_quota
+    level: cluster
+    kind: predicted
+    target: [pod]
+    usage: 'max by (pod) (etcd_mvcc_db_total_size_in_bytes)'
+    capacity: 'max by (pod) (etcd_server_quota_backend_bytes)'
+    sampled: 'max by (pod) (timestamp(etcd_mvcc_db_total_size_in_bytes))'
+    horizon: 24h
+    severity: critical
+    profile: minimal
+    unit: bytes
+    action: Compact and defragment etcd, or find the objects that grow, before etcd turns read-only
+  - id: etcd-slow-disk
+    failureMode: etcd_slow_disk
+    level: cluster
+    kind: detected
+    target: [pod]
+    value: 'clamp_max((histogram_quantile(0.99, sum by (pod,le) (rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m]))) > bool 0.5) + (histogram_quantile(0.99, sum by (pod,le) (rate(etcd_disk_backend_commit_duration_seconds_bucket[5m]))) > bool 0.25), 1)'
+    sampled: 'max by (pod) (timestamp(etcd_disk_wal_fsync_duration_seconds_count))'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    evidence: etcd WAL fsync 99th percentile over 0.5 s, or backend commit over 0.25 s
+    action: Move etcd to faster disks or find what shares its disk; slow commits slow the whole cluster
+  - id: etcd-member-down
+    failureMode: etcd_member_down
+    level: cluster
+    kind: detected
+    target: [pod]
+    value: 'max by (pod) ((etcd_server_has_leader == bool 0) or (up{job="etcd"} == bool 0))'
+    sampled: 'max by (pod) (timestamp(etcd_server_has_leader))'
+    raiseAfter: 3m
+    clearAfter: 2m
+    severity: critical
+    profile: minimal
+    evidence: This etcd member has no leader, or its metrics target is down
+    action: Restore this etcd member; one more loss can cost the cluster its quorum
+  - id: cluster-operator-degraded
+    failureMode: cluster_operator_degraded
+    level: cluster
+    kind: detected
+    target: [name]
+    value: 'max by (name) (cluster_operator_conditions{condition="Degraded"})'
+    sampled: 'max by (name) (timestamp(cluster_operator_conditions{condition="Degraded"}))'
+    raiseAfter: 30m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    evidence: The cluster version operator reports this ClusterOperator Degraded
+    action: Read the conditions of this ClusterOperator (oc get co) and the logs of its operator
+  - id: cluster-operator-down
+    failureMode: cluster_operator_degraded
+    level: cluster
+    kind: detected
+    target: [name]
+    value: 'max by (name) (cluster_operator_conditions{condition="Available"} == bool 0)'
+    sampled: 'max by (name) (timestamp(cluster_operator_conditions{condition="Available"}))'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: critical
+    profile: minimal
+    evidence: The cluster version operator reports this ClusterOperator not Available
+    action: Read the conditions of this ClusterOperator (oc get co); the component it manages is not available
+  - id: operator-install-failed
+    failureMode: operator_install_failed
+    level: cluster
+    kind: detected
+    target: [exported_namespace, name]
+    value: 'max by (exported_namespace,name) (csv_succeeded == bool 0)'
+    sampled: 'max by (exported_namespace,name) (timestamp(csv_succeeded))'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    evidence: OLM reports this ClusterServiceVersion not Succeeded
+    action: Read the status of this ClusterServiceVersion and its InstallPlan, then fix or roll back the operator
+  - id: monitoring-target-down
+    failureMode: monitoring_target_down
+    level: cluster
+    kind: detected
+    target: [namespace, job, instance]
+    value: 'max by (namespace,job,instance) (up == bool 0)'
+    sampled: 'max by (namespace,job,instance) (timestamp(up))'
+    raiseAfter: 15m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    evidence: Prometheus cannot scrape this target
+    action: Check the pod and the endpoint behind this target; while it is down its failures go unseen
+  - id: dns-resolution-failures
+    failureMode: dns_resolution_failures
+    level: cluster
+    kind: detected
+    target: [namespace]
+    value: '(sum by (namespace) (rate(coredns_dns_responses_total{rcode="SERVFAIL"}[5m])) / sum by (namespace) (rate(coredns_dns_responses_total[5m])) > bool 0.03) * (sum by (namespace) (rate(coredns_dns_responses_total[5m])) > bool 1)'
+    sampled: 'max by (namespace) (timestamp(coredns_dns_responses_total))'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    evidence: Over 3% of DNS answers are SERVFAIL
+    action: Check the CoreDNS pods and their upstream resolvers; lookups that fail break calls between services

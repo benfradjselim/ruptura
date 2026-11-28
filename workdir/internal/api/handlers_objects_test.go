@@ -73,18 +73,25 @@ func TestObjectFailuresScope(t *testing.T) {
 		{Level: "node", Target: "n1/Ready", Estimate: failuremodes.Estimate{Mode: "node_not_ready"}},
 		{Level: "namespace", Target: "shop/q/pods", Predicted: true, Estimate: failuremodes.Estimate{Mode: "quota_exhaustion", ETF: time.Hour}},
 		{Level: "workload", Target: "other/pdb", Estimate: failuremodes.Estimate{Mode: "pdb_blocks_drain"}},
+		{Level: "cluster", Target: "shop", Estimate: failuremodes.Estimate{Mode: "cluster_operator_degraded"}},
 	}
 	h := &Handlers{}
 	if got := h.objectFailures(time.Now()); got != nil {
 		t.Fatalf("without findings source = %v", got)
 	}
 	h.SetObjectFindings(findings, nil)
-	if got := len(h.objectFailures(time.Now())); got != 3 {
-		t.Fatalf("cluster-wide instance sees %d, want 3", got)
+	all := h.objectFailures(time.Now())
+	if len(all) != 4 {
+		t.Fatalf("cluster-wide instance sees %d, want 4", len(all))
+	}
+	for _, f := range all {
+		if (f.Level == "cluster" || f.Level == "node") && f.Workload != "" {
+			t.Fatalf("%s finding names workload %q", f.Level, f.Workload)
+		}
 	}
 	h.SetNamespaceSelector(map[string]string{"team": "shop"}, labelSource{"shop": {"team": "shop"}, "other": {"team": "x"}})
 	got := h.objectFailures(time.Now())
 	if len(got) != 1 || got[0].Target != "shop/q/pods" {
-		t.Fatalf("namespace-limited instance sees %+v, want only the shop quota", got)
+		t.Fatalf("namespace-limited instance sees %+v, want only the shop quota, not the cluster operator named shop", got)
 	}
 }

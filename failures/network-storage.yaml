@@ -44,7 +44,7 @@
   propagates_to: [every workload that resolves names]
   action: Check CoreDNS pods, their limits and upstream resolvers
   sources: [CoreDNS CoreDNSErrorsHigh]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: dns_resolution_failures}
 
 - id: tcp-retransmits
   title: Network retransmits rise
