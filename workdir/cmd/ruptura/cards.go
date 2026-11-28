@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"math"
 	"strings"
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/api"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/mcp"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/internal/sources"
 	"github.com/benfradjselim/ruptura/pkg/outage"
@@ -24,12 +26,17 @@ type vectorSource interface {
 func pollCards(ctx context.Context, source vectorSource, cards []sources.Card, objects *failuremodes.Objects, now time.Time) {
 	failed := false
 	for _, card := range cards {
+		if card.Source != "" {
+			continue
+		}
 		var err error
 		switch card.Kind {
 		case sources.CardPredicted:
 			err = pollPredictedCard(ctx, source, card, objects, now)
 		case sources.CardDetected:
 			err = pollDetectedCard(ctx, source, card, objects, now)
+		case sources.CardDeadline:
+			err = pollDeadlineCard(ctx, source, card, objects, now)
 		}
 		if err != nil {
 			cardsOutage.Failed("card "+card.ID, err)
@@ -104,6 +111,56 @@ func pollDetectedCard(ctx context.Context, source vectorSource, card sources.Car
 	return nil
 }
 
+func pollDeadlineCard(ctx context.Context, source vectorSource, card sources.Card, objects *failuremodes.Objects, now time.Time) error {
+	values, err := source.QueryVector(ctx, card.Value)
+	if err != nil {
+		return err
+	}
+	sampled, err := sampleTimes(ctx, source, card)
+	if err != nil {
+		return err
+	}
+	for _, series := range values {
+		target, ok := cardTarget(card, series.Labels)
+		if !ok || math.IsNaN(series.Value) {
+			continue
+		}
+		at, dated := sampleOf(card, sampled, target)
+		if !dated {
+			objects.Seen(card.ID, target, now)
+			continue
+		}
+		objects.ObserveDeadline(card.ID, card.Level, target, failuremodes.Mode(card.FailureMode), card.Horizon, now, at, series.Value)
+	}
+	return nil
+}
+
+// objectReading is one object's value read from the Kubernetes API, 1 while
+// the failure holds and 0 otherwise.
+type objectReading struct {
+	Target string
+	Value  float64
+}
+
+// objectSource returns the current readings of a Kubernetes API reader.
+type objectSource func() []objectReading
+
+// pollSourceCards feeds the detected cards whose value comes from a
+// Kubernetes API reader instead of Prometheus. A card whose reader is absent,
+// such as machineconfigpools outside OpenShift, reports nothing.
+func pollSourceCards(cards []sources.Card, readers map[string]objectSource, objects *failuremodes.Objects, now time.Time) {
+	for _, card := range cards {
+		read, ok := readers[card.Source]
+		if card.Source == "" || !ok {
+			continue
+		}
+		for _, r := range read() {
+			objects.ObserveDetected(card.ID, card.Level, r.Target, failuremodes.Mode(card.FailureMode), card.RaiseAfter, card.ClearAfter, now, time.Time{}, r.Value)
+		}
+		objects.Polled(card.ID, now)
+	}
+}
+
 // sampleOf returns the sample time of target, zero for a card without a
 // Sampled query, and false when the card has one but it missed this target: that
 // reading is not dated by the poll, which would be later than its sample.
@@ -166,7 +223,24 @@ func cardInfo() map[string]api.CardInfo {
 	}
 	info := make(map[string]api.CardInfo, len(catalog.Cards))
 	for _, card := range catalog.Cards {
-		info[card.ID] = api.CardInfo{Action: card.Action, Severity: card.Severity}
+		info[card.ID] = api.CardInfo{Action: card.Action, Severity: card.Severity, Evidence: card.Evidence}
 	}
 	return info
+}
+
+// poolReadings reads the MachineConfigPools of an OpenShift cluster: 1 for a
+// degraded pool.
+func poolReadings(c *mcp.Collector) objectSource {
+	return func() []objectReading {
+		pools := c.Pools()
+		out := make([]objectReading, 0, len(pools))
+		for _, p := range pools {
+			value := 0.0
+			if p.Degraded {
+				value = 1
+			}
+			out = append(out, objectReading{Target: p.Name, Value: value})
+		}
+		return out
+	}
 }

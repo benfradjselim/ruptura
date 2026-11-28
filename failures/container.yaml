@@ -124,7 +124,7 @@
   propagates_to: [callers of the workload]
   action: Relax the probe timeout or fix the slowness it measures
   sources: [Kubernetes event reason Unhealthy]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: liveness_probe_restarts}
 
 - id: readiness-probe-failing
   title: Pod running but never ready
@@ -140,7 +140,7 @@
   propagates_to: [workload replicas, rollout]
   action: Check what the probe tests, often a dependency or a slow start
   sources: [kubernetes-mixin KubePodNotReady]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: readiness_probe_failing}
 
 - id: config-error-at-start
   title: Container cannot start because of its configuration
@@ -156,7 +156,7 @@
   propagates_to: [callers of the workload]
   action: Create the missing ConfigMap or Secret, or fix the reference
   sources: [kubernetes-mixin KubeContainerWaiting, Kubernetes waiting reason CreateContainerConfigError]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: config_error_at_start}
 
 - id: init-container-failing
   title: Init container keeps failing
@@ -172,7 +172,7 @@
   propagates_to: [callers of the workload]
   action: Read the init container logs, often a dependency that is not reachable
   sources: [Kubernetes pod phase Pending with init containers]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: init_container_failing}
 
 - id: pid-exhaustion
   title: Container runs out of process IDs

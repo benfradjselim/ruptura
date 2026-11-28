@@ -28,7 +28,27 @@ type mcpItem struct {
 		DegradedMachineCount    int `json:"degradedMachineCount"`
 		UnavailableMachineCount int `json:"unavailableMachineCount"`
 		UpdatedMachineCount     int `json:"updatedMachineCount"`
+		Conditions              []struct {
+			Type   string `json:"type"`
+			Status string `json:"status"`
+		} `json:"conditions"`
 	} `json:"status"`
+}
+
+// Pool is the state of one MachineConfigPool for the failure cards.
+type Pool struct {
+	Name     string
+	Degraded bool
+}
+
+// degraded reports whether the pool says Degraded or counts a degraded machine.
+func (item *mcpItem) degraded() bool {
+	for _, c := range item.Status.Conditions {
+		if c.Type == "Degraded" && c.Status == "True" {
+			return true
+		}
+	}
+	return item.Status.DegradedMachineCount > 0
 }
 
 // Collector watches OpenShift MachineConfigPool objects and emits GroupControlPlane signals.
@@ -38,6 +58,7 @@ type Collector struct {
 	httpClient *http.Client
 	mu         sync.RWMutex
 	signals    map[string]infra.InfraSignal
+	pools      map[string]Pool
 }
 
 // New creates a Collector using in-cluster ServiceAccount credentials.
@@ -51,6 +72,7 @@ func New() (*Collector, error) {
 		token:      token,
 		httpClient: client,
 		signals:    make(map[string]infra.InfraSignal),
+		pools:      make(map[string]Pool),
 	}, nil
 }
 
@@ -120,6 +142,17 @@ func (c *Collector) Signals() []infra.InfraSignal {
 	out := make([]infra.InfraSignal, 0, len(c.signals))
 	for _, s := range c.signals {
 		out = append(out, s)
+	}
+	return out
+}
+
+// Pools returns a concurrent-safe snapshot of every MachineConfigPool.
+func (c *Collector) Pools() []Pool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make([]Pool, 0, len(c.pools))
+	for _, p := range c.pools {
+		out = append(out, p)
 	}
 	return out
 }
@@ -232,6 +265,7 @@ func (c *Collector) upsert(item *mcpItem) {
 	sig := mcpSignal(obj, item)
 	c.mu.Lock()
 	c.signals[obj.Key()] = sig
+	c.pools[item.Metadata.Name] = Pool{Name: item.Metadata.Name, Degraded: item.degraded()}
 	c.mu.Unlock()
 }
 
@@ -244,6 +278,7 @@ func (c *Collector) remove(name string) {
 	}
 	c.mu.Lock()
 	delete(c.signals, obj.Key())
+	delete(c.pools, name)
 	c.mu.Unlock()
 }
 

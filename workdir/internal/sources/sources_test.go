@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func vec(rows ...string) string {
@@ -229,6 +230,9 @@ func TestCatalogValidateRejects(t *testing.T) {
 		{"no target", []Card{{ID: "a", Level: "node", Kind: CardDetected, FailureMode: "m", Value: "q"}}},
 		{"predicted without horizon", []Card{{ID: "a", Level: "node", Kind: CardPredicted, FailureMode: "m", Target: []string{"n"}, Usage: "u", Capacity: "c"}}},
 		{"detected without value", []Card{{ID: "a", Level: "node", Kind: CardDetected, FailureMode: "m", Target: []string{"n"}}}},
+		{"deadline without horizon", []Card{{ID: "a", Level: "node", Kind: CardDeadline, FailureMode: "m", Target: []string{"n"}, Value: "q"}}},
+		{"deadline without value", []Card{{ID: "a", Level: "node", Kind: CardDeadline, FailureMode: "m", Target: []string{"n"}, Horizon: time.Hour}}},
+		{"detected with value and source", []Card{{ID: "a", Level: "cluster", Kind: CardDetected, FailureMode: "m", Target: []string{"n"}, Value: "q", Source: "machineconfigpools"}}},
 		{"unknown kind", []Card{{ID: "a", Level: "node", Kind: "maybe", FailureMode: "m", Target: []string{"n"}}}},
 	}
 	for _, tt := range tests {

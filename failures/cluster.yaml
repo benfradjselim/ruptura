@@ -44,7 +44,7 @@
   propagates_to: [every write through the webhook]
   action: Fix the webhook service or set its failure policy
   sources: [Kubernetes admission webhooks]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: webhook_failing}
 
 - id: apiserver-errors-latency
   title: API server errors or slow requests
@@ -60,7 +60,7 @@
   propagates_to: [every controller and operator]
   action: Find the noisy client or the slow etcd
   sources: [kubernetes-mixin KubeAPIErrorBudgetBurn]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: apiserver_errors_latency}
 
 - id: etcd-database-quota
   title: etcd database reaches its quota
@@ -76,7 +76,7 @@
   propagates_to: [the whole cluster]
   action: Compact and defragment, find what stores too many objects
   sources: [etcd-mixin etcdDatabaseQuotaLowSpace]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: etcd_database_quota}
 
 - id: etcd-slow-disk
   title: etcd disk too slow
@@ -92,7 +92,7 @@
   propagates_to: [the whole cluster]
   action: Move etcd to faster disks or reduce load
   sources: [etcd-mixin etcdHighFsyncDurations, etcd-mixin etcdHighCommitDurations]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: etcd_slow_disk}
 
 - id: etcd-member-down
   title: etcd member down
@@ -108,7 +108,7 @@
   propagates_to: [the whole cluster]
   action: Restore the member before any other maintenance
   sources: [etcd-mixin etcdMembersDown, etcd-mixin etcdInsufficientMembers]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: etcd_member_down}
 
 - id: certificate-expiry
   title: TLS certificate expires
@@ -124,7 +124,7 @@
   propagates_to: [every client of the certificate]
   action: Renew the certificate and check its automation
   sources: [kubernetes-mixin KubeClientCertificateExpiration, kubernetes-mixin KubeletClientCertificateExpiration]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: certificate_expiry}
 
 - id: cluster-operator-degraded
   title: OpenShift cluster operator degraded
@@ -140,7 +140,7 @@
   propagates_to: [workloads using that platform function]
   action: Read the operator's condition message and its pods
   sources: [OpenShift ClusterOperatorDegraded, OpenShift ClusterOperatorDown]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: cluster_operator_degraded}
 
 - id: machine-config-pool-degraded
   title: Machine config pool degraded
@@ -156,7 +156,7 @@
   propagates_to: [nodes of the pool]
   action: Check the machine config daemon on the stuck node
   sources: [OpenShift MachineConfigPool]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: machine_config_pool_degraded}
 
 - id: operator-install-failed
   title: OLM operator install fails
@@ -172,7 +172,7 @@
   propagates_to: [workloads managed by the operator]
   action: Read the CSV condition and the install plan
   sources: [Operator Lifecycle Manager ClusterServiceVersion]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: operator_install_failed}
 
 - id: monitoring-target-down
   title: Metrics target down
@@ -188,7 +188,7 @@
   propagates_to: [alerts and forecasts on that target]
   action: Fix the target or its ServiceMonitor
   sources: [kube-prometheus TargetDown]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: monitoring_target_down}
 
 - id: dependency-failure-cascade
   title: A failing dependency takes its callers down

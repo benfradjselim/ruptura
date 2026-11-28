@@ -28,7 +28,7 @@
   propagates_to: [every pod of the node]
   action: Check the network and the kubelet of the node
   sources: [kubernetes-mixin KubeNodeReadinessFlapping]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: node_readiness_flapping}
 
 - id: node-memory-pressure
   title: Node under memory pressure
@@ -124,7 +124,7 @@
   propagates_to: [every pod of the node]
   action: Remove the many small files, often logs or caches
   sources: [node-exporter NodeFilesystemFilesFillingUp, node-exporter NodeFilesystemAlmostOutOfFiles]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: inode_exhaustion}
 
 - id: too-many-pods
   title: Kubelet at its pod limit
@@ -140,7 +140,7 @@
   propagates_to: [scheduling of new pods]
   action: Add nodes or raise maxPods
   sources: [kubernetes-mixin KubeletTooManyPods]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: too_many_pods}
 
 - id: clock-not-synchronised
   title: Node clock drifts
@@ -156,7 +156,7 @@
   propagates_to: [every pod of the node, etcd]
   action: Fix time synchronisation on the node
   sources: [node-exporter NodeClockNotSynchronising, node-exporter NodeClockSkewDetected]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: clock_not_synchronised}
 
 - id: conntrack-table-full
   title: Connection tracking table full
@@ -172,7 +172,7 @@
   propagates_to: [every pod of the node]
   action: Raise the conntrack limit or reduce connection churn
   sources: [node-exporter NodeHighNumberConntrackEntriesUsed]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: conntrack_table_full}
 
 - id: node-capacity-exhausted
   title: Requests outgrow node allocatable
@@ -188,4 +188,4 @@
   propagates_to: [scheduling of new pods]
   action: Add nodes or right-size requests
   sources: [kubernetes-mixin KubeCPUOvercommit, kubernetes-mixin KubeMemoryOvercommit]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: node_capacity_exhausted}

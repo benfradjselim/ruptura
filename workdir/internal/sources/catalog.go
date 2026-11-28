@@ -40,11 +40,14 @@ type Role struct {
 const (
 	CardPredicted = "predicted"
 	CardDetected  = "detected"
+	// CardDeadline is a failure at a known time: Value returns the seconds
+	// left, such as a certificate's remaining validity.
+	CardDeadline = "deadline"
 )
 
 // Card is one failure of the catalog that the engine reads as data: a trend
-// toward a capacity (predicted) or a query that returns 1 while the failure
-// holds (detected).
+// toward a capacity (predicted), a query that returns 1 while the failure
+// holds (detected), or the seconds left before a known time (deadline).
 type Card struct {
 	ID          string   `yaml:"id"`
 	FailureMode string   `yaml:"failureMode"`
@@ -69,6 +72,11 @@ type Card struct {
 	Profile    string            `yaml:"profile"`
 	Action     string            `yaml:"action"`
 	Unit       string            `yaml:"unit"`
+	// Source, when set, names a Kubernetes API reader that gives a detected
+	// card its value in place of a PromQL query, such as machineconfigpools.
+	Source string `yaml:"source"`
+	// Evidence, when set, states the reading behind a detected finding.
+	Evidence string `yaml:"evidence"`
 }
 
 // Catalog is the set of known signals, roles and failure cards.
@@ -95,8 +103,12 @@ func (c Catalog) Validate() error {
 				return fmt.Errorf("sources: card %q: predicted needs usage, capacity and horizon", card.ID)
 			}
 		case CardDetected:
-			if card.Value == "" {
-				return fmt.Errorf("sources: card %q: detected needs value", card.ID)
+			if (card.Value == "") == (card.Source == "") {
+				return fmt.Errorf("sources: card %q: detected needs a value or a source", card.ID)
+			}
+		case CardDeadline:
+			if card.Value == "" || card.Horizon <= 0 {
+				return fmt.Errorf("sources: card %q: deadline needs value and horizon", card.ID)
 			}
 		default:
 			return fmt.Errorf("sources: card %q: unknown kind %q", card.ID, card.Kind)

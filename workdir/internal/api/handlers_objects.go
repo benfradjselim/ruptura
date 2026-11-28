@@ -8,7 +8,14 @@ import (
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 )
 
-const failureLevelNode = "node"
+const (
+	failureLevelNode    = "node"
+	failureLevelCluster = "cluster"
+)
+
+// clusterWide reports whether a finding belongs to no namespace: a node, or a
+// cluster component such as etcd, the API server or a cluster operator.
+func clusterWide(level string) bool { return level == failureLevelNode || level == failureLevelCluster }
 
 // ObjectFindings reports failures of objects read from catalog cards.
 type ObjectFindings interface {
@@ -19,6 +26,8 @@ type ObjectFindings interface {
 type CardInfo struct {
 	Action   string
 	Severity string
+	// Evidence states the reading behind a detected finding; empty keeps the default.
+	Evidence string
 }
 
 // SetObjectFindings adds the findings of catalog cards to the failure list.
@@ -26,16 +35,16 @@ func (h *Handlers) SetObjectFindings(findings ObjectFindings, cards map[string]C
 	h.objectFindings, h.cardInfo = findings, cards
 }
 
-// objectFailures returns the card findings this instance may show. Node
-// findings belong to no namespace, so an instance limited to some namespaces
-// does not show them.
+// objectFailures returns the card findings this instance may show. Node and
+// cluster findings belong to no namespace, so an instance limited to some
+// namespaces does not show them.
 func (h *Handlers) objectFailures(now time.Time) []*FailureResult {
 	if h.objectFindings == nil {
 		return nil
 	}
 	var out []*FailureResult
 	for _, finding := range h.objectFindings.Findings(now) {
-		if finding.Level == failureLevelNode {
+		if clusterWide(finding.Level) {
 			if len(h.namespaceSelector) > 0 {
 				continue
 			}
@@ -57,9 +66,9 @@ func objectResult(f failuremodes.ObjectFinding, info CardInfo) *FailureResult {
 		Kind:              failureKindDetected,
 		State:             "degraded",
 		RecommendedAction: info.Action,
-		Evidence:          []string{objectEvidence(f)},
+		Evidence:          []string{objectEvidence(f, info)},
 	}
-	if f.Level != failureLevelNode {
+	if !clusterWide(f.Level) {
 		result.Workload = f.Target
 	}
 	if !f.Predicted {
@@ -80,9 +89,15 @@ func objectResult(f failuremodes.ObjectFinding, info CardInfo) *FailureResult {
 }
 
 // objectEvidence states the reading behind a finding.
-func objectEvidence(f failuremodes.ObjectFinding) string {
+func objectEvidence(f failuremodes.ObjectFinding, info CardInfo) string {
 	if !f.Predicted {
+		if info.Evidence != "" {
+			return info.Evidence
+		}
 		return "Reported by kube-state-metrics at the last reading"
+	}
+	if f.Deadline {
+		return "Expires in " + leftText(f.Estimate.ETF)
 	}
 	percent := 0.0
 	if f.Capacity > 0 {
@@ -92,6 +107,14 @@ func objectEvidence(f failuremodes.ObjectFinding) string {
 		return fmt.Sprintf("%d MiB used of %d MiB (%.0f%%) and growing", mebibytes(f.Value), mebibytes(f.Capacity), percent)
 	}
 	return fmt.Sprintf("%s used of %s (%.0f%%) and growing", plainNumber(f.Value), plainNumber(f.Capacity), percent)
+}
+
+// leftText states a remaining time in days and hours, or hours and minutes.
+func leftText(d time.Duration) string {
+	if d >= 24*time.Hour {
+		return fmt.Sprintf("%dd %dh", int(d.Hours())/24, int(d.Hours())%24)
+	}
+	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
 }
 
 func plainNumber(v float64) string {

@@ -48,12 +48,27 @@ func TestObjectResult(t *testing.T) {
 
 func TestObjectEvidence(t *testing.T) {
 	f := failuremodes.ObjectFinding{Predicted: true, Unit: "count", Value: 45, Capacity: 60}
-	if got, want := objectEvidence(f), "45 used of 60 (75%) and growing"; got != want {
+	if got, want := objectEvidence(f, CardInfo{}), "45 used of 60 (75%) and growing"; got != want {
 		t.Fatalf("evidence = %q, want %q", got, want)
 	}
 	f = failuremodes.ObjectFinding{Predicted: true, Unit: "bytes", Value: 256 << 20, Capacity: 512 << 20}
-	if got, want := objectEvidence(f), "256 MiB used of 512 MiB (50%) and growing"; got != want {
+	if got, want := objectEvidence(f, CardInfo{}), "256 MiB used of 512 MiB (50%) and growing"; got != want {
 		t.Fatalf("evidence = %q, want %q", got, want)
+	}
+	deadline := failuremodes.ObjectFinding{Predicted: true, Deadline: true, Estimate: failuremodes.Estimate{ETF: 30*time.Hour + 15*time.Minute}}
+	if got, want := objectEvidence(deadline, CardInfo{}), "Expires in 1d 6h"; got != want {
+		t.Fatalf("deadline evidence = %q, want %q", got, want)
+	}
+	deadline.Estimate.ETF = 5*time.Hour + 20*time.Minute
+	if got, want := objectEvidence(deadline, CardInfo{}), "Expires in 5h 20m"; got != want {
+		t.Fatalf("deadline evidence = %q, want %q", got, want)
+	}
+	detected := failuremodes.ObjectFinding{Value: 1}
+	if got := objectEvidence(detected, CardInfo{}); got != "Reported by kube-state-metrics at the last reading" {
+		t.Fatalf("default detected evidence = %q", got)
+	}
+	if got, want := objectEvidence(detected, CardInfo{Evidence: "Clock offset over 50 ms"}), "Clock offset over 50 ms"; got != want {
+		t.Fatalf("card evidence = %q, want %q", got, want)
 	}
 }
 
@@ -66,18 +81,25 @@ func TestObjectFailuresScope(t *testing.T) {
 		{Level: "node", Target: "n1/Ready", Estimate: failuremodes.Estimate{Mode: "node_not_ready"}},
 		{Level: "namespace", Target: "shop/q/pods", Predicted: true, Estimate: failuremodes.Estimate{Mode: "quota_exhaustion", ETF: time.Hour}},
 		{Level: "workload", Target: "other/pdb", Estimate: failuremodes.Estimate{Mode: "pdb_blocks_drain"}},
+		{Level: "cluster", Target: "shop", Estimate: failuremodes.Estimate{Mode: "cluster_operator_degraded"}},
 	}
 	h := &Handlers{}
 	if got := h.objectFailures(time.Now()); got != nil {
 		t.Fatalf("without findings source = %v", got)
 	}
 	h.SetObjectFindings(findings, nil)
-	if got := len(h.objectFailures(time.Now())); got != 3 {
-		t.Fatalf("cluster-wide instance sees %d, want 3", got)
+	all := h.objectFailures(time.Now())
+	if len(all) != 4 {
+		t.Fatalf("cluster-wide instance sees %d, want 4", len(all))
+	}
+	for _, f := range all {
+		if (f.Level == "cluster" || f.Level == "node") && f.Workload != "" {
+			t.Fatalf("%s finding names workload %q", f.Level, f.Workload)
+		}
 	}
 	h.SetNamespaceSelector(map[string]string{"team": "shop"}, labelSource{"shop": {"team": "shop"}, "other": {"team": "x"}})
 	got := h.objectFailures(time.Now())
 	if len(got) != 1 || got[0].Target != "shop/q/pods" {
-		t.Fatalf("namespace-limited instance sees %+v, want only the shop quota", got)
+		t.Fatalf("namespace-limited instance sees %+v, want only the shop quota, not the cluster operator named shop", got)
 	}
 }
