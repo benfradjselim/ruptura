@@ -128,8 +128,8 @@ func agentDaemonSet(ns, name, image string, labels map[string]string) map[string
 							"runAsNonRoot":             false,
 							"allowPrivilegeEscalation": false,
 							"readOnlyRootFilesystem":   true,
-							"capabilities":             map[string]interface{}{"drop": []string{"ALL"}},
-							"seccompProfile":           map[string]string{"type": "RuntimeDefault"},
+							// No seccompProfile: hostmount-anyuid allows none.
+							"capabilities": map[string]interface{}{"drop": []string{"ALL"}},
 						},
 					}},
 				},
