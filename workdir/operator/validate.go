@@ -27,8 +27,8 @@ func sortedKeys(m map[string]string) []string {
 var (
 	availableScopes   = set("pod", "workload", "namespace")
 	plannedScopes     = set("container", "service", "node", "cluster", "application", "customResource")
-	availableProfiles = set("minimal", "standard")
-	plannedProfiles   = set("full", "deep")
+	availableProfiles = set("minimal", "standard", "deep")
+	plannedProfiles   = set("full")
 	deploymentModes   = set("Deployment")
 	sensitivities     = set("conservative", "balanced", "aggressive")
 	logLevels         = set("debug", "info", "warn", "error")

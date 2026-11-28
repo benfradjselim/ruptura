@@ -27,7 +27,7 @@ func TestValidateSpec(t *testing.T) {
 		}, ""},
 		{"unknown scope", RupturaInstanceSpec{Level: LevelConfig{Scope: "galaxy"}}, "level.scope"},
 		{"scope of a later version", RupturaInstanceSpec{Level: LevelConfig{Scope: "node"}}, "not available"},
-		{"deep profile of a later version", RupturaInstanceSpec{Input: InputConfig{Profile: "deep"}}, "not available"},
+		{"full profile of a later version", RupturaInstanceSpec{Input: InputConfig{Profile: "full"}}, "not available"},
 		{"unknown profile", RupturaInstanceSpec{Input: InputConfig{Profile: "max"}}, "input.profile"},
 		{"unknown deployment mode", RupturaInstanceSpec{Deployment: DeploymentConfig{Mode: "Job"}}, "deployment.mode"},
 		{"unknown sensitivity", RupturaInstanceSpec{Analysis: AnalysisConfig{Sensitivity: "high"}}, "analysis.sensitivity"},

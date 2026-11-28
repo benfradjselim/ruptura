@@ -1,0 +1,15 @@
+# Lets the node agent of the deep input profile use the OpenShift
+# hostmount-anyuid SCC: read-only host directories and root (for the
+# root-only OVN ACL audit log), no host namespaces. Bound per instance to the
+# ruptura-agent ServiceAccount only. Ignored on vanilla Kubernetes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ruptura-agent-scc
+  labels:
+    app.kubernetes.io/name: ruptura
+rules:
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    resourceNames: ["hostmount-anyuid"]
+    verbs: ["use"]

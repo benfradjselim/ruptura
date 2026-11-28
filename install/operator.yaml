@@ -471,7 +471,7 @@ rules:
     verbs: ["get", "create", "update", "patch", "delete"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterroles"]
-    resourceNames: ["cluster-monitoring-view", "ruptura-instance-reader"]
+    resourceNames: ["cluster-monitoring-view", "ruptura-instance-reader", "ruptura-agent-scc"]
     verbs: ["bind"]
   # Let instances post to the OpenShift cluster Alertmanager
   - apiGroups: ["rbac.authorization.k8s.io"]
@@ -493,9 +493,9 @@ rules:
   - apiGroups: ["ruptura.io"]
     resources: ["rupturainstances", "rupturainstances/status"]
     verbs: ["get", "list", "watch", "update", "patch"]
-  # Manage Deployments
+  # Manage Deployments, and the node agent DaemonSet of the deep profile
   - apiGroups: ["apps"]
-    resources: ["deployments"]
+    resources: ["deployments", "daemonsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Manage Services, PVCs, ServiceAccounts and the generated API key Secret
   - apiGroups: [""]
@@ -532,6 +532,22 @@ subjects:
   - kind: ServiceAccount
     name: ruptura-operator
     namespace: ruptura-system
+---
+# Lets the node agent of the deep input profile use the OpenShift
+# hostmount-anyuid SCC: read-only host directories and root (for the
+# root-only OVN ACL audit log), no host namespaces. Bound per instance to the
+# ruptura-agent ServiceAccount only. Ignored on vanilla Kubernetes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ruptura-agent-scc
+  labels:
+    app.kubernetes.io/name: ruptura
+rules:
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    resourceNames: ["hostmount-anyuid"]
+    verbs: ["use"]
 ---
 # Allow operator + instance pods to use restricted-v2 SCC on OpenShift.
 # Ignored on vanilla Kubernetes.

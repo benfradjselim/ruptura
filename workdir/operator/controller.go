@@ -97,6 +97,9 @@ func cleanup(c *k8sClient, inst RupturaInstance, isOCP bool) error {
 	if err := deleteMCP(c, ns, name); err != nil {
 		return fmt.Errorf("delete MCP server: %w", err)
 	}
+	if err := deleteAgent(c, ns, name); err != nil {
+		return fmt.Errorf("delete node agent: %w", err)
+	}
 	if err := c.delete(readerBindingPath(ns, name)); err != nil {
 		return fmt.Errorf("delete reader ClusterRoleBinding: %w", err)
 	}
@@ -229,6 +232,9 @@ func reconcile(ctx context.Context, c *k8sClient, inst RupturaInstance, isOCP bo
 	}
 	if err := reconcileMCP(c, ns, name, image, apiKeyRef, inst.Spec, labels); err != nil {
 		return fmt.Errorf("MCP server: %w", err)
+	}
+	if err := reconcileAgent(c, ns, name, image, isOCP, inst.Spec, labels); err != nil {
+		return fmt.Errorf("node agent: %w", err)
 	}
 
 	return updateStatus(c, inst, note)
