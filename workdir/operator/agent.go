@@ -104,6 +104,7 @@ func agentDaemonSet(ns, name, image string, labels map[string]string) map[string
 				"metadata": map[string]interface{}{"labels": map[string]string{appLabel: "ruptura-agent", agentLabel: name}},
 				"spec": map[string]interface{}{
 					"serviceAccountName": agentServiceAccount,
+					"volumes":            volumes,
 					// Every node, control plane and tainted nodes included.
 					"tolerations": []interface{}{map[string]interface{}{"operator": "Exists"}},
 					"containers": []interface{}{map[string]interface{}{

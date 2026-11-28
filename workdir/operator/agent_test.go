@@ -46,9 +46,17 @@ func TestReconcile_AgentWithDeepProfile(t *testing.T) {
 	if env["NODE_NAME"].(map[string]interface{})["valueFrom"] == nil {
 		t.Fatal("NODE_NAME not taken from the pod's node")
 	}
+	volumes := map[string]bool{}
+	for _, v := range pod["volumes"].([]interface{}) {
+		volumes[v.(map[string]interface{})["name"].(string)] = true
+	}
 	for _, m := range container["volumeMounts"].([]interface{}) {
-		if m.(map[string]interface{})["readOnly"] != true {
+		mount := m.(map[string]interface{})
+		if mount["readOnly"] != true {
 			t.Fatalf("host mount not read-only: %v", m)
+		}
+		if !volumes[mount["name"].(string)] {
+			t.Fatalf("mount %v has no volume in %v", mount["name"], pod["volumes"])
 		}
 	}
 	for _, path := range []string{testAgentSAPath, testAgentCRBPath, testAgentSCCPath} {
