@@ -91,7 +91,8 @@ func TestCatalogCardsFire(t *testing.T) {
 		"cluster-operator-down", "operator-install-failed", "monitoring-target-down", "dns-resolution-failures",
 		"liveness-probe-restarts", "readiness-probe-failing", "config-error-at-start", "init-container-failing",
 		"service-without-endpoints", "route-without-backend", "pvc-pending", "persistent-volume-errors",
-		"eviction-node-memory-pressure", "pod-stuck-terminating", "cronjob-not-running"}
+		"eviction-node-memory-pressure", "pod-stuck-terminating", "cronjob-not-running",
+		"network-policy-drops-cilium", "network-policy-drops-calico"}
 	for _, id := range detected {
 		t.Run(id, func(t *testing.T) {
 			card := catalogCard(t, id)

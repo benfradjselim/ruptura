@@ -76,7 +76,7 @@
   propagates_to: [callers of the blocked workload]
   action: Allow the call in the policy or revert the change
   sources: [Kubernetes NetworkPolicy]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: network_policy_blocks_traffic}
 
 - id: route-without-backend
   title: Route or Ingress has no healthy backend

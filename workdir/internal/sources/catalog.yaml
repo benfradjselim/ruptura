@@ -616,3 +616,29 @@ cards:
     profile: minimal
     evidence: This workload spends its error budget over 14 times faster than its objective allows, from failed calls measured in traces
     action: Find what fails in this workload's answers; at this rate a 30-day error budget is gone in about 2 days
+  - id: network-policy-drops-cilium
+    failureMode: network_policy_blocks_traffic
+    level: node
+    kind: detected
+    target: [instance]
+    value: 'max by (instance) (rate(cilium_drop_count_total{reason="Policy denied"}[5m])) > bool 0'
+    sampled: 'max by (instance) (timestamp(cilium_drop_count_total{reason="Policy denied"}))'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    evidence: Cilium drops packets on this node because a network policy denies them
+    action: Check the network policies changed recently and the traffic they now deny; allow it if the calls are wanted
+  - id: network-policy-drops-calico
+    failureMode: network_policy_blocks_traffic
+    level: cluster
+    kind: detected
+    target: [policy]
+    value: 'max by (policy) (rate(calico_denied_packets[5m])) > bool 0'
+    sampled: 'max by (policy) (timestamp(calico_denied_packets))'
+    raiseAfter: 10m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    evidence: Calico denies packets under this policy
+    action: Check whether this policy changed recently and the traffic it now denies; allow it if the calls are wanted
