@@ -156,7 +156,7 @@
   propagates_to: [nodes of the pool]
   action: Check the machine config daemon on the stuck node
   sources: [OpenShift MachineConfigPool]
-  ruptura: {status: not-covered}
+  ruptura: {status: implemented, mode: machine_config_pool_degraded}
 
 - id: operator-install-failed
   title: OLM operator install fails

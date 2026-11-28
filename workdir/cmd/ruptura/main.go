@@ -161,8 +161,10 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	if coCol, err := co.New(); err == nil {
 		infraRegistry.Add(coCol)
 	}
+	readers := map[string]objectSource{}
 	if mcpCol, err := mcp.New(); err == nil {
 		infraRegistry.Add(mcpCol)
+		readers["machineconfigpools"] = poolReadings(mcpCol)
 	}
 	if netCol, err := networking.New(); err == nil {
 		infraRegistry.Add(netCol)
@@ -242,7 +244,7 @@ func runWithContext(ctx context.Context, cfg Config) error {
 	}
 	limits := newCeilings(os.Getenv("RUPTURA_DEFAULT_MEMORY_LIMITS"))
 	objects := failuremodes.NewObjects()
-	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store, limits, objects)
+	tracker := startFailureModes(ctx, os.Getenv("RUPTURA_THANOS_URL"), inf, store, limits, objects, readers)
 	switch {
 	case cfg.DemoMode:
 		// --demo: synthetic failures, no cluster required.

@@ -565,3 +565,15 @@ cards:
     profile: minimal
     evidence: The kubelet failed to renew its client certificate in the last 15 minutes
     action: Look for pending CertificateSigningRequests of this node and approve or fix the approver, before the certificate expires
+  - id: machine-config-pool-degraded
+    failureMode: machine_config_pool_degraded
+    level: cluster
+    kind: detected
+    target: [name]
+    source: machineconfigpools
+    raiseAfter: 5m
+    clearAfter: 5m
+    severity: warning
+    profile: minimal
+    evidence: This MachineConfigPool reports Degraded or counts a degraded machine, read from the Kubernetes API
+    action: Read the pool conditions (oc describe mcp) and the machine-config-daemon logs of the degraded node; updates of this pool are blocked

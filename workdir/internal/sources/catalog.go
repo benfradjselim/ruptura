@@ -72,6 +72,9 @@ type Card struct {
 	Profile    string            `yaml:"profile"`
 	Action     string            `yaml:"action"`
 	Unit       string            `yaml:"unit"`
+	// Source, when set, names a Kubernetes API reader that gives a detected
+	// card its value in place of a PromQL query, such as machineconfigpools.
+	Source string `yaml:"source"`
 	// Evidence, when set, states the reading behind a detected finding.
 	Evidence string `yaml:"evidence"`
 }
@@ -100,8 +103,8 @@ func (c Catalog) Validate() error {
 				return fmt.Errorf("sources: card %q: predicted needs usage, capacity and horizon", card.ID)
 			}
 		case CardDetected:
-			if card.Value == "" {
-				return fmt.Errorf("sources: card %q: detected needs value", card.ID)
+			if (card.Value == "") == (card.Source == "") {
+				return fmt.Errorf("sources: card %q: detected needs a value or a source", card.ID)
 			}
 		case CardDeadline:
 			if card.Value == "" || card.Horizon <= 0 {

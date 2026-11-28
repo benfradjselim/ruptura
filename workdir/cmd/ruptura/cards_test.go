@@ -84,3 +84,25 @@ func TestPollCardsDatedCardMissingSampleTime(t *testing.T) {
 		t.Fatalf("findings = %+v, want only the dated object", got)
 	}
 }
+
+func TestPollSourceCards(t *testing.T) {
+	card := sources.Card{ID: "mcp", Kind: sources.CardDetected, Level: "cluster", FailureMode: "machine_config_pool_degraded",
+		Target: []string{"name"}, Source: "machineconfigpools", RaiseAfter: 5 * time.Minute}
+	absent := sources.Card{ID: "other", Kind: sources.CardDetected, Level: "cluster", FailureMode: "x", Target: []string{"name"}, Source: "missing"}
+	readers := map[string]objectSource{"machineconfigpools": func() []objectReading {
+		return []objectReading{{Target: "worker", Value: 1}, {Target: "master", Value: 0}}
+	}}
+	objects := failuremodes.NewObjects()
+	start := time.Date(2026, 11, 28, 10, 0, 0, 0, time.UTC)
+	var now time.Time
+	for i := 0; i <= 12; i++ {
+		now = start.Add(time.Duration(i) * 30 * time.Second)
+		pollSourceCards([]sources.Card{card, absent}, readers, objects, now)
+		// The Prometheus poll leaves source cards alone.
+		pollCards(context.Background(), fakeVectors{}, []sources.Card{card}, objects, now)
+	}
+	got := objects.Findings(now)
+	if len(got) != 1 || got[0].Target != "worker" || got[0].Estimate.Mode != "machine_config_pool_degraded" {
+		t.Fatalf("findings = %+v, want the degraded worker pool", got)
+	}
+}

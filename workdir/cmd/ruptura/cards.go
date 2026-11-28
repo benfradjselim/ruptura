@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/benfradjselim/ruptura/internal/api"
+	"github.com/benfradjselim/ruptura/internal/collector/infra/mcp"
 	"github.com/benfradjselim/ruptura/internal/failuremodes"
 	"github.com/benfradjselim/ruptura/internal/sources"
 	"github.com/benfradjselim/ruptura/pkg/outage"
@@ -25,6 +26,9 @@ type vectorSource interface {
 func pollCards(ctx context.Context, source vectorSource, cards []sources.Card, objects *failuremodes.Objects, now time.Time) {
 	failed := false
 	for _, card := range cards {
+		if card.Source != "" {
+			continue
+		}
 		var err error
 		switch card.Kind {
 		case sources.CardPredicted:
@@ -131,6 +135,32 @@ func pollDeadlineCard(ctx context.Context, source vectorSource, card sources.Car
 	return nil
 }
 
+// objectReading is one object's value read from the Kubernetes API, 1 while
+// the failure holds and 0 otherwise.
+type objectReading struct {
+	Target string
+	Value  float64
+}
+
+// objectSource returns the current readings of a Kubernetes API reader.
+type objectSource func() []objectReading
+
+// pollSourceCards feeds the detected cards whose value comes from a
+// Kubernetes API reader instead of Prometheus. A card whose reader is absent,
+// such as machineconfigpools outside OpenShift, reports nothing.
+func pollSourceCards(cards []sources.Card, readers map[string]objectSource, objects *failuremodes.Objects, now time.Time) {
+	for _, card := range cards {
+		read, ok := readers[card.Source]
+		if card.Source == "" || !ok {
+			continue
+		}
+		for _, r := range read() {
+			objects.ObserveDetected(card.ID, card.Level, r.Target, failuremodes.Mode(card.FailureMode), card.RaiseAfter, card.ClearAfter, now, time.Time{}, r.Value)
+		}
+		objects.Polled(card.ID, now)
+	}
+}
+
 // sampleOf returns the sample time of target, zero for a card without a
 // Sampled query, and false when the card has one but it missed this target: that
 // reading is not dated by the poll, which would be later than its sample.
@@ -196,4 +226,21 @@ func cardInfo() map[string]api.CardInfo {
 		info[card.ID] = api.CardInfo{Action: card.Action, Severity: card.Severity, Evidence: card.Evidence}
 	}
 	return info
+}
+
+// poolReadings reads the MachineConfigPools of an OpenShift cluster: 1 for a
+// degraded pool.
+func poolReadings(c *mcp.Collector) objectSource {
+	return func() []objectReading {
+		pools := c.Pools()
+		out := make([]objectReading, 0, len(pools))
+		for _, p := range pools {
+			value := 0.0
+			if p.Degraded {
+				value = 1
+			}
+			out = append(out, objectReading{Target: p.Name, Value: value})
+		}
+		return out
+	}
 }
