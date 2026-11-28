@@ -55,6 +55,14 @@ func TestObjectEvidence(t *testing.T) {
 	if got, want := objectEvidence(f, CardInfo{}), "256 MiB used of 512 MiB (50%) and growing"; got != want {
 		t.Fatalf("evidence = %q, want %q", got, want)
 	}
+	deadline := failuremodes.ObjectFinding{Predicted: true, Deadline: true, Estimate: failuremodes.Estimate{ETF: 30*time.Hour + 15*time.Minute}}
+	if got, want := objectEvidence(deadline, CardInfo{}), "Expires in 1d 6h"; got != want {
+		t.Fatalf("deadline evidence = %q, want %q", got, want)
+	}
+	deadline.Estimate.ETF = 5*time.Hour + 20*time.Minute
+	if got, want := objectEvidence(deadline, CardInfo{}), "Expires in 5h 20m"; got != want {
+		t.Fatalf("deadline evidence = %q, want %q", got, want)
+	}
 	detected := failuremodes.ObjectFinding{Value: 1}
 	if got := objectEvidence(detected, CardInfo{}); got != "Reported by kube-state-metrics at the last reading" {
 		t.Fatalf("default detected evidence = %q", got)

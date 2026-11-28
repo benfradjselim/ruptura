@@ -40,11 +40,14 @@ type Role struct {
 const (
 	CardPredicted = "predicted"
 	CardDetected  = "detected"
+	// CardDeadline is a failure at a known time: Value returns the seconds
+	// left, such as a certificate's remaining validity.
+	CardDeadline = "deadline"
 )
 
 // Card is one failure of the catalog that the engine reads as data: a trend
-// toward a capacity (predicted) or a query that returns 1 while the failure
-// holds (detected).
+// toward a capacity (predicted), a query that returns 1 while the failure
+// holds (detected), or the seconds left before a known time (deadline).
 type Card struct {
 	ID          string   `yaml:"id"`
 	FailureMode string   `yaml:"failureMode"`
@@ -99,6 +102,10 @@ func (c Catalog) Validate() error {
 		case CardDetected:
 			if card.Value == "" {
 				return fmt.Errorf("sources: card %q: detected needs value", card.ID)
+			}
+		case CardDeadline:
+			if card.Value == "" || card.Horizon <= 0 {
+				return fmt.Errorf("sources: card %q: deadline needs value and horizon", card.ID)
 			}
 		default:
 			return fmt.Errorf("sources: card %q: unknown kind %q", card.ID, card.Kind)

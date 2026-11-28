@@ -530,3 +530,38 @@ cards:
     profile: minimal
     evidence: The scheduled time of this CronJob passed over 5 minutes ago and it is not suspended
     action: Check the controller, the concurrency policy and the starting deadline of this CronJob; its scheduled run did not start
+  - id: kubelet-client-certificate
+    failureMode: certificate_expiry
+    level: node
+    kind: deadline
+    target: [node]
+    value: 'min by (node) (kubelet_certificate_manager_client_ttl_seconds)'
+    sampled: 'max by (node) (timestamp(kubelet_certificate_manager_client_ttl_seconds))'
+    horizon: 48h
+    severity: critical
+    profile: minimal
+    action: Check why the kubelet did not renew its client certificate (pending CSRs, approver); once it expires the node goes NotReady
+  - id: kubelet-server-certificate
+    failureMode: certificate_expiry
+    level: node
+    kind: deadline
+    target: [node]
+    value: 'min by (node) (kubelet_certificate_manager_server_ttl_seconds)'
+    sampled: 'max by (node) (timestamp(kubelet_certificate_manager_server_ttl_seconds))'
+    horizon: 48h
+    severity: critical
+    profile: minimal
+    action: Check why the kubelet serving certificate was not renewed (pending CSRs); once it expires logs, exec and metrics of this node fail
+  - id: kubelet-certificate-renewal-errors
+    failureMode: certificate_expiry
+    level: node
+    kind: detected
+    target: [node]
+    value: 'max by (node) (increase(kubelet_certificate_manager_client_expiration_renew_errors[15m])) > bool 0'
+    sampled: 'max by (node) (timestamp(kubelet_certificate_manager_client_expiration_renew_errors))'
+    raiseAfter: 0s
+    clearAfter: 15m
+    severity: warning
+    profile: minimal
+    evidence: The kubelet failed to renew its client certificate in the last 15 minutes
+    action: Look for pending CertificateSigningRequests of this node and approve or fix the approver, before the certificate expires

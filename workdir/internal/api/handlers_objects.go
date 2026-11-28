@@ -96,6 +96,9 @@ func objectEvidence(f failuremodes.ObjectFinding, info CardInfo) string {
 		}
 		return "Reported by kube-state-metrics at the last reading"
 	}
+	if f.Deadline {
+		return "Expires in " + leftText(f.Estimate.ETF)
+	}
 	percent := 0.0
 	if f.Capacity > 0 {
 		percent = 100 * f.Value / f.Capacity
@@ -104,6 +107,14 @@ func objectEvidence(f failuremodes.ObjectFinding, info CardInfo) string {
 		return fmt.Sprintf("%d MiB used of %d MiB (%.0f%%) and growing", mebibytes(f.Value), mebibytes(f.Capacity), percent)
 	}
 	return fmt.Sprintf("%s used of %s (%.0f%%) and growing", plainNumber(f.Value), plainNumber(f.Capacity), percent)
+}
+
+// leftText states a remaining time in days and hours, or hours and minutes.
+func leftText(d time.Duration) string {
+	if d >= 24*time.Hour {
+		return fmt.Sprintf("%dd %dh", int(d.Hours())/24, int(d.Hours())%24)
+	}
+	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
 }
 
 func plainNumber(v float64) string {

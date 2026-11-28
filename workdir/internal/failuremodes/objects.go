@@ -34,6 +34,8 @@ type ObjectFinding struct {
 	Value    float64
 	Capacity float64
 	Unit     string
+	// Deadline marks a predicted finding read from a known time, not a trend.
+	Deadline bool
 }
 
 // sampling follows when one object was read and which source sample it saw.
@@ -99,11 +101,20 @@ type objectCondition struct {
 	value    float64
 }
 
+type objectDeadline struct {
+	sampling
+	level   string
+	mode    Mode
+	horizon time.Duration
+	left    time.Duration
+}
+
 // Objects follows catalog cards per object. It is safe for concurrent use.
 type Objects struct {
 	mu         sync.Mutex
 	trends     map[string]*objectTrend
 	conditions map[string]*objectCondition
+	deadlines  map[string]*objectDeadline
 	// polled is the time of the last successful query of each card. An object
 	// missing from that poll is gone: a deleted Job, a removed node.
 	polled map[string]time.Time
@@ -115,7 +126,7 @@ type Objects struct {
 // NewObjects returns an empty object tracker.
 func NewObjects() *Objects {
 	return &Objects{trends: map[string]*objectTrend{}, conditions: map[string]*objectCondition{},
-		polled: map[string]time.Time{}, intervals: map[string]time.Duration{}}
+		deadlines: map[string]*objectDeadline{}, polled: map[string]time.Time{}, intervals: map[string]time.Duration{}}
 }
 
 func objectKey(card, target string) string { return card + "\x00" + target }
@@ -191,6 +202,25 @@ func (o *Objects) ObserveDetected(card, level, target string, mode Mode, raiseAf
 	state.estimate, state.active = state.detector.Observe(at, value)
 }
 
+// ObserveDeadline records the seconds left before a known failure time, read
+// at polled from a source sample taken at sampled, or zero for a card whose
+// readings carry no sample time. No detector is needed: the time is known.
+func (o *Objects) ObserveDeadline(card, level, target string, mode Mode, horizon time.Duration, polled, sampled time.Time, secondsLeft float64) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	key := objectKey(card, target)
+	state, ok := o.deadlines[key]
+	if !ok {
+		state = &objectDeadline{level: level, mode: mode, horizon: horizon}
+		o.deadlines[key] = state
+	}
+	if _, fresh := state.next(polled, sampled); !fresh {
+		return
+	}
+	o.noteInterval(card, state.interval)
+	state.left = time.Duration(secondsLeft * float64(time.Second))
+}
+
 // Seen keeps an object of a dated card alive when a poll returned its value
 // but not its sample time, without feeding a reading.
 func (o *Objects) Seen(card, target string, polled time.Time) {
@@ -201,6 +231,9 @@ func (o *Objects) Seen(card, target string, polled time.Time) {
 		state.last = polled
 	}
 	if state, ok := o.conditions[key]; ok {
+		state.last = polled
+	}
+	if state, ok := o.deadlines[key]; ok {
 		state.last = polled
 	}
 }
@@ -294,6 +327,16 @@ func (o *Objects) Findings(now time.Time) []ObjectFinding {
 		out = append(out, ObjectFinding{Card: card, Level: state.level, Target: target,
 			Estimate: state.estimate, Value: state.value})
 	}
+	for key, state := range o.deadlines {
+		card, target := splitObjectKey(key)
+		left := state.left
+		est := aged(Estimate{Mode: state.mode, ETF: left, ETFEarly: left, ETFLate: left, Confidence: 1}, now.Sub(state.at))
+		if o.gone(card, state.sampling, now) || est.ETF > state.horizon {
+			continue
+		}
+		out = append(out, ObjectFinding{Card: card, Level: state.level, Target: target, Predicted: true, Deadline: true,
+			Estimate: est, Value: state.left.Seconds(), Unit: "seconds"})
+	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Predicted != out[j].Predicted {
 			return !out[i].Predicted
@@ -318,6 +361,11 @@ func (o *Objects) Prune(before time.Time) {
 	for key, state := range o.conditions {
 		if state.last.Before(before) {
 			delete(o.conditions, key)
+		}
+	}
+	for key, state := range o.deadlines {
+		if state.last.Before(before) {
+			delete(o.deadlines, key)
 		}
 	}
 }

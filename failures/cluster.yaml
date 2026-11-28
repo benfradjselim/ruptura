@@ -124,7 +124,7 @@
   propagates_to: [every client of the certificate]
   action: Renew the certificate and check its automation
   sources: [kubernetes-mixin KubeClientCertificateExpiration, kubernetes-mixin KubeletClientCertificateExpiration]
-  ruptura: {status: planned}
+  ruptura: {status: implemented, mode: certificate_expiry}
 
 - id: cluster-operator-degraded
   title: OpenShift cluster operator degraded

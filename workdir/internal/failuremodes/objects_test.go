@@ -346,3 +346,30 @@ func TestStalledKeepsStepLeak(t *testing.T) {
 		}
 	}
 }
+
+func TestObjectsDeadline(t *testing.T) {
+	o := NewObjects()
+	sampled := objectsStart
+	o.ObserveDeadline("cert", "node", "n1", "certificate_expiry", 48*time.Hour, sampled.Add(10*time.Second), sampled, (30 * time.Hour).Seconds())
+	o.ObserveDeadline("cert", "node", "n2", "certificate_expiry", 48*time.Hour, sampled.Add(10*time.Second), sampled, (20 * 24 * time.Hour).Seconds())
+	o.Polled("cert", sampled.Add(10*time.Second))
+	now := sampled.Add(time.Minute)
+	got := o.Findings(now)
+	if len(got) != 1 {
+		t.Fatalf("findings = %+v, want only the certificate inside the horizon", got)
+	}
+	f := got[0]
+	if !f.Predicted || !f.Deadline || f.Target != "n1" || f.Estimate.Mode != "certificate_expiry" || f.Estimate.Confidence != 1 {
+		t.Fatalf("finding = %+v", f)
+	}
+	// Counted down by the age of the sample.
+	if want := 30*time.Hour - time.Minute; f.Estimate.ETF != want || f.Estimate.ETFEarly != want || f.Estimate.ETFLate != want {
+		t.Fatalf("ETF = %v [%v, %v], want %v", f.Estimate.ETF, f.Estimate.ETFEarly, f.Estimate.ETFLate, want)
+	}
+	// A renewed certificate leaves the horizon.
+	o.ObserveDeadline("cert", "node", "n1", "certificate_expiry", 48*time.Hour, now, now, (30 * 24 * time.Hour).Seconds())
+	o.Polled("cert", now)
+	if got := o.Findings(now); len(got) != 0 {
+		t.Fatalf("after renewal findings = %+v", got)
+	}
+}

@@ -71,7 +71,22 @@ func TestCatalogCardsFire(t *testing.T) {
 			}
 		})
 	}
-	detected := []string{"clock-not-synchronised", "node-readiness-flapping", "tcp-retransmits",
+	for _, id := range []string{"kubelet-client-certificate", "kubelet-server-certificate"} {
+		t.Run(id, func(t *testing.T) {
+			card := catalogCard(t, id)
+			if card.Kind != sources.CardDeadline {
+				t.Fatalf("kind = %q", card.Kind)
+			}
+			near := runCard(card, 3, nil, 0, (card.Horizon - time.Hour).Seconds())
+			if len(near) != 1 || !near[0].Deadline || near[0].Estimate.Mode != failuremodes.Mode(card.FailureMode) {
+				t.Fatalf("near findings = %+v", near)
+			}
+			if far := runCard(card, 3, nil, 0, (card.Horizon + time.Hour).Seconds()); len(far) != 0 {
+				t.Fatalf("far findings = %+v", far)
+			}
+		})
+	}
+	detected := []string{"clock-not-synchronised", "kubelet-certificate-renewal-errors", "node-readiness-flapping", "tcp-retransmits",
 		"webhook-failing", "apiserver-errors-latency", "etcd-slow-disk", "etcd-member-down", "cluster-operator-degraded",
 		"cluster-operator-down", "operator-install-failed", "monitoring-target-down", "dns-resolution-failures",
 		"liveness-probe-restarts", "readiness-probe-failing", "config-error-at-start", "init-container-failing",

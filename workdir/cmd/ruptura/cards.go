@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"math"
 	"strings"
 	"time"
 
@@ -30,6 +31,8 @@ func pollCards(ctx context.Context, source vectorSource, cards []sources.Card, o
 			err = pollPredictedCard(ctx, source, card, objects, now)
 		case sources.CardDetected:
 			err = pollDetectedCard(ctx, source, card, objects, now)
+		case sources.CardDeadline:
+			err = pollDeadlineCard(ctx, source, card, objects, now)
 		}
 		if err != nil {
 			cardsOutage.Failed("card "+card.ID, err)
@@ -100,6 +103,30 @@ func pollDetectedCard(ctx context.Context, source vectorSource, card sources.Car
 			continue
 		}
 		objects.ObserveDetected(card.ID, card.Level, target, mode, card.RaiseAfter, card.ClearAfter, now, at, series.Value)
+	}
+	return nil
+}
+
+func pollDeadlineCard(ctx context.Context, source vectorSource, card sources.Card, objects *failuremodes.Objects, now time.Time) error {
+	values, err := source.QueryVector(ctx, card.Value)
+	if err != nil {
+		return err
+	}
+	sampled, err := sampleTimes(ctx, source, card)
+	if err != nil {
+		return err
+	}
+	for _, series := range values {
+		target, ok := cardTarget(card, series.Labels)
+		if !ok || math.IsNaN(series.Value) {
+			continue
+		}
+		at, dated := sampleOf(card, sampled, target)
+		if !dated {
+			objects.Seen(card.ID, target, now)
+			continue
+		}
+		objects.ObserveDeadline(card.ID, card.Level, target, failuremodes.Mode(card.FailureMode), card.Horizon, now, at, series.Value)
 	}
 	return nil
 }
